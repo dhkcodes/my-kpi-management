@@ -1,0 +1,25 @@
+{
+  "name": "my-kpi-management",
+  "version": "1.0.0",
+  "description": "Oracle JET Redwood KPI operating cockpit",
+  "dependencies": {
+    "@oracle/oraclejet": "~20.1.0",
+    "@oracle/oraclejet-core-pack": "~20.1.0"
+  },
+  "devDependencies": {
+    "@oracle/ojet-cli": "~20.1.2",
+    "extract-zip": "2.0.1",
+    "fs-extra": "^8.1.0",
+    "glob": "10.4.5",
+    "typescript": "5.8.3",
+    "underscore": "^1.10.2",
+    "yargs-parser": "13.1.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "private": true,
+  "overrides": {
+    "@types/minimatch": "5.1.2"
+  }
+}
