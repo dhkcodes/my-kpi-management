@@ -301,8 +301,9 @@ body {
 .kpi-status-badge--success { background: #e5f3e7; color: #246230; }
 .kpi-status-badge--danger { background: #fde9e4; color: var(--kpi-danger); }
 .kpi-status-badge--rate-red { background: #fde9e4; color: var(--kpi-danger); }
-.kpi-status-badge--rate-orange { background: #fff0df; color: #a04f00; }
-.kpi-status-badge--rate-amber { background: #fff6d7; color: #7d5a00; }
+.kpi-status-badge--rate-yellow { background: #fff6d7; color: #7d5a00; }
+.kpi-status-badge--rate-blue { background: #e6f1fb; color: #245f8f; }
+.kpi-status-badge--rate-light-green { background: #edf8e8; color: #4d7c22; }
 .kpi-status-badge--rate-green { background: #e5f3e7; color: #246230; }
 .kpi-tooltip-trigger { display: inline-flex; outline: none; position: relative; }
 .kpi-tooltip-trigger:focus-visible .kpi-status-badge { box-shadow: 0 0 0 3px rgba(47, 111, 159, 0.22); }
@@ -350,12 +351,14 @@ body {
 .kpi-new-workload-metric__bar { background: #eee9e5; border-radius: 999px; height: 0.62rem; overflow: hidden; }
 .kpi-new-workload-metric__bar-fill { border-radius: inherit; display: block; height: 100%; }
 .kpi-new-workload-metric--red .kpi-new-workload-metric__row strong { color: var(--kpi-danger); }
-.kpi-new-workload-metric--orange .kpi-new-workload-metric__row strong { color: #a04f00; }
-.kpi-new-workload-metric--amber .kpi-new-workload-metric__row strong { color: #7d5a00; }
+.kpi-new-workload-metric--yellow .kpi-new-workload-metric__row strong { color: #7d5a00; }
+.kpi-new-workload-metric--blue .kpi-new-workload-metric__row strong { color: #245f8f; }
+.kpi-new-workload-metric--light-green .kpi-new-workload-metric__row strong { color: #4d7c22; }
 .kpi-new-workload-metric--green .kpi-new-workload-metric__row strong { color: #246230; }
 .kpi-new-workload-metric__bar-fill--red { background: var(--kpi-danger); }
-.kpi-new-workload-metric__bar-fill--orange { background: #d86c00; }
-.kpi-new-workload-metric__bar-fill--amber { background: #d6a400; }
+.kpi-new-workload-metric__bar-fill--yellow { background: #d6a400; }
+.kpi-new-workload-metric__bar-fill--blue { background: var(--kpi-blue); }
+.kpi-new-workload-metric__bar-fill--light-green { background: #86b852; }
 .kpi-new-workload-metric__bar-fill--green { background: var(--kpi-success); }
 
 .kpi-guide-overlay {

@@ -26,8 +26,9 @@ const statusToneClassName = (status: KpiStatus) =>
 
 const workloadRateTone = (rate: number) => {
   if (rate >= 100) return "green";
-  if (rate >= 80) return "amber";
-  if (rate >= 50) return "orange";
+  if (rate >= 91) return "light-green";
+  if (rate >= 61) return "blue";
+  if (rate >= 31) return "yellow";
   return "red";
 };
 
