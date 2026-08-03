@@ -1246,6 +1246,6 @@ export const customerNavItems: NavigationItem[] = [
 
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", href: "#cockpit", icon: "oj-ux-ico-home" },
-  { id: "kpis", label: "KPIs", href: "#activities", icon: "oj-ux-ico-book", children: kpiNavItems },
-  { id: "my-customers-360", label: "My Customers 360", href: "#customers", icon: "oj-ux-ico-contact-group", children: customerNavItems }
+  { id: "my-customers-360", label: "My Customers 360", href: "#customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
+  { id: "kpis", label: "KPIs", href: "#activities", icon: "oj-ux-ico-book", children: kpiNavItems }
 ];

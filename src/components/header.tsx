@@ -43,7 +43,8 @@ export function Header({ appName, userLogin, navigationOpen, onToggleNavigation 
         <div class="oj-flex-bar-end kpi-header__end">
           <oj-toolbar aria-label="User actions">
             <oj-menu-button id="userMenu" display="all" chroming="borderless">
-              <span>{userLogin}</span>
+              <span class="oj-ux-ico-user kpi-profile-icon" aria-hidden="true"></span>
+              <span class="kpi-profile-email">{userLogin}</span>
               <span slot="endIcon" class="oj-component-icon oj-button-menu-dropdown-icon"></span>
               <oj-menu id="menu1" slot="menu">
                 <oj-option id="pref" value="pref">Preferences</oj-option>

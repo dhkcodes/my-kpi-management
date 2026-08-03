@@ -6,20 +6,123 @@
  * @ignore
  */
 import { h } from "preact";
-import { FiscalYear, FiscalYearDataset, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
+import { useState } from "preact/hooks";
+import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
+import { NavigationRouteDefinition } from "../navigationRoutes";
 import "ojs/ojbutton";
 
 type Props = Readonly<{
+  activeRoute: NavigationRouteDefinition;
   dataset: FiscalYearDataset;
   fiscalYear: FiscalYear;
   fiscalYears: FiscalYear[];
   guideOpen: boolean;
-  selectedKpiId?: string;
   onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   onCloseGuide: () => void;
   onOpenGuide: () => void;
 }>;
+
+type GuideDetails = Readonly<{
+  srType: string;
+  businessSrType: string;
+  combinedSrType?: string;
+  targetPerQuarter: string;
+  activity: string;
+  taskType: string;
+  measuring: string;
+  details: string;
+  notes: string;
+}>;
+
+const guideDetailsByCode: Partial<Record<GuideSection["code"], GuideDetails>> = {
+  A: {
+    srType: "Independent SR",
+    businessSrType: "Business Planning & Development",
+    targetPerQuarter: "1 session / Quarter",
+    activity: "Customer Workshop or Cloud Day",
+    taskType: "Delivery",
+    measuring: "# of Sessions",
+    details: "A measures delivered market-awareness sessions such as customer workshops or Cloud Days.",
+    notes: ""
+  },
+  B: {
+    srType: "Account Level SR",
+    businessSrType: "Account Development",
+    targetPerQuarter: "12 / Quarter",
+    activity: "Discovery",
+    taskType: "Delivery",
+    measuring: "# of Sessions",
+    details: "B captures early customer discovery sessions that identify needs, clarify workloads, and create qualified account-development evidence.",
+    notes: ""
+  },
+  C1: {
+    srType: "Account Level SR",
+    businessSrType: "Account Development",
+    targetPerQuarter: "C1 + C2 combined target >= 6 activities",
+    activity: "Customer Workshop or Cloud Day",
+    taskType: "Delivery",
+    measuring: "# of Workshops",
+    details: "C1 measures customer-facing workshops that explain solutions, discover requirements, and produce workshop completion evidence.",
+    notes: ""
+  },
+  C2: {
+    srType: "Account Level SR",
+    businessSrType: "Account Development",
+    targetPerQuarter: "C1 + C2 combined target >= 6 activities",
+    activity: "Proof of Concept",
+    taskType: "Delivery",
+    measuring: "# of POCs",
+    details: "C2 measures proof-of-concept work completed in customer tenancy to validate technical feasibility and customer fit.",
+    notes: ""
+  },
+  D1: {
+    srType: "Opportunity Level SR",
+    businessSrType: "Opportunity Pursuit",
+    targetPerQuarter: "Onboarded $500K / Quarter (WON); Validated $1M / Quarter (40%~50%); Identified $2M / Quarter (30%)",
+    activity: "Onboarded = Solution Deployment; Validated = Solution Proposal; Identified = Solution Design",
+    taskType: "Delivery",
+    measuring: "$ ACR WON\nOR $ ACR 40–50%\nOR $ ACR 30% with Sol Demo + functional fit",
+    details: "D1 measures new workload progress across identified, validated, and onboarded stages so pipeline creation and conversion are visible by quarter.",
+    notes: ""
+  },
+  F: {
+    srType: "Account Level SR",
+    businessSrType: "Account Development",
+    targetPerQuarter: "1 / Quarter",
+    activity: "Customer questionnaire",
+    taskType: "Delivery",
+    measuring: "# Internal win story / published case study",
+    details: "F measures customer-reference evidence such as internal win stories or published case studies that can be reused for account development.",
+    notes: ""
+  },
+  H: {
+    srType: "Non-SR activity managed by CEs in the time entry system",
+    businessSrType: "Non-SR activity managed by CEs in the time entry system",
+    combinedSrType: "This is non SR activity to be managed by CEs in time entry system",
+    targetPerQuarter: "1 / Quarter",
+    activity: "Content Creation",
+    taskType: "Delivery",
+    measuring: "# of content created",
+    details: "H measures technical content creation managed outside SR activity, ensuring CE knowledge assets are captured through time entry evidence.",
+    notes: ""
+  }
+};
+
+const defaultGuideDetails = (guide: GuideSection): GuideDetails => ({
+  srType: "SR evidence item",
+  businessSrType: "KPI activity evidence",
+  targetPerQuarter: guide.criteria,
+  activity: guide.name,
+  taskType: "KPI task",
+  measuring: "KPI achievement evidence",
+  details: guide.criteria,
+  notes: ""
+});
+
+const getGuideDetails = (guide: GuideSection): GuideDetails => guideDetailsByCode[guide.code] ?? defaultGuideDetails(guide);
+
+type GuideDetailsField = keyof GuideDetails;
 
 const statusToneClassName = (status: KpiStatus) =>
   status === "Achieved" ? "kpi-status-badge kpi-status-badge--success" : "kpi-status-badge kpi-status-badge--danger";
@@ -41,8 +144,8 @@ const workloadStatusToneClassName = (metrics: FiscalYearDataset["newWorkload"][n
   return `kpi-status-badge kpi-status-badge--rate-${workloadRateTone(bestRate)}`;
 };
 
-const guideListSelectionClass = (code: string) =>
-  code === "B" ? "kpi-guide-list-item is-selected" : "kpi-guide-list-item";
+const guideListSelectionClass = (code: string, selectedCode: string) =>
+  code === selectedCode ? "kpi-guide-list-item is-selected" : "kpi-guide-list-item";
 
 const overviewTooltip = (dataset: FiscalYearDataset, rowCode: string, quarter: string, displayActual: string, displayTarget: string) => {
   if (rowCode === "D1") {
@@ -57,10 +160,120 @@ const overviewTooltip = (dataset: FiscalYearDataset, rowCode: string, quarter: s
   return `Achieved count / Target count: ${displayActual} / ${displayTarget}`;
 };
 
-export function Content({ dataset, fiscalYear, fiscalYears, guideOpen, selectedKpiId, onFiscalYearChange, onCloseGuide, onOpenGuide }: Props) {
-  const selectedRow = selectedKpiId
-    ? dataset.overviewRows.find((row) => row.code === selectedKpiId || (row.code === "C1+C2" && (selectedKpiId === "C1" || selectedKpiId === "C2")))
-    : undefined;
+const isHomeRoute = (route: NavigationRouteDefinition) => route.module === "home";
+
+function EmptyRoutePage({ route }: Readonly<{ route: NavigationRouteDefinition }>) {
+  return (
+    <section id="routePage" class="kpi-panel kpi-route-page" aria-labelledby="routePageTitle" data-route-id={route.id}>
+      <span class="kpi-eyebrow">Page</span>
+      <h2 id="routePageTitle">{route.pageTitle}</h2>
+    </section>
+  );
+}
+
+function ReadOnlyDetails({ details }: Readonly<{ details: GuideDetails }>) {
+  return (
+    <>
+      <table class="kpi-guide-criteria-table" aria-label="Selected KPI details table">
+        <tbody>
+          {details.combinedSrType ? (
+            <tr><th>SR / Business SR Type</th><td>{details.combinedSrType}</td></tr>
+          ) : (
+            <>
+              <tr><th>SR Type</th><td>{details.srType}</td></tr>
+              <tr><th>Business SR Type</th><td>{details.businessSrType}</td></tr>
+            </>
+          )}
+          <tr><th>Target</th><td>{details.targetPerQuarter}</td></tr>
+          <tr><th>Activity</th><td>{details.activity}</td></tr>
+          <tr><th>Task Type</th><td>{details.taskType}</td></tr>
+          <tr><th>What are we measuring?</th><td>{details.measuring}</td></tr>
+
+        </tbody>
+      </table>
+      <section class="kpi-guide-notes-readonly" aria-label="KPI notes">
+        <h3>Notes</h3>
+        <p>{details.notes}</p>
+      </section>
+    </>
+  );
+}
+
+function EditableDetails({ details, onChange }: Readonly<{
+  details: GuideDetails;
+  onChange: (field: GuideDetailsField, value: string) => void;
+}>) {
+  const handleInput = (field: GuideDetailsField) => (event: Event) => {
+    onChange(field, (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value);
+  };
+
+  return (
+    <div class="kpi-guide-edit-grid" aria-label="Editable KPI details">
+      {details.combinedSrType ? (
+        <label class="kpi-guide-edit-grid__wide">SR / Business SR Type<input value={details.combinedSrType} onInput={handleInput("combinedSrType")} /></label>
+      ) : (
+        <>
+          <label>SR Type<input value={details.srType} onInput={handleInput("srType")} /></label>
+          <label>Business SR Type<input value={details.businessSrType} onInput={handleInput("businessSrType")} /></label>
+        </>
+      )}
+      <label>Target<input value={details.targetPerQuarter} onInput={handleInput("targetPerQuarter")} /></label>
+      <label>Activity<input value={details.activity} onInput={handleInput("activity")} /></label>
+      <label>Task Type<input value={details.taskType} onInput={handleInput("taskType")} /></label>
+      <label>What are we measuring?<input value={details.measuring} onInput={handleInput("measuring")} /></label>
+      <label class="kpi-guide-edit-grid__wide">KPI description<textarea value={details.details} onInput={handleInput("details")}></textarea></label>
+      <label class="kpi-guide-edit-grid__wide">Notes<textarea value={details.notes} onInput={handleInput("notes")}></textarea></label>
+    </div>
+  );
+}
+
+export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOpen, onFiscalYearChange, onCloseGuide, onOpenGuide }: Props) {
+  const showHome = isHomeRoute(activeRoute);
+  const guideItems = dataset.guides;
+  const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
+    Object.fromEntries(dataset.guides.map((guide) => [guide.code, getGuideDetails(guide)])) as Record<string, GuideDetails>
+  );
+  const [draftGuideDetails, setDraftGuideDetails] = useState<Record<string, GuideDetails>>(() => ({ ...savedGuideDetails }));
+  const [selectedGuideCode, setSelectedGuideCode] = useState<GuideSection["code"]>("A");
+  const [guideEditMode, setGuideEditMode] = useState(false);
+  const selectedGuide = guideItems.find((guide) => guide.code === selectedGuideCode) ?? guideItems[0];
+  const selectedGuideDetails = guideEditMode
+    ? draftGuideDetails[selectedGuide.code]
+    : savedGuideDetails[selectedGuide.code];
+  const updateDraftGuideDetails = (field: GuideDetailsField, value: string) => {
+    setDraftGuideDetails((current) => ({
+      ...current,
+      [selectedGuide.code]: {
+        ...current[selectedGuide.code],
+        [field]: value
+      }
+    }));
+  };
+  const startGuideEdit = () => {
+    setDraftGuideDetails((current) => ({
+      ...current,
+      [selectedGuide.code]: { ...savedGuideDetails[selectedGuide.code] }
+    }));
+    setGuideEditMode(true);
+  };
+  const saveGuideEdit = () => {
+    setSavedGuideDetails((current) => ({
+      ...current,
+      [selectedGuide.code]: { ...draftGuideDetails[selectedGuide.code] }
+    }));
+    setGuideEditMode(false);
+  };
+  const cancelGuideEdit = () => {
+    setDraftGuideDetails((current) => ({
+      ...current,
+      [selectedGuide.code]: { ...savedGuideDetails[selectedGuide.code] }
+    }));
+    setGuideEditMode(false);
+  };
+  const selectGuide = (code: GuideSection["code"]) => {
+    setGuideEditMode(false);
+    setSelectedGuideCode(code);
+  };
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
@@ -82,178 +295,154 @@ export function Content({ dataset, fiscalYear, fiscalYears, guideOpen, selectedK
         <button
           type="button"
           class="kpi-guide-entry-button"
-          aria-label="View criteria and SR guide"
-          title="View criteria & SR guide"
+          aria-label="Open KPI Guide"
+          title="KPI Guide"
           onClick={onOpenGuide}>
           <span class="oj-ux-ico-book" aria-hidden="true"></span>
-          <span class="kpi-guide-entry-button__label">View criteria &amp; SR guide</span>
+          <span class="kpi-guide-entry-button__label">KPI Guide</span>
         </button>
       </section>
 
-      <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
-        <div class="kpi-panel__header">
-          <div>
-            <h2 id="kpiOverviewTitle">KPI Overview</h2>
-            <p class="kpi-panel__description">Quarter status is shown first; details are available on hover or keyboard focus.</p>
-          </div>
-          <span class="kpi-source-note">Source: {dataset.sourceWorkbook}</span>
-        </div>
-
-        <div class="kpi-overview-table-wrap">
-          <table class="kpi-overview-table">
-            <thead>
-              <tr>
-                <th>KPI</th>
-                <th>Q1</th>
-                <th>Q2</th>
-                <th>Q3</th>
-                <th>Q4</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dataset.overviewRows.map((row) => (
-                <tr id={`activity-${row.code.toLowerCase().replace("+", "-")}`} class={selectedRow?.code === row.code ? "is-selected" : undefined}>
-                  <td>
-                    <div class="kpi-name-cell">
-                      <span class={row.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{row.codeBadge}</span>
-                      <span>{row.name}</span>
-                    </div>
-                  </td>
-                  {row.quarters.map((quarter) => {
-                    const tooltip = overviewTooltip(dataset, row.code, quarter.quarter, quarter.displayActual, quarter.displayTarget);
-                    return (
-                      <td>
-                        <span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}>
-                          <span class={statusToneClassName(quarter.status)}>
-                            <span>{quarter.status}</span>
-                          </span>
-                          <span class="kpi-tooltip" role="tooltip">{tooltip}</span>
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p class="kpi-helper-note">Workshops and POCs are consolidated in one overview row with the combined target of 6 qualified activities.</p>
-      </section>
-
-      {selectedRow && (
-        <section class="kpi-panel kpi-selected-summary" aria-labelledby="selectedKpiTitle">
-          <div class="kpi-panel__header">
-            <div>
-              <span class="kpi-eyebrow">Selected KPI</span>
-              <h3 id="selectedKpiTitle">{selectedRow.name}</h3>
-            </div>
-            <span class={selectedRow.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{selectedRow.codeBadge}</span>
-          </div>
-          <p class="kpi-panel__description">Left navigation selection highlights the matching KPI row only; the existing left navigation item structure remains unchanged.</p>
-        </section>
-      )}
-
-      <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
-        <div class="kpi-panel__header">
-          <div>
-            <h2 id="newWorkloadTitle">New Workload</h2>
-            <p class="kpi-panel__description">Quarterly Onboarded / Validated / Identified achievement rate, actual amount, and target amount.</p>
-          </div>
-        </div>
-        <div class="kpi-new-workload-grid">
-          {dataset.newWorkload.map((quarter) => (
-            <article class="kpi-new-workload-card">
-              <div class="kpi-new-workload-card__header">
-                <strong>{quarter.quarter}</strong>
-                <span class={workloadStatusToneClassName(quarter.metrics)}>
-                  <span>{quarter.status}</span>
-                </span>
+      {showHome ? (
+        <>
+          <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
+            <div class="kpi-panel__header">
+              <div>
+                <h2 id="kpiOverviewTitle">KPI Overview</h2>
+                <p class="kpi-panel__description">KPI Overview summarizes quarterly achievement status across each KPI so progress and gaps are visible at a glance.</p>
               </div>
-              {quarter.metrics.map((metric) => (
-                <div class={metricClass(metric.stage, metric.rate)}>
-                  <div class="kpi-new-workload-metric__row">
-                    <span>{metric.label}</span>
-                    <strong>{metric.rate}%</strong>
+
+            </div>
+
+            <div class="kpi-overview-table-wrap">
+              <table class="kpi-overview-table">
+                <thead>
+                  <tr>
+                    <th>KPI</th>
+                    <th>Q1</th>
+                    <th>Q2</th>
+                    <th>Q3</th>
+                    <th>Q4</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dataset.overviewRows.map((row) => (
+                    <tr id={`activity-${row.code.toLowerCase().replace("+", "-")}`}>
+                      <td>
+                        <div class="kpi-name-cell">
+                          <span class={row.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{row.codeBadge}</span>
+                          <span>{row.name}</span>
+                        </div>
+                      </td>
+                      {row.quarters.map((quarter) => {
+                        const tooltip = overviewTooltip(dataset, row.code, quarter.quarter, quarter.displayActual, quarter.displayTarget);
+                        return (
+                          <td>
+                            <span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}>
+                              <span class={statusToneClassName(quarter.status)}>
+                                <span>{quarter.status}</span>
+                              </span>
+                              <span class="kpi-tooltip" role="tooltip">{tooltip}</span>
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="kpi-helper-note">Workshops and POCs are consolidated in one overview row with the combined target of 6 qualified activities.</p>
+          </section>
+
+          <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
+            <div class="kpi-panel__header">
+              <div>
+                <h2 id="newWorkloadTitle">New Workload</h2>
+                <p class="kpi-panel__description">New Workload tracks how identified opportunities progress into validated pipeline and onboarded revenue against quarterly targets.</p>
+              </div>
+            </div>
+            <div class="kpi-new-workload-grid">
+              {dataset.newWorkload.map((quarter) => (
+                <article class="kpi-new-workload-card">
+                  <div class="kpi-new-workload-card__header">
+                    <strong>{quarter.quarter}</strong>
+                    <span class={workloadStatusToneClassName(quarter.metrics)}>
+                      <span>{quarter.status}</span>
+                    </span>
                   </div>
-                  <div class="kpi-new-workload-metric__amounts">
-                    <span>{formatAmountK(metric.actualK)}</span>
-                    <span>/ {formatAmountK(metric.targetK)}</span>
-                  </div>
-                  <div class="kpi-new-workload-metric__bar" aria-hidden="true">
-                    <span class={metricToneClass(metric.rate)} style={`width: ${Math.min(100, metric.rate)}%`}></span>
-                  </div>
-                </div>
+                  {quarter.metrics.map((metric) => (
+                    <div class={metricClass(metric.stage, metric.rate)}>
+                      <div class="kpi-new-workload-metric__row">
+                        <span>{metric.label}</span>
+                        <strong>{metric.rate}%</strong>
+                      </div>
+                      <div class="kpi-new-workload-metric__amounts">
+                        <span>{formatAmountK(metric.actualK)}</span>
+                        <span>/ {formatAmountK(metric.targetK)}</span>
+                      </div>
+                      <div class="kpi-new-workload-metric__bar" aria-hidden="true">
+                        <span class={metricToneClass(metric.rate)} style={`width: ${Math.min(100, metric.rate)}%`}></span>
+                      </div>
+                    </div>
+                  ))}
+                </article>
               ))}
-            </article>
-          ))}
-        </div>
-      </section>
+            </div>
+          </section>
+        </>
+      ) : (
+        <EmptyRoutePage route={activeRoute} />
+      )}
 
       {guideOpen && (
         <div class="kpi-guide-overlay" role="presentation">
-          <section class="kpi-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="criteriaGuideTitle">
+          <section class="kpi-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="kpiGuideTitle">
             <div class="kpi-guide-dialog__header">
               <div>
-                <h2 id="criteriaGuideTitle">View criteria &amp; SR guide</h2>
-                <p class="kpi-panel__description">Select a KPI on the left, then review criteria, SR creation, or time card entry guidance.</p>
+                <h2 id="kpiGuideTitle">KPI Guide</h2>
+                <p class="kpi-panel__description">Use KPI Guide to understand each KPI target, required evidence, and how each activity is measured before updating details.</p>
               </div>
-              <oj-button chroming="borderless" display="icons" aria-label="Close criteria guide" onojAction={onCloseGuide}>
-                <span slot="startIcon" class="oj-ux-ico-close"></span>
-                Close
-              </oj-button>
+              <div class="kpi-guide-dialog__actions">
+                {guideEditMode ? (
+                  <>
+                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" onClick={saveGuideEdit}>Save</button>
+                    <button type="button" id="kpiGuideCancelButton" class="kpi-guide-edit-button" onClick={cancelGuideEdit}>Cancel</button>
+                  </>
+                ) : (
+                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" onClick={startGuideEdit}>Edit</button>
+                )}
+                <oj-button chroming="borderless" display="icons" aria-label="Close KPI Guide" onojAction={onCloseGuide}>
+                  <span slot="startIcon" class="oj-ux-ico-close"></span>
+                  Close
+                </oj-button>
+              </div>
             </div>
 
-            <div class="kpi-guide-layout">
+            <div class="kpi-guide-layout kpi-guide-layout--unified">
               <aside class="kpi-guide-list" aria-label="KPI guide list">
-                {dataset.guides.map((guide) => (
-                  <button type="button" class={guideListSelectionClass(guide.code)} aria-current={guide.code === "B" ? "true" : undefined}>
+                {guideItems.map((guide) => (
+                  <button
+                    type="button"
+                    class={guideListSelectionClass(guide.code, selectedGuide.code)}
+                    aria-current={guide.code === selectedGuide.code ? "true" : undefined}
+                    onClick={() => selectGuide(guide.code)}>
                     <span class={guide.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{guide.code}</span>
                     <span>{guide.name}</span>
                   </button>
                 ))}
               </aside>
 
-              <div class="kpi-guide-main">
-                <div class="kpi-guide-tabs" role="tablist" aria-label="Guide sections">
-                  <button type="button" class="kpi-guide-tab is-selected">Criteria</button>
-                  <button type="button" class="kpi-guide-tab">SR Creation Guide</button>
-                  <button type="button" class="kpi-guide-tab">Time Card Entry Guide</button>
+              <div class="kpi-guide-main kpi-guide-main--details">
+                <div class="kpi-guide-details-heading">
+                  <div>
+                    <h3><span class={selectedGuide.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{selectedGuide.code}</span> {selectedGuide.name}</h3>
+                    <p class="kpi-guide-kpi-description">{selectedGuideDetails.details}</p>
+                  </div>
                 </div>
-
-                <div class="kpi-guide-criteria-panel">
-                  <h3>Criteria</h3>
-                  <table class="kpi-guide-criteria-table" aria-label="Selected KPI criteria table">
-                    <tbody>
-                      <tr>
-                        <th>KPI</th>
-                        <td><span class="kpi-code-badge">B</span> Early Discovery with Customers</td>
-                      </tr>
-                      <tr>
-                        <th>Quarterly target</th>
-                        <td>12 qualified discovery activities per quarter</td>
-                      </tr>
-                      <tr>
-                        <th>Evidence</th>
-                        <td>Customer workload, SR number, SR description, and delivery date from the Excel workbook</td>
-                      </tr>
-                      <tr>
-                        <th>Achievement logic</th>
-                        <td>Achieved when the quarter reaches or exceeds the target count. Otherwise Not achieved.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div class="kpi-guide-card-row">
-                  <article class="kpi-guide-info-card">
-                    <h3>SR Creation Guide</h3>
-                    <p>Create one SR record per qualifying activity or evidence item. Map the SR to fiscal year, quarter, activity, KPI, and customer/workload evidence.</p>
-                  </article>
-                  <article class="kpi-guide-info-card">
-                    <h3>Time Card Entry Guide</h3>
-                    <p>Select the matching activity category, use the same fiscal quarter as the KPI evidence, and include the customer, workload, or content reference in the notes.</p>
-                  </article>
-                </div>
+                {guideEditMode
+                  ? <EditableDetails details={selectedGuideDetails} onChange={updateDraftGuideDetails} />
+                  : <ReadOnlyDetails details={selectedGuideDetails} />}
               </div>
             </div>
           </section>
