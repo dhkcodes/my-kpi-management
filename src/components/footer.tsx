@@ -47,7 +47,7 @@ const _DEFAULT_LINKS: FooterLink[] = [
 
 export function Footer({ links = _DEFAULT_LINKS } : Props ) {
   return (
-    <footer class="oj-web-applayout-footer" role="contentinfo">
+    <footer class="oj-web-applayout-footer kpi-footer" role="contentinfo">
       <div class="oj-web-applayout-footer-item oj-web-applayout-max-width">
         <ul>
           {links.map((item) => (

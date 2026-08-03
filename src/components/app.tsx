@@ -12,6 +12,7 @@ import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
 import { Content } from "./content/index";
+import { getNavigationRoute, NavigationRouteDefinition } from "./navigationRoutes";
 import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
 import "ojs/ojnavigationlist";
 
@@ -55,12 +56,13 @@ function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
 export const App = registerCustomElement(
   "app-root",
   ({ appName = "KPI Management", userLogin = "donghu.kim@oracle.com" }: Props) => {
-    const [navigationOpen, setNavigationOpen] = useState(() =>
+    const [isDesktopNavigation, setIsDesktopNavigation] = useState(() =>
       typeof window === "undefined" ? true : window.matchMedia("(min-width: 1025px)").matches
     );
+    const [navigationOpen, setNavigationOpen] = useState(isDesktopNavigation);
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const [selectedNavigationId, setSelectedNavigationId] = useState("home");
-    const [selectedKpiId, setSelectedKpiId] = useState<string | undefined>();
+    const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(() => getNavigationRoute("home"));
     const [guideOpen, setGuideOpen] = useState(false);
 
     useEffect(() => {
@@ -70,6 +72,7 @@ export const App = registerCustomElement(
     useEffect(() => {
       const mediaQuery = window.matchMedia("(min-width: 1025px)");
       const syncNavigationMode = (event: MediaQueryListEvent | MediaQueryList) => {
+        setIsDesktopNavigation(event.matches);
         setNavigationOpen(event.matches);
       };
 
@@ -78,13 +81,18 @@ export const App = registerCustomElement(
       return () => mediaQuery.removeEventListener("change", syncNavigationMode);
     }, []);
 
-    const closeNavigation = () => setNavigationOpen(false);
+    const closeNavigation = () => {
+      if (!isDesktopNavigation) {
+        setNavigationOpen(false);
+      }
+    };
     const handleNavigate = (item: NavigationItem) => {
+      const route = getNavigationRoute(item.id);
       setSelectedNavigationId(item.id);
-      setSelectedKpiId(item.code);
-      closeNavigation();
-      const target = document.querySelector(item.code ? "#activities" : item.href);
-      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveRoute(route);
+      window.requestAnimationFrame(() => {
+        document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     };
 
     return (
@@ -112,17 +120,17 @@ export const App = registerCustomElement(
             </oj-navigation-list>
           </aside>
           <Content
+            activeRoute={activeRoute}
             dataset={fiscalYearData[fiscalYear]}
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}
-            selectedKpiId={selectedKpiId}
             onCloseGuide={() => setGuideOpen(false)}
             onOpenGuide={() => setGuideOpen(true)}
             onFiscalYearChange={(year) => {
               setFiscalYear(year);
-              setSelectedKpiId(undefined);
               setSelectedNavigationId("home");
+              setActiveRoute(getNavigationRoute("home"));
             }}
           />
         </div>
