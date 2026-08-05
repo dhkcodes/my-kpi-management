@@ -10,6 +10,7 @@ import { useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
 import { NavigationRouteDefinition } from "../navigationRoutes";
+import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import "ojs/ojbutton";
 
 type Props = Readonly<{
@@ -391,6 +392,8 @@ export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOp
             </div>
           </section>
         </>
+      ) : activeRoute.module === "accountsWorkloads" ? (
+        <AccountsWorkloadsPage key={fiscalYear} fiscalYear={fiscalYear} />
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}
