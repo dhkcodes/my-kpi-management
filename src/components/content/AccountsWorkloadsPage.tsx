@@ -326,9 +326,17 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
 
   const selectedVisibleRowIds = visibleRows.map((row) => row.id).filter((id) => selectedRowIds.includes(id));
   const allVisibleSelected = visibleRows.length > 0 && selectedVisibleRowIds.length === visibleRows.length;
-  const selectedCount = selectedRowIds.length;
+  const selectedCount = selectedVisibleRowIds.length;
   const showFooterActions = Boolean(editCell || isDirty || addingRow);
   const hasFiscalYearSeed = fiscalYear === accountWorkloadMetadata.fiscalYear;
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleRows.map((row) => row.id));
+    setSelectedRowIds((current) => {
+      const next = current.filter((id) => visibleIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [visibleRows]);
 
   const commitActiveCell = () => {
     setEditCell(null);
@@ -409,17 +417,18 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
 
   const highlightSelected = () => {
     setDraftRows((current) =>
-      current.map((row) => selectedRowIds.includes(row.id) ? { ...row, isImportant: !row.isImportant } : row)
+      current.map((row) => selectedVisibleRowIds.includes(row.id) ? { ...row, isImportant: !row.isImportant } : row)
     );
     setIsDirty(true);
   };
 
   const deleteSelected = () => {
     setDraftRows((current) =>
-      current.map((row) => selectedRowIds.includes(row.id)
+      current.map((row) => selectedVisibleRowIds.includes(row.id)
         ? { ...row, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: "current-user" }
         : row)
     );
+    setSelectedRowIds((current) => current.filter((id) => !selectedVisibleRowIds.includes(id)));
     setIsDirty(true);
   };
 
