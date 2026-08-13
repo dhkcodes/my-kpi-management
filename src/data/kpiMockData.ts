@@ -1239,6 +1239,7 @@ export const kpiNavItems: NavigationItem[] = [
 ];
 
 export const customerNavItems: NavigationItem[] = [
+  { id: "customers-overview", label: "Portfolio Overview", href: "#customers", icon: "oj-ux-ico-contact-group" },
   { id: "accounts-workloads", label: "Accounts & Workloads", href: "#pipeline", icon: "oj-ux-ico-cloud" },
   { id: "weekly-activities", label: "Weekly Activities", href: "#activities", icon: "oj-ux-ico-calendar-clock" },
   { id: "consumption", label: "Consumption", href: "#consumption", icon: "oj-ux-ico-chart-line" }

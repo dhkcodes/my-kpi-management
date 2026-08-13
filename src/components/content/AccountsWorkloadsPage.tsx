@@ -1,14 +1,19 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
+import { AccountsWorkloadsListQuery, AccountsWorkloadsPersistenceError } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
+import { applyDraftDelete, applyDraftRestore, hasSelectedDeletedRows, remainingPermanentDeleteIds, resolveDeleteMode, withMinimumPendingDuration } from "../../data/accountsWorkloadsSelection";
 import {
-  AccountWorkloadRow,
-  createAccountWorkloadRows,
-  getAccountWorkloadMetadata
+  AccountWorkloadMetadata,
+  AccountWorkloadRow
 } from "../../data/accountsWorkloadsMockData";
 import "ojs/ojbutton";
 import "ojs/ojswitch";
 import "ojs/ojdatetimepicker";
+import "ojs/ojdialog";
+import "ojs/ojprogress-circle";
+import { ojDialog } from "ojs/ojdialog";
 
 type EditableField = keyof Pick<
   AccountWorkloadRow,
@@ -37,11 +42,15 @@ type EditCell = Readonly<{
 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
+  rows: AccountWorkloadRow[];
+  metadata: AccountWorkloadMetadata;
+  query: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
+  dataSource: AccountsWorkloadsDataSource;
+  onQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
+  onRefresh: () => void;
+  onDraftStateChange: (active: boolean) => void;
+  onRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds?: string[]) => Promise<void>;
 }>;
-
-const accountWorkloadMetadata = getAccountWorkloadMetadata();
-const createRowsForFiscalYear = (fiscalYear: FiscalYear) =>
-  fiscalYear === accountWorkloadMetadata.fiscalYear ? createAccountWorkloadRows() : [];
 
 const editableFields: EditableField[] = [
   "planNumber",
@@ -59,6 +68,21 @@ const editableFields: EditableField[] = [
   "latestUpdate",
   "notes"
 ];
+
+const centerAlignedFields = new Set<EditableField>([
+  "startDate",
+  "endDate",
+  "opptyNo",
+  "target",
+  "winProbability"
+]);
+const rightAlignedFields = new Set<EditableField>(["arrUsd", "arrKrw", "acrUsd", "acrKrw"]);
+const fieldAlignmentClass = (field: EditableField) =>
+  rightAlignedFields.has(field)
+    ? "accounts-workloads-cell--right"
+    : centerAlignedFields.has(field)
+      ? "accounts-workloads-cell--center"
+      : "accounts-workloads-cell--left";
 
 const targetOptions = (["FY26", "FY27", "FY28"] as FiscalYear[])
   .flatMap((year) => [1, 2, 3, 4].map((quarter) => `${year} Q${quarter}`));
@@ -243,22 +267,37 @@ function EditableCell({
   );
 }
 
-export function AccountsWorkloadsPage({ fiscalYear }: Props) {
-  const [rows, setRows] = useState<AccountWorkloadRow[]>(() => createRowsForFiscalYear(fiscalYear));
-  const [draftRows, setDraftRows] = useState<AccountWorkloadRow[]>(() => createRowsForFiscalYear(fiscalYear));
+export function AccountsWorkloadsPage({
+  fiscalYear,
+  rows,
+  metadata,
+  query,
+  dataSource,
+  onQueryChange,
+  onRefresh,
+  onDraftStateChange,
+  onRowsChange
+}: Props) {
+  const [draftRows, setDraftRows] = useState<AccountWorkloadRow[]>(rows);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [includeDeleted, setIncludeDeleted] = useState(false);
-  const [sortField, setSortField] = useState<SortField>("account");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [includeDeleted, setIncludeDeleted] = useState(Boolean(query.includeDeleted));
+  const [sortField, setSortField] = useState<SortField>((query.sort as SortField | undefined) ?? "account");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(query.direction ?? "asc");
+  const [searchTerm, setSearchTerm] = useState(query.search ?? "");
   const [editCell, setEditCell] = useState<EditCell | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [addingRow, setAddingRow] = useState<AccountWorkloadRow | null>(null);
-  const [savedExchangeRate, setSavedExchangeRate] = useState(accountWorkloadMetadata.exchangeRate);
-  const [exchangeRate, setExchangeRate] = useState(accountWorkloadMetadata.exchangeRate);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [permanentDeleteIds, setPermanentDeleteIds] = useState<string[]>([]);
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState(false);
+  const [savedExchangeRate, setSavedExchangeRate] = useState(metadata.exchangeRate);
+  const [exchangeRate, setExchangeRate] = useState(metadata.exchangeRate);
   const [fxPopoverOpen, setFxPopoverOpen] = useState(false);
-  const [draftExchangeRate, setDraftExchangeRate] = useState(`${accountWorkloadMetadata.exchangeRate}`);
+  const [draftExchangeRate, setDraftExchangeRate] = useState(`${metadata.exchangeRate}`);
   const gridScrollRef = useRef<HTMLDivElement>(null);
+  const savingDialogRef = useRef<ojDialog>(null);
+  const deleteDialogRef = useRef<ojDialog>(null);
   const [scrollState, setScrollState] = useState({ left: 0, max: 0, clientWidth: 0 });
 
   const updateScrollState = () => {
@@ -296,10 +335,13 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
   };
 
   const visibleRows = useMemo(() => {
+    const sourceRows = editCell ? rows : draftRows;
+    if (dataSource === "api") {
+      return sourceRows.map((row) => draftRows.find((draftRow) => draftRow.id === row.id) ?? row);
+    }
     const search = searchTerm.trim().toLowerCase();
-    const orderingRows = editCell ? rows : draftRows;
-    const filtered = orderingRows.filter((row) => {
-      const matchesDeleted = includeDeleted || !row.isDeleted;
+    const filtered = sourceRows.filter((row) => {
+      const matchesDeleted = includeDeleted || !row.isDeleted || selectedRowIds.includes(row.id);
       const matchesSearch =
         search === "" ||
         row.account.toLowerCase().includes(search) ||
@@ -316,7 +358,27 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
         : `${leftValue}`.localeCompare(`${rightValue}`);
       return sortDirection === "asc" ? comparison : comparison * -1;
     }).map((row) => draftRows.find((draftRow) => draftRow.id === row.id) ?? row);
-  }, [draftRows, editCell, includeDeleted, rows, searchTerm, sortDirection, sortField]);
+  }, [dataSource, draftRows, editCell, includeDeleted, rows, searchTerm, selectedRowIds, sortDirection, sortField]);
+
+  useEffect(() => {
+    if (!isDirty && !addingRow && !editCell) setDraftRows(rows);
+  }, [addingRow, editCell, isDirty, rows]);
+
+  const draftActive = Boolean(isDirty || addingRow || editCell);
+  useEffect(() => {
+    onDraftStateChange(draftActive);
+    return () => onDraftStateChange(false);
+  }, [draftActive, onDraftStateChange]);
+
+  useEffect(() => {
+    if (saving) savingDialogRef.current?.open();
+    else if (savingDialogRef.current?.isOpen()) savingDialogRef.current.close();
+  }, [saving]);
+
+  useEffect(() => {
+    if (confirmPermanentDelete) deleteDialogRef.current?.open();
+    else if (deleteDialogRef.current?.isOpen()) deleteDialogRef.current.close();
+  }, [confirmPermanentDelete]);
 
   useEffect(() => {
     updateScrollState();
@@ -327,8 +389,10 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
   const selectedVisibleRowIds = visibleRows.map((row) => row.id).filter((id) => selectedRowIds.includes(id));
   const allVisibleSelected = visibleRows.length > 0 && selectedVisibleRowIds.length === visibleRows.length;
   const selectedCount = selectedVisibleRowIds.length;
+  const selectedHasDeletedRows = hasSelectedDeletedRows(rows, selectedVisibleRowIds);
+  const deleteMode = resolveDeleteMode(rows, selectedVisibleRowIds);
   const showFooterActions = Boolean(editCell || isDirty || addingRow);
-  const hasFiscalYearSeed = fiscalYear === accountWorkloadMetadata.fiscalYear;
+  const hasFiscalYearSeed = fiscalYear === metadata.fiscalYear;
 
   useEffect(() => {
     const visibleIds = new Set(visibleRows.map((row) => row.id));
@@ -343,12 +407,10 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
   };
 
   const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
-      return;
-    }
+    const direction = sortField === field && sortDirection === "asc" ? "desc" : "asc";
     setSortField(field);
-    setSortDirection("asc");
+    setSortDirection(direction);
+    onQueryChange({ ...query, search: searchTerm, includeDeleted, sort: field, direction });
   };
 
   const sortIndicator = (field: SortField) => (sortField === field ? (sortDirection === "asc" ? "▲" : "▼") : "↕");
@@ -382,12 +444,29 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
     });
   };
 
-  const saveGridChanges = () => {
-    setRows(draftRows);
-    setSavedExchangeRate(exchangeRate);
-    setDraftExchangeRate(`${exchangeRate}`);
-    setIsDirty(false);
-    setEditCell(null);
+  const saveGridChanges = async () => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await withMinimumPendingDuration(() => onRowsChange(draftRows));
+      setSavedExchangeRate(exchangeRate);
+      setDraftExchangeRate(`${exchangeRate}`);
+      setIsDirty(false);
+      setEditCell(null);
+      setPermanentDeleteIds([]);
+      setSelectedRowIds([]);
+    } catch (error) {
+      if (error instanceof AccountsWorkloadsPersistenceError) {
+        setDraftRows(error.retryRows);
+        setSaveError("Some changes were saved before a later operation failed. Latest server state was reloaded; retry will send only the remaining changes.");
+      } else {
+        setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
+          ? "Another user changed this row. Reload the latest data before saving again."
+          : "The changes could not be saved. Check the API connection and try again.");
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelEditSession = () => {
@@ -397,22 +476,39 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
     setIsDirty(false);
     setEditCell(null);
     setAddingRow(null);
+    setPermanentDeleteIds([]);
   };
 
   const addRow = () => {
     setAddingRow(createEmptyRow(fiscalYear));
   };
 
-  const saveAddRow = () => {
+  const saveAddRow = async () => {
     if (!addingRow || !addingRow.account.trim() || !addingRow.workloadName.trim()) return;
     const nextRows = [...draftRows, addingRow];
-    setRows(nextRows);
-    setDraftRows(nextRows);
-    setSavedExchangeRate(exchangeRate);
-    setDraftExchangeRate(`${exchangeRate}`);
-    setAddingRow(null);
-    setIsDirty(false);
-    setEditCell(null);
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onRowsChange(nextRows);
+      setDraftRows(nextRows);
+      setSavedExchangeRate(exchangeRate);
+      setDraftExchangeRate(`${exchangeRate}`);
+      setAddingRow(null);
+      setIsDirty(false);
+      setEditCell(null);
+      setPermanentDeleteIds([]);
+      setSelectedRowIds([]);
+    } catch (error) {
+      if (error instanceof AccountsWorkloadsPersistenceError) {
+        setDraftRows(error.retryRows.filter((row) => row.id !== addingRow.id));
+        setAddingRow(error.retryRows.find((row) => row.id === addingRow.id) ?? addingRow);
+        setSaveError("Some changes were saved before this row failed. Latest server state was reloaded; retry will send only the remaining row.");
+      } else {
+        setSaveError("The row could not be added. Check required values and the API connection.");
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const highlightSelected = () => {
@@ -422,13 +518,62 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
     setIsDirty(true);
   };
 
+  const stageDraftDelete = () => {
+    const activeIds = selectedVisibleRowIds.filter((id) => !rows.find((row) => row.id === id)?.isDeleted);
+    setDraftRows((current) => applyDraftDelete(current, activeIds, "current-user", new Date().toISOString()));
+    setIsDirty(true);
+  };
+
   const deleteSelected = () => {
-    setDraftRows((current) =>
-      current.map((row) => selectedVisibleRowIds.includes(row.id)
-        ? { ...row, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: "current-user" }
-        : row)
+    if (deleteMode === "permanent" || deleteMode === "mixed") {
+      setPermanentDeleteIds(selectedVisibleRowIds.filter((id) => rows.find((row) => row.id === id)?.isDeleted));
+      setConfirmPermanentDelete(true);
+      return;
+    }
+    stageDraftDelete();
+  };
+
+  const permanentlyDeleteSelected = async () => {
+    const ids = [...permanentDeleteIds];
+    const activeIds = selectedVisibleRowIds.filter((id) => !rows.find((row) => row.id === id)?.isDeleted);
+    const nextRows = applyDraftDelete(
+      draftRows.filter((row) => !ids.includes(row.id)),
+      activeIds,
+      "current-user",
+      new Date().toISOString()
     );
-    setSelectedRowIds((current) => current.filter((id) => !selectedVisibleRowIds.includes(id)));
+    setConfirmPermanentDelete(false);
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onRowsChange(nextRows, ids);
+      setDraftRows(nextRows);
+      setPermanentDeleteIds([]);
+      setIsDirty(false);
+      setSelectedRowIds([]);
+    } catch (error) {
+      if (error instanceof AccountsWorkloadsPersistenceError) {
+        const remainingIds = remainingPermanentDeleteIds(error.retryRows, ids);
+        setDraftRows(error.retryRows);
+        setPermanentDeleteIds(remainingIds);
+        setSelectedRowIds((current) => current.filter((id) => remainingIds.includes(id) || error.retryRows.some((row) => row.id === id)));
+        setIsDirty(remainingIds.length > 0 || error.retryRows.some((retryRow) => {
+          const authoritativeRow = error.authoritative.items.find((row) => row.id === retryRow.id);
+          return !authoritativeRow || JSON.stringify(retryRow) !== JSON.stringify(authoritativeRow);
+        }));
+        setSaveError("Some rows were deleted permanently before a later operation failed. Completed deletions were reconciled; only the remaining rows will be retried.");
+      } else {
+        setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
+          ? "Another user changed this row. Reload the latest data before permanently deleting it."
+          : "The selected deleted rows could not be permanently deleted.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restoreSelected = () => {
+    setDraftRows((current) => applyDraftRestore(current, selectedVisibleRowIds, rows));
     setIsDirty(true);
   };
 
@@ -476,7 +621,9 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
     const isChanged = isFieldChanged(rows, row, field);
     const value = row[field];
     const cellClass = [
+      fieldAlignmentClass(field),
       field === "latestUpdate" ? "accounts-workloads-latest-cell" : "",
+      field === "notes" ? "accounts-workloads-notes-cell" : "",
       isEditing ? "is-editing-cell" : "",
       isChanged ? "is-unsaved-cell" : ""
     ].filter(Boolean).join(" ");
@@ -489,6 +636,8 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
             <span class="accounts-workloads-update-summary">{row.latestUpdate || "—"}</span>
             <span class="accounts-workloads-update-popup" role="tooltip">{row.latestUpdate || "No update yet."}</span>
           </span>
+        ) : field === "notes" ? (
+          <span class="accounts-workloads-notes-content" title={row.notes || "No notes."}>{displayValue}</span>
         ) : (
           displayValue
         )}
@@ -544,8 +693,8 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
           <h2 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h2>
           <p class="kpi-panel__description">
             {hasFiscalYearSeed
-              ? `Manage ${fiscalYear} accounts and workloads from ${accountWorkloadMetadata.sourceSheet}. Mock seed rows: ${accountWorkloadMetadata.parsedRowCount}.`
-              : `Manage ${fiscalYear} accounts and workloads. No mock seed workbook is loaded for this fiscal year.`}
+              ? `Manage ${fiscalYear} accounts and workloads from ${metadata.sourceSheet}. Loaded rows: ${metadata.parsedRowCount}.`
+              : `Manage ${fiscalYear} accounts and workloads. No dataset is loaded for this fiscal year.`}
           </p>
         </div>
         <div class="accounts-workloads-fx">
@@ -576,23 +725,60 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
       <div class="accounts-workloads-toolbar" aria-label="Accounts and workloads actions">
         <label class="accounts-workloads-search">
           <span>Search</span>
-          <input value={searchTerm} onInput={(event) => setSearchTerm((event.currentTarget as HTMLInputElement).value)} placeholder="Account / Workload / Oppty / Plan Number" />
+          <input
+            value={searchTerm}
+            disabled={draftActive}
+            title={draftActive ? "Save or cancel changes before changing the server query." : undefined}
+            onInput={(event) => {
+              const search = (event.currentTarget as HTMLInputElement).value;
+              setSearchTerm(search);
+              onQueryChange({ ...query, search, includeDeleted, sort: sortField, direction: sortDirection });
+            }}
+            placeholder="Account / Workload / Oppty / Plan Number"
+          />
         </label>
         <label class="accounts-workloads-switch">
           <span>Include deleted</span>
           <oj-switch
             value={includeDeleted}
-            onvalueChanged={(event: CustomEvent) => setIncludeDeleted(Boolean(event.detail.value))}
+            disabled={draftActive}
+            onvalueChanged={(event: CustomEvent) => {
+              const nextIncludeDeleted = Boolean(event.detail.value);
+              setIncludeDeleted(nextIncludeDeleted);
+              onQueryChange({ ...query, search: searchTerm, includeDeleted: nextIncludeDeleted, sort: sortField, direction: sortDirection });
+            }}
             aria-label="Include deleted rows">
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
           <oj-button class="accounts-workloads-jet-button" chroming="callToAction" onojAction={addRow}>Add Row</oj-button>
+          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive} onojAction={onRefresh}>Refresh</oj-button>
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={selectedCount === 0} onojAction={highlightSelected}>Highlight</oj-button>
+          {selectedHasDeletedRows && (
+            <oj-button class="accounts-workloads-jet-button" chroming="outlined" onojAction={restoreSelected}>Restore</oj-button>
+          )}
           <oj-button class="accounts-workloads-jet-button" chroming="danger" disabled={selectedCount === 0} onojAction={deleteSelected}>Delete</oj-button>
         </div>
-        <span class="accounts-workloads-selected-count">Selected rows: {selectedCount}</span>
       </div>
+
+      {saveError && <div class="accounts-workloads-save-error" role="alert">{saveError}</div>}
+
+      <oj-dialog ref={savingDialogRef} class="accounts-workloads-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
+        <div class="accounts-workloads-saving-content" role="status" aria-live="polite">
+          <oj-progress-circle value={-1} size="sm" aria-label="Saving"></oj-progress-circle>
+          <span>Saving changes…</span>
+        </div>
+      </oj-dialog>
+
+      <oj-dialog ref={deleteDialogRef} class="accounts-workloads-delete-dialog" initialVisibility="hide" modality="modal" cancelBehavior="escape" dragAffordance="none" resizeBehavior="none" dialogTitle="Permanently delete?" onojClose={() => setConfirmPermanentDelete(false)}>
+        <div class="accounts-workloads-delete-content">
+          <p>{permanentDeleteIds.length} draft-deleted row(s) will be removed permanently. This action cannot be undone.</p>
+          <div class="accounts-workloads-save-actions">
+            <oj-button chroming="danger" onojAction={permanentlyDeleteSelected}>Delete permanently</oj-button>
+            <oj-button chroming="outlined" onojAction={() => setConfirmPermanentDelete(false)}>Cancel</oj-button>
+          </div>
+        </div>
+      </oj-dialog>
 
       <div class="accounts-workloads-grid-shell">
         <div class="accounts-workloads-scroll-hint" role="note">Use fixed arrows, Shift + mouse wheel, or ← / → while the grid is focused.</div>
@@ -608,31 +794,31 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
               <th class="is-sticky accounts-workloads-selection-col">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisibleRows} aria-label="Select or clear all visible rows" />
               </th>
-              <th class="is-sticky accounts-workloads-no-col">No</th>
-              <th class="is-sticky accounts-workloads-important-col">
-                <button type="button" onClick={() => toggleSort("isImportant")}>! {sortIndicator("isImportant")}</button>
+              <th class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">No</th>
+              <th class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center">
+                <button type="button" disabled={draftActive} onClick={() => toggleSort("isImportant")}>! {sortIndicator("isImportant")}</button>
               </th>
               <th class="is-sticky accounts-workloads-plan-col">
-                <button type="button" onClick={() => toggleSort("planNumber")}>{columnLabels.planNumber} {sortIndicator("planNumber")}</button>
+                <button type="button" disabled={draftActive} onClick={() => toggleSort("planNumber")}>{columnLabels.planNumber} {sortIndicator("planNumber")}</button>
               </th>
               <th class="is-sticky accounts-workloads-account-col">
-                <button type="button" onClick={() => toggleSort("account")}>{columnLabels.account} {sortIndicator("account")}</button>
+                <button type="button" disabled={draftActive} onClick={() => toggleSort("account")}>{columnLabels.account} {sortIndicator("account")}</button>
               </th>
               {editableFields.filter((field) => !["planNumber", "account"].includes(field)).map((field) => (
-                <th key={field}>
-                  <button type="button" onClick={() => toggleSort(field)}>{columnLabels[field]} {sortIndicator(field)}</button>
+                <th key={field} class={fieldAlignmentClass(field)}>
+                  <button type="button" disabled={draftActive} onClick={() => toggleSort(field)}>{columnLabels[field]} {sortIndicator(field)}</button>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {visibleRows.map((row, index) => (
-              <tr key={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
+              <tr key={row.id} data-row-id={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
                 <td class="is-sticky accounts-workloads-selection-col">
                   <input type="checkbox" checked={selectedRowIds.includes(row.id)} onChange={() => toggleSelection(row.id)} aria-label={`Select ${row.account} ${row.workloadName}`} />
                 </td>
-                <td class="is-sticky accounts-workloads-no-col">{index + 1}</td>
-                <td class="is-sticky accounts-workloads-important-col">{row.isImportant ? <span class="accounts-workloads-important-badge">!</span> : ""}</td>
+                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">{index + 1}</td>
+                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center">{row.isImportant ? <span class="accounts-workloads-important-badge">!</span> : ""}</td>
                 {renderEditableCell(row, "planNumber", row.planNumber || "—")}
                 {renderEditableCell(row, "account", row.account)}
                 {renderEditableCell(row, "workloadName", row.workloadName)}
@@ -657,22 +843,22 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
             {addingRow && (
               <tr class="is-adding-row">
                 <td class="is-sticky accounts-workloads-selection-col">New</td>
-                <td class="is-sticky accounts-workloads-no-col">—</td>
-                <td class="is-sticky accounts-workloads-important-col"></td>
-                <td>{renderAddInput("planNumber", "UCM / PAYG")}</td>
-                <td>{renderAddInput("account", "Account *")}</td>
-                <td>{renderAddInput("workloadName", "Workload *")}</td>
-                <td>{renderAddInput("opptyNo", "Oppty")}</td>
-                <td>{renderAddInput("startDate", "Start", "date")}</td>
-                <td>{renderAddInput("endDate", "End", "date")}</td>
-                <td>{renderAddInput("arrUsd", "USD", "number")}</td>
-                <td>{renderAddInput("arrKrw", "KRW", "number")}</td>
-                <td>{renderAddInput("acrUsd", "USD", "number")}</td>
-                <td>{renderAddInput("acrKrw", "KRW", "number")}</td>
-                <td>{renderAddInput("target", "FY27 Q1")}</td>
-                <td>{renderAddInput("winProbability", "%", "number")}</td>
-                <td>{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
-                <td>{renderAddInput("notes", "Notes", "textarea")}</td>
+                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">—</td>
+                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center"></td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("account", "Account *")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("workloadName", "Workload *")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("opptyNo", "Oppty")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("startDate", "Start", "date")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("endDate", "End", "date")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("arrUsd", "USD", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("arrKrw", "KRW", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("acrUsd", "USD", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("acrKrw", "KRW", "number")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("target", "FY27 Q1")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("winProbability", "%", "number")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("notes", "Notes", "textarea")}</td>
               </tr>
             )}
           </tbody>
@@ -689,10 +875,11 @@ export function AccountsWorkloadsPage({ fiscalYear }: Props) {
             <button
               type="button"
               class="accounts-workloads-button accounts-workloads-button--primary"
+              disabled={saving}
               onClick={addingRow ? saveAddRow : saveGridChanges}>
-              Save
+              {saving ? "Saving…" : "Save"}
             </button>
-            <button type="button" class="accounts-workloads-button" onClick={cancelEditSession}>Cancel</button>
+            <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>
           </div>
         </div>
       )}

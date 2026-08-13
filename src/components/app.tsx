@@ -14,12 +14,27 @@ import { Header } from "./header";
 import { Content } from "./content/index";
 import { getNavigationRoute, NavigationRouteDefinition } from "./navigationRoutes";
 import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
+import { AccountWorkloadMetadata, AccountWorkloadRow, getAccountWorkloadMetadata } from "../data/accountsWorkloadsMockData";
+import {
+  AccountsWorkloadsDataSource,
+  loadAccountWorkloadStateSeed
+} from "../data/accountsWorkloadsDataSource";
+import {
+  AccountsWorkloadsListQuery,
+  AccountsWorkloadsPersistenceError,
+  canUseDevelopmentDataFallback,
+  fetchAccountsWorkloads,
+  persistAndReconcileAccountWorkloadChanges
+} from "../data/accountsWorkloadsApi";
+import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
 import "ojs/ojnavigationlist";
 
 type Props = Readonly<{
   appName?: string;
   userLogin?: string;
 }>;
+
+const defaultAccountWorkloadMetadata = getAccountWorkloadMetadata();
 
 type NavigationEntryProps = Readonly<{
   item: NavigationItem;
@@ -64,10 +79,73 @@ export const App = registerCustomElement(
     const [selectedNavigationId, setSelectedNavigationId] = useState("home");
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(() => getNavigationRoute("home"));
     const [guideOpen, setGuideOpen] = useState(false);
+    const [accountsWorkloadsAsOf] = useState(() => getBusinessAsOfDate());
+    const [accountWorkloadMetadata, setAccountWorkloadMetadata] = useState<AccountWorkloadMetadata>(defaultAccountWorkloadMetadata);
+    const [accountsWorkloadsDataSource, setAccountsWorkloadsDataSource] = useState<AccountsWorkloadsDataSource>("synthetic-fallback");
+    const [accountsWorkloadsLoading, setAccountsWorkloadsLoading] = useState(true);
+    const [accountsWorkloadsLoadError, setAccountsWorkloadsLoadError] = useState("");
+    const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
+    const [accountsWorkloadsRefreshVersion, setAccountsWorkloadsRefreshVersion] = useState(0);
+    const [accountsWorkloadsQuery, setAccountsWorkloadsQuery] = useState<Omit<AccountsWorkloadsListQuery, "fiscalYear">>({
+      search: "",
+      includeDeleted: false,
+      sort: "account",
+      direction: "asc"
+    });
+    const [accountsWorkloadsRows, setAccountsWorkloadsRows] = useState<Record<FiscalYear, AccountWorkloadRow[]>>(() =>
+      Object.fromEntries(fiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
+    );
 
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     }, []);
+
+    useEffect(() => {
+      let active = true;
+      const tableRoute = activeRoute.module === "accountsWorkloads";
+      const query: AccountsWorkloadsListQuery = tableRoute
+        ? { fiscalYear, ...accountsWorkloadsQuery }
+        : { fiscalYear, search: "", includeDeleted: true, sort: "account", direction: "asc" };
+      const load = async () => {
+        setAccountsWorkloadsLoading(true);
+        setAccountsWorkloadsLoadError("");
+        try {
+          const result = await fetchAccountsWorkloads(query);
+          if (!active) return;
+          setAccountWorkloadMetadata((current) => ({
+            ...current,
+            sourceWorkbook: "Accounts & Workloads API",
+            parsedRowCount: result.total
+          }));
+          setAccountsWorkloadsDataSource("api");
+          setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: result.items }));
+        } catch (error) {
+          if (!canUseDevelopmentDataFallback(error)) {
+            if (!active) return;
+            setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Accounts & Workloads API request failed.");
+            return;
+          }
+          try {
+            const { seed, source } = await loadAccountWorkloadStateSeed();
+            if (!active) return;
+            setAccountWorkloadMetadata(seed.metadata);
+            setAccountsWorkloadsDataSource(source);
+            setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: seed.metadata.fiscalYear === fiscalYear ? seed.rows : [] }));
+          } catch (fallbackError) {
+            if (!active) return;
+            setAccountsWorkloadsLoadError(fallbackError instanceof Error ? fallbackError.message : "Development data could not be loaded.");
+          }
+        } finally {
+          if (active) setAccountsWorkloadsLoading(false);
+        }
+      };
+      const delay = tableRoute && (accountsWorkloadsQuery.search ?? "") !== "" ? 250 : 0;
+      const timer = window.setTimeout(() => void load(), delay);
+      return () => {
+        active = false;
+        window.clearTimeout(timer);
+      };
+    }, [activeRoute.module, accountsWorkloadsQuery, accountsWorkloadsRefreshVersion, fiscalYear]);
 
     useEffect(() => {
       const mediaQuery = window.matchMedia("(min-width: 1025px)");
@@ -121,12 +199,43 @@ export const App = registerCustomElement(
           </aside>
           <Content
             activeRoute={activeRoute}
+            accountsWorkloadsRows={accountsWorkloadsRows[fiscalYear]}
+            accountsWorkloadsAsOf={accountsWorkloadsAsOf}
+            accountsWorkloadsDataSource={accountsWorkloadsDataSource}
+            accountsWorkloadsLoadError={accountsWorkloadsLoadError}
+            accountsWorkloadsQuery={accountsWorkloadsQuery}
+            accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
+            accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
+            accountsWorkloadsLoading={accountsWorkloadsLoading}
+            onAccountsWorkloadsRefresh={() => setAccountsWorkloadsRefreshVersion((version) => version + 1)}
+            accountWorkloadMetadata={accountWorkloadMetadata}
             dataset={fiscalYearData[fiscalYear]}
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}
             onCloseGuide={() => setGuideOpen(false)}
             onOpenGuide={() => setGuideOpen(true)}
+            onAccountsWorkloadsRowsChange={async (rows, permanentDeleteIds = []) => {
+              const savedRows = accountsWorkloadsRows[fiscalYear];
+              if (accountsWorkloadsDataSource !== "api") {
+                setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: rows }));
+                return;
+              }
+              const refreshQuery: AccountsWorkloadsListQuery = { fiscalYear, ...accountsWorkloadsQuery };
+              try {
+                const refreshed = await persistAndReconcileAccountWorkloadChanges(savedRows, rows, fiscalYear, refreshQuery, fetch, permanentDeleteIds);
+                setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
+                setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
+              } catch (error) {
+                if (error instanceof AccountsWorkloadsPersistenceError) {
+                  setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: error.authoritative.items }));
+                  setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: error.authoritative.total }));
+                }
+                throw error;
+              }
+            }}
+            onAccountsWorkloadsQueryChange={setAccountsWorkloadsQuery}
+            onAccountsWorkloadsDraftStateChange={setAccountsWorkloadsDraftActive}
             onFiscalYearChange={(year) => {
               setFiscalYear(year);
               setSelectedNavigationId("home");
