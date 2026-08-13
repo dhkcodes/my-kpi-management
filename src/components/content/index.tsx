@@ -11,10 +11,26 @@ import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage }
 import { formatAmountK } from "../../data/kpiCalculations";
 import { NavigationRouteDefinition } from "../navigationRoutes";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
+import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
+import { MyCustomers360Page } from "./MyCustomers360Page";
+import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
+import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
+import { AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import "ojs/ojbutton";
+import "ojs/ojprogress-circle";
 
 type Props = Readonly<{
   activeRoute: NavigationRouteDefinition;
+  accountsWorkloadsRows: AccountWorkloadRow[];
+  accountsWorkloadsAsOf: string;
+  accountsWorkloadsDataSource: AccountsWorkloadsDataSource;
+  accountsWorkloadsLoadError: string;
+  accountsWorkloadsQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
+  accountsWorkloadsDraftActive: boolean;
+  accountsWorkloadsDatasetAvailable: boolean;
+  accountsWorkloadsLoading: boolean;
+  accountWorkloadMetadata: AccountWorkloadMetadata;
+  onAccountsWorkloadsRefresh: () => void;
   dataset: FiscalYearDataset;
   fiscalYear: FiscalYear;
   fiscalYears: FiscalYear[];
@@ -22,6 +38,9 @@ type Props = Readonly<{
   onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   onCloseGuide: () => void;
   onOpenGuide: () => void;
+  onAccountsWorkloadsRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds?: string[]) => Promise<void>;
+  onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
+  onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
 }>;
 
 type GuideDetails = Readonly<{
@@ -228,7 +247,29 @@ function EditableDetails({ details, onChange }: Readonly<{
   );
 }
 
-export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOpen, onFiscalYearChange, onCloseGuide, onOpenGuide }: Props) {
+export function Content({
+  activeRoute,
+  accountWorkloadMetadata,
+  accountsWorkloadsRows,
+  accountsWorkloadsAsOf,
+  accountsWorkloadsDataSource,
+  accountsWorkloadsLoadError,
+  accountsWorkloadsQuery,
+  accountsWorkloadsDraftActive,
+  accountsWorkloadsDatasetAvailable,
+  accountsWorkloadsLoading,
+  onAccountsWorkloadsRefresh,
+  dataset,
+  fiscalYear,
+  fiscalYears,
+  guideOpen,
+  onFiscalYearChange,
+  onCloseGuide,
+  onOpenGuide,
+  onAccountsWorkloadsRowsChange,
+  onAccountsWorkloadsQueryChange,
+  onAccountsWorkloadsDraftStateChange
+}: Props) {
   const showHome = isHomeRoute(activeRoute);
   const guideItems = dataset.guides;
   const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
@@ -287,6 +328,8 @@ export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOp
                 type="button"
                 class={year === fiscalYear ? "kpi-fiscal-year-option is-selected" : "kpi-fiscal-year-option"}
                 aria-pressed={year === fiscalYear ? "true" : "false"}
+                disabled={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear}
+                title={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear ? "Save or cancel table changes before changing fiscal year." : undefined}
                 onClick={() => onFiscalYearChange(year)}>
                 {year}
               </button>
@@ -304,8 +347,27 @@ export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOp
         </button>
       </section>
 
+      {accountsWorkloadsLoadError && (
+        <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
+          <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
+        </div>
+      )}
+      {!accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+        <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
+          <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
+        </div>
+      )}
+
       {showHome ? (
         <>
+          <AccountsWorkloadsPulseV2
+            fiscalYear={fiscalYear}
+            rows={accountsWorkloadsRows}
+            asOf={accountsWorkloadsAsOf}
+            dataAvailable={accountsWorkloadsDatasetAvailable}
+            loading={accountsWorkloadsLoading}
+            dataSource={accountsWorkloadsDataSource}
+          />
           <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
             <div class="kpi-panel__header">
               <div>
@@ -392,8 +454,32 @@ export function Content({ activeRoute, dataset, fiscalYear, fiscalYears, guideOp
             </div>
           </section>
         </>
+      ) : activeRoute.module === "myCustomers360" ? (
+        <MyCustomers360Page
+          fiscalYear={fiscalYear}
+          rows={accountsWorkloadsRows}
+          dataAvailable={accountsWorkloadsDatasetAvailable}
+        />
       ) : activeRoute.module === "accountsWorkloads" ? (
-        <AccountsWorkloadsPage key={fiscalYear} fiscalYear={fiscalYear} />
+        accountsWorkloadsLoading ? (
+          <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">
+            <oj-progress-circle value={-1} size="md" aria-label="Loading Accounts and Workloads"></oj-progress-circle>
+            <span id="accountsWorkloadsLoadingText">Loading Accounts &amp; Workloads data…</span>
+          </section>
+        ) : (
+          <AccountsWorkloadsPage
+            key={fiscalYear}
+            fiscalYear={fiscalYear}
+            rows={accountsWorkloadsRows}
+            metadata={accountWorkloadMetadata}
+            query={accountsWorkloadsQuery}
+            dataSource={accountsWorkloadsDataSource}
+            onQueryChange={onAccountsWorkloadsQueryChange}
+            onRefresh={onAccountsWorkloadsRefresh}
+            onDraftStateChange={onAccountsWorkloadsDraftStateChange}
+            onRowsChange={onAccountsWorkloadsRowsChange}
+          />
+        )
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}

@@ -1,5 +1,7 @@
 export type AccountWorkloadRow = {
   id: string;
+  commitmentId?: number;
+  versionNo?: number;
   sourceRowNumber: number;
   planNumber: string;
   account: string;
