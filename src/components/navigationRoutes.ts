@@ -36,3 +36,11 @@ const navigationRoutesById = navigationRouteDefinitions.reduce((routes, route) =
 
 export const getNavigationRoute = (id: string): NavigationRouteDefinition =>
   navigationRoutesById[id] ?? navigationRoutesById.home;
+
+export const getNavigationPath = (route: NavigationRouteDefinition): string =>
+  route.id === "home" ? "/" : `/${route.id}`;
+
+export const getNavigationRouteFromPath = (pathname: string): NavigationRouteDefinition => {
+  const normalized = pathname.replace(/^\/+|\/+$/g, "");
+  return getNavigationRoute(normalized || "home");
+};

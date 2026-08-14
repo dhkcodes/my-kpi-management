@@ -7,12 +7,17 @@
  */
 import { registerCustomElement } from "ojs/ojvcomponent";
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
 import { Content } from "./content/index";
-import { getNavigationRoute, NavigationRouteDefinition } from "./navigationRoutes";
+import {
+  getNavigationPath,
+  getNavigationRoute,
+  getNavigationRouteFromPath,
+  NavigationRouteDefinition
+} from "./navigationRoutes";
 import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
 import { AccountWorkloadMetadata, AccountWorkloadRow, getAccountWorkloadMetadata } from "../data/accountsWorkloadsMockData";
 import {
@@ -21,12 +26,18 @@ import {
 } from "../data/accountsWorkloadsDataSource";
 import {
   AccountsWorkloadsListQuery,
-  AccountsWorkloadsPersistenceError,
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloads,
-  persistAndReconcileAccountWorkloadChanges
+  saveAccountsWorkloadsBatch
 } from "../data/accountsWorkloadsApi";
 import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
+import {
+  fetchFxRate,
+  fetchKpiGuides,
+  FxRateRecord,
+  KpiGuideRecord,
+  updateKpiGuide
+} from "../data/kpiConfigurationApi";
 import "ojs/ojnavigationlist";
 
 type Props = Readonly<{
@@ -54,7 +65,14 @@ function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
       <a href={item.href} onClick={handleItemClick}>
         {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
         {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
-        <span class="kpi-navigation-label">{item.label}</span>
+        <span
+          class="kpi-navigation-label"
+          title={item.label}
+          tabIndex={0}
+          aria-describedby={`${item.id}-full-name`}>
+          <span class="kpi-navigation-label__text">{item.label}</span>
+          <span id={`${item.id}-full-name`} class="kpi-navigation-full-name" role="tooltip">{item.label}</span>
+        </span>
         {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
       </a>
       {item.children && (
@@ -71,21 +89,33 @@ function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
 export const App = registerCustomElement(
   "app-root",
   ({ appName = "KPI Management", userLogin = "donghu.kim@oracle.com" }: Props) => {
+    const initialRoute = typeof window === "undefined"
+      ? getNavigationRoute("home")
+      : getNavigationRouteFromPath(window.location.pathname);
     const [isDesktopNavigation, setIsDesktopNavigation] = useState(() =>
       typeof window === "undefined" ? true : window.matchMedia("(min-width: 1025px)").matches
     );
     const [navigationOpen, setNavigationOpen] = useState(isDesktopNavigation);
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
-    const [selectedNavigationId, setSelectedNavigationId] = useState("home");
-    const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(() => getNavigationRoute("home"));
+    const fiscalYearRef = useRef(fiscalYear);
+    const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
+    const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
     const [guideOpen, setGuideOpen] = useState(false);
+    const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
+    const [guideLoading, setGuideLoading] = useState(false);
+    const [guideSaving, setGuideSaving] = useState(false);
+    const [guideError, setGuideError] = useState("");
+    const [fxRate, setFxRate] = useState<FxRateRecord | null>(null);
+    const [fxLoading, setFxLoading] = useState(false);
+
+    const [fxError, setFxError] = useState("");
     const [accountsWorkloadsAsOf] = useState(() => getBusinessAsOfDate());
     const [accountWorkloadMetadata, setAccountWorkloadMetadata] = useState<AccountWorkloadMetadata>(defaultAccountWorkloadMetadata);
     const [accountsWorkloadsDataSource, setAccountsWorkloadsDataSource] = useState<AccountsWorkloadsDataSource>("synthetic-fallback");
     const [accountsWorkloadsLoading, setAccountsWorkloadsLoading] = useState(true);
     const [accountsWorkloadsLoadError, setAccountsWorkloadsLoadError] = useState("");
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
-    const [accountsWorkloadsRefreshVersion, setAccountsWorkloadsRefreshVersion] = useState(0);
+    const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
     const [accountsWorkloadsQuery, setAccountsWorkloadsQuery] = useState<Omit<AccountsWorkloadsListQuery, "fiscalYear">>({
       search: "",
       includeDeleted: false,
@@ -99,6 +129,31 @@ export const App = registerCustomElement(
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     }, []);
+
+    useEffect(() => {
+      if (!guideOpen) return;
+      let active = true;
+      setKpiGuides([]);
+      setGuideLoading(true);
+      setGuideError("");
+      void fetchKpiGuides(fiscalYear)
+        .then((guides) => { if (active) setKpiGuides(guides); })
+        .catch((error) => { if (active) setGuideError(error instanceof Error ? error.message : "KPI Guide API request failed."); })
+        .finally(() => { if (active) setGuideLoading(false); });
+      return () => { active = false; };
+    }, [fiscalYear, guideOpen]);
+
+    useEffect(() => {
+      let active = true;
+      setFxRate(null);
+      setFxLoading(true);
+      setFxError("");
+      void fetchFxRate(fiscalYear)
+        .then((rate) => { if (active) setFxRate(rate); })
+        .catch((error) => { if (active) setFxError(error instanceof Error ? error.message : "FX Rate API request failed."); })
+        .finally(() => { if (active) setFxLoading(false); });
+      return () => { active = false; };
+    }, [fiscalYear]);
 
     useEffect(() => {
       let active = true;
@@ -145,7 +200,17 @@ export const App = registerCustomElement(
         active = false;
         window.clearTimeout(timer);
       };
-    }, [activeRoute.module, accountsWorkloadsQuery, accountsWorkloadsRefreshVersion, fiscalYear]);
+    }, [activeRoute.module, accountsWorkloadsQuery, fiscalYear]);
+
+    useEffect(() => {
+      const handlePopState = () => {
+        const route = getNavigationRouteFromPath(window.location.pathname);
+        setSelectedNavigationId(route.id);
+        setActiveRoute(route);
+      };
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
+    }, []);
 
     useEffect(() => {
       const mediaQuery = window.matchMedia("(min-width: 1025px)");
@@ -168,10 +233,53 @@ export const App = registerCustomElement(
       const route = getNavigationRoute(item.id);
       setSelectedNavigationId(item.id);
       setActiveRoute(route);
+      window.history.pushState({ routeId: route.id }, "", getNavigationPath(route));
       window.requestAnimationFrame(() => {
         document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     };
+
+    const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
+      fiscalYearRef.current = nextFiscalYear;
+      setFiscalYear(nextFiscalYear);
+    };
+
+    const saveKpiGuide = async (draft: KpiGuideRecord) => {
+      if (draft.fiscalYear !== fiscalYearRef.current) {
+        throw new Error("Fiscal year changed. Reload the KPI Guide before saving.");
+      }
+      setGuideSaving(true);
+      setGuideError("");
+      try {
+        const authoritative = await updateKpiGuide(draft);
+        if (fiscalYearRef.current !== authoritative.fiscalYear) {
+          throw new Error("Fiscal year changed while saving. The stale response was ignored.");
+        }
+        setKpiGuides((current) => current.map((guide) => guide.kpiCode === authoritative.kpiCode ? authoritative : guide));
+        return authoritative;
+      } catch (error) {
+        setGuideError(error instanceof Error ? error.message : "KPI Guide could not be saved.");
+        throw error;
+      } finally {
+        setGuideSaving(false);
+      }
+    };
+
+    const handleAccountsWorkloadsRefresh = async () => {
+      setAccountsWorkloadsRefreshing(true);
+      setAccountsWorkloadsLoadError("");
+      try {
+        const refreshed = await fetchAccountsWorkloads({ fiscalYear, ...accountsWorkloadsQuery });
+        setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
+        setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
+        setAccountsWorkloadsDataSource("api");
+      } catch (error) {
+        setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Accounts & Workloads refresh failed.");
+      } finally {
+        setAccountsWorkloadsRefreshing(false);
+      }
+    };
+
 
     return (
       <div id="appContainer" class="oj-web-applayout-page kpi-shell">
@@ -207,40 +315,49 @@ export const App = registerCustomElement(
             accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
             accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
             accountsWorkloadsLoading={accountsWorkloadsLoading}
-            onAccountsWorkloadsRefresh={() => setAccountsWorkloadsRefreshVersion((version) => version + 1)}
+            accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
+            onAccountsWorkloadsRefresh={() => void handleAccountsWorkloadsRefresh()}
             accountWorkloadMetadata={accountWorkloadMetadata}
             dataset={fiscalYearData[fiscalYear]}
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}
+            guideRecords={kpiGuides}
+            guideLoading={guideLoading}
+            guideSaving={guideSaving}
+            guideError={guideError}
+            fxRate={fxRate}
+            fxLoading={fxLoading}
+            fxError={fxError}
+            onSaveGuide={saveKpiGuide}
+
             onCloseGuide={() => setGuideOpen(false)}
             onOpenGuide={() => setGuideOpen(true)}
-            onAccountsWorkloadsRowsChange={async (rows, permanentDeleteIds = []) => {
+            onAccountsWorkloadsRowsChange={async (rows, permanentDeleteIds, draftFxRate) => {
               const savedRows = accountsWorkloadsRows[fiscalYear];
               if (accountsWorkloadsDataSource !== "api") {
+                const localResult = { items: rows, total: rows.length, ...(draftFxRate ? { fxRate: draftFxRate } : {}) };
                 setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: rows }));
-                return;
+                if (draftFxRate) setFxRate(draftFxRate);
+                return localResult;
               }
-              const refreshQuery: AccountsWorkloadsListQuery = { fiscalYear, ...accountsWorkloadsQuery };
-              try {
-                const refreshed = await persistAndReconcileAccountWorkloadChanges(savedRows, rows, fiscalYear, refreshQuery, fetch, permanentDeleteIds);
-                setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
-                setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
-              } catch (error) {
-                if (error instanceof AccountsWorkloadsPersistenceError) {
-                  setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: error.authoritative.items }));
-                  setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: error.authoritative.total }));
-                }
-                throw error;
-              }
+              const committedQuery: AccountsWorkloadsListQuery = { fiscalYear, ...accountsWorkloadsQuery };
+              const authoritative = await saveAccountsWorkloadsBatch(
+                savedRows,
+                rows,
+                committedQuery,
+                draftFxRate,
+                fetch,
+                permanentDeleteIds
+              );
+              setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: authoritative.items }));
+              setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: authoritative.total }));
+              if (authoritative.fxRate) setFxRate(authoritative.fxRate);
+              return authoritative;
             }}
             onAccountsWorkloadsQueryChange={setAccountsWorkloadsQuery}
             onAccountsWorkloadsDraftStateChange={setAccountsWorkloadsDraftActive}
-            onFiscalYearChange={(year) => {
-              setFiscalYear(year);
-              setSelectedNavigationId("home");
-              setActiveRoute(getNavigationRoute("home"));
-            }}
+            onFiscalYearChange={handleFiscalYearChange}
           />
         </div>
         <Footer />
