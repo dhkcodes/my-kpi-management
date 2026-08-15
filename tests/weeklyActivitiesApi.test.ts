@@ -119,6 +119,19 @@ await assert.rejects(
   "a coded Backend domain 404 keeps its original code and message"
 );
 
+const codedHttpErrorFetch = async () => new Response(
+  JSON.stringify({ code: "HTTP_ERROR", message: "Backend supplied message" }),
+  { status: 404, headers: { "Content-Type": "application/json" } }
+);
+await assert.rejects(
+  () => fetchWeeklyActivities({ fromDate: "2026-07-15", toDate: "2026-08-15" }, codedHttpErrorFetch),
+  (error: unknown) => error instanceof WeeklyActivitiesApiError
+    && error.status === 404
+    && error.code === "HTTP_ERROR"
+    && error.message === "Backend supplied message",
+  "an explicitly coded HTTP_ERROR 404 keeps the Backend message"
+);
+
 assert.deepEqual(getDefaultWeeklyActivityRange(new Date("2026-08-15T12:00:00Z")), {
   fromDate: "2026-07-15",
   toDate: "2026-08-15"

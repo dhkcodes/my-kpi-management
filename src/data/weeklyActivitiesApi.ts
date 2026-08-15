@@ -77,8 +77,9 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
   if (!response.ok) {
     let payload: { code?: string; message?: string } = {};
     try { payload = await response.json(); } catch { /* sanitized fallback */ }
-    const responseCode = typeof payload.code === "string" && hasValidUtf8Content(payload.code) ? payload.code : "HTTP_ERROR";
-    const responseMessage = response.status === 404 && responseCode === "HTTP_ERROR"
+    const hasResponseCode = typeof payload.code === "string" && hasValidUtf8Content(payload.code);
+    const responseCode = hasResponseCode ? payload.code! : "HTTP_ERROR";
+    const responseMessage = response.status === 404 && !hasResponseCode
       ? "Weekly Activities API route is unavailable (404). Deploy or restart the Backend that contains /api/v1/weekly-activities."
       : typeof payload.message === "string" && hasValidUtf8Content(payload.message)
         ? payload.message
