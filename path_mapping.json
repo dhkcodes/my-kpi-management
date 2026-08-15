@@ -10,6 +10,28 @@
     "3rdparty": "https://static.oracle.com/cdn/jet/20.1.2/3rdparty"
   },
   "libs": {
+    "quill": {
+      "cwd": "node_modules/quill/dist",
+      "debug": {
+        "src": "quill.js",
+        "path": "libs/quill/quill.js"
+      },
+      "release": {
+        "src": "quill.js",
+        "path": "libs/quill/quill.js"
+      }
+    },
+    "quill-css": {
+      "cwd": "node_modules/quill/dist",
+      "debug": {
+        "src": "quill.snow.css",
+        "path": "styles/quill.snow.css"
+      },
+      "release": {
+        "src": "quill.snow.css",
+        "path": "styles/quill.snow.css"
+      }
+    },
     "knockout": {
       "cdn": "3rdparty",
       "cwd": "node_modules/knockout/build/output",

@@ -13,6 +13,7 @@ import { NavigationRouteDefinition } from "../navigationRoutes";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
+import { WeeklyActivitiesPage } from "./WeeklyActivitiesPage";
 import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
@@ -389,7 +390,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      {activeRoute.module !== "weeklyActivities" && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -419,14 +420,14 @@ export function Content({
           <span class="oj-ux-ico-book" aria-hidden="true"></span>
           <span class="kpi-guide-entry-button__label">KPI Guide</span>
         </button>
-      </section>
+      </section>}
 
-      {accountsWorkloadsLoadError && (
+      {activeRoute.module !== "weeklyActivities" && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
           <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
         </div>
       )}
-      {!accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+      {activeRoute.module !== "weeklyActivities" && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
@@ -558,6 +559,8 @@ export function Content({
             onRowsChange={onAccountsWorkloadsRowsChange}
           />
         )
+      ) : activeRoute.module === "weeklyActivities" ? (
+        <WeeklyActivitiesPage />
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}

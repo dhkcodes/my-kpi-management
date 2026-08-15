@@ -1555,3 +1555,163 @@ body {
   .accounts-workloads-fx__button { width: 100%; }
   .accounts-workloads-fx-popover { left: 0; right: auto; width: min(100%, 18rem); }
 }
+
+/* Weekly Activities — Redwood-first app-owned layout. */
+.weekly-activities-page {
+  background: var(--kpi-surface);
+  border: 1px solid var(--kpi-border);
+  border-radius: 0.35rem;
+  box-shadow: var(--kpi-shadow);
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+.weekly-activities-page__header,
+.weekly-activities-page__footer,
+.weekly-activity-card__header,
+.weekly-activity-inline-editor__actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.weekly-activities-page__header h2 { margin: 0.25rem 0; }
+.weekly-activities-page__header p { color: var(--kpi-muted); margin: 0; }
+
+.weekly-activity-filters {
+  align-items: end;
+  background: var(--kpi-surface-soft);
+  border: 1px solid var(--kpi-border);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(10rem, 0.75fr) minmax(10rem, 0.75fr) minmax(14rem, 1.5fr) auto;
+  margin: 1.25rem 0;
+  padding: 1rem;
+}
+
+.weekly-activity-filters__actions { display: flex; gap: 0.5rem; }
+.weekly-activity-list { display: grid; gap: 0.85rem; }
+
+.weekly-activity-card {
+  background: var(--kpi-surface);
+  border: 1px solid var(--kpi-border);
+  border-left: 0.3rem solid var(--kpi-brand);
+  border-radius: 0.3rem;
+  overflow: hidden;
+}
+
+.weekly-activity-card--editing { border-color: var(--kpi-brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--kpi-brand) 18%, transparent); }
+.weekly-activity-card__header { background: var(--kpi-surface-soft); min-height: 3.25rem; padding: 0.55rem 0.8rem; }
+.weekly-activity-card__header h3 { flex: 1; font-size: 1rem; margin: 0; }
+
+.weekly-activity-disclosure {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.2rem;
+  color: var(--kpi-text);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
+}
+.weekly-activity-disclosure:focus-visible { outline: 2px solid var(--kpi-brand); outline-offset: 1px; }
+
+.weekly-activity-card__sections,
+.weekly-activity-editor-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: 1rem;
+}
+
+.weekly-activity-card__sections > section,
+.weekly-activity-active-editor,
+.weekly-activity-preview {
+  background: var(--kpi-surface);
+  border: 1px solid var(--kpi-border);
+  border-radius: 0.25rem;
+  min-width: 0;
+  padding: 0.85rem;
+}
+
+.weekly-activity-card__sections h4,
+.weekly-activity-editor-grid h4 { color: var(--kpi-text); font-size: 0.82rem; margin: 0 0 0.65rem; }
+.weekly-activity-card__rich-text,
+.weekly-activity-preview__content { overflow-wrap: anywhere; }
+.weekly-activity-direction { display: none; }
+
+.weekly-activity-inline-editor { border-top: 1px solid var(--kpi-border); padding: 1rem; }
+.weekly-activity-week-date { max-width: 18rem; }
+.weekly-activity-editor-composition { margin-top: 0.9rem; }
+
+.weekly-activity-toolbar {
+  align-items: center;
+  background: var(--kpi-surface-soft);
+  border: 1px solid var(--kpi-border);
+  border-radius: 0.25rem 0.25rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  min-height: 3rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.weekly-activity-toolbar button,
+.weekly-activity-toolbar select { min-height: 2.25rem; min-width: 2.25rem; }
+
+.weekly-activity-target-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 0.75rem;
+}
+.weekly-activity-target-selector button {
+  background: var(--kpi-surface-soft);
+  border: 1px solid var(--kpi-border);
+  color: var(--kpi-text);
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 2.75rem;
+  padding: 0.55rem;
+}
+.weekly-activity-target-selector button.is-selected {
+  background: color-mix(in srgb, var(--kpi-brand) 10%, var(--kpi-surface));
+  border-color: var(--kpi-brand);
+  color: var(--kpi-brand);
+  outline: 2px solid color-mix(in srgb, var(--kpi-brand) 38%, transparent);
+  outline-offset: -2px;
+}
+
+.weekly-activity-active-editor .ql-container { border-color: var(--kpi-border); height: auto; min-height: 12rem; }
+.weekly-activity-active-editor .ql-editor { min-height: 12rem; }
+.weekly-activity-preview { background: var(--kpi-surface-soft); }
+.weekly-activity-inline-editor__actions { justify-content: flex-end; padding-top: 0.75rem; }
+
+.weekly-activity-message { margin: 0.75rem 0; padding: 0.75rem; }
+.weekly-activity-message--error { background: #fff2f0; border-left: 0.25rem solid #b3261e; color: #7a1a14; }
+.weekly-activity-state { align-items: center; display: flex; gap: 0.75rem; justify-content: center; min-height: 12rem; }
+.weekly-activities-page__footer { color: var(--kpi-muted); margin-top: 1rem; }
+
+@media (max-width: 1024px) {
+  .weekly-activity-filters { grid-template-columns: 1fr 1fr; }
+  .weekly-activity-filters oj-input-text { grid-column: 1 / -1; }
+  .weekly-activity-filters__actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
+
+@media (max-width: 640px) {
+  .weekly-activities-page__header { align-items: stretch; flex-direction: column; }
+  .weekly-activity-filters { grid-template-columns: minmax(0, 1fr); }
+  .weekly-activity-filters oj-input-text,
+  .weekly-activity-filters__actions { grid-column: 1; }
+  .weekly-activity-filters__actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .weekly-activity-card__sections,
+  .weekly-activity-editor-grid { grid-template-columns: minmax(0, 1fr); }
+  .weekly-activity-direction { color: var(--kpi-brand); display: block; font-size: 1.4rem; font-weight: 800; text-align: center; }
+  .weekly-activity-target-selector button { min-height: 2.75rem; overflow-wrap: anywhere; }
+  .weekly-activity-toolbar button,
+  .weekly-activity-toolbar .ql-picker,
+  .weekly-activity-toolbar .ql-picker-label { min-height: 2.75rem; min-width: 2.75rem; }
+  .weekly-activity-week-date { max-width: none; }
+}
