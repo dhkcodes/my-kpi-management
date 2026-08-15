@@ -1,7 +1,7 @@
 {
   "name": "my-kpi-management",
   "version": "1.0.0",
-  "description": "Oracle JET Redwood KPI operating cockpit",
+  "description": "My KPI & Account Planner — Goals, Accounts and Next Actions",
   "dependencies": {
     "@oracle/oraclejet": "~20.1.0",
     "@oracle/oraclejet-core-pack": "~20.1.0"

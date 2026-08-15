@@ -501,7 +501,7 @@ body {
 .kpi-guide-edit-button.is-active,
 .kpi-guide-edit-button:hover,
 .kpi-guide-edit-button:focus-visible { background: #fff4f1; border-color: rgba(199, 70, 52, 0.42); box-shadow: 0 0 0 3px rgba(199, 70, 52, 0.12); outline: none; }
-.kpi-guide-layout { display: grid; gap: 1.15rem; grid-template-columns: 16.5rem minmax(0, 1fr); margin-top: 1.1rem; min-height: 33rem; }
+.kpi-guide-layout { display: grid; gap: 1.15rem; grid-template-columns: 16.5rem minmax(0, 1fr); margin-top: 1.1rem; min-height: 28rem; }
 .kpi-guide-layout--unified { grid-template-columns: 17rem minmax(0, 1fr); }
 .kpi-guide-list { background: #f7f4f1; border: 1px solid #ebe7e3; border-radius: 0.2rem; display: flex; flex-direction: column; gap: 0.35rem; padding: 0.9rem; }
 .kpi-guide-list-item { align-items: center; background: transparent; border: 1px solid transparent; border-left: 4px solid transparent; border-radius: 0.8rem; color: var(--kpi-ink); cursor: pointer; display: grid; gap: 0.6rem; grid-template-columns: auto minmax(0, 1fr); font: inherit; font-weight: 800; padding: 0.68rem 0.68rem 0.68rem 0.58rem; text-align: left; width: 100%; }
@@ -522,8 +522,8 @@ body {
 .kpi-guide-edit-grid textarea { min-height: 7rem; resize: vertical; }
 .kpi-guide-edit-grid__wide { grid-column: 1 / -1; }
 .kpi-guide-criteria-table { border-collapse: collapse; width: 100%; }
-.kpi-guide-criteria-table th { background: #f7f4f1; border: 1px solid #ebe7e3; color: var(--kpi-muted); padding: 0.82rem; text-align: left; vertical-align: top; width: 13rem; }
-.kpi-guide-criteria-table td { border: 1px solid #ebe7e3; color: var(--kpi-ink); line-height: 1.45; padding: 0.82rem; vertical-align: top; white-space: pre-line; }
+.kpi-guide-criteria-table th { background: #f7f4f1; border: 1px solid #ebe7e3; color: var(--kpi-muted); padding: 0.62rem; text-align: left; vertical-align: top; width: 13rem; }
+.kpi-guide-criteria-table td { border: 1px solid #ebe7e3; color: var(--kpi-ink); line-height: 1.35; padding: 0.62rem; vertical-align: top; white-space: pre-line; }
 .kpi-guide-card-row { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1rem; }
 .kpi-guide-info-card { background: var(--kpi-soft); border: 1px solid #ebe7e3; border-radius: 1rem; padding: 1rem; }
 .kpi-guide-info-card h3 { margin: 0 0 0.55rem; }
