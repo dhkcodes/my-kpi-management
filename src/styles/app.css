@@ -1581,7 +1581,7 @@ body {
 
 .weekly-activity-filters {
   align-items: end;
-  background: var(--kpi-surface-soft);
+  background: var(--kpi-soft);
   border: 1px solid var(--kpi-border);
   display: grid;
   gap: 0.75rem;
@@ -1602,7 +1602,7 @@ body {
 }
 
 .weekly-activity-card--editing { border-color: var(--kpi-brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--kpi-brand) 18%, transparent); }
-.weekly-activity-card__header { background: var(--kpi-surface-soft); min-height: 3.25rem; padding: 0.55rem 0.8rem; }
+.weekly-activity-card__header { background: var(--kpi-soft); min-height: 3.25rem; padding: 0.55rem 0.8rem; }
 .weekly-activity-card__header h3 { flex: 1; font-size: 1rem; margin: 0; }
 
 .weekly-activity-disclosure {
@@ -1610,7 +1610,7 @@ body {
   background: transparent;
   border: 0;
   border-radius: 0.2rem;
-  color: var(--kpi-text);
+  color: var(--kpi-ink);
   cursor: pointer;
   display: inline-flex;
   height: 2.75rem;
@@ -1638,7 +1638,7 @@ body {
 }
 
 .weekly-activity-card__sections h4,
-.weekly-activity-editor-grid h4 { color: var(--kpi-text); font-size: 0.82rem; margin: 0 0 0.65rem; }
+.weekly-activity-editor-grid h4 { color: var(--kpi-ink); font-size: 0.82rem; margin: 0 0 0.65rem; }
 .weekly-activity-card__rich-text,
 .weekly-activity-preview__content { overflow-wrap: anywhere; }
 .weekly-activity-direction { display: none; }
@@ -1649,7 +1649,7 @@ body {
 
 .weekly-activity-toolbar {
   align-items: center;
-  background: var(--kpi-surface-soft);
+  background: var(--kpi-soft);
   border: 1px solid var(--kpi-border);
   border-radius: 0.25rem 0.25rem 0 0;
   display: flex;
@@ -1668,9 +1668,9 @@ body {
   margin-top: 0.75rem;
 }
 .weekly-activity-target-selector button {
-  background: var(--kpi-surface-soft);
+  background: var(--kpi-soft);
   border: 1px solid var(--kpi-border);
-  color: var(--kpi-text);
+  color: var(--kpi-ink);
   cursor: pointer;
   font-weight: 700;
   min-height: 2.75rem;
@@ -1685,8 +1685,13 @@ body {
 }
 
 .weekly-activity-active-editor .ql-container { border-color: var(--kpi-border); height: auto; min-height: 12rem; }
+.weekly-activity-active-editor:focus-within {
+  border-color: var(--kpi-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kpi-brand) 20%, transparent);
+  outline: none;
+}
 .weekly-activity-active-editor .ql-editor { min-height: 12rem; }
-.weekly-activity-preview { background: var(--kpi-surface-soft); }
+.weekly-activity-preview { background: var(--kpi-soft); }
 .weekly-activity-inline-editor__actions { justify-content: flex-end; padding-top: 0.75rem; }
 
 .weekly-activity-message { margin: 0.75rem 0; padding: 0.75rem; }

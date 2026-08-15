@@ -4,6 +4,7 @@ import QuillClass from "quill";
 import * as QuillModule from "quill";
 import {
   ALLOWED_QUILL_FORMATS,
+  sanitizeWeeklyActivityHtml,
   SharedEditorSession,
   WeeklyActivityDrafts,
   WeeklyActivityTarget
@@ -153,7 +154,7 @@ export function SharedWeeklyActivityEditor({
         </section>
         <section class="weekly-activity-preview" aria-labelledby="weeklyActivityPreviewLabel">
           <h4 id="weeklyActivityPreviewLabel">{TARGET_LABELS[inactiveTarget]} (read only)</h4>
-          <div class="weekly-activity-preview__content" dangerouslySetInnerHTML={{ __html: inactiveHtml }}></div>
+          <div class="weekly-activity-preview__content" dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(inactiveHtml) }}></div>
         </section>
       </div>
     </div>

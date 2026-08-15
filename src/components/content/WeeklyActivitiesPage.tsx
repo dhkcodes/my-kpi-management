@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import {
   createWeeklyActivity,
   fetchWeeklyActivities,
@@ -9,7 +9,14 @@ import {
   WeeklyActivityRecord
 } from "../../data/weeklyActivitiesApi";
 import { SharedWeeklyActivityEditor } from "./SharedWeeklyActivityEditor";
-import { WeeklyActivityDrafts } from "./weeklyActivityEditorSession";
+import { sanitizeWeeklyActivityHtml, WeeklyActivityDrafts } from "./weeklyActivityEditorSession";
+import {
+  fetchWeeklyActivityLoadedWindow,
+  LatestRequestGuard,
+  reconcileWeeklyActivityMutation,
+  validateWeeklyActivityDraft,
+  weeklyActivityMatchesQuery
+} from "./weeklyActivitiesPageState";
 import "ojs/ojbutton";
 import "ojs/ojdatetimepicker";
 import "ojs/ojinputtext";
@@ -26,22 +33,6 @@ type EditSession = Readonly<{
   drafts: WeeklyActivityDrafts;
 }>;
 
-const plainText = (html: string) => {
-  if (typeof DOMParser === "undefined") return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  const document = new DOMParser().parseFromString(html, "text/html");
-  return (document.body.textContent ?? "").replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").trim();
-};
-
-const validateDraft = (session: EditSession): string => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(session.weekOfDate)) return "Select a valid Week Date.";
-  const thisWeekText = plainText(session.drafts.thisWeekHtml);
-  const nextWeekText = plainText(session.drafts.nextWeekHtml);
-  if (!thisWeekText || !nextWeekText) return "Both Completed and Planned activities require meaningful content. Use ‘None’ when applicable.";
-  if (thisWeekText.length > 20_000 || nextWeekText.length > 20_000 || thisWeekText.length + nextWeekText.length > 40_000) {
-    return "Each activity field is limited to 20,000 plain-text characters (40,000 total).";
-  }
-  return "";
-};
 
 const formatWeekDate = (value: string) => {
   const date = new Date(`${value}T00:00:00Z`);
@@ -50,10 +41,14 @@ const formatWeekDate = (value: string) => {
 };
 
 function ActivityContent({ html, label }: Readonly<{ html: string; label: string }>) {
-  return <div class="weekly-activity-card__rich-text" aria-label={label} dangerouslySetInnerHTML={{ __html: html }}></div>;
+  return <div class="weekly-activity-card__rich-text" aria-label={label} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(html) }}></div>;
 }
 
-export function WeeklyActivitiesPage() {
+type WeeklyActivitiesPageProps = Readonly<{
+  onDirtyStateChange?: (active: boolean) => void;
+}>;
+
+export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPageProps) {
   const defaultRange = getDefaultWeeklyActivityRange();
   const [filters, setFilters] = useState({ ...defaultRange, search: "" });
   const [query, setQuery] = useState<WeeklyActivitiesQuery>({ ...defaultRange, search: "", page: 0, size: PAGE_SIZE });
@@ -67,24 +62,51 @@ export function WeeklyActivitiesPage() {
   const [saving, setSaving] = useState(false);
   const [editSession, setEditSession] = useState<EditSession | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
+  const requestGuardRef = useRef(new LatestRequestGuard());
+  const controlsBusy = loading || loadingMore || saving;
 
-  const load = async (nextQuery: WeeklyActivitiesQuery, append = false) => {
+  const load = async (nextQuery: WeeklyActivitiesQuery, append = false, clearBeforeLoad = !append) => {
+    const requestId = requestGuardRef.current.begin();
     append ? setLoadingMore(true) : setLoading(true);
     setError("");
+    if (clearBeforeLoad) {
+      setItems([]);
+      setTotalElements(0);
+    }
     try {
       const page = await fetchWeeklyActivities(nextQuery);
+      if (!requestGuardRef.current.isLatest(requestId)) return;
       setItems((current) => append ? [...current, ...page.items] : page.items);
       setTotalElements(page.totalElements);
       setQuery(nextQuery);
     } catch (cause) {
+      if (!requestGuardRef.current.isLatest(requestId)) return;
       setError(cause instanceof Error ? cause.message : "Weekly Activities could not be loaded.");
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (requestGuardRef.current.isLatest(requestId)) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
   useEffect(() => { void load(query); }, []);
+
+  useEffect(() => {
+    onDirtyStateChange?.(Boolean(editSession));
+  }, [editSession, onDirtyStateChange]);
+
+  useEffect(() => () => onDirtyStateChange?.(false), [onDirtyStateChange]);
+
+  useEffect(() => {
+    if (!editSession) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [editSession]);
 
   const submitSearch = () => {
     if (!filters.fromDate || !filters.toDate || filters.fromDate > filters.toDate) {
@@ -134,7 +156,7 @@ export function WeeklyActivitiesPage() {
   const save = async () => {
     const session = editSession;
     if (!session) return;
-    const validation = validateDraft(session);
+    const validation = validateWeeklyActivityDraft(session.weekOfDate, session.drafts);
     if (validation) {
       setEditError(validation);
       return;
@@ -147,13 +169,20 @@ export function WeeklyActivitiesPage() {
         thisWeekHtml: session.drafts.thisWeekHtml,
         nextWeekHtml: session.drafts.nextWeekHtml
       };
-      if (session.mode === "add") {
-        await createWeeklyActivity(request);
-      } else {
-        await updateWeeklyActivity(session.activityId!, { ...request, versionNo: session.versionNo! });
-      }
+      const saved = session.mode === "add"
+        ? await createWeeklyActivity(request)
+        : await updateWeeklyActivity(session.activityId!, { ...request, versionNo: session.versionNo! });
+      setItems((current) => reconcileWeeklyActivityMutation(current, saved, query));
+      const savedMatchesQuery = weeklyActivityMatchesQuery(saved, query);
+      if (session.mode === "add" && savedMatchesQuery) setTotalElements((current) => current + 1);
+      if (session.mode === "edit" && !savedMatchesQuery) setTotalElements((current) => Math.max(0, current - 1));
       setEditSession(null);
-      await load({ ...query, page: 0 });
+      const requestId = requestGuardRef.current.begin();
+      const authoritative = await fetchWeeklyActivityLoadedWindow(query);
+      if (requestGuardRef.current.isLatest(requestId)) {
+        setItems(authoritative.items);
+        setTotalElements(authoritative.totalElements);
+      }
     } catch (cause) {
       setEditError(cause instanceof Error ? cause.message : "Weekly Activity could not be saved.");
     } finally {
@@ -195,7 +224,7 @@ export function WeeklyActivitiesPage() {
           <h2 id="weeklyActivitiesTitle">Weekly Activities</h2>
           <p>Review completed work and plan next-week actions in one weekly row.</p>
         </div>
-        <oj-button id="weeklyActivityAddButton" chroming="callToAction" disabled={Boolean(editSession) || saving} onojAction={startAdd}>
+        <oj-button id="weeklyActivityAddButton" chroming="callToAction" disabled={Boolean(editSession) || controlsBusy} onojAction={startAdd}>
           <span slot="startIcon" class="oj-ux-ico-plus" aria-hidden="true"></span>
           Add Activity
         </oj-button>
@@ -207,7 +236,7 @@ export function WeeklyActivitiesPage() {
           labelHint="From Date"
           labelEdge="inside"
           value={filters.fromDate}
-          disabled={Boolean(editSession) || loading}
+          disabled={Boolean(editSession) || controlsBusy}
           onvalueChanged={(event: CustomEvent) => setFilters((current) => ({ ...current, fromDate: `${event.detail.value ?? ""}` }))}>
         </oj-input-date>
         <oj-input-date
@@ -215,7 +244,7 @@ export function WeeklyActivitiesPage() {
           labelHint="To Date"
           labelEdge="inside"
           value={filters.toDate}
-          disabled={Boolean(editSession) || loading}
+          disabled={Boolean(editSession) || controlsBusy}
           onvalueChanged={(event: CustomEvent) => setFilters((current) => ({ ...current, toDate: `${event.detail.value ?? ""}` }))}>
         </oj-input-date>
         <oj-input-text
@@ -224,13 +253,13 @@ export function WeeklyActivitiesPage() {
           labelEdge="inside"
           placeholder="Search Completed or Planned"
           value={filters.search}
-          disabled={Boolean(editSession) || loading}
+          disabled={Boolean(editSession) || controlsBusy}
           onvalueChanged={(event: CustomEvent) => setFilters((current) => ({ ...current, search: `${event.detail.value ?? ""}` }))}
           onKeyDown={(event: KeyboardEvent) => { if (event.key === "Enter") submitSearch(); }}>
         </oj-input-text>
         <div class="weekly-activity-filters__actions">
-          <oj-button chroming="outlined" disabled={Boolean(editSession) || loading} onojAction={resetSearch}>Reset</oj-button>
-          <oj-button id="weeklyActivitySearchButton" chroming="callToAction" disabled={Boolean(editSession) || loading} onojAction={submitSearch}>Search</oj-button>
+          <oj-button chroming="outlined" disabled={Boolean(editSession) || controlsBusy} onojAction={resetSearch}>Reset</oj-button>
+          <oj-button id="weeklyActivitySearchButton" chroming="callToAction" disabled={Boolean(editSession) || controlsBusy} onojAction={submitSearch}>Search</oj-button>
         </div>
       </section>
       {filterError && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{filterError}</div>}
@@ -271,7 +300,7 @@ export function WeeklyActivitiesPage() {
                     <span class={isCollapsed ? "oj-ux-ico-chevron-right" : "oj-ux-ico-chevron-down"} aria-hidden="true"></span>
                   </button>
                   <h3>{formatWeekDate(record.weekOfDate)}</h3>
-                  <oj-button chroming="borderless" disabled={Boolean(editSession) || saving} onojAction={() => startEdit(record)}>Edit</oj-button>
+                  <oj-button chroming="borderless" disabled={Boolean(editSession) || controlsBusy} onojAction={() => startEdit(record)}>Edit</oj-button>
                 </header>
                 {!isCollapsed && (
                   <>
@@ -298,7 +327,7 @@ export function WeeklyActivitiesPage() {
       <footer class="weekly-activities-page__footer">
         <span>{items.length} of {totalElements} activities</span>
         {items.length < totalElements && (
-          <oj-button chroming="outlined" disabled={loadingMore || Boolean(editSession)} onojAction={() => void load({ ...query, page: (query.page ?? 0) + 1 }, true)}>
+          <oj-button chroming="outlined" disabled={controlsBusy || Boolean(editSession)} onojAction={() => void load({ ...query, page: (query.page ?? 0) + 1 }, true)}>
             {loadingMore ? "Loading…" : "Load more"}
           </oj-button>
         )}

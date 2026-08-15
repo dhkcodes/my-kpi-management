@@ -1,3 +1,5 @@
+import { assertValidUtf8Content, hasValidUtf8Content } from "./utf8TextPolicy";
+
 export const WEEKLY_ACTIVITIES_API_BASE = "/api/v1";
 
 export type WeeklyActivityRecord = Readonly<{
@@ -75,10 +77,14 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
   if (!response.ok) {
     let payload: { code?: string; message?: string } = {};
     try { payload = await response.json(); } catch { /* sanitized fallback */ }
+    const responseCode = typeof payload.code === "string" && hasValidUtf8Content(payload.code) ? payload.code : "HTTP_ERROR";
+    const responseMessage = typeof payload.message === "string" && hasValidUtf8Content(payload.message)
+      ? payload.message
+      : `Weekly Activities request failed (${response.status}).`;
     throw new WeeklyActivitiesApiError(
       response.status,
-      payload.code ?? "HTTP_ERROR",
-      payload.message ?? `Weekly Activities request failed (${response.status}).`
+      responseCode,
+      responseMessage
     );
   }
   return response.json() as Promise<T>;
@@ -89,18 +95,19 @@ const isPositiveInteger = (value: unknown): value is number =>
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 0;
 const isString = (value: unknown): value is string => typeof value === "string";
+const isValidUtf8String = (value: unknown): value is string => isString(value) && hasValidUtf8Content(value);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const parseRecord = (value: unknown): WeeklyActivityRecord | null => {
   if (typeof value !== "object" || value === null) return null;
   const row = value as Record<string, unknown>;
   if (
-    !isPositiveInteger(row.activityId) || !isString(row.weekOfDate) || !ISO_DATE.test(row.weekOfDate) ||
-    !isString(row.thisWeekHtml) || !isString(row.thisWeekText) ||
-    !isString(row.nextWeekHtml) || !isString(row.nextWeekText) ||
+    !isPositiveInteger(row.activityId) || !isValidUtf8String(row.weekOfDate) || !ISO_DATE.test(row.weekOfDate) ||
+    !isValidUtf8String(row.thisWeekHtml) || !isValidUtf8String(row.thisWeekText) ||
+    !isValidUtf8String(row.nextWeekHtml) || !isValidUtf8String(row.nextWeekText) ||
     !isPositiveInteger(row.versionNo) ||
-    !isString(row.createdAt) || !isString(row.createdBy) ||
-    !isString(row.updatedAt) || !isString(row.updatedBy)
+    !isValidUtf8String(row.createdAt) || !isValidUtf8String(row.createdBy) ||
+    !isValidUtf8String(row.updatedAt) || !isValidUtf8String(row.updatedBy)
   ) return null;
   return row as WeeklyActivityRecord;
 };
@@ -109,6 +116,7 @@ export const fetchWeeklyActivities = async (
   query: WeeklyActivitiesQuery,
   fetchImpl: FetchLike = fetch
 ): Promise<WeeklyActivitiesPage> => {
+  assertValidUtf8Content([query.fromDate, query.toDate, query.search ?? ""]);
   const params = new URLSearchParams({
     fromDate: query.fromDate,
     toDate: query.toDate,
@@ -137,6 +145,7 @@ export const createWeeklyActivity = async (
   request: CreateWeeklyActivityRequest,
   fetchImpl: FetchLike = fetch
 ): Promise<WeeklyActivityRecord> => {
+  assertValidUtf8Content([request.weekOfDate, request.thisWeekHtml, request.nextWeekHtml]);
   const payload = await requestJson<unknown>(fetchImpl, `${apiBase()}/weekly-activities`, {
     method: "POST",
     body: JSON.stringify(request)
@@ -151,6 +160,7 @@ export const updateWeeklyActivity = async (
   request: UpdateWeeklyActivityRequest,
   fetchImpl: FetchLike = fetch
 ): Promise<WeeklyActivityRecord> => {
+  assertValidUtf8Content([request.weekOfDate, request.thisWeekHtml, request.nextWeekHtml]);
   const payload = await requestJson<unknown>(fetchImpl, `${apiBase()}/weekly-activities/${activityId}`, {
     method: "PUT",
     body: JSON.stringify(request)

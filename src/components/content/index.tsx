@@ -52,6 +52,7 @@ type Props = Readonly<{
   onAccountsWorkloadsRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
   onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
+  onWeeklyActivitiesDraftStateChange: (active: boolean) => void;
 }>;
 
 type GuideDetails = Readonly<{
@@ -301,7 +302,8 @@ export function Content({
 
   onAccountsWorkloadsRowsChange,
   onAccountsWorkloadsQueryChange,
-  onAccountsWorkloadsDraftStateChange
+  onAccountsWorkloadsDraftStateChange,
+  onWeeklyActivitiesDraftStateChange
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const guideItems = dataset.guides;
@@ -560,7 +562,7 @@ export function Content({
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage />
+        <WeeklyActivitiesPage onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}
