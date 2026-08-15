@@ -97,6 +97,28 @@ await assert.rejects(
   (error: unknown) => error instanceof WeeklyActivitiesApiError && error.status === 409 && error.code === "VERSION_CONFLICT"
 );
 
+const missingRouteFetch = async () => new Response("Not Found", { status: 404 });
+await assert.rejects(
+  () => fetchWeeklyActivities({ fromDate: "2026-07-15", toDate: "2026-08-15" }, missingRouteFetch),
+  (error: unknown) => error instanceof WeeklyActivitiesApiError
+    && error.status === 404
+    && error.message === "Weekly Activities API route is unavailable (404). Deploy or restart the Backend that contains /api/v1/weekly-activities.",
+  "a stale or undeployed Backend route produces an actionable 404 message"
+);
+
+const codedNotFoundFetch = async () => new Response(
+  JSON.stringify({ code: "NOT_FOUND", message: "Weekly Activity was not found" }),
+  { status: 404, headers: { "Content-Type": "application/json" } }
+);
+await assert.rejects(
+  () => updateWeeklyActivity(404, { weekOfDate: "2026-08-15", thisWeekHtml: "<p>A</p>", nextWeekHtml: "<p>B</p>", versionNo: 1 }, codedNotFoundFetch),
+  (error: unknown) => error instanceof WeeklyActivitiesApiError
+    && error.status === 404
+    && error.code === "NOT_FOUND"
+    && error.message === "Weekly Activity was not found",
+  "a coded Backend domain 404 keeps its original code and message"
+);
+
 assert.deepEqual(getDefaultWeeklyActivityRange(new Date("2026-08-15T12:00:00Z")), {
   fromDate: "2026-07-15",
   toDate: "2026-08-15"
