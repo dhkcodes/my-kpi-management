@@ -9,7 +9,7 @@ import {
   WeeklyActivityRecord
 } from "../../data/weeklyActivitiesApi";
 import { SharedWeeklyActivityEditor } from "./SharedWeeklyActivityEditor";
-import { sanitizeWeeklyActivityHtml, WeeklyActivityDrafts } from "./weeklyActivityEditorSession";
+import { sanitizeWeeklyActivityHtml, WeeklyActivityDrafts, WeeklyActivityTarget } from "./weeklyActivityEditorSession";
 import {
   fetchWeeklyActivityLoadedWindow,
   LatestRequestGuard,
@@ -30,6 +30,7 @@ type EditSession = Readonly<{
   activityId?: number;
   versionNo?: number;
   weekOfDate: string;
+  target: WeeklyActivityTarget;
   drafts: WeeklyActivityDrafts;
 }>;
 
@@ -61,7 +62,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editSession, setEditSession] = useState<EditSession | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const requestGuardRef = useRef(new LatestRequestGuard());
   const controlsBusy = loading || loadingMore || saving;
 
@@ -76,6 +77,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
     try {
       const page = await fetchWeeklyActivities(nextQuery);
       if (!requestGuardRef.current.isLatest(requestId)) return;
+      if (!append) setExpanded(new Set());
       setItems((current) => append ? [...current, ...page.items] : page.items);
       setTotalElements(page.totalElements);
       setQuery(nextQuery);
@@ -132,15 +134,16 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
       key: `add-${Date.now()}`,
       mode: "add",
       weekOfDate: getDefaultWeeklyActivityRange().toDate,
+      target: "thisWeek",
       drafts: { thisWeekHtml: "", nextWeekHtml: "" }
     });
   };
 
-  const startEdit = (record: WeeklyActivityRecord) => {
+  const startEdit = (record: WeeklyActivityRecord, target: WeeklyActivityTarget) => {
     setEditError("");
-    setCollapsed((current) => {
+    setExpanded((current) => {
       const next = new Set(current);
-      next.delete(record.activityId);
+      next.add(record.activityId);
       return next;
     });
     setEditSession({
@@ -149,6 +152,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
       activityId: record.activityId,
       versionNo: record.versionNo,
       weekOfDate: record.weekOfDate,
+      target,
       drafts: { thisWeekHtml: record.thisWeekHtml, nextWeekHtml: record.nextWeekHtml }
     });
   };
@@ -205,6 +209,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
       <SharedWeeklyActivityEditor
         key={session.key}
         drafts={session.drafts}
+        initialTarget={session.target}
         disabled={saving}
         onDraftsChange={(drafts) => setEditSession((current) => current ? { ...current, drafts } : current)}
       />
@@ -282,7 +287,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
       ) : (
         <div class="weekly-activity-list" aria-label="Weekly Activities newest first">
           {items.map((record) => {
-            const isCollapsed = collapsed.has(record.activityId);
+            const isCollapsed = !expanded.has(record.activityId);
             const isEditing = editSession?.mode === "edit" && editSession.activityId === record.activityId;
             return (
               <article key={record.activityId} class={isEditing ? "weekly-activity-card weekly-activity-card--editing" : "weekly-activity-card"}>
@@ -292,7 +297,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
                     class="weekly-activity-disclosure"
                     aria-expanded={!isCollapsed}
                     aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${formatWeekDate(record.weekOfDate)}`}
-                    onClick={() => setCollapsed((current) => {
+                    onClick={() => setExpanded((current) => {
                       const next = new Set(current);
                       next.has(record.activityId) ? next.delete(record.activityId) : next.add(record.activityId);
                       return next;
@@ -300,22 +305,28 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
                     <span class={isCollapsed ? "oj-ux-ico-chevron-right" : "oj-ux-ico-chevron-down"} aria-hidden="true"></span>
                   </button>
                   <h3>{formatWeekDate(record.weekOfDate)}</h3>
-                  <oj-button chroming="borderless" disabled={Boolean(editSession) || controlsBusy} onojAction={() => startEdit(record)}>Edit</oj-button>
                 </header>
                 {!isCollapsed && (
                   <>
                     <div class="weekly-activity-card__sections">
                       <section aria-labelledby={`completed-${record.activityId}`}>
-                        <h4 id={`completed-${record.activityId}`}>This Week · Completed</h4>
+                        <div class="weekly-activity-section__header">
+                          <h4 id={`completed-${record.activityId}`}>This Week</h4>
+                          <oj-button chroming="borderless" disabled={Boolean(editSession) || controlsBusy} onojAction={() => startEdit(record, "thisWeek")}>Edit</oj-button>
+                        </div>
                         <ActivityContent html={record.thisWeekHtml} label="Completed activities" />
+                        {isEditing && editSession?.target === "thisWeek" && renderEditor(editSession)}
                       </section>
                       <div class="weekly-activity-direction" aria-hidden="true">↓</div>
                       <section aria-labelledby={`planned-${record.activityId}`}>
-                        <h4 id={`planned-${record.activityId}`}>Next Week · Planned</h4>
+                        <div class="weekly-activity-section__header">
+                          <h4 id={`planned-${record.activityId}`}>Next Week</h4>
+                          <oj-button chroming="borderless" disabled={Boolean(editSession) || controlsBusy} onojAction={() => startEdit(record, "nextWeek")}>Edit</oj-button>
+                        </div>
                         <ActivityContent html={record.nextWeekHtml} label="Planned activities" />
+                        {isEditing && editSession?.target === "nextWeek" && renderEditor(editSession)}
                       </section>
                     </div>
-                    {isEditing && editSession && renderEditor(editSession)}
                   </>
                 )}
               </article>

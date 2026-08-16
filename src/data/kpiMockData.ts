@@ -1229,24 +1229,24 @@ export const fiscalYearData: Record<FiscalYear, FiscalYearDataset> = workbookSee
 export const getLatestFiscalYear = (): FiscalYear => fiscalYears[fiscalYears.length - 1];
 
 export const kpiNavItems: NavigationItem[] = [
-  { id: "activity-a", label: "1 to many market awareness", href: "#activity-a", code: "A", codePlacement: "before" },
-  { id: "activity-b", label: "Early discovery with customer", href: "#activity-b", code: "B", codePlacement: "before" },
-  { id: "activity-c1", label: "Show and discover workshops", href: "#activity-c1", code: "C1", codePlacement: "before" },
-  { id: "activity-c2", label: "POCs in customer tenancy", href: "#activity-c2", code: "C2", codePlacement: "before" },
-  { id: "activity-d1", label: "New workload", href: "#activity-d1", code: "D1", codePlacement: "before" },
-  { id: "activity-f", label: "Customer references", href: "#activity-f", code: "F", codePlacement: "before" },
-  { id: "activity-h", label: "Technical blogs", href: "#activity-h", code: "H", codePlacement: "before" }
+  { id: "activity-a", label: "1 to many market awareness", href: "/activity-a", code: "A", codePlacement: "before" },
+  { id: "activity-b", label: "Early discovery with customer", href: "/activity-b", code: "B", codePlacement: "before" },
+  { id: "activity-c1", label: "Show and discover workshops", href: "/activity-c1", code: "C1", codePlacement: "before" },
+  { id: "activity-c2", label: "POCs in customer tenancy", href: "/activity-c2", code: "C2", codePlacement: "before" },
+  { id: "activity-d1", label: "New workload", href: "/activity-d1", code: "D1", codePlacement: "before" },
+  { id: "activity-f", label: "Customer references", href: "/activity-f", code: "F", codePlacement: "before" },
+  { id: "activity-h", label: "Technical blogs", href: "/activity-h", code: "H", codePlacement: "before" }
 ];
 
 export const customerNavItems: NavigationItem[] = [
-  { id: "customers-overview", label: "Portfolio Overview", href: "#customers", icon: "oj-ux-ico-contact-group" },
-  { id: "accounts-workloads", label: "Accounts & Workloads", href: "#pipeline", icon: "oj-ux-ico-cloud" },
-  { id: "weekly-activities", label: "Weekly Activities", href: "#activities", icon: "oj-ux-ico-calendar-clock" },
-  { id: "consumption", label: "Consumption", href: "#consumption", icon: "oj-ux-ico-chart-line" }
+  { id: "customers-overview", label: "Portfolio Overview", href: "/customers-overview", icon: "oj-ux-ico-contact-group" },
+  { id: "accounts-workloads", label: "Accounts & Workloads", href: "/accounts-workloads", icon: "oj-ux-ico-cloud" },
+  { id: "weekly-activities", label: "Weekly Activities", href: "/weekly-activities", icon: "oj-ux-ico-calendar-clock" },
+  { id: "consumption", label: "Consumption", href: "/consumption", icon: "oj-ux-ico-chart-line" }
 ];
 
 export const navItems: NavigationItem[] = [
-  { id: "home", label: "Home", href: "#cockpit", icon: "oj-ux-ico-home" },
-  { id: "my-customers-360", label: "My Customers 360", href: "#customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
-  { id: "kpis", label: "KPIs", href: "#activities", icon: "oj-ux-ico-book", children: kpiNavItems }
+  { id: "home", label: "Home", href: "/", icon: "oj-ux-ico-home" },
+  { id: "my-customers-360", label: "My Customers 360", href: "/my-customers-360", icon: "oj-ux-ico-contact-group", children: customerNavItems },
+  { id: "kpis", label: "KPIs", href: "/kpis", icon: "oj-ux-ico-book", children: kpiNavItems }
 ];

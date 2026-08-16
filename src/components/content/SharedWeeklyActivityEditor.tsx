@@ -12,13 +12,14 @@ import {
 
 export type SharedWeeklyActivityEditorProps = Readonly<{
   drafts: WeeklyActivityDrafts;
+  initialTarget: WeeklyActivityTarget;
   disabled?: boolean;
   onDraftsChange: (drafts: WeeklyActivityDrafts) => void;
 }>;
 
 const TARGET_LABELS: Record<WeeklyActivityTarget, string> = {
-  thisWeek: "This Week · Completed",
-  nextWeek: "Next Week · Planned"
+  thisWeek: "This Week",
+  nextWeek: "Next Week"
 };
 
 // Quill 2's UMD build is a direct AMD export while its declarations
@@ -31,6 +32,7 @@ const normalizeEditorHtml = (html: string) => html === "<p><br></p>" ? "" : html
 
 export function SharedWeeklyActivityEditor({
   drafts,
+  initialTarget,
   disabled = false,
   onDraftsChange
 }: SharedWeeklyActivityEditorProps) {
@@ -39,7 +41,7 @@ export function SharedWeeklyActivityEditor({
   const quillRef = useRef<QuillClass | null>(null);
   const sessionRef = useRef<SharedEditorSession | null>(null);
   const onDraftsChangeRef = useRef(onDraftsChange);
-  const [activeTarget, setActiveTarget] = useState<WeeklyActivityTarget>("thisWeek");
+  const [activeTarget, setActiveTarget] = useState<WeeklyActivityTarget>(initialTarget);
 
   onDraftsChangeRef.current = onDraftsChange;
 
@@ -76,7 +78,7 @@ export function SharedWeeklyActivityEditor({
       },
       focus: () => quill.focus()
     };
-    const session = new SharedEditorSession(adapter, drafts, "thisWeek");
+    const session = new SharedEditorSession(adapter, drafts, initialTarget);
     quill.on("text-change", (_delta, _old, source) => {
       if (source === "silent") return;
       onDraftsChangeRef.current(session.flush());
@@ -142,7 +144,7 @@ export function SharedWeeklyActivityEditor({
             class={activeTarget === target ? "is-selected" : ""}
             disabled={disabled}
             onClick={() => selectTarget(target)}>
-            {activeTarget === target ? "✓ " : ""}{TARGET_LABELS[target]}
+            {TARGET_LABELS[target]}
           </button>
         ))}
       </div>

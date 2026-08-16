@@ -1638,7 +1638,17 @@ body {
 }
 
 .weekly-activity-card__sections h4,
-.weekly-activity-editor-grid h4 { color: var(--kpi-ink); font-size: 0.82rem; margin: 0 0 0.65rem; }
+.weekly-activity-editor-grid h4 { color: var(--kpi-ink); font-size: 0.82rem; margin: 0; }
+.weekly-activity-section__header {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+.weekly-activity-card__sections section .weekly-activity-editor-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
 .weekly-activity-card__rich-text,
 .weekly-activity-preview__content { overflow-wrap: anywhere; }
 .weekly-activity-direction { display: none; }
