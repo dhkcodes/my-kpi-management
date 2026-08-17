@@ -5,7 +5,9 @@ import path from "node:path";
 const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheetPage.tsx"), "utf8");
 const api = fs.readFileSync(path.resolve("src/data/kpiSpreadsheetApi.ts"), "utf8");
 const contract = fs.readFileSync(path.resolve("src/data/kpiSpreadsheet.ts"), "utf8");
+const main = fs.readFileSync(path.resolve("src/main.js"), "utf8");
 
+assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "KPI's expanded JET dependency graph must tolerate Tailnet load latency");
 assert.match(page, /import "ojs\/ojtable"/, "KPI tables must use Oracle JET Data Table");
 assert.match(page, /import "ojs\/ojdatetimepicker"/, "date cells must load Oracle JET Date Picker");
 assert.match(page, /<oj-table/, "detail tables must render an oj-table");

@@ -17,6 +17,8 @@
     {
       // injector:baseUrl
       baseUrl: '.',
+      // KPI editable tables load additional JET modules; Tailnet startup can exceed RequireJS' default timeout.
+      waitSeconds: 60,
       // endinjector
       paths:
       /* DO NOT MODIFY
