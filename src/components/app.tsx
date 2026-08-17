@@ -534,6 +534,7 @@ export const App = registerCustomElement(
               setWeeklyActivitiesDraftActive(active);
             }}
             onFiscalYearChange={handleFiscalYearChange}
+            onNavigate={handleNavigate}
           />
         </div>
         <Footer />

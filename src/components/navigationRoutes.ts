@@ -14,6 +14,7 @@ export type NavigationRouteDefinition = Readonly<{
 
 export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "home", module: "home", pageTitle: "Home" },
+  { id: "kpis-overview", module: "kpiPage", pageTitle: "KPI Activities Overview" },
   { id: "activity-a", module: "kpiPage", pageTitle: "[A] 1 to many market awareness" },
   { id: "activity-b", module: "kpiPage", pageTitle: "[B] Early discovery with customer" },
   { id: "activity-c1", module: "kpiPage", pageTitle: "[C1] Show and discover workshops" },

@@ -1865,3 +1865,64 @@ h4.weekly-activity-section-label--next-week,
   .kpi-sheet-editor > div { grid-template-columns: minmax(0, 1fr); }
   .kpi-d1-matrix { font-size: .7rem; grid-template-columns: repeat(4, minmax(3.4rem, 1fr)); }
 }
+
+/* KPI Activities phase 1: approved Redwood Spreadsheet Overview + route shells. */
+.kpi-spreadsheet-page__header { align-items: flex-end; }
+.kpi-spreadsheet-page__fiscal-year { align-items: center; display: flex; gap: .65rem; white-space: nowrap; }
+.kpi-spreadsheet-page__fiscal-year span { color: var(--kpi-muted); font-size: .78rem; font-weight: 700; }
+.kpi-spreadsheet-page__fiscal-year strong { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); padding: .55rem .75rem; }
+.kpi-sheet-tabs button { align-items: center; display: inline-flex; gap: .45rem; white-space: nowrap; }
+.kpi-sheet-tab-code { align-items: center; background: #eeebe8; border-radius: 999px; color: #403b37; display: inline-flex; font-size: .68rem; font-weight: 800; height: 1.55rem; justify-content: center; min-width: 1.55rem; padding: 0 .35rem; }
+.kpi-overview-metrics { display: grid; gap: .65rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi-overview-metrics article { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); display: grid; gap: .35rem; padding: .8rem; }
+.kpi-overview-metrics article span { color: var(--kpi-muted); font-size: .78rem; }
+.kpi-overview-metrics article strong { font-size: 1.6rem; }
+.kpi-overview-portfolio { margin-top: 1rem; }
+.kpi-overview-portfolio__heading { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.kpi-overview-portfolio__heading h3 { font-size: .95rem; margin: 0 0 .65rem; }
+.kpi-overview-portfolio__heading span { color: var(--kpi-muted); font-size: .78rem; }
+.kpi-overview-portfolio__table-wrap { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); overflow-x: auto; }
+.kpi-overview-portfolio table { border-collapse: collapse; min-width: 58rem; width: 100%; }
+.kpi-overview-portfolio th, .kpi-overview-portfolio td { border-bottom: 1px solid var(--kpi-border); padding: .7rem; text-align: left; }
+.kpi-overview-portfolio tbody tr:last-child td { border-bottom: 0; }
+.kpi-overview-route-link { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-flex; font: inherit; gap: .5rem; padding: 0; text-align: left; }
+.kpi-overview-route-link:hover strong, .kpi-overview-route-link:focus-visible strong { text-decoration: underline; }
+.kpi-overview-status { background: #fff0cc; border-radius: 999px; color: #7b5100; display: inline-block; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; white-space: nowrap; }
+.kpi-spreadsheet-page .kpi-route-page { margin-top: 0; min-height: 16rem; }
+
+@media (max-width: 720px) {
+  .kpi-spreadsheet-page__header { align-items: flex-start; }
+  .kpi-overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-overview-portfolio__heading { align-items: flex-start; flex-direction: column; gap: 0; }
+}
+
+/* KPI Activities phase 2: API-backed activity grids and stable workload selection. */
+.kpi-activity-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; margin: 0 0 .9rem; }
+.kpi-activity-toolbar__left, .kpi-activity-toolbar__right { align-items: center; display: flex; flex-wrap: wrap; gap: .45rem; }
+.kpi-activity-toolbar button { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; font-weight: 700; min-height: 2.35rem; padding: .45rem .75rem; }
+.kpi-activity-toolbar__left button:first-child, .kpi-activity-toolbar__right button:first-child { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
+.kpi-activity-toolbar__right button:last-child { border-color: #c74634; color: #a63122; }
+.kpi-activity-toolbar button:disabled { cursor: default; opacity: .45; }
+.kpi-status-badge { border-radius: 999px; display: inline-block; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; white-space: nowrap; }
+.kpi-status-badge--achieved { background: #e6f4ea; color: #176b3a; }
+.kpi-status-badge--in-progress { background: #fff0cc; color: #7b5100; }
+.kpi-status-badge--not-achieved { background: #fde7e3; color: #a63122; }
+.kpi-month-summary .is-combined { color: var(--kpi-brand); font-weight: 700; }
+.kpi-inline-editor { background: #f7f4f1; border: 1px solid var(--kpi-border); border-left: 4px solid var(--kpi-brand); margin: 0 0 .9rem; padding: .85rem; }
+.kpi-inline-editor__fields { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kpi-inline-editor label { color: var(--kpi-muted); display: grid; font-size: .75rem; font-weight: 800; gap: .3rem; text-transform: uppercase; }
+.kpi-inline-editor input, .kpi-inline-editor select { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); font: inherit; min-height: 2.5rem; padding: .5rem; text-transform: none; width: 100%; }
+.kpi-workload-selector { grid-column: 1 / -1; }
+.kpi-workload-selector__current { color: var(--kpi-muted); font-size: .8rem; margin: .45rem 0; }
+.kpi-workload-selector__results { background: #fff; border: 1px solid var(--kpi-border); max-height: 12rem; overflow-y: auto; }
+.kpi-workload-selector__results > button { align-items: start; background: #fff; border: 0; border-bottom: 1px solid #ebe7e3; cursor: pointer; display: grid; gap: .15rem; padding: .55rem .65rem; text-align: left; width: 100%; }
+.kpi-workload-selector__results > button:hover, .kpi-workload-selector__results > button:focus { background: #f4f1ee; }
+.kpi-workload-selector__results span, .kpi-workload-selector__results small { color: var(--kpi-muted); }
+.kpi-workload-selector__results p { color: var(--kpi-muted); margin: 0; padding: .65rem; }
+.kpi-sheet-table tr.is-selected td { background: #f0f6f5; }
+.kpi-sheet-table td:first-child, .kpi-sheet-table th:first-child { text-align: center; width: 2.5rem; }
+@media (max-width: 760px) {
+  .kpi-inline-editor__fields { grid-template-columns: minmax(0, 1fr); }
+  .kpi-activity-toolbar { align-items: stretch; flex-direction: column; }
+  .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { justify-content: space-between; width: 100%; }
+}

@@ -48,6 +48,7 @@ type Props = Readonly<{
   fxLoading: boolean;
   fxError: string;
   onFiscalYearChange: (fiscalYear: FiscalYear) => void;
+  onNavigate: (routeId: string) => void;
   onCloseGuide: () => void;
   onOpenGuide: () => void;
   onSaveGuide: (draft: KpiGuideRecord) => Promise<KpiGuideRecord>;
@@ -299,6 +300,7 @@ export function Content({
   fxLoading,
   fxError,
   onFiscalYearChange,
+  onNavigate,
   onCloseGuide,
   onOpenGuide,
   onSaveGuide,
@@ -539,7 +541,7 @@ export function Content({
           </section>
         </>
       ) : activeRoute.module === "kpiPage" ? (
-        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} />
+        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} onNavigate={onNavigate} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page
           fiscalYear={fiscalYear}

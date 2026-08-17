@@ -53,6 +53,7 @@ export const fiscalYearData: Record<FiscalYear, FiscalYearDataset> = workbookSee
 export const getLatestFiscalYear = (): FiscalYear => fiscalYears[fiscalYears.length - 1];
 
 export const kpiNavItems: NavigationItem[] = [
+  { id: "kpis-overview", label: "Overview", icon: "oj-ux-ico-dashboard" },
   { id: "activity-a", label: "1 to many market awareness", code: "A", codePlacement: "before" },
   { id: "activity-b", label: "Early discovery with customer", code: "B", codePlacement: "before" },
   { id: "activity-c1", label: "Show and discover workshops", code: "C1", codePlacement: "before" },
@@ -70,5 +71,5 @@ export const customerNavItems: NavigationItem[] = [
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", icon: "oj-ux-ico-home" },
   { id: "my-customers", label: "My Customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
-  { id: "kpis", label: "KPIs", icon: "oj-ux-ico-book", children: kpiNavItems }
+  { id: "kpis", label: "KPI Activities", icon: "oj-ux-ico-book", children: kpiNavItems }
 ];

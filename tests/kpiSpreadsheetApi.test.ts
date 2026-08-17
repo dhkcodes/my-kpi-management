@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { decodeKpiRows, deleteKpiRow, getKpiActivitiesApiBase, listKpiRows, saveKpiRow } from "../src/data/kpiSpreadsheetApi";
+import { decodeKpiOverview, decodeKpiRows, deleteKpiRow, getKpiActivitiesApiBase, listKpiOverview, listKpiRows, listKpiWorkloadOptions, saveKpiRow } from "../src/data/kpiSpreadsheetApi";
 import { KpiSpreadsheetRow } from "../src/data/kpiSpreadsheet";
 
 const backend = {
@@ -10,7 +10,7 @@ const backend = {
 };
 const valid: KpiSpreadsheetRow = {
   id: "41", versionNo: 2, manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "A", quarter: "Q1", month: "",
-  accountWorkload: "", title: "Awareness session", srNumber: "SYN-2001",
+  accountWorkload: "", workloadId: null, mappingStatus: "NOT_REQUIRED", title: "Awareness session", srNumber: "SYN-2001",
   stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-07-15"
 };
 assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
@@ -28,10 +28,26 @@ assert.equal(
   "/api/v1/kpi-activities"
 );
 
+const overviewPayload = {
+  fiscalYear: "FY27",
+  asOf: "2026-08-17",
+  items: [
+    { code: "C1", rows: 3, target: "C1 + C2 combined · 6 / Quarter", status: "Achieved", explanation: "Target reached" },
+    { code: "C2", rows: 3, target: "C1 + C2 combined · 6 / Quarter", status: "Achieved", explanation: "Target reached" }
+  ]
+};
+assert.equal(decodeKpiOverview(overviewPayload).items[0].status, "Achieved");
+assert.throws(() => decodeKpiOverview({ ...overviewPayload, items: [{ ...overviewPayload.items[0], status: "Unknown" }] }), /Invalid KPI overview/);
+
 const calls: Array<{ url: string; init?: RequestInit }> = [];
 const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push({ url: String(input), init });
-  return new Response(JSON.stringify(init?.method === "DELETE" ? undefined : init?.method ? backend : { items: [backend] }), {
+  const responseBody = String(input).includes("/overview")
+    ? overviewPayload
+    : String(input).includes("workload-options")
+      ? { items: [{ workloadId: 17, accountName: "Account A", workloadName: "Workload A", opptyNo: "D100" }], total: 1, hasMore: false }
+      : null;
+  return new Response(JSON.stringify(init?.method === "DELETE" ? undefined : responseBody ?? (init?.method ? backend : { items: [backend] })), {
     status: init?.method === "DELETE" ? 204 : init?.method === "POST" ? 201 : 200,
     headers: { "Content-Type": "application/json" }
   });
@@ -39,14 +55,20 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 async function run() {
   await listKpiRows("FY27", fetchImpl);
+  const overview = await listKpiOverview("FY27", fetchImpl);
+  assert.equal(overview.items[1].rows, 3);
+  const options = await listKpiWorkloadOptions("FY27", "Account", 0, fetchImpl);
+  assert.equal(options.items[0].workloadId, 17);
   await saveKpiRow(valid, fetchImpl);
   await saveKpiRow({ ...valid, id: "draft-a-1", versionNo: undefined }, fetchImpl);
   await deleteKpiRow(valid, fetchImpl);
   assert.equal(calls[0].url, "/api/v1/kpi-activities?fiscalYear=FY27");
-  assert.equal(calls[1].init?.method, "PATCH");
-  assert.equal(calls[2].init?.method, "POST");
-  assert.match(calls[3].url, /versionNo=2$/);
-  assert.equal(calls[3].init?.method, "DELETE");
+  assert.equal(calls[1].url, "/api/v1/kpi-activities/overview?fiscalYear=FY27");
+  assert.match(calls[2].url, /workload-options\?fiscalYear=FY27&search=Account&offset=0&size=10$/);
+  assert.equal(calls[3].init?.method, "PATCH");
+  assert.equal(calls[4].init?.method, "POST");
+  assert.match(calls[5].url, /versionNo=2$/);
+  assert.equal(calls[5].init?.method, "DELETE");
   console.log("kpiSpreadsheetApi tests passed");
 }
 
