@@ -17,7 +17,7 @@ assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
 assert.throws(() => decodeKpiRows({ items: [{ ...backend, kpiCode: "G" }] }), /Invalid KPI code/);
 assert.equal(
   getKpiActivitiesApiBase({ location: { protocol: "http:", hostname: "127.0.0.1", port: "8000" } }),
-  "http://127.0.0.1:18081/api/v1/kpi-activities"
+  "/api/v1/kpi-activities"
 );
 assert.equal(
   getKpiActivitiesApiBase({ location: { protocol: "https:", hostname: "127.0.0.1", port: "8000" } }),
@@ -43,10 +43,12 @@ async function run() {
   await saveKpiRow({ ...valid, id: "draft-a-1", versionNo: undefined }, fetchImpl);
   await deleteKpiRow(valid, fetchImpl);
   assert.equal(calls[0].url, "/api/v1/kpi-activities?fiscalYear=FY27");
+  assert.equal(new Headers(calls[0].init?.headers).has("Content-Type"), false, "GET must not add a JSON content type");
   assert.equal(calls[1].init?.method, "PATCH");
   assert.equal(calls[2].init?.method, "POST");
   assert.match(calls[3].url, /versionNo=2$/);
   assert.equal(calls[3].init?.method, "DELETE");
+  assert.equal(new Headers(calls[3].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
   console.log("kpiSpreadsheetApi tests passed");
 }
 

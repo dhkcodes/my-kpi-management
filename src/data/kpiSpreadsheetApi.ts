@@ -3,16 +3,13 @@ import { KpiSpreadsheetRow, SpreadsheetKpiCode } from "./kpiSpreadsheet";
 
 const API_BASE = "/api/v1/kpi-activities";
 type KpiActivitiesRuntime = Readonly<{
+  __KPI_API_BASE_URL__?: unknown;
   location?: { protocol?: string; hostname?: string; port?: string };
 }>;
 
 export function getKpiActivitiesApiBase(runtime: KpiActivitiesRuntime = globalThis as KpiActivitiesRuntime): string {
-  if (
-    runtime.location?.protocol === "http:" &&
-    ["localhost", "127.0.0.1"].includes(runtime.location?.hostname ?? "") &&
-    runtime.location?.port === "8000"
-  ) {
-    return `http://${runtime.location?.hostname}:18081/api/v1/kpi-activities`;
+  if (typeof runtime.__KPI_API_BASE_URL__ === "string" && runtime.__KPI_API_BASE_URL__.trim()) {
+    return `${runtime.__KPI_API_BASE_URL__.replace(/\/$/, "")}/api/v1/kpi-activities`;
   }
   return API_BASE;
 }
@@ -50,7 +47,11 @@ export function decodeKpiRows(payload: unknown): KpiSpreadsheetRow[] {
 }
 
 async function request(fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetchImpl(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+  const hasBody = init?.body !== undefined && init?.body !== null;
+  const response = await fetchImpl(url, {
+    ...init,
+    headers: hasBody ? { "Content-Type": "application/json", ...(init?.headers ?? {}) } : init?.headers
+  });
   if (!response.ok) throw new Error(`KPI API request failed (${response.status})`);
   return response.status === 204 ? undefined : response.json();
 }
