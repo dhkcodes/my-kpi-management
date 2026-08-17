@@ -1,3 +1,5 @@
+import { FiscalYear } from "./kpiMockData";
+
 export type AccountWorkloadRow = {
   id: string;
   commitmentId?: number;
@@ -24,7 +26,7 @@ export type AccountWorkloadRow = {
 };
 
 export type AccountWorkloadMetadata = {
-  fiscalYear: "FY27";
+  fiscalYear: FiscalYear;
   sourceWorkbook: string;
   sourceSheet: "Deal Status";
   headerRowNumber: number;

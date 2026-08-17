@@ -119,22 +119,37 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
 };
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
-const isNullableNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
+const isPositiveInteger = (value: unknown): value is number => isFiniteNumber(value) && Number.isInteger(value) && value > 0;
+const isNullableNonnegativeNumber = (value: unknown): value is number | null =>
+  value === null || (isFiniteNumber(value) && value >= 0);
+const isNullableProbability = (value: unknown): value is number | null =>
+  value === null || (isFiniteNumber(value) && value >= 0 && value <= 100);
 const isNullableString = (value: unknown): value is string | null => value === null || typeof value === "string";
 const textOrEmpty = (value: string | null) => value ?? "";
+const isRealIsoDate = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+};
+const isNullableIsoDateOrEmpty = (value: unknown): value is string | null =>
+  value === null || value === "" || (typeof value === "string" && isRealIsoDate(value));
 
 const parseAccountWorkloadRow = (value: unknown): AccountWorkloadRow | null => {
   if (typeof value !== "object" || value === null) return null;
   const row = value as Record<string, unknown>;
   if (
     typeof row.id !== "string" ||
-    !isFiniteNumber(row.commitmentId) || !isFiniteNumber(row.versionNo) || !isFiniteNumber(row.sourceRowNumber) ||
+    !isPositiveInteger(row.commitmentId) || !isPositiveInteger(row.versionNo) || !isPositiveInteger(row.sourceRowNumber) ||
     typeof row.account !== "string" || typeof row.workloadName !== "string" ||
     !isNullableString(row.planNumber) || !isNullableString(row.opptyNo) ||
-    !isNullableString(row.startDate) || !isNullableString(row.endDate) ||
-    !isNullableNumber(row.arrUsd) || !isNullableNumber(row.arrKrw) ||
-    !isNullableNumber(row.acrUsd) || !isNullableNumber(row.acrKrw) ||
-    !isNullableString(row.target) || !isNullableNumber(row.winProbability) ||
+    !isNullableIsoDateOrEmpty(row.startDate) || !isNullableIsoDateOrEmpty(row.endDate) ||
+    !isNullableNonnegativeNumber(row.arrUsd) || !isNullableNonnegativeNumber(row.arrKrw) ||
+    !isNullableNonnegativeNumber(row.acrUsd) || !isNullableNonnegativeNumber(row.acrKrw) ||
+    !isNullableString(row.target) || !isNullableProbability(row.winProbability) ||
     !isNullableString(row.latestUpdate) || !isNullableString(row.notes) ||
     typeof row.isImportant !== "boolean" || typeof row.isDeleted !== "boolean" ||
     !isNullableString(row.deletedAt) || !isNullableString(row.deletedBy)
@@ -280,10 +295,34 @@ export const permanentlyDeleteAccountWorkload = async (
 export const fetchAccountsWorkloadsSummary = async (
   fiscalYear: FiscalYear,
   fetchImpl: FetchLike = fetch
-): Promise<AccountsWorkloadsSummary> => requestJson(
-  fetchImpl,
-  `${accountsWorkloadsApiBase()}/dashboard/accounts-workloads?fiscalYear=${encodeURIComponent(fiscalYear)}`
-);
+): Promise<AccountsWorkloadsSummary> => {
+  const payload = await requestJson<unknown>(
+    fetchImpl,
+    `${accountsWorkloadsApiBase()}/dashboard/accounts-workloads?fiscalYear=${encodeURIComponent(fiscalYear)}`
+  );
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error("Malformed Accounts & Workloads API summary response");
+  }
+  const normalized = payload as Record<string, unknown>;
+  if (
+    !isFiniteNumber(normalized.activeAccounts) || !Number.isInteger(normalized.activeAccounts) || normalized.activeAccounts < 0 ||
+    !isFiniteNumber(normalized.activeWorkloads) || !Number.isInteger(normalized.activeWorkloads) || normalized.activeWorkloads < 0 ||
+    !isFiniteNumber(normalized.important) || !Number.isInteger(normalized.important) || normalized.important < 0 ||
+    !isFiniteNumber(normalized.targeted) || !Number.isInteger(normalized.targeted) || normalized.targeted < 0 ||
+    !isFiniteNumber(normalized.arrUsd) || normalized.arrUsd < 0 ||
+    !isFiniteNumber(normalized.acrUsd) || normalized.acrUsd < 0
+  ) {
+    throw new Error("Malformed Accounts & Workloads API summary response");
+  }
+  return {
+    activeAccounts: normalized.activeAccounts,
+    activeWorkloads: normalized.activeWorkloads,
+    arrUsd: normalized.arrUsd,
+    acrUsd: normalized.acrUsd,
+    important: normalized.important,
+    targeted: normalized.targeted
+  };
+};
 
 export const persistAccountWorkloadChanges = async (
   savedRows: AccountWorkloadRow[],

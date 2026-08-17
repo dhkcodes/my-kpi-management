@@ -22,6 +22,7 @@ import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems,
 import { AccountWorkloadMetadata, AccountWorkloadRow, getAccountWorkloadMetadata } from "../data/accountsWorkloadsMockData";
 import {
   AccountsWorkloadsDataSource,
+  createApiAccountWorkloadMetadata,
   loadAccountWorkloadStateSeed
 } from "../data/accountsWorkloadsDataSource";
 import {
@@ -209,11 +210,9 @@ export const App = registerCustomElement(
         try {
           const result = await fetchAccountsWorkloads(query);
           if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
-          setAccountWorkloadMetadata((current) => ({
-            ...current,
-            sourceWorkbook: "Accounts & Workloads API",
-            parsedRowCount: result.total
-          }));
+          setAccountWorkloadMetadata((current) =>
+            createApiAccountWorkloadMetadata(fiscalYear, result.total, current)
+          );
           setAccountsWorkloadsDataSource("api");
           setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: result.items }));
         } catch (error) {

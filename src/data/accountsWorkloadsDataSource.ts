@@ -4,6 +4,7 @@ import {
   AccountWorkloadStateSeed,
   accountWorkloadSeed
 } from "./accountsWorkloadsMockData";
+import { FiscalYear } from "./kpiMockData";
 
 export const ACCOUNTS_WORKLOADS_PRIVATE_DATA_URL = "/private-data/accounts-workloads-fy27.json";
 
@@ -110,6 +111,17 @@ export const normalizeAccountWorkloadStateSeed = (value: unknown): AccountWorklo
   if (ids.size !== rows.length) throw new Error("Duplicate row IDs");
   return { metadata, rows };
 };
+
+export const createApiAccountWorkloadMetadata = (
+  fiscalYear: FiscalYear,
+  parsedRowCount: number,
+  base: AccountWorkloadMetadata
+): AccountWorkloadMetadata => ({
+  ...base,
+  fiscalYear,
+  sourceWorkbook: "Accounts & Workloads API",
+  parsedRowCount
+});
 
 const fallbackSeed = (): AccountWorkloadStateSeed => ({
   metadata: { ...accountWorkloadSeed.metadata },

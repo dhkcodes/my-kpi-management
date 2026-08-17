@@ -230,6 +230,58 @@ async function run() {
     "malformed row objects must surface as errors"
   );
 
+  const invalidRowCases: Array<[string, Partial<AccountWorkloadRow>]> = [
+    ["zero commitment ID", { commitmentId: 0 }],
+    ["fractional version", { versionNo: 1.5 }],
+    ["zero source row", { sourceRowNumber: 0 }],
+    ["impossible start date", { startDate: "2026-02-30" }],
+    ["non-ISO end date", { endDate: "2026-2-03" }],
+    ["negative win probability", { winProbability: -1 }],
+    ["win probability above 100", { winProbability: 101 }],
+    ["negative ARR USD", { arrUsd: -1 }],
+    ["negative ARR KRW", { arrKrw: -1 }],
+    ["negative ACR USD", { acrUsd: -1 }],
+    ["negative ACR KRW", { acrKrw: -1 }]
+  ];
+  for (const [label, override] of invalidRowCases) {
+    await assert.rejects(
+      () => fetchAccountsWorkloads(
+        { fiscalYear: "FY27" },
+        async () => response({ items: [{ ...saved, ...override }], total: 1 })
+      ),
+      /malformed/i,
+      `${label} must be rejected`
+    );
+  }
+  for (const validOverride of [
+    { startDate: "", endDate: "" },
+    { startDate: null, endDate: null },
+    { winProbability: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null }
+  ]) {
+    const validList = await fetchAccountsWorkloads(
+      { fiscalYear: "FY27" },
+      async () => response({ items: [{ ...saved, ...validOverride }], total: 1 })
+    );
+    assert.equal(validList.items.length, 1);
+  }
+
+  const invalidSummaryCases: Array<[string, Record<string, unknown>]> = [
+    ["fractional account count", { activeAccounts: 1.5 }],
+    ["negative workload count", { activeWorkloads: -1 }],
+    ["fractional important count", { important: 0.5 }],
+    ["negative targeted count", { targeted: -1 }],
+    ["negative ARR", { arrUsd: -1 }],
+    ["non-finite ACR", { acrUsd: Number.POSITIVE_INFINITY }]
+  ];
+  const validSummary = { activeAccounts: 2, activeWorkloads: 3, arrUsd: 100, acrUsd: 80, important: 1, targeted: 2 };
+  for (const [label, override] of invalidSummaryCases) {
+    await assert.rejects(
+      () => fetchAccountsWorkloadsSummary("FY27", async () => response({ ...validSummary, ...override })),
+      /malformed/i,
+      `${label} must be rejected`
+    );
+  }
+
   let wrappedNetworkError: unknown;
   try {
     await fetchAccountsWorkloads(
