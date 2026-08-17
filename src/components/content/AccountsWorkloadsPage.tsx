@@ -1,9 +1,10 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
-import { AccountsWorkloadsListQuery, AccountsWorkloadsPersistenceError } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
-import { applyDraftDelete, applyDraftRestore, hasSelectedDeletedRows, remainingPermanentDeleteIds, resolveDeleteMode, withMinimumPendingDuration } from "../../data/accountsWorkloadsSelection";
+import { FxRateRecord } from "../../data/kpiConfigurationApi";
+import { applyDraftDelete, applyDraftRestore, hasSelectedDeletedRows, resolveDeleteMode, withMinimumPendingDuration } from "../../data/accountsWorkloadsSelection";
 import {
   AccountWorkloadMetadata,
   AccountWorkloadRow
@@ -46,10 +47,14 @@ type Props = Readonly<{
   metadata: AccountWorkloadMetadata;
   query: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
   dataSource: AccountsWorkloadsDataSource;
+  fxRate: FxRateRecord | null;
+  fxLoading: boolean;
+  fxError: string;
+  accountsWorkloadsRefreshing: boolean;
   onQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onRefresh: () => void;
   onDraftStateChange: (active: boolean) => void;
-  onRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds?: string[]) => Promise<void>;
+  onRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
 }>;
 
 const editableFields: EditableField[] = [
@@ -273,6 +278,10 @@ export function AccountsWorkloadsPage({
   metadata,
   query,
   dataSource,
+  fxRate,
+  fxLoading,
+  fxError,
+  accountsWorkloadsRefreshing,
   onQueryChange,
   onRefresh,
   onDraftStateChange,
@@ -291,10 +300,11 @@ export function AccountsWorkloadsPage({
   const [saveError, setSaveError] = useState("");
   const [permanentDeleteIds, setPermanentDeleteIds] = useState<string[]>([]);
   const [confirmPermanentDelete, setConfirmPermanentDelete] = useState(false);
-  const [savedExchangeRate, setSavedExchangeRate] = useState(metadata.exchangeRate);
-  const [exchangeRate, setExchangeRate] = useState(metadata.exchangeRate);
+  const initialExchangeRate = fxRate?.rateValue ?? metadata.exchangeRate;
+  const [savedExchangeRate, setSavedExchangeRate] = useState(initialExchangeRate);
+  const [exchangeRate, setExchangeRate] = useState(initialExchangeRate);
   const [fxPopoverOpen, setFxPopoverOpen] = useState(false);
-  const [draftExchangeRate, setDraftExchangeRate] = useState(`${metadata.exchangeRate}`);
+  const [draftExchangeRate, setDraftExchangeRate] = useState(`${initialExchangeRate}`);
   const gridScrollRef = useRef<HTMLDivElement>(null);
   const savingDialogRef = useRef<ojDialog>(null);
   const deleteDialogRef = useRef<ojDialog>(null);
@@ -364,6 +374,13 @@ export function AccountsWorkloadsPage({
     if (!isDirty && !addingRow && !editCell) setDraftRows(rows);
   }, [addingRow, editCell, isDirty, rows]);
 
+  useEffect(() => {
+    if (!fxRate || isDirty) return;
+    setSavedExchangeRate(fxRate.rateValue);
+    setExchangeRate(fxRate.rateValue);
+    setDraftExchangeRate(`${fxRate.rateValue}`);
+  }, [fxRate, isDirty]);
+
   const draftActive = Boolean(isDirty || addingRow || editCell);
   useEffect(() => {
     onDraftStateChange(draftActive);
@@ -406,11 +423,21 @@ export function AccountsWorkloadsPage({
     setEditCell(null);
   };
 
+  const submitSearch = () => {
+    onQueryChange({ ...query, search: searchTerm, includeDeleted, sort: sortField, direction: sortDirection });
+  };
+
+  const submitSearchOnEnter = (event: KeyboardEvent) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    submitSearch();
+  };
+
   const toggleSort = (field: SortField) => {
     const direction = sortField === field && sortDirection === "asc" ? "desc" : "asc";
     setSortField(field);
     setSortDirection(direction);
-    onQueryChange({ ...query, search: searchTerm, includeDeleted, sort: field, direction });
+    onQueryChange({ ...query, search: query.search, includeDeleted, sort: field, direction });
   };
 
   const sortIndicator = (field: SortField) => (sortField === field ? (sortDirection === "asc" ? "▲" : "▼") : "↕");
@@ -445,25 +472,35 @@ export function AccountsWorkloadsPage({
   };
 
   const saveGridChanges = async () => {
+    const rowsToSave = addingRow ? [...draftRows, addingRow] : draftRows;
+    if (addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim())) return;
+    const draftFxRate = fxRate && exchangeRate !== savedExchangeRate
+      ? { ...fxRate, rateValue: exchangeRate }
+      : undefined;
     setSaving(true);
     setSaveError("");
     try {
-      await withMinimumPendingDuration(() => onRowsChange(draftRows));
-      setSavedExchangeRate(exchangeRate);
-      setDraftExchangeRate(`${exchangeRate}`);
+      const authoritative = await withMinimumPendingDuration(() =>
+        onRowsChange(rowsToSave, permanentDeleteIds, draftFxRate)
+      );
+      setDraftRows(authoritative.items);
+      if (authoritative.fxRate) {
+        setSavedExchangeRate(authoritative.fxRate.rateValue);
+        setExchangeRate(authoritative.fxRate.rateValue);
+        setDraftExchangeRate(`${authoritative.fxRate.rateValue}`);
+      } else {
+        setSavedExchangeRate(exchangeRate);
+        setDraftExchangeRate(`${exchangeRate}`);
+      }
+      setAddingRow(null);
       setIsDirty(false);
       setEditCell(null);
       setPermanentDeleteIds([]);
       setSelectedRowIds([]);
     } catch (error) {
-      if (error instanceof AccountsWorkloadsPersistenceError) {
-        setDraftRows(error.retryRows);
-        setSaveError("Some changes were saved before a later operation failed. Latest server state was reloaded; retry will send only the remaining changes.");
-      } else {
-        setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
-          ? "Another user changed this row. Reload the latest data before saving again."
-          : "The changes could not be saved. Check the API connection and try again.");
-      }
+      setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
+        ? "Another user changed this data. Reload the latest data before saving again."
+        : "The changes could not be saved. Your drafts are unchanged; check the API connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -481,34 +518,6 @@ export function AccountsWorkloadsPage({
 
   const addRow = () => {
     setAddingRow(createEmptyRow(fiscalYear));
-  };
-
-  const saveAddRow = async () => {
-    if (!addingRow || !addingRow.account.trim() || !addingRow.workloadName.trim()) return;
-    const nextRows = [...draftRows, addingRow];
-    setSaving(true);
-    setSaveError("");
-    try {
-      await onRowsChange(nextRows);
-      setDraftRows(nextRows);
-      setSavedExchangeRate(exchangeRate);
-      setDraftExchangeRate(`${exchangeRate}`);
-      setAddingRow(null);
-      setIsDirty(false);
-      setEditCell(null);
-      setPermanentDeleteIds([]);
-      setSelectedRowIds([]);
-    } catch (error) {
-      if (error instanceof AccountsWorkloadsPersistenceError) {
-        setDraftRows(error.retryRows.filter((row) => row.id !== addingRow.id));
-        setAddingRow(error.retryRows.find((row) => row.id === addingRow.id) ?? addingRow);
-        setSaveError("Some changes were saved before this row failed. Latest server state was reloaded; retry will send only the remaining row.");
-      } else {
-        setSaveError("The row could not be added. Check required values and the API connection.");
-      }
-    } finally {
-      setSaving(false);
-    }
   };
 
   const highlightSelected = () => {
@@ -533,7 +542,7 @@ export function AccountsWorkloadsPage({
     stageDraftDelete();
   };
 
-  const permanentlyDeleteSelected = async () => {
+  const permanentlyDeleteSelected = () => {
     const ids = [...permanentDeleteIds];
     const activeIds = selectedVisibleRowIds.filter((id) => !rows.find((row) => row.id === id)?.isDeleted);
     const nextRows = applyDraftDelete(
@@ -543,33 +552,9 @@ export function AccountsWorkloadsPage({
       new Date().toISOString()
     );
     setConfirmPermanentDelete(false);
-    setSaving(true);
-    setSaveError("");
-    try {
-      await onRowsChange(nextRows, ids);
-      setDraftRows(nextRows);
-      setPermanentDeleteIds([]);
-      setIsDirty(false);
-      setSelectedRowIds([]);
-    } catch (error) {
-      if (error instanceof AccountsWorkloadsPersistenceError) {
-        const remainingIds = remainingPermanentDeleteIds(error.retryRows, ids);
-        setDraftRows(error.retryRows);
-        setPermanentDeleteIds(remainingIds);
-        setSelectedRowIds((current) => current.filter((id) => remainingIds.includes(id) || error.retryRows.some((row) => row.id === id)));
-        setIsDirty(remainingIds.length > 0 || error.retryRows.some((retryRow) => {
-          const authoritativeRow = error.authoritative.items.find((row) => row.id === retryRow.id);
-          return !authoritativeRow || JSON.stringify(retryRow) !== JSON.stringify(authoritativeRow);
-        }));
-        setSaveError("Some rows were deleted permanently before a later operation failed. Completed deletions were reconciled; only the remaining rows will be retried.");
-      } else {
-        setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
-          ? "Another user changed this row. Reload the latest data before permanently deleting it."
-          : "The selected deleted rows could not be permanently deleted.");
-      }
-    } finally {
-      setSaving(false);
-    }
+    setDraftRows(nextRows);
+    setIsDirty(true);
+    setSelectedRowIds([]);
   };
 
   const restoreSelected = () => {
@@ -579,10 +564,11 @@ export function AccountsWorkloadsPage({
 
   const applyExchangeRate = () => {
     const parsed = numberFromInput(draftExchangeRate);
-    if (parsed === null || parsed <= 0) return;
+    if (parsed === null || parsed <= 0 || !fxRate) return;
     setExchangeRate(parsed);
+    setDraftExchangeRate(`${parsed}`);
     setDraftRows((current) =>
-      current.map((row) => ({
+      current.map((row) => row.isDeleted ? row : ({
         ...row,
         arrKrw: row.arrUsd === null ? row.arrKrw : Math.round(row.arrUsd * parsed),
         acrKrw: row.acrUsd === null ? row.acrKrw : Math.round(row.acrUsd * parsed)
@@ -713,8 +699,10 @@ export function AccountsWorkloadsPage({
                 />
               </label>
               <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
+              {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
+              {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
               <div class="accounts-workloads-popover-actions">
-                <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" onClick={applyExchangeRate}>Apply</button>
+                <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={fxLoading || !fxRate} onClick={applyExchangeRate}>Apply</button>
                 <button type="button" class="accounts-workloads-button" onClick={cancelExchangeRateEdit}>Cancel</button>
               </div>
             </div>
@@ -723,20 +711,32 @@ export function AccountsWorkloadsPage({
       </div>
 
       <div class="accounts-workloads-toolbar" aria-label="Accounts and workloads actions">
-        <label class="accounts-workloads-search">
-          <span>Search</span>
-          <input
-            value={searchTerm}
-            disabled={draftActive}
-            title={draftActive ? "Save or cancel changes before changing the server query." : undefined}
-            onInput={(event) => {
-              const search = (event.currentTarget as HTMLInputElement).value;
-              setSearchTerm(search);
-              onQueryChange({ ...query, search, includeDeleted, sort: sortField, direction: sortDirection });
-            }}
-            placeholder="Account / Workload / Oppty / Plan Number"
-          />
-        </label>
+        <div class="accounts-workloads-search">
+          <label for="accountsWorkloadsSearchInput">Search</label>
+          <div class="accounts-workloads-search__control">
+            <input
+              id="accountsWorkloadsSearchInput"
+              value={searchTerm}
+              disabled={draftActive}
+              title={draftActive ? "Save or cancel changes before changing the server query." : undefined}
+              onInput={(event) => {
+                const search = (event.currentTarget as HTMLInputElement).value;
+                setSearchTerm(search);
+              }}
+              onKeyDown={submitSearchOnEnter}
+              placeholder="Account / Workload / Oppty / Plan Number"
+            />
+            <button
+              id="accountsWorkloadsSearchButton"
+              type="button"
+              aria-label="Search accounts and workloads"
+              title="Search"
+              disabled={draftActive}
+              onClick={submitSearch}>
+              <span class="oj-ux-ico-search" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
         <label class="accounts-workloads-switch">
           <span>Include deleted</span>
           <oj-switch
@@ -745,14 +745,14 @@ export function AccountsWorkloadsPage({
             onvalueChanged={(event: CustomEvent) => {
               const nextIncludeDeleted = Boolean(event.detail.value);
               setIncludeDeleted(nextIncludeDeleted);
-              onQueryChange({ ...query, search: searchTerm, includeDeleted: nextIncludeDeleted, sort: sortField, direction: sortDirection });
+              onQueryChange({ ...query, search: query.search, includeDeleted: nextIncludeDeleted, sort: sortField, direction: sortDirection });
             }}
             aria-label="Include deleted rows">
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
           <oj-button class="accounts-workloads-jet-button" chroming="callToAction" onojAction={addRow}>Add Row</oj-button>
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive} onojAction={onRefresh}>Refresh</oj-button>
+          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing} onojAction={onRefresh}>Refresh</oj-button>
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={selectedCount === 0} onojAction={highlightSelected}>Highlight</oj-button>
           {selectedHasDeletedRows && (
             <oj-button class="accounts-workloads-jet-button" chroming="outlined" onojAction={restoreSelected}>Restore</oj-button>
@@ -781,6 +781,7 @@ export function AccountsWorkloadsPage({
       </oj-dialog>
 
       <div class="accounts-workloads-grid-shell">
+        {accountsWorkloadsRefreshing && <div class="accounts-workloads-table-refresh" role="status" aria-live="polite">Refreshing table…</div>}
         <div class="accounts-workloads-scroll-hint" role="note">Use fixed arrows, Shift + mouse wheel, or ← / → while the grid is focused.</div>
         <div class="accounts-workloads-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" class="accounts-workloads-scroll-control" aria-label="Move table left" title="Move left" disabled={scrollState.left <= 0} onClick={() => moveHorizontally(-1)}>‹</button>
@@ -876,7 +877,7 @@ export function AccountsWorkloadsPage({
               type="button"
               class="accounts-workloads-button accounts-workloads-button--primary"
               disabled={saving}
-              onClick={addingRow ? saveAddRow : saveGridChanges}>
+              onClick={saveGridChanges}>
               {saving ? "Saving…" : "Save"}
             </button>
             <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>

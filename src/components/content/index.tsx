@@ -6,7 +6,7 @@
  * @ignore
  */
 import { h } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
 import { NavigationRouteDefinition } from "../navigationRoutes";
@@ -15,7 +15,8 @@ import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
 import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
-import { AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
+import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -29,16 +30,25 @@ type Props = Readonly<{
   accountsWorkloadsDraftActive: boolean;
   accountsWorkloadsDatasetAvailable: boolean;
   accountsWorkloadsLoading: boolean;
+  accountsWorkloadsRefreshing: boolean;
   accountWorkloadMetadata: AccountWorkloadMetadata;
   onAccountsWorkloadsRefresh: () => void;
   dataset: FiscalYearDataset;
   fiscalYear: FiscalYear;
   fiscalYears: FiscalYear[];
   guideOpen: boolean;
+  guideRecords: KpiGuideRecord[];
+  guideLoading: boolean;
+  guideSaving: boolean;
+  guideError: string;
+  fxRate: FxRateRecord | null;
+  fxLoading: boolean;
+  fxError: string;
   onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   onCloseGuide: () => void;
   onOpenGuide: () => void;
-  onAccountsWorkloadsRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds?: string[]) => Promise<void>;
+  onSaveGuide: (draft: KpiGuideRecord) => Promise<KpiGuideRecord>;
+  onAccountsWorkloadsRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
   onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
 }>;
@@ -141,6 +151,18 @@ const defaultGuideDetails = (guide: GuideSection): GuideDetails => ({
 });
 
 const getGuideDetails = (guide: GuideSection): GuideDetails => guideDetailsByCode[guide.code] ?? defaultGuideDetails(guide);
+
+const recordToGuideDetails = (record: KpiGuideRecord): GuideDetails => ({
+  srType: record.srType,
+  businessSrType: record.businessSrType,
+  combinedSrType: record.combinedSrType ?? undefined,
+  targetPerQuarter: record.targetPerQuarter,
+  activity: record.activity,
+  taskType: record.taskType,
+  measuring: record.measuring,
+  details: record.details,
+  notes: record.notes
+});
 
 type GuideDetailsField = keyof GuideDetails;
 
@@ -258,14 +280,24 @@ export function Content({
   accountsWorkloadsDraftActive,
   accountsWorkloadsDatasetAvailable,
   accountsWorkloadsLoading,
+  accountsWorkloadsRefreshing,
   onAccountsWorkloadsRefresh,
   dataset,
   fiscalYear,
   fiscalYears,
   guideOpen,
+  guideRecords,
+  guideLoading,
+  guideSaving,
+  guideError,
+  fxRate,
+  fxLoading,
+  fxError,
   onFiscalYearChange,
   onCloseGuide,
   onOpenGuide,
+  onSaveGuide,
+
   onAccountsWorkloadsRowsChange,
   onAccountsWorkloadsQueryChange,
   onAccountsWorkloadsDraftStateChange
@@ -278,6 +310,7 @@ export function Content({
   const [draftGuideDetails, setDraftGuideDetails] = useState<Record<string, GuideDetails>>(() => ({ ...savedGuideDetails }));
   const [selectedGuideCode, setSelectedGuideCode] = useState<GuideSection["code"]>("A");
   const [guideEditMode, setGuideEditMode] = useState(false);
+  const [guideSaveError, setGuideSaveError] = useState("");
   const selectedGuide = guideItems.find((guide) => guide.code === selectedGuideCode) ?? guideItems[0];
   const selectedGuideDetails = guideEditMode
     ? draftGuideDetails[selectedGuide.code]
@@ -298,12 +331,49 @@ export function Content({
     }));
     setGuideEditMode(true);
   };
-  const saveGuideEdit = () => {
-    setSavedGuideDetails((current) => ({
-      ...current,
-      [selectedGuide.code]: { ...draftGuideDetails[selectedGuide.code] }
-    }));
+  useEffect(() => {
+    if (guideRecords.length === 0) {
+      const authoritative = Object.fromEntries(
+        guideItems.map((guide) => [guide.code, getGuideDetails(guide)])
+      ) as Record<string, GuideDetails>;
+      setSavedGuideDetails(authoritative);
+      setDraftGuideDetails(authoritative);
+      setSelectedGuideCode("A");
+      setGuideEditMode(false);
+      setGuideSaveError("");
+      return;
+    }
+    const authoritative = Object.fromEntries(
+      guideItems.map((guide) => {
+        const record = guideRecords.find((item) => item.kpiCode === guide.code);
+        return [guide.code, record ? recordToGuideDetails(record) : getGuideDetails(guide)];
+      })
+    ) as Record<string, GuideDetails>;
+    setSavedGuideDetails(authoritative);
+    setDraftGuideDetails(authoritative);
     setGuideEditMode(false);
+  }, [guideRecords, fiscalYear]);
+  const saveGuideEdit = async () => {
+    const record = guideRecords.find((item) => item.kpiCode === selectedGuide.code);
+    if (!record) {
+      setGuideSaveError("The selected KPI Guide record is not available from the database.");
+      return;
+    }
+    setGuideSaveError("");
+    try {
+      const details = draftGuideDetails[selectedGuide.code];
+      const authoritative = await onSaveGuide({
+        ...record,
+        ...details,
+        combinedSrType: details.combinedSrType ?? null
+      });
+      const saved = recordToGuideDetails(authoritative);
+      setSavedGuideDetails((current) => ({ ...current, [selectedGuide.code]: saved }));
+      setDraftGuideDetails((current) => ({ ...current, [selectedGuide.code]: saved }));
+      setGuideEditMode(false);
+    } catch (error) {
+      setGuideSaveError(error instanceof Error ? error.message : "KPI Guide could not be saved.");
+    }
   };
   const cancelGuideEdit = () => {
     setDraftGuideDetails((current) => ({
@@ -328,8 +398,12 @@ export function Content({
                 type="button"
                 class={year === fiscalYear ? "kpi-fiscal-year-option is-selected" : "kpi-fiscal-year-option"}
                 aria-pressed={year === fiscalYear ? "true" : "false"}
-                disabled={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear}
-                title={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear ? "Save or cancel table changes before changing fiscal year." : undefined}
+                disabled={(activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear) || (guideSaving && year !== fiscalYear)}
+                title={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear
+                  ? "Save or cancel table changes before changing fiscal year."
+                  : guideSaving && year !== fiscalYear
+                    ? "Wait for the KPI Guide save to finish before changing fiscal year."
+                    : undefined}
                 onClick={() => onFiscalYearChange(year)}>
                 {year}
               </button>
@@ -474,6 +548,10 @@ export function Content({
             metadata={accountWorkloadMetadata}
             query={accountsWorkloadsQuery}
             dataSource={accountsWorkloadsDataSource}
+            fxRate={fxRate}
+            fxLoading={fxLoading}
+            fxError={fxError}
+            accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
             onQueryChange={onAccountsWorkloadsQueryChange}
             onRefresh={onAccountsWorkloadsRefresh}
             onDraftStateChange={onAccountsWorkloadsDraftStateChange}
@@ -495,11 +573,11 @@ export function Content({
               <div class="kpi-guide-dialog__actions">
                 {guideEditMode ? (
                   <>
-                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" onClick={saveGuideEdit}>Save</button>
-                    <button type="button" id="kpiGuideCancelButton" class="kpi-guide-edit-button" onClick={cancelGuideEdit}>Cancel</button>
+                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" disabled={guideSaving} onClick={() => void saveGuideEdit()}>{guideSaving ? "Saving…" : "Save"}</button>
+                    <button type="button" id="kpiGuideCancelButton" class="kpi-guide-edit-button" disabled={guideSaving} onClick={cancelGuideEdit}>Cancel</button>
                   </>
                 ) : (
-                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" onClick={startGuideEdit}>Edit</button>
+                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" disabled={guideLoading || guideRecords.length === 0} onClick={startGuideEdit}>Edit</button>
                 )}
                 <oj-button chroming="borderless" display="icons" aria-label="Close KPI Guide" onojAction={onCloseGuide}>
                   <span slot="startIcon" class="oj-ux-ico-close"></span>
@@ -508,7 +586,11 @@ export function Content({
               </div>
             </div>
 
-            <div class="kpi-guide-layout kpi-guide-layout--unified">
+            <div class="kpi-guide-dialog__body">
+              {guideLoading && <div id="kpiGuideLoading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> Loading KPI Guide…</div>}
+              {(guideError || guideSaveError) && <div id="kpiGuideError" role="alert">{guideSaveError || guideError}</div>}
+
+              {!guideLoading && <div class="kpi-guide-layout kpi-guide-layout--unified">
               <aside class="kpi-guide-list" aria-label="KPI guide list">
                 {guideItems.map((guide) => (
                   <button
@@ -533,6 +615,7 @@ export function Content({
                   ? <EditableDetails details={selectedGuideDetails} onChange={updateDraftGuideDetails} />
                   : <ReadOnlyDetails details={selectedGuideDetails} />}
               </div>
+              </div>}
             </div>
           </section>
         </div>

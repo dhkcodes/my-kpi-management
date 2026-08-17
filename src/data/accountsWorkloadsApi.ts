@@ -1,5 +1,6 @@
 import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
 import { FiscalYear } from "./kpiMockData";
+import { FxRateRecord } from "./kpiConfigurationApi";
 
 export const ACCOUNTS_WORKLOADS_API_BASE = "/api/v1";
 
@@ -50,6 +51,10 @@ export type AccountsWorkloadsListQuery = Readonly<{
 export type AccountsWorkloadsListResponse = Readonly<{
   items: AccountWorkloadRow[];
   total: number;
+}>;
+
+export type AccountsWorkloadsBatchSaveResponse = AccountsWorkloadsListResponse & Readonly<{
+  fxRate?: FxRateRecord;
 }>;
 
 export type AccountsWorkloadsSummary = Readonly<{
@@ -351,6 +356,78 @@ const collectPendingChanges = (
     if (Object.keys(patch).length > 1) changes.push({ draft, saved, kind: "patch", patch });
   }
   return changes;
+};
+
+const createPayload = (row: AccountWorkloadRow) => {
+  const {
+    id: _id,
+    commitmentId: _commitmentId,
+    versionNo: _versionNo,
+    sourceRowNumber: _sourceRowNumber,
+    isDeleted: _isDeleted,
+    deletedAt: _deletedAt,
+    deletedBy: _deletedBy,
+    ...fields
+  } = row;
+  return fields;
+};
+
+const parseBatchFxRate = (value: unknown): FxRateRecord | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || value === null) throw new Error("Malformed Accounts & Workloads API save response");
+  const fx = value as Record<string, unknown>;
+  if (
+    typeof fx.fxRateId !== "number" || !Number.isInteger(fx.fxRateId) || fx.fxRateId <= 0 ||
+    typeof fx.fiscalYear !== "string" || !/^FY\d{2}$/.test(fx.fiscalYear) ||
+    fx.fromCurrency !== "USD" || fx.toCurrency !== "KRW" ||
+    typeof fx.rateValue !== "number" || !Number.isFinite(fx.rateValue) || fx.rateValue <= 0 ||
+    !(fx.sourceReference === null || typeof fx.sourceReference === "string") ||
+    typeof fx.versionNo !== "number" || !Number.isInteger(fx.versionNo) || fx.versionNo <= 0
+  ) throw new Error("Malformed Accounts & Workloads API save response");
+  return fx as FxRateRecord;
+};
+
+export const saveAccountsWorkloadsBatch = async (
+  savedRows: AccountWorkloadRow[],
+  draftRows: AccountWorkloadRow[],
+  query: AccountsWorkloadsListQuery,
+  fxRate: FxRateRecord | undefined,
+  fetchImpl: FetchLike = fetch,
+  permanentDeleteIds: string[] = []
+): Promise<AccountsWorkloadsBatchSaveResponse> => {
+  const changes = collectPendingChanges(savedRows, draftRows, permanentDeleteIds);
+  const mutationRef = (change: PendingChange) => ({
+    commitmentId: change.saved?.commitmentId,
+    versionNo: change.saved?.versionNo
+  });
+  const body = {
+    query: {
+      fiscalYear: query.fiscalYear,
+      search: query.search ?? "",
+      includeDeleted: query.includeDeleted ?? false,
+      sort: query.sort ?? "account",
+      direction: query.direction ?? "asc"
+    },
+    creates: changes.filter((change) => change.kind === "create").map((change) => createPayload(change.draft)),
+    patches: changes.filter((change) => change.kind === "patch").map((change) => ({ ...mutationRef(change), ...change.patch })),
+    deletes: changes.filter((change) => change.kind === "delete").map(mutationRef),
+    restores: changes.filter((change) => change.kind === "restore").map(mutationRef),
+    permanentDeletes: changes.filter((change) => change.kind === "permanent").map(mutationRef),
+    ...(fxRate ? { fxRate: { fxRateId: fxRate.fxRateId, versionNo: fxRate.versionNo, rateValue: fxRate.rateValue } } : {})
+  };
+  const payload = await requestJson<unknown>(fetchImpl, `${accountsWorkloadsApiBase()}/accounts-workloads/save`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Accounts & Workloads API save response");
+  const result = payload as { items?: unknown; total?: unknown; fxRate?: unknown };
+  const parsedItems = Array.isArray(result.items) ? result.items.map(parseAccountWorkloadRow) : [];
+  if (
+    !Array.isArray(result.items) || parsedItems.some((row) => row === null) ||
+    typeof result.total !== "number" || !Number.isInteger(result.total) || result.total < 0
+  ) throw new Error("Malformed Accounts & Workloads API save response");
+  const authoritativeFx = parseBatchFxRate(result.fxRate);
+  return { items: parsedItems as AccountWorkloadRow[], total: result.total, ...(authoritativeFx ? { fxRate: authoritativeFx } : {}) };
 };
 
 const retryRowsAfterPartialSave = (

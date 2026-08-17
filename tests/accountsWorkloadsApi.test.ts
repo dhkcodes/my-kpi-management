@@ -10,6 +10,7 @@ import {
   persistAccountWorkloadChanges,
   persistAndReconcileAccountWorkloadChanges,
   restoreAccountWorkload,
+  saveAccountsWorkloadsBatch,
   AccountsWorkloadsPersistenceError,
   canUseDevelopmentDataFallback
 } from "../src/data/accountsWorkloadsApi";
@@ -66,6 +67,56 @@ async function run() {
   }, fetchImpl);
   assert.equal(list.items.length, 1);
   assert.equal(calls[0].url, "/api/v1/accounts-workloads?fiscalYear=FY27&search=Demo+%26+Cloud&includeDeleted=true&sort=account&direction=desc");
+
+  const newRow = { ...saved, id: "new-atomic", commitmentId: undefined, versionNo: undefined, account: "Atomic New" };
+  const deleted = { ...saved, isDeleted: true };
+  const atomicCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const authoritativeFx = {
+    fxRateId: 9,
+    fiscalYear: "FY27" as const,
+    fromCurrency: "USD" as const,
+    toCurrency: "KRW" as const,
+    rateValue: 1400,
+    sourceReference: "Finance",
+    versionNo: 5
+  };
+  const atomicResult = await saveAccountsWorkloadsBatch(
+    [saved],
+    [deleted, newRow],
+    { fiscalYear: "FY27", search: "Demo & Cloud", includeDeleted: true, sort: "account", direction: "desc" },
+    { ...authoritativeFx, rateValue: 1390, versionNo: 4 },
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      atomicCalls.push({ url: String(input), init });
+      return response({ items: [{ ...saved, isDeleted: true, versionNo: 4 }], total: 1, fxRate: authoritativeFx });
+    }
+  );
+  assert.equal(atomicCalls.length, 1, "all row and FX changes use one atomic request");
+  assert.equal(atomicCalls[0].url, "/api/v1/accounts-workloads/save");
+  assert.equal(atomicCalls[0].init?.method, "POST");
+  const atomicBody = JSON.parse(String(atomicCalls[0].init?.body));
+  assert.deepEqual(
+    atomicBody.query,
+    { fiscalYear: "FY27", search: "Demo & Cloud", includeDeleted: true, sort: "account", direction: "desc" },
+    "the committed list query is preserved exactly as the backend typed query"
+  );
+  assert.equal(atomicBody.creates.length, 1);
+  assert.equal(atomicBody.creates[0].account, "Atomic New");
+  assert.deepEqual(atomicBody.patches, []);
+  assert.deepEqual(atomicBody.deletes, [{ commitmentId: 41, versionNo: 3 }]);
+  assert.deepEqual(atomicBody.restores, []);
+  assert.deepEqual(atomicBody.permanentDeletes, []);
+  assert.deepEqual(atomicBody.fxRate, { fxRateId: 9, versionNo: 4, rateValue: 1390 });
+  assert.equal(atomicResult.items[0].versionNo, 4, "authoritative rows win");
+  assert.equal(atomicResult.fxRate?.versionNo, 5, "authoritative FX/version wins");
+
+  const rowOnlyResult = await saveAccountsWorkloadsBatch(
+    [saved],
+    [{ ...saved, notes: "row-only" }],
+    { fiscalYear: "FY27" },
+    undefined,
+    async () => response({ items: [{ ...saved, notes: "row-only", versionNo: 4 }], total: 1, fxRate: null })
+  );
+  assert.equal(rowOnlyResult.fxRate, undefined, "row-only Save accepts the backend's optional null FX field");
 
   const changed = { ...saved, notes: "changed", winProbability: null };
   assert.deepEqual(buildAccountWorkloadPatch(saved, changed), {
