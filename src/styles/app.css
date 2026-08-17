@@ -1926,3 +1926,39 @@ h4.weekly-activity-section-label--next-week,
   .kpi-activity-toolbar { align-items: stretch; flex-direction: column; }
   .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { justify-content: space-between; width: 100%; }
 }
+
+/* KPI-only editable Data Table interactions. Accounts & Workloads remains untouched. */
+.kpi-jet-table-wrap { border: 1px solid var(--kpi-border); min-height: 8rem; overflow-x: auto; }
+.kpi-jet-editable-table { min-width: 62rem; width: 100%; }
+.kpi-jet-editable-table td { min-width: 8rem; position: relative; }
+.kpi-jet-editable-table td.is-editing-cell { background: #fff; box-shadow: inset 0 0 0 2px #2f6f9f; padding: .25rem; }
+.kpi-jet-editable-table tr.is-unsaved-row td { border-bottom-color: #d39b2a; }
+.kpi-jet-editable-table td.is-unsaved-cell { background: #fff4ce; }
+.kpi-jet-editable-table tr.kpi-manage-time-reflected-row td { background: #eaf4ec; }
+.kpi-jet-editable-table tr.kpi-manage-time-reflected-row td.is-unsaved-cell { background: #f4edc7; }
+.kpi-cell-editor, .kpi-cell-editor--boolean { font: inherit; min-height: 2.3rem; width: 100%; }
+.kpi-cell-editor--boolean { align-items: center; display: flex; gap: .35rem; white-space: nowrap; }
+.kpi-workload-cell-editor { min-width: 20rem; position: relative; }
+.kpi-workload-cell-editor > input { border: 1px solid var(--kpi-border); font: inherit; min-height: 2.3rem; padding: .4rem; width: 100%; }
+.kpi-workload-cell-editor__results { background: #fff; border: 1px solid var(--kpi-border); box-shadow: 0 10px 24px rgba(22,21,19,.16); left: 0; max-height: 13rem; overflow-y: auto; position: absolute; top: calc(100% + .2rem); width: min(28rem, 80vw); z-index: 30; }
+.kpi-workload-cell-editor__results button { background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); cursor: pointer; display: grid; gap: .15rem; padding: .55rem; text-align: left; width: 100%; }
+.kpi-workload-cell-editor__results button:hover, .kpi-workload-cell-editor__results button:focus-visible { background: #f3f1ef; }
+.kpi-workload-cell-editor__results span { color: var(--kpi-muted); display: block; padding: .55rem; }
+.kpi-activity-toolbar__right button.kpi-delete-button { background: #b42318; border-color: #b42318; color: #fff; }
+.kpi-activity-toolbar__right button.kpi-delete-button:hover, .kpi-activity-toolbar__right button.kpi-delete-button:focus-visible { background: #8f1b12; color: #fff; }
+
+.kpi-d1-progress-grid { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kpi-d1-progress-quarter { border: 1px solid var(--kpi-border); padding: .75rem; }
+.kpi-d1-progress-quarter h4 { margin: 0 0 .65rem; }
+.kpi-d1-progress-item + .kpi-d1-progress-item { margin-top: .6rem; }
+.kpi-d1-progress-label { align-items: center; display: flex; font-size: .78rem; gap: .5rem; justify-content: space-between; }
+.kpi-d1-progress-label strong { font-variant-numeric: tabular-nums; }
+.kpi-d1-progress-track { background: #e9e6e3; border-radius: 999px; height: .72rem; margin-top: .28rem; overflow: hidden; }
+.kpi-d1-progress-fill { display: block; height: 100%; min-width: 0; }
+.kpi-d1-progress-fill--identified { background: #2f6f9f; }
+.kpi-d1-progress-fill--validated { background: #8b63a6; }
+.kpi-d1-progress-fill--onboarded { background: #2f7d4b; }
+
+@media (max-width: 760px) {
+  .kpi-d1-progress-grid { grid-template-columns: minmax(0, 1fr); }
+}

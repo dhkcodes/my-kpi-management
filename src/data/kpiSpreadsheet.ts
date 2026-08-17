@@ -4,7 +4,7 @@ export const KPI_TABS = ["Overview", "A", "B", "C1", "C2", "D1", "F", "H"] as co
 export type KpiWorkspaceTab = typeof KPI_TABS[number];
 export type SpreadsheetKpiCode = Exclude<KpiWorkspaceTab, "Overview">;
 export type KpiFieldKey = "manageTimeReflected" | "quarter" | "month" | "accountWorkload" | "title" | "srNumber" | "stage" | "acrK" | "targetQuarter" | "deliveryDate";
-export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "date" | "number" | "quarter" | "month" | "stage" | "boolean" }>;
+export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "date" | "number" | "quarter" | "month" | "stage" | "activity" | "workload" | "boolean" }>;
 export type KpiToolbarAction = "save" | "cancel" | "delete";
 
 export const getKpiToolbarActions = (draftCount: number, selectedCount: number): readonly KpiToolbarAction[] =>
@@ -12,19 +12,20 @@ export const getKpiToolbarActions = (draftCount: number, selectedCount: number):
 
 const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text"): KpiField => ({ key, label, type });
 const manageTime = field("manageTimeReflected", "Manage Time", "boolean");
-const base = [manageTime, field("quarter", "Quarter", "quarter"), field("srNumber", "SR Number"), field("title", "SR Description")];
-const related = [manageTime, field("quarter", "Quarter", "quarter"), field("accountWorkload", "Account / Workload / OPPTY"), field("srNumber", "SR Number"), field("title", "SR Description")];
-const monthly = [manageTime, field("quarter", "Quarter", "quarter"), field("month", "Month", "month"), field("accountWorkload", "Account / Workload / OPPTY"), field("srNumber", "SR Number"), field("title", "SR Description")];
+const targetQuarter = field("quarter", "Target Quarter", "quarter");
+const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description")];
+const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description")];
+const monthly = [manageTime, field("month", "Month", "month"), field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description")];
 const delivery = field("deliveryDate", "Delivery Date", "date");
 
 export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]> = {
-  A: [...base, delivery],
-  B: [...related, delivery],
-  C1: [...monthly, delivery],
-  C2: [...monthly, delivery],
-  D1: [manageTime, field("quarter", "Quarter", "quarter"), field("accountWorkload", "Account / Workload / OPPTY"), field("srNumber", "SR Number"), field("title", "Activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
-  F: [...base, delivery],
-  H: [manageTime, field("quarter", "Quarter", "quarter"), field("title", "Content"), delivery]
+  A: [...base, targetQuarter, delivery],
+  B: [...related, targetQuarter, delivery],
+  C1: [...monthly, targetQuarter, delivery],
+  C2: [...monthly, targetQuarter, delivery],
+  D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
+  F: [...base, targetQuarter, delivery],
+  H: [manageTime, field("title", "Content"), targetQuarter, delivery]
 };
 
 export type KpiSpreadsheetRow = {
@@ -56,7 +57,7 @@ export const createEmptyKpiRow = (kpiCode: SpreadsheetKpiCode, fiscalYear: Fisca
   accountWorkload: "",
   workloadId: null,
   mappingStatus: ["B", "C1", "C2", "D1"].includes(kpiCode) ? "UNMATCHED" : "NOT_REQUIRED",
-  title: "",
+  title: kpiCode === "D1" ? "Solution Design" : "",
   srNumber: "",
   stage: kpiCode === "D1" ? "identified" : "",
   acrK: kpiCode === "D1" ? 0 : null,
@@ -70,17 +71,72 @@ const monthsByQuarter: Record<Quarter, readonly string[]> = {
 const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
 const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
 
+export const fiscalQuarterFromDeliveryDate = (deliveryDate: string): Quarter | "" => {
+  const match = /^\d{4}-(\d{2})-\d{2}$/.exec(deliveryDate);
+  if (!match) return "";
+  const month = Number(match[1]);
+  if (month >= 6 && month <= 8) return "Q1";
+  if (month >= 9 && month <= 11) return "Q2";
+  if (month === 12 || month <= 2) return "Q3";
+  if (month >= 3 && month <= 5) return "Q4";
+  return "";
+};
+
+export const formatKpiWorkloadOption = (option: Readonly<{
+  workloadId?: number;
+  accountName: string;
+  workloadName: string;
+  opptyNo: string | null;
+}>) => `${option.accountName} - ${option.workloadName}${option.opptyNo ? ` (${option.opptyNo})` : ""}`;
+
+export const isKpiFieldChanged = (
+  saved: KpiSpreadsheetRow,
+  draft: KpiSpreadsheetRow,
+  key: KpiFieldKey
+) => (saved[key] ?? "") !== (draft[key] ?? "");
+
+type JetRowKeySet = Readonly<{
+  isAddAll: () => boolean;
+  values: () => Set<string>;
+  deletedValues: () => Set<string>;
+}>;
+
+export const getSelectedKpiRowIds = (keySet: JetRowKeySet, availableIds: readonly string[]) => {
+  if (!keySet.isAddAll()) return Array.from(keySet.values());
+  const deleted = keySet.deletedValues();
+  return availableIds.filter((id) => !deleted.has(id));
+};
+
+export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadsheetRow) => {
+  const isNew = draft.id.startsWith("draft-");
+  if (!draft.deliveryDate && (isNew || Boolean(saved?.deliveryDate))) return true;
+  if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
+    && draft.workloadId == null && (isNew || saved?.workloadId != null)) return true;
+  if (draft.kpiCode === "D1") {
+    const missingDimension = !draft.stage || draft.acrK === null || !draft.targetQuarter;
+    const savedHadDimension = Boolean(saved?.stage) || saved?.acrK !== null || Boolean(saved?.targetQuarter);
+    if (missingDimension && (isNew || savedHadDimension)) return true;
+  }
+  return false;
+};
+
+const monthFromDeliveryDate = (deliveryDate: string) => {
+  const match = /^\d{4}-(\d{2})-\d{2}$/.exec(deliveryDate);
+  if (!match) return "";
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(match[1]) - 1] ?? "";
+};
+
 export function buildKpiSummary(rows: readonly KpiSpreadsheetRow[]) {
-  const quarterly = Object.fromEntries(KPI_TABS.filter((tab): tab is SpreadsheetKpiCode => tab !== "Overview").map((code) => [code, Object.fromEntries(quarters.map((quarter) => [quarter, rows.filter((row) => row.kpiCode === code && row.quarter === quarter).length]))])) as Record<SpreadsheetKpiCode, Record<Quarter, number>>;
+  const quarterly = Object.fromEntries(KPI_TABS.filter((tab): tab is SpreadsheetKpiCode => tab !== "Overview").map((code) => [code, Object.fromEntries(quarters.map((quarter) => [quarter, rows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter).length]))])) as Record<SpreadsheetKpiCode, Record<Quarter, number>>;
   const monthly = Object.fromEntries((["C1", "C2"] as const).map((code) => [code, Object.fromEntries(quarters.map((quarter) => {
-    const monthCounts = Object.fromEntries(monthsByQuarter[quarter].map((month) => [month, rows.filter((row) => row.kpiCode === code && row.quarter === quarter && row.month === month).length]));
+    const monthCounts = Object.fromEntries(monthsByQuarter[quarter].map((month) => [month, rows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && monthFromDeliveryDate(row.deliveryDate) === month).length]));
     return [quarter, { ...monthCounts, total: quarterly[code][quarter] }];
   }))])) as Record<"C1" | "C2", Record<Quarter, Record<string, number> & { total: number }>>;
   const c1c2Combined = Object.fromEntries(quarters.map((quarter) => [quarter, {
     actual: quarterly.C1[quarter] + quarterly.C2[quarter],
     target: 6
   }])) as Record<Quarter, { actual: number; target: number }>;
-  const d1 = Object.fromEntries(quarters.map((quarter) => [quarter, Object.fromEntries(stages.map((stage) => [stage, rows.filter((row) => row.kpiCode === "D1" && (row.targetQuarter || row.quarter) === quarter && row.stage === stage).reduce((sum, row) => sum + (row.acrK ?? 0), 0)]))])) as Record<Quarter, Record<WorkloadStage, number>>;
+  const d1 = Object.fromEntries(quarters.map((quarter) => [quarter, Object.fromEntries(stages.map((stage) => [stage, rows.filter((row) => row.kpiCode === "D1" && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && row.stage === stage).reduce((sum, row) => sum + (row.acrK ?? 0), 0)]))])) as Record<Quarter, Record<WorkloadStage, number>>;
   return { quarterly, monthly, c1c2Combined, d1 };
 }
 

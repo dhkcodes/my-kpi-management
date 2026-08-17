@@ -38,7 +38,7 @@ export type KpiWorkloadOption = Readonly<{
   workloadId: number;
   accountName: string;
   workloadName: string;
-  opptyNo: string;
+  opptyNo: string | null;
 }>;
 
 export type KpiWorkloadOptionPage = Readonly<{
@@ -129,7 +129,8 @@ function payloadFor(row: KpiSpreadsheetRow) {
   const verified = usesWorkload && row.workloadId != null;
   return {
     manageTimeReflected: row.manageTimeReflected, fiscalYear: row.fiscalYear, kpiCode: row.kpiCode,
-    deliveryDate: row.deliveryDate || null, deliveryDateRaw: null, quarter: row.quarter,
+    deliveryDate: row.deliveryDate || null, deliveryDateRaw: null,
+    quarter: row.kpiCode === "D1" ? (row.targetQuarter || row.quarter) : row.quarter,
     activityMonth: activityMonth(row), rawWorkload: usesWorkload ? row.accountWorkload : null,
     workloadId: verified ? row.workloadId : null,
     mappingStatus: usesWorkload ? (verified ? "VERIFIED" : row.mappingStatus ?? "UNMATCHED") : "NOT_REQUIRED",
@@ -163,7 +164,7 @@ export async function listKpiWorkloadOptions(
     if (!isObject(item) || typeof item.workloadId !== "number" || typeof item.accountName !== "string" || typeof item.workloadName !== "string") {
       throw new Error("Invalid KPI workload option");
     }
-    return { workloadId: item.workloadId, accountName: item.accountName, workloadName: item.workloadName, opptyNo: asText(item.opptyNo) };
+    return { workloadId: item.workloadId, accountName: item.accountName, workloadName: item.workloadName, opptyNo: asText(item.opptyNo) || null };
   });
   return { items, total: value.total, hasMore: value.hasMore };
 }
