@@ -7,11 +7,12 @@
  */
 import { registerCustomElement } from "ojs/ojvcomponent";
 import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
 import { Content } from "./content/index";
+import type { KpiNavigationGuard } from "./content/KpiSpreadsheetPage";
 import {
   getNavigationPath,
   getNavigationRoute,
@@ -132,6 +133,9 @@ export const App = registerCustomElement(
     const activeLocationHrefRef = useRef(typeof window === "undefined" ? getNavigationPath(initialRoute) : window.location.href);
     const historyIndexRef = useRef(typeof window === "undefined" ? 0 : getHistoryIndex(window.history.state) ?? 0);
     const restoringHistoryRef = useRef(false);
+    const kpiNavigationGuardRef = useRef<KpiNavigationGuard | null>(null);
+    const pendingKpiPopstatePromptRef = useRef<null | { label: string; retry: () => void }>(null);
+    const confirmedKpiPopstateRetryRef = useRef<null | { historyIndex: number | null; href: string }>(null);
     const [guideOpen, setGuideOpen] = useState(false);
     const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
     const [guideLoading, setGuideLoading] = useState(false);
@@ -169,6 +173,20 @@ export const App = registerCustomElement(
     useEffect(() => {
       const currentHistoryIndex = historyIndexRef.current;
       window.history.replaceState(withHistoryIndex(window.history.state, currentHistoryIndex), "", window.location.href);
+    }, []);
+
+    useEffect(() => {
+      const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        if (!kpiNavigationGuardRef.current) return;
+        event.preventDefault();
+        event.returnValue = "";
+      };
+      window.addEventListener("beforeunload", handleBeforeUnload);
+      return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, []);
+
+    const handleKpiNavigationGuardChange = useCallback((guard: KpiNavigationGuard | null) => {
+      kpiNavigationGuardRef.current = guard;
     }, []);
 
     useEffect(() => {
@@ -304,10 +322,68 @@ export const App = registerCustomElement(
       const handlePopState = (event: PopStateEvent) => {
         if (restoringHistoryRef.current) {
           restoringHistoryRef.current = false;
+          const pendingPrompt = pendingKpiPopstatePromptRef.current;
+          pendingKpiPopstatePromptRef.current = null;
+          if (pendingPrompt) {
+            const guard = kpiNavigationGuardRef.current;
+            if (guard) guard(pendingPrompt.label, pendingPrompt.retry);
+            else pendingPrompt.retry();
+          }
           return;
         }
         const route = getNavigationRouteFromPath(window.location.pathname);
-        if (!confirmWeeklyActivitiesNavigation(route, window.location.href)) {
+        const destinationHref = window.location.href;
+        const destinationIndex = getHistoryIndex(event.state);
+        const confirmedRetry = confirmedKpiPopstateRetryRef.current;
+        const isConfirmedKpiRetry = Boolean(confirmedRetry
+          && confirmedRetry.href === destinationHref
+          && confirmedRetry.historyIndex === destinationIndex);
+        if (confirmedRetry) confirmedKpiPopstateRetryRef.current = null;
+
+        const destinationChanged = hasNavigationDestinationChanged(
+          activeRouteRef.current.id,
+          route.id,
+          activeLocationHrefRef.current,
+          destinationHref
+        );
+        const applyDestination = (historyIndex: number | null) => {
+          if (historyIndex !== null) historyIndexRef.current = historyIndex;
+          if (route.module !== activeRouteModuleRef.current) {
+            accountsWorkloadsRequestIdRef.current += 1;
+            setAccountsWorkloadsRefreshing(false);
+          }
+          activeRouteRef.current = route;
+          activeRouteModuleRef.current = route.module;
+          setSelectedNavigationId(route.id);
+          setExpandedNavigationKeys(getExpandedNavigationKeys(route.id));
+          setActiveRoute(route);
+        };
+        if (!isConfirmedKpiRetry && destinationChanged && kpiNavigationGuardRef.current) {
+          const restorationDelta = getRejectedPopstateDelta(historyIndexRef.current, event.state);
+          if (restorationDelta !== null && restorationDelta !== 0) {
+            pendingKpiPopstatePromptRef.current = {
+              label: route.pageTitle,
+              retry: () => {
+                confirmedKpiPopstateRetryRef.current = { historyIndex: destinationIndex, href: destinationHref };
+                window.history.go(-restorationDelta);
+              }
+            };
+            restoringHistoryRef.current = true;
+            window.history.go(restorationDelta);
+            return;
+          }
+          const currentHref = activeLocationHrefRef.current;
+          const currentRoute = activeRouteRef.current;
+          window.history.replaceState(withHistoryIndex({ routeId: currentRoute.id }, historyIndexRef.current), "", currentHref);
+          kpiNavigationGuardRef.current(route.pageTitle, () => {
+            historyIndexRef.current += 1;
+            window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", destinationHref);
+            activeLocationHrefRef.current = destinationHref;
+            applyDestination(historyIndexRef.current);
+          });
+          return;
+        }
+        if (!confirmWeeklyActivitiesNavigation(route, destinationHref)) {
           const restorationDelta = getRejectedPopstateDelta(historyIndexRef.current, event.state);
           if (restorationDelta !== null && restorationDelta !== 0) {
             restoringHistoryRef.current = true;
@@ -315,17 +391,7 @@ export const App = registerCustomElement(
           }
           return;
         }
-        const destinationIndex = getHistoryIndex(event.state);
-        if (destinationIndex !== null) historyIndexRef.current = destinationIndex;
-        if (route.module !== activeRouteModuleRef.current) {
-          accountsWorkloadsRequestIdRef.current += 1;
-          setAccountsWorkloadsRefreshing(false);
-        }
-        activeRouteRef.current = route;
-        activeRouteModuleRef.current = route.module;
-        setSelectedNavigationId(route.id);
-        setExpandedNavigationKeys(getExpandedNavigationKeys(route.id));
-        setActiveRoute(route);
+        applyDestination(destinationIndex);
 
       };
       window.addEventListener("popstate", handlePopState);
@@ -358,21 +424,27 @@ export const App = registerCustomElement(
         activeLocationHrefRef.current,
         destinationHref
       );
-      if (!confirmWeeklyActivitiesNavigation(route, destinationHref) || !destinationChanged) return;
-      if (route.module !== activeRouteModuleRef.current) {
-        accountsWorkloadsRequestIdRef.current += 1;
-        setAccountsWorkloadsRefreshing(false);
-      }
-      activeRouteRef.current = route;
-      activeRouteModuleRef.current = route.module;
-      setSelectedNavigationId(navigationId);
-      setExpandedNavigationKeys(getExpandedNavigationKeys(navigationId));
-      setActiveRoute(route);
-      historyIndexRef.current += 1;
-      window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
-      requestAnimationFrame(() => {
-        document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+      if (!destinationChanged) return;
+      const navigate = () => {
+        if (!confirmWeeklyActivitiesNavigation(route, destinationHref)) return;
+        if (route.module !== activeRouteModuleRef.current) {
+          accountsWorkloadsRequestIdRef.current += 1;
+          setAccountsWorkloadsRefreshing(false);
+        }
+        activeRouteRef.current = route;
+        activeRouteModuleRef.current = route.module;
+        setSelectedNavigationId(navigationId);
+        setExpandedNavigationKeys(getExpandedNavigationKeys(navigationId));
+        setActiveRoute(route);
+        historyIndexRef.current += 1;
+        window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
+        requestAnimationFrame(() => {
+          document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      };
+      const kpiGuard = kpiNavigationGuardRef.current;
+      if (kpiGuard) kpiGuard(route.pageTitle, navigate);
+      else navigate();
     };
     const handleNavigationSelectionAction = (event: CustomEvent<{ value: unknown }>) => {
       const navigationId = typeof event.detail.value === "string" ? event.detail.value : "";
@@ -386,10 +458,15 @@ export const App = registerCustomElement(
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
       if (nextFiscalYear === fiscalYearRef.current) return;
       if (activeRouteRef.current.module === "weeklyActivities" && weeklyActivitiesDraftActiveRef.current) return;
-      accountsWorkloadsRequestIdRef.current += 1;
-      setAccountsWorkloadsRefreshing(false);
-      fiscalYearRef.current = nextFiscalYear;
-      setFiscalYear(nextFiscalYear);
+      const changeFiscalYear = () => {
+        accountsWorkloadsRequestIdRef.current += 1;
+        setAccountsWorkloadsRefreshing(false);
+        fiscalYearRef.current = nextFiscalYear;
+        setFiscalYear(nextFiscalYear);
+      };
+      const kpiGuard = kpiNavigationGuardRef.current;
+      if (kpiGuard) kpiGuard(nextFiscalYear, changeFiscalYear);
+      else changeFiscalYear();
     };
 
     const saveKpiGuide = async (draft: KpiGuideRecord) => {
@@ -533,6 +610,7 @@ export const App = registerCustomElement(
               weeklyActivitiesDraftActiveRef.current = active;
               setWeeklyActivitiesDraftActive(active);
             }}
+            onKpiNavigationGuardChange={handleKpiNavigationGuardChange}
             onFiscalYearChange={handleFiscalYearChange}
             onNavigate={handleNavigate}
           />

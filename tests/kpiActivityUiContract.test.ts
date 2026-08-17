@@ -6,6 +6,8 @@ const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheet
 const api = fs.readFileSync(path.resolve("src/data/kpiSpreadsheetApi.ts"), "utf8");
 const contract = fs.readFileSync(path.resolve("src/data/kpiSpreadsheet.ts"), "utf8");
 const main = fs.readFileSync(path.resolve("src/main.js"), "utf8");
+const content = fs.readFileSync(path.resolve("src/components/content/index.tsx"), "utf8");
+const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
 
 assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "KPI's expanded JET dependency graph must tolerate Tailnet load latency");
 assert.match(page, /import "ojs\/ojtable"/, "KPI tables must use Oracle JET Data Table");
@@ -13,17 +15,33 @@ assert.match(page, /import "ojs\/ojdatetimepicker"/, "date cells must load Oracl
 assert.match(page, /<oj-table/, "detail tables must render an oj-table");
 assert.doesNotMatch(page, />Edit</, "Edit button must be removed");
 assert.match(page, /onDblClick/, "double-click must enter cell edit mode");
+assert.match(page, /requestAnimationFrame/, "cell editor focus must wait for JET table rendering");
+assert.match(page, /\.focus\(\)/, "the opened cell editor must receive input focus");
 assert.match(page, /event\.key === "Enter"/, "Enter must commit the active editor to the draft");
 assert.match(page, /is-unsaved-cell/, "changed cells must be visually marked");
 assert.match(page, /is-unsaved-row/, "changed rows must be visually marked");
 assert.match(page, /kpi-manage-time-reflected-row/, "Manage Time Reflected must mark the full row");
 assert.match(page, /<oj-input-date/, "Delivery Date must use oj-input-date");
+assert.match(page, /<textarea/, "SR Description must use a textarea editor");
+assert.match(page, /<oj-dialog/, "navigation and delete confirmations must use Oracle JET Dialog");
+assert.match(page, /<oj-popup/, "truncated SR Description must expose its full value in an Oracle JET Popup");
+assert.match(page, /Save and Continue/);
+assert.match(page, /Discard and Continue/);
+assert.match(page, />Stay</);
+assert.match(page, /Delete selected KPI activities/);
+assert.match(page, /selectedQuarter/);
+assert.match(page, />Refresh</);
+assert.match(page, /const selectQuarter[\s\S]*setSelectedIds\(new Set\(\)\)[\s\S]*setSelectedQuarter\(quarter\)/, "quarter cards and Refresh must clear row selection before changing the filter");
+assert.match(page, /const selectedRows = visibleRows\.filter/, "delete candidates must be scoped to currently visible rows");
+assert.match(page, /const closeDescriptionPopup[\s\S]*cancelDescriptionPopupOpen\(\)[\s\S]*descriptionPopupRef\.current\?\.close\(\)/, "mouseleave and blur must cancel a pending popup open");
+assert.match(page, /onMouseLeave=\{closeDescriptionPopup\}[\s\S]*onBlur=\{closeDescriptionPopup\}/);
+assert.match(page, /drafts\.filter[\s\S]*authoritativeRows/, "new draft rows must be placed before saved rows");
 assert.match(contract, /Account \/ Workload \/ Oppty\.No/);
 assert.match(page, /Solution Design/);
 assert.match(page, /Solution Proposal/);
 assert.match(page, /Solution Deployment/);
 assert.match(page, /role="progressbar"/, "D1 summary must expose accessible progress bars");
-assert.match(page, /Sales Stage ACR USD K/);
+assert.match(page, /Sales Stage ACR[\s\S]*USD K/);
 
 const toolbarStart = page.indexOf('<div class="kpi-activity-toolbar"');
 const toolbarEnd = page.indexOf("<Summary rows=", toolbarStart);
@@ -39,13 +57,22 @@ assert.match(page, /Promise\.allSettled\(draftSnapshot\.map/s, "Save must send e
 assert.match(page, /Promise\.allSettled\(rowsToDelete\.map/s, "Delete must support multiple selected rows");
 assert.match(page, /sessionVersion\.current !== saveSession/, "late Save responses must not update a different FY\/route session");
 assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)/, "discarded mutation responses must trigger a fresh active-route fetch");
-assert.match(page, /deferredDraftsRef\.current\.set\(saveSessionKey, failedDrafts\)/, "failed stale-session saves must retain their drafts for retry");
-assert.match(page, /deferredDraftsRef\.current\.set\(previousSessionKey, currentDraftsRef\.current\)/, "later route switches must retain existing failed retry drafts");
+assert.doesNotMatch(page, /deferredDraftsRef/, "navigation guard must replace deferred stale toolbar state");
 assert.match(page, /requestVersion\.current !== requestVersionAtStart/, "workload pagination must reject stale query responses");
 assert.match(page, /setDrafts\(\[\]\)/, "Cancel\/save success must clear drafts");
 assert.match(api, /workloadId/, "save payload must preserve stable workloadId");
 assert.doesNotMatch(page, /<th>Rows<\/th>/);
 assert.match(page, /overview\?\.target/);
 assert.match(page, /listKpiOverview/);
+assert.match(page, /onNavigationGuardChange\(drafts\.length > 0 \? requestProtectedNavigation : null\)/, "the KPI page must register its JET-dialog guard only while drafts exist");
+assert.match(content, /onKpiNavigationGuardChange[\s\S]*onNavigationGuardChange=\{onKpiNavigationGuardChange\}/, "Content must forward the KPI guard registration to App");
+assert.match(app, /onKpiNavigationGuardChange=\{handleKpiNavigationGuardChange\}/);
+assert.match(app, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "KPI drafts must participate in browser unload protection");
+assert.match(app, /if \(kpiGuard\) kpiGuard\(route\.pageTitle, navigate\)/, "App side navigation must use the registered JET dialog guard");
+assert.match(app, /if \(kpiGuard\) kpiGuard\(nextFiscalYear, changeFiscalYear\)/, "App fiscal-year changes must use the registered JET dialog guard");
+assert.match(app, /pendingKpiPopstatePromptRef\.current = \{[\s\S]*confirmedKpiPopstateRetryRef\.current = \{ historyIndex: destinationIndex, href: destinationHref \}[\s\S]*window\.history\.go\(-restorationDelta\)[\s\S]*window\.history\.go\(restorationDelta\)/, "rejected popstate must register one confirmed retry and restore the current history entry before prompting");
+assert.match(app, /if \(confirmedRetry\) confirmedKpiPopstateRetryRef\.current = null/, "the popstate retry bypass must be consumed exactly once");
+assert.match(app, /UNSAVED_WEEKLY_ACTIVITY_MESSAGE[\s\S]*window\.confirm/, "the existing Weekly Activity native guard must remain intact");
+assert.doesNotMatch(page, /window\.confirm/, "the KPI guard must keep the centrally mounted Oracle JET dialog");
 
 console.log("kpiActivityUiContract tests passed");

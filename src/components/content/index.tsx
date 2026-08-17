@@ -18,7 +18,7 @@ import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accounts
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
-import { KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
+import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -56,6 +56,7 @@ type Props = Readonly<{
   onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
   onWeeklyActivitiesDraftStateChange: (active: boolean) => void;
+  onKpiNavigationGuardChange: (guard: KpiNavigationGuard | null) => void;
 }>;
 
 type GuideDetails = Readonly<{
@@ -308,7 +309,8 @@ export function Content({
   onAccountsWorkloadsRowsChange,
   onAccountsWorkloadsQueryChange,
   onAccountsWorkloadsDraftStateChange,
-  onWeeklyActivitiesDraftStateChange
+  onWeeklyActivitiesDraftStateChange,
+  onKpiNavigationGuardChange
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const guideItems = dataset.guides;
@@ -541,7 +543,7 @@ export function Content({
           </section>
         </>
       ) : activeRoute.module === "kpiPage" ? (
-        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} onNavigate={onNavigate} />
+        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page
           fiscalYear={fiscalYear}

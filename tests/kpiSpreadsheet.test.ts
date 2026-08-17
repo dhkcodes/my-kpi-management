@@ -8,6 +8,9 @@ import {
   formatKpiWorkloadOption,
   getSelectedKpiRowIds,
   getKpiToolbarActions,
+  getQuarterStatus,
+  getRowsForQuarter,
+  isD1QuarterAchieved,
   isKpiDraftInvalid,
   isKpiFieldChanged,
   KpiSpreadsheetRow
@@ -31,6 +34,10 @@ for (const code of KPI_TABS.filter((tab) => tab !== "Overview")) {
 const d1Keys = KPI_FIELD_CONTRACTS.D1.map((field) => field.key);
 assert.equal(d1Keys.includes("quarter"), false, "D1 must expose one Target Quarter only");
 assert.ok(d1Keys.indexOf("stage") < d1Keys.indexOf("acrK"));
+assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false, "C1 Month column must be removed");
+assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
+assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.type, "manageTime", "Manage Time must be a Pending/Reflected select");
+assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H must not expose an SR Number editor");
 
 assert.equal(fiscalQuarterFromDeliveryDate("2026-06-01"), "Q1");
 assert.equal(fiscalQuarterFromDeliveryDate("2026-08-31"), "Q1");
@@ -41,10 +48,12 @@ assert.equal(formatKpiWorkloadOption({ workloadId: 7, accountName: "Acme", workl
 assert.equal(formatKpiWorkloadOption({ workloadId: 8, accountName: "Acme", workloadName: "Analytics", opptyNo: null }), "Acme - Analytics");
 
 const rows: KpiSpreadsheetRow[] = [
-  { id: "c1-jun", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "C1", quarter: "Q4", month: "Aug", accountWorkload: "Synthetic Account / Analytics", title: "Workshop", srNumber: "SYN-1001", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-12" },
-  { id: "c2-aug", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "C2", quarter: "Q3", month: "Aug", accountWorkload: "Synthetic Account / Database", title: "POC", srNumber: "SYN-1002", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-08-18" },
-  { id: "d1-i", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1003", stage: "identified", acrK: 600, targetQuarter: "Q3", deliveryDate: "2026-10-20" },
-  { id: "d1-v", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Proposal", srNumber: "SYN-1004", stage: "validated", acrK: 350, targetQuarter: "Q3", deliveryDate: "2026-11-21" }
+  { id: "c1-jun", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "C1", quarter: "Q4", month: "Aug", accountWorkload: "Synthetic Account / Analytics", title: "Workshop", srNumber: "SYN-1001", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-12" },
+  { id: "c2-aug", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "C2", quarter: "Q3", month: "Aug", accountWorkload: "Synthetic Account / Database", title: "POC", srNumber: "SYN-1002", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-08-18" },
+  { id: "c2-pending", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "C2", quarter: "Q1", month: "Jun", accountWorkload: "Synthetic Account / Pending", title: "Pending POC", srNumber: "SYN-PENDING", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-20" },
+  { id: "d1-i", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1003", stage: "identified", acrK: 600, targetQuarter: "Q3", deliveryDate: "2026-10-20" },
+  { id: "d1-v", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Proposal", srNumber: "SYN-1004", stage: "validated", acrK: 350, targetQuarter: "Q3", deliveryDate: "2026-11-21" },
+  { id: "d1-pending", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q2", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1005", stage: "identified", acrK: 5000, targetQuarter: "Q2", deliveryDate: "2026-10-22" }
 ];
 const summary = buildKpiSummary(rows);
 assert.deepEqual(summary.monthly.C1.Q1, { Jun: 1, Jul: 0, Aug: 0, total: 1 });
@@ -56,11 +65,26 @@ assert.equal(summary.c1c2Combined.Q1.target, 6);
 assert.equal(summary.d1.Q2.identified, 600, "D1 Delivery Date must control Q1-Q4 statistics");
 assert.equal(summary.d1.Q2.validated, 350);
 assert.equal(summary.d1.Q3.identified, 0, "D1 Target Quarter must not control statistics");
+assert.equal(summary.quarterly.C2.Q1, 1, "Pending rows must be excluded from KPI counts");
+assert.equal(summary.d1.Q2.identified, 600, "Pending D1 ACR must be excluded from totals");
+assert.deepEqual(getRowsForQuarter(rows, "Q1").map((row) => row.id), ["c1-jun", "c2-aug", "c2-pending"], "quarter filter uses Delivery Date and keeps pending rows visible");
+assert.equal(getRowsForQuarter([createEmptyKpiRow("A", "FY27"), ...rows], "Q1")[0].id.startsWith("draft-"), true, "new rows stay visible above a selected Quarter filter");
+assert.equal(getQuarterStatus("FY27", "Q1", 1, 1, "2026-08-17"), "Achieved");
+assert.equal(getQuarterStatus("FY27", "Q1", 0, 1, "2026-08-17"), "In Progress");
+assert.equal(getQuarterStatus("FY27", "Q1", 0, 1, "2026-09-01"), "Not Achieved");
+assert.equal(getQuarterStatus("FY27", "Q2", 0, 1, "2026-08-17"), "Not Started");
+assert.equal(isD1QuarterAchieved({ identified: 2000, validated: 0, onboarded: 0 }), true, "D1 Identified target alone must achieve the quarter");
+assert.equal(isD1QuarterAchieved({ identified: 0, validated: 1000, onboarded: 0 }), true, "D1 Validated target alone must achieve the quarter");
+assert.equal(isD1QuarterAchieved({ identified: 0, validated: 0, onboarded: 500 }), true, "D1 Onboarded target alone must achieve the quarter");
+assert.equal(isD1QuarterAchieved({ identified: 1999, validated: 999, onboarded: 499 }), false, "D1 below all targets must not achieve the quarter");
 assert.equal(isKpiFieldChanged(rows[0], { ...rows[0], title: "Changed" }, "title"), true);
 assert.equal(isKpiFieldChanged(rows[0], { ...rows[0] }, "title"), false);
 assert.equal(isKpiDraftInvalid({ ...rows[0], deliveryDate: "" }, rows[0]), true, "clearing an existing Delivery Date must block Save");
-assert.equal(isKpiDraftInvalid({ ...rows[0], id: "legacy", deliveryDate: "" }, { ...rows[0], id: "legacy", deliveryDate: "" }), false, "an unchanged legacy missing date must remain editable");
+assert.equal(isKpiDraftInvalid({ ...rows[0], id: "legacy", deliveryDate: "" }, { ...rows[0], id: "legacy", deliveryDate: "" }), true, "a Reflected row without Delivery Date must be invalid");
 assert.equal(isKpiDraftInvalid(createEmptyKpiRow("A", "FY27")), true, "new rows require Delivery Date");
+assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, srNumber: "" }, rows[0]), true, "Reflected requires SR Number");
+assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, deliveryDate: "" }, rows[0]), true, "Reflected requires Delivery Date");
+assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), false, "H has no SR Number field, so Reflected requires Delivery Date only");
 const addAll = { isAddAll: () => true, values: () => new Set<string>(), deletedValues: () => new Set(["row-2"]) };
 assert.deepEqual(getSelectedKpiRowIds(addAll, ["row-1", "row-2", "row-3"]), ["row-1", "row-3"], "JET add-all selection must honor deleted keys");
 const explicit = { isAddAll: () => false, values: () => new Set(["row-2"]), deletedValues: () => new Set<string>() };

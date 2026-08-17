@@ -21,12 +21,14 @@ export type KpiOverviewRow = Readonly<{
 export const KPI_OVERVIEW_ROWS: readonly KpiOverviewRow[] = [
   { code: "A", name: "1 to many market awareness", target: "1 / Quarter", summaryModel: "Target Quarter count" },
   { code: "B", name: "Early discovery with customer", target: "12 / Quarter", summaryModel: "Target Quarter count" },
-  { code: "C1", name: "Show and discover workshops", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Fiscal Month → combined Target Quarter roll-up" },
-  { code: "C2", name: "POCs in customer tenancy", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Fiscal Month → combined Target Quarter roll-up" },
-  { code: "D1", name: "New workload", target: "Onboarded 500K · Validated 1,000K · Identified 2,000K / Quarter", summaryModel: "Target Quarter × Sales Stage ACR matrix" },
+  { code: "C1", name: "Show and discover workshops", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Target Quarter count" },
+  { code: "C2", name: "POCs in customer tenancy", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Target Quarter count" },
+  { code: "D1", name: "New workload", target: "Identified 2,000K OR Validated 1,000K OR Onboarded 500K / Quarter", summaryModel: "Target Quarter × Sales Stage ACR matrix" },
   { code: "F", name: "Customer references", target: "1 / Quarter", summaryModel: "Target Quarter count" },
   { code: "H", name: "Technical blogs", target: "1 / Quarter", summaryModel: "Target Quarter count" }
 ];
+
+export const KPI_QUARTER_COUNT_TARGETS = { A: 1, B: 12, F: 1, H: 1 } as const;
 
 export const getKpiTabForRoute = (routeId: string): KpiActivityTab =>
   KPI_ACTIVITY_TABS.find((item) => item.routeId === routeId)?.tab ?? "Overview";

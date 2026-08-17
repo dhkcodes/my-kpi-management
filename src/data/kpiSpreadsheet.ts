@@ -4,25 +4,24 @@ export const KPI_TABS = ["Overview", "A", "B", "C1", "C2", "D1", "F", "H"] as co
 export type KpiWorkspaceTab = typeof KPI_TABS[number];
 export type SpreadsheetKpiCode = Exclude<KpiWorkspaceTab, "Overview">;
 export type KpiFieldKey = "manageTimeReflected" | "quarter" | "month" | "accountWorkload" | "title" | "srNumber" | "stage" | "acrK" | "targetQuarter" | "deliveryDate";
-export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "date" | "number" | "quarter" | "month" | "stage" | "activity" | "workload" | "boolean" }>;
+export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "textarea" | "date" | "number" | "quarter" | "month" | "stage" | "activity" | "workload" | "manageTime" }>;
 export type KpiToolbarAction = "save" | "cancel" | "delete";
 
 export const getKpiToolbarActions = (draftCount: number, selectedCount: number): readonly KpiToolbarAction[] =>
   draftCount > 0 ? ["save", "cancel"] : selectedCount > 0 ? ["delete"] : [];
 
 const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text"): KpiField => ({ key, label, type });
-const manageTime = field("manageTimeReflected", "Manage Time", "boolean");
+const manageTime = field("manageTimeReflected", "Manage Time", "manageTime");
 const targetQuarter = field("quarter", "Target Quarter", "quarter");
-const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description")];
-const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description")];
-const monthly = [manageTime, field("month", "Month", "month"), field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description")];
+const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
+const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const delivery = field("deliveryDate", "Delivery Date", "date");
 
 export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]> = {
   A: [...base, targetQuarter, delivery],
   B: [...related, targetQuarter, delivery],
-  C1: [...monthly, targetQuarter, delivery],
-  C2: [...monthly, targetQuarter, delivery],
+  C1: [...related, targetQuarter, delivery],
+  C2: [...related, targetQuarter, delivery],
   D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
   F: [...base, targetQuarter, delivery],
   H: [manageTime, field("title", "Content"), targetQuarter, delivery]
@@ -109,6 +108,7 @@ export const getSelectedKpiRowIds = (keySet: JetRowKeySet, availableIds: readonl
 
 export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadsheetRow) => {
   const isNew = draft.id.startsWith("draft-");
+  if (draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim()))) return true;
   if (!draft.deliveryDate && (isNew || Boolean(saved?.deliveryDate))) return true;
   if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
     && draft.workloadId == null && (isNew || saved?.workloadId != null)) return true;
@@ -127,17 +127,50 @@ const monthFromDeliveryDate = (deliveryDate: string) => {
 };
 
 export function buildKpiSummary(rows: readonly KpiSpreadsheetRow[]) {
-  const quarterly = Object.fromEntries(KPI_TABS.filter((tab): tab is SpreadsheetKpiCode => tab !== "Overview").map((code) => [code, Object.fromEntries(quarters.map((quarter) => [quarter, rows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter).length]))])) as Record<SpreadsheetKpiCode, Record<Quarter, number>>;
+  const reflectedRows = rows.filter((row) => row.manageTimeReflected);
+  const quarterly = Object.fromEntries(KPI_TABS.filter((tab): tab is SpreadsheetKpiCode => tab !== "Overview").map((code) => [code, Object.fromEntries(quarters.map((quarter) => [quarter, reflectedRows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter).length]))])) as Record<SpreadsheetKpiCode, Record<Quarter, number>>;
   const monthly = Object.fromEntries((["C1", "C2"] as const).map((code) => [code, Object.fromEntries(quarters.map((quarter) => {
-    const monthCounts = Object.fromEntries(monthsByQuarter[quarter].map((month) => [month, rows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && monthFromDeliveryDate(row.deliveryDate) === month).length]));
+    const monthCounts = Object.fromEntries(monthsByQuarter[quarter].map((month) => [month, reflectedRows.filter((row) => row.kpiCode === code && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && monthFromDeliveryDate(row.deliveryDate) === month).length]));
     return [quarter, { ...monthCounts, total: quarterly[code][quarter] }];
   }))])) as Record<"C1" | "C2", Record<Quarter, Record<string, number> & { total: number }>>;
   const c1c2Combined = Object.fromEntries(quarters.map((quarter) => [quarter, {
     actual: quarterly.C1[quarter] + quarterly.C2[quarter],
     target: 6
   }])) as Record<Quarter, { actual: number; target: number }>;
-  const d1 = Object.fromEntries(quarters.map((quarter) => [quarter, Object.fromEntries(stages.map((stage) => [stage, rows.filter((row) => row.kpiCode === "D1" && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && row.stage === stage).reduce((sum, row) => sum + (row.acrK ?? 0), 0)]))])) as Record<Quarter, Record<WorkloadStage, number>>;
+  const d1 = Object.fromEntries(quarters.map((quarter) => [quarter, Object.fromEntries(stages.map((stage) => [stage, reflectedRows.filter((row) => row.kpiCode === "D1" && fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter && row.stage === stage).reduce((sum, row) => sum + (row.acrK ?? 0), 0)]))])) as Record<Quarter, Record<WorkloadStage, number>>;
   return { quarterly, monthly, c1c2Combined, d1 };
 }
 
 export const getMonthsForQuarter = (quarter: Quarter) => monthsByQuarter[quarter];
+
+export const getRowsForQuarter = (rows: readonly KpiSpreadsheetRow[], quarter: Quarter | null) =>
+  quarter ? rows.filter((row) => row.id.startsWith("draft-") || fiscalQuarterFromDeliveryDate(row.deliveryDate) === quarter) : [...rows];
+
+export type KpiQuarterStatus = "Achieved" | "In Progress" | "Not Achieved" | "Not Started";
+
+const fiscalQuarterRange = (fiscalYear: FiscalYear, quarter: Quarter): readonly [string, string] => {
+  const endYear = 2000 + Number(fiscalYear.slice(2));
+  const startYear = endYear - 1;
+  return ({
+    Q1: [`${startYear}-06-01`, `${startYear}-08-31`],
+    Q2: [`${startYear}-09-01`, `${startYear}-11-30`],
+    Q3: [`${startYear}-12-01`, `${endYear}-02-${endYear % 4 === 0 ? "29" : "28"}`],
+    Q4: [`${endYear}-03-01`, `${endYear}-05-31`]
+  } as const)[quarter];
+};
+
+export const getQuarterStatus = (
+  fiscalYear: FiscalYear,
+  quarter: Quarter,
+  actual: number,
+  target: number,
+  asOf: string
+): KpiQuarterStatus => {
+  const [start, end] = fiscalQuarterRange(fiscalYear, quarter);
+  if (asOf < start) return "Not Started";
+  if (actual >= target) return "Achieved";
+  return asOf > end ? "Not Achieved" : "In Progress";
+};
+
+export const isD1QuarterAchieved = (actual: Readonly<Record<WorkloadStage, number>>) =>
+  actual.identified >= 2000 || actual.validated >= 1000 || actual.onboarded >= 500;
