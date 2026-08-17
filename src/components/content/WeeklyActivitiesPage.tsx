@@ -9,7 +9,9 @@ import {
   WeeklyActivitiesQuery,
   WeeklyActivityRecord
 } from "../../data/weeklyActivitiesApi";
+import { FiscalYear } from "../../data/kpiMockData";
 import { SharedWeeklyActivityEditor } from "./SharedWeeklyActivityEditor";
+import { getWeeklyActivityFiscalYearRange } from "./weeklyActivityFiscalYear";
 import {
   hasWeeklyActivityFormattingParity,
   promoteWeeklyActivityListMarkerStyles,
@@ -63,11 +65,12 @@ function ActivityContent({ html, label, onDblClick }: Readonly<{ html: string; l
 }
 
 type WeeklyActivitiesPageProps = Readonly<{
+  fiscalYear: FiscalYear;
   onDirtyStateChange?: (active: boolean) => void;
 }>;
 
-export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPageProps) {
-  const defaultRange = getDefaultWeeklyActivityRange();
+export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyActivitiesPageProps) {
+  const defaultRange = getWeeklyActivityFiscalYearRange(fiscalYear);
   const [filters, setFilters] = useState({ ...defaultRange, search: "" });
   const [query, setQuery] = useState<WeeklyActivitiesQuery>({ ...defaultRange, search: "", page: 0, size: PAGE_SIZE });
   const [items, setItems] = useState<WeeklyActivityRecord[]>([]);
@@ -181,7 +184,7 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
   };
 
   const resetSearch = () => {
-    const next = { ...getDefaultWeeklyActivityRange(), search: "" };
+    const next = { ...getWeeklyActivityFiscalYearRange(fiscalYear), search: "" };
     setFilters(next);
     setFilterError("");
     setEditSession(null);
@@ -191,7 +194,11 @@ export function WeeklyActivitiesPage({ onDirtyStateChange }: WeeklyActivitiesPag
   const startAdd = () => {
     setEditError("");
     setRowError(null);
-    const weekOfDate = getDefaultWeeklyActivityRange().toDate;
+    const currentWeekDate = getDefaultWeeklyActivityRange().toDate;
+    const fiscalRange = getWeeklyActivityFiscalYearRange(fiscalYear);
+    const weekOfDate = currentWeekDate >= fiscalRange.fromDate && currentWeekDate <= fiscalRange.toDate
+      ? currentWeekDate
+      : fiscalRange.toDate;
     const drafts = { thisWeekHtml: "", nextWeekHtml: "" };
     setEditSession({
       key: `add-${Date.now()}`,

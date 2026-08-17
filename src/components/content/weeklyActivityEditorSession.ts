@@ -13,7 +13,8 @@ export interface SharedEditorAdapter {
 
 export const ALLOWED_QUILL_FORMATS = ["bold", "color", "size", "list"] as const;
 export const WEEKLY_ACTIVITY_COLORS = [
-  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B"
+  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B",
+  "#B3261E", "#D45B13", "#C58A00", "#007C91", "#A13E75", "#6E46A5"
 ] as const;
 
 const escapeHtml = (value: string) => value
@@ -32,9 +33,16 @@ const ALLOWED_COLORS = new Map<string, string>([
   ["#0b5f66", "#0B5F66"], ["rgb(11,95,102)", "#0B5F66"],
   ["#2458a6", "#2458A6"], ["rgb(36,88,166)", "#2458A6"],
   ["#2e6b3f", "#2E6B3F"], ["rgb(46,107,63)", "#2E6B3F"],
-  ["#5f4b8b", "#5F4B8B"], ["rgb(95,75,139)", "#5F4B8B"]
+  ["#5f4b8b", "#5F4B8B"], ["rgb(95,75,139)", "#5F4B8B"],
+  ["#b3261e", "#B3261E"], ["rgb(179,38,30)", "#B3261E"],
+  ["#d45b13", "#D45B13"], ["rgb(212,91,19)", "#D45B13"],
+  ["#c58a00", "#C58A00"], ["rgb(197,138,0)", "#C58A00"],
+  ["#007c91", "#007C91"], ["rgb(0,124,145)", "#007C91"],
+  ["#a13e75", "#A13E75"], ["rgb(161,62,117)", "#A13E75"],
+  ["#6e46a5", "#6E46A5"], ["rgb(110,70,165)", "#6E46A5"]
 ]);
-const ALLOWED_SIZES = new Set(["12px", "14px", "16px", "18px", "20px"]);
+export const WEEKLY_ACTIVITY_SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"] as const;
+const ALLOWED_SIZES = new Set<string>(WEEKLY_ACTIVITY_SIZES);
 
 const NODE_TEST_ENTITY_FALLBACK: Readonly<Record<string, string>> = {
   amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: "\u00A0",

@@ -29,6 +29,7 @@ type Props = Readonly<{
   accountsWorkloadsLoadError: string;
   accountsWorkloadsQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
   accountsWorkloadsDraftActive: boolean;
+  weeklyActivitiesDraftActive: boolean;
   accountsWorkloadsDatasetAvailable: boolean;
   accountsWorkloadsLoading: boolean;
   accountsWorkloadsRefreshing: boolean;
@@ -280,6 +281,7 @@ export function Content({
   accountsWorkloadsLoadError,
   accountsWorkloadsQuery,
   accountsWorkloadsDraftActive,
+  weeklyActivitiesDraftActive,
   accountsWorkloadsDatasetAvailable,
   accountsWorkloadsLoading,
   accountsWorkloadsRefreshing,
@@ -392,7 +394,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      {activeRoute.module !== "weeklyActivities" && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -401,19 +403,23 @@ export function Content({
                 type="button"
                 class={year === fiscalYear ? "kpi-fiscal-year-option is-selected" : "kpi-fiscal-year-option"}
                 aria-pressed={year === fiscalYear ? "true" : "false"}
-                disabled={(activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear) || (guideSaving && year !== fiscalYear)}
+                disabled={(activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear)
+                  || (activeRoute.module === "weeklyActivities" && weeklyActivitiesDraftActive && year !== fiscalYear)
+                  || (guideSaving && year !== fiscalYear)}
                 title={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear
                   ? "Save or cancel table changes before changing fiscal year."
-                  : guideSaving && year !== fiscalYear
-                    ? "Wait for the KPI Guide save to finish before changing fiscal year."
-                    : undefined}
+                  : activeRoute.module === "weeklyActivities" && weeklyActivitiesDraftActive && year !== fiscalYear
+                    ? "Save or cancel Weekly Activity changes before changing fiscal year."
+                    : guideSaving && year !== fiscalYear
+                      ? "Wait for the KPI Guide save to finish before changing fiscal year."
+                      : undefined}
                 onClick={() => onFiscalYearChange(year)}>
                 {year}
               </button>
             ))}
           </div>
         </div>
-        <button
+        {activeRoute.module !== "weeklyActivities" && <button
           type="button"
           class="kpi-guide-entry-button"
           aria-label="Open KPI Guide"
@@ -421,8 +427,8 @@ export function Content({
           onClick={onOpenGuide}>
           <span class="oj-ux-ico-book" aria-hidden="true"></span>
           <span class="kpi-guide-entry-button__label">KPI Guide</span>
-        </button>
-      </section>}
+        </button>}
+      </section>
 
       {activeRoute.module !== "weeklyActivities" && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
@@ -562,7 +568,7 @@ export function Content({
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
+        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}

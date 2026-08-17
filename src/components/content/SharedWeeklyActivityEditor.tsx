@@ -6,6 +6,8 @@ import {
   ALLOWED_QUILL_FORMATS,
   sanitizeWeeklyActivityHtml,
   SharedEditorSession,
+  WEEKLY_ACTIVITY_COLORS,
+  WEEKLY_ACTIVITY_SIZES,
   WeeklyActivityDrafts,
   WeeklyActivityTarget
 } from "./weeklyActivityEditorSession";
@@ -42,6 +44,37 @@ const syncWeeklyActivityListMarkerStyles = (root: HTMLElement) => {
   }
 };
 
+const installWeeklyActivityListIcons = (toolbar: HTMLElement) => {
+  const namespace = "http://www.w3.org/2000/svg";
+  for (const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>("button.ql-list"))) {
+    const ordered = button.value === "ordered";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("class", "weekly-activity-list-icon");
+    svg.setAttribute("viewBox", "0 0 18 18");
+    svg.setAttribute("aria-hidden", "true");
+    for (let row = 0; row < 3; row += 1) {
+      const y = 4 + row * 5;
+      if (ordered) {
+        const number = document.createElementNS(namespace, "text");
+        number.setAttribute("x", "1.25");
+        number.setAttribute("y", `${y + 1.5}`);
+        number.textContent = `${row + 1}`;
+        svg.append(number);
+      } else {
+        const bullet = document.createElementNS(namespace, "circle");
+        bullet.setAttribute("cx", "3");
+        bullet.setAttribute("cy", `${y}`);
+        bullet.setAttribute("r", "1.15");
+        svg.append(bullet);
+      }
+      const line = document.createElementNS(namespace, "path");
+      line.setAttribute("d", `M6 ${y}H16`);
+      svg.append(line);
+    }
+    button.replaceChildren(svg);
+  }
+};
+
 export function SharedWeeklyActivityEditor({
   drafts,
   disabled = false,
@@ -62,7 +95,7 @@ export function SharedWeeklyActivityEditor({
     if (!toolbarRef.current || !editorRef.current || quillRef.current) return;
 
     const SizeStyle = QuillRuntime.import("attributors/style/size") as any;
-    SizeStyle.whitelist = ["12px", "14px", "16px", "18px", "20px"];
+    SizeStyle.whitelist = [...WEEKLY_ACTIVITY_SIZES];
     QuillRuntime.register(SizeStyle, true);
 
     const quill = new QuillRuntime(editorRef.current, {
@@ -80,6 +113,7 @@ export function SharedWeeklyActivityEditor({
       },
       placeholder: "Enter weekly activities"
     });
+    installWeeklyActivityListIcons(toolbarRef.current);
     toolbarRef.current.querySelector<HTMLElement>(".ql-color .ql-picker-label")?.setAttribute("aria-label", "Text color");
     toolbarRef.current.querySelector<HTMLElement>(".ql-size .ql-picker-label")?.setAttribute("aria-label", "Text size");
     const adapter = {
@@ -131,22 +165,11 @@ export function SharedWeeklyActivityEditor({
     <div class="weekly-activity-editor-composition">
       <div ref={toolbarRef} class="weekly-activity-toolbar" role="toolbar" aria-label="Weekly activity rich text formatting">
         <select class="ql-size" aria-label="Text size" defaultValue="14px">
-          <option value="12px">12px</option>
-          <option value="14px">14px</option>
-          <option value="16px">16px</option>
-          <option value="18px">18px</option>
-          <option value="20px">20px</option>
+          {WEEKLY_ACTIVITY_SIZES.map((size) => <option value={size}>{size}</option>)}
         </select>
         <button type="button" class="ql-bold" aria-label="Bold"></button>
         <select class="ql-color" aria-label="Text color">
-          <option value="#161513"></option>
-          <option value="#C74634"></option>
-          <option value="#7A2E1E"></option>
-          <option value="#8A5B00"></option>
-          <option value="#0B5F66"></option>
-          <option value="#2458A6"></option>
-          <option value="#2E6B3F"></option>
-          <option value="#5F4B8B"></option>
+          {WEEKLY_ACTIVITY_COLORS.map((color) => <option value={color}></option>)}
         </select>
         <button type="button" class="ql-list" value="bullet" aria-label="Unordered list"></button>
         <button type="button" class="ql-list" value="ordered" aria-label="Ordered list"></button>
@@ -160,7 +183,7 @@ export function SharedWeeklyActivityEditor({
           <span class="weekly-activity-edit-column__status">Editing</span>
           <div id="weeklyActivitySharedEditor" ref={editorRef}></div>
         </section>
-        <section class="weekly-activity-edit-column weekly-activity-edit-column--inactive">
+        <section class="weekly-activity-edit-column weekly-activity-edit-column--inactive" onDblClick={() => selectTarget(inactiveTarget)}>
           <button
             type="button"
             class="weekly-activity-edit-column__select"

@@ -28,6 +28,10 @@ import {
   SharedEditorSession,
   WeeklyActivityTarget
 } from "../src/components/content/weeklyActivityEditorSession";
+import {
+  getFiscalYearForWeekDate,
+  getWeeklyActivityFiscalYearRange
+} from "../src/components/content/weeklyActivityFiscalYear";
 
 
 class FakeEditor {
@@ -63,7 +67,10 @@ const sameTarget: WeeklyActivityTarget = session.activeTarget;
 session.switchTarget(sameTarget);
 assert.equal(editor.focusCount, 3, "same-target selection focuses without creating another editor");
 assert.deepEqual(ALLOWED_QUILL_FORMATS, ["bold", "color", "size", "list"]);
-assert.deepEqual(WEEKLY_ACTIVITY_COLORS, ["#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B"]);
+assert.deepEqual(WEEKLY_ACTIVITY_COLORS, [
+  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B",
+  "#B3261E", "#D45B13", "#C58A00", "#007C91", "#A13E75", "#6E46A5"
+]);
 
 const colorEditor = new FakeEditor();
 const colorSession = new SharedEditorSession(colorEditor, {
@@ -155,6 +162,17 @@ assert.equal(sanitizeWeeklyActivityStyle("color:red;font-size:13px"), "", "disal
 assert.equal(sanitizeWeeklyActivityStyle("color: rgb(199, 70, 52)"), "color:#C74634", "Quill RGB red is canonicalized instead of being stripped");
 assert.equal(sanitizeWeeklyActivityStyle("color:rgb(36,88,166)"), "color:#2458A6", "Quill RGB blue is canonicalized with optional whitespace");
 assert.equal(
+  sanitizeWeeklyActivityStyle("color:rgb(179, 38, 30);font-size:10px"),
+  "color:#B3261E;font-size:10px",
+  "the added Crimson Red and minimum font size survive Quill CSSOM serialization"
+);
+assert.equal(
+  sanitizeWeeklyActivityStyle("color:#6e46a5;font-size:30px"),
+  "color:#6E46A5;font-size:30px",
+  "the added Violet and maximum font size survive canonicalization"
+);
+assert.equal(sanitizeWeeklyActivityStyle("font-size:32px"), "", "sizes outside the 10px to 30px contract remain blocked");
+assert.equal(
   promoteWeeklyActivityListMarkerStyles('<ol><li><span style="color:#C74634;font-size:18px">First item</span></li></ol>'),
   '<ol><li style="color:#C74634;font-size:18px"><span style="color:#C74634;font-size:18px">First item</span></li></ol>',
   "a list marker inherits the leading text color and size in persisted/view HTML"
@@ -225,5 +243,12 @@ const staleRequest = requests.begin();
 const latestRequest = requests.begin();
 assert.equal(requests.isLatest(staleRequest), false);
 assert.equal(requests.isLatest(latestRequest), true);
+
+assert.deepEqual(getWeeklyActivityFiscalYearRange("FY26"), { fromDate: "2025-06-01", toDate: "2026-05-31" });
+assert.deepEqual(getWeeklyActivityFiscalYearRange("FY27"), { fromDate: "2026-06-01", toDate: "2027-05-31" });
+assert.equal(getFiscalYearForWeekDate("2025-05-31"), "FY25", "the day before June remains in the prior KAP fiscal year");
+assert.equal(getFiscalYearForWeekDate("2025-06-01"), "FY26", "June 1 starts the next KAP fiscal year");
+assert.equal(getFiscalYearForWeekDate("2026-05-31"), "FY26", "May 31 closes the current KAP fiscal year");
+assert.equal(getFiscalYearForWeekDate("2026-06-01"), "FY27", "the next June 1 starts FY27");
 
 console.log("weeklyActivityEditorSession tests passed");

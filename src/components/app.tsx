@@ -60,22 +60,14 @@ const UNSAVED_WEEKLY_ACTIVITY_MESSAGE = "Discard the unsaved Weekly Activity cha
 
 type NavigationEntryProps = Readonly<{
   item: NavigationItem;
-  onNavigate: (item: NavigationItem) => void;
+  selectedNavigationId: string;
 }>;
 
-function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
-  const handleItemClick = item.children
-    ? undefined
-    : (event: MouseEvent) => {
-        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onNavigate(item);
-      };
-
+function NavigationEntry({ item, selectedNavigationId }: NavigationEntryProps) {
+  const selected = item.id === selectedNavigationId;
   return (
-    <li id={item.id}>
-      <a href={item.href} data-app-navigation={item.children ? undefined : "true"} onClick={handleItemClick}>
+    <li id={item.id} class={selected ? "kpi-navigation-item--selected" : undefined}>
+      <a href={item.href} aria-current={selected ? "page" : undefined} data-app-navigation={item.children ? undefined : "true"} data-navigation-id={item.children ? undefined : item.id}>
         {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
         {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
         <span
@@ -91,7 +83,7 @@ function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
       {item.children && (
         <ul>
           {item.children.map((child) => (
-            <NavigationEntry item={child} onNavigate={onNavigate} />
+            <NavigationEntry item={child} selectedNavigationId={selectedNavigationId} />
           ))}
         </ul>
       )}
@@ -133,7 +125,10 @@ export const App = registerCustomElement(
     const [accountsWorkloadsLoading, setAccountsWorkloadsLoading] = useState(true);
     const [accountsWorkloadsLoadError, setAccountsWorkloadsLoadError] = useState("");
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
+    const [weeklyActivitiesDraftActive, setWeeklyActivitiesDraftActive] = useState(false);
     const weeklyActivitiesDraftActiveRef = useRef(false);
+    const navigateLeafRef = useRef<(navigationId: string) => void>(() => undefined);
+
     const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
     const accountsWorkloadsRequestIdRef = useRef(0);
     const [accountsWorkloadsQuery, setAccountsWorkloadsQuery] = useState<Omit<AccountsWorkloadsListQuery, "fiscalYear">>({
@@ -240,6 +235,7 @@ export const App = registerCustomElement(
       }
       if (shouldReleaseWeeklyActivityDraft(previousRoute.id, route.id)) {
         weeklyActivitiesDraftActiveRef.current = false;
+        setWeeklyActivitiesDraftActive(false);
       }
       activeLocationHrefRef.current = destinationHref;
       return true;
@@ -254,6 +250,9 @@ export const App = registerCustomElement(
         if (anchor.closest("oj-navigation-list")) {
           if (anchor.dataset.appNavigation === "true" && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
             event.preventDefault();
+            event.stopImmediatePropagation();
+            const navigationId = anchor.dataset.navigationId;
+            if (navigationId) navigateLeafRef.current(navigationId);
           }
           return;
         }
@@ -315,6 +314,7 @@ export const App = registerCustomElement(
         activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(route.id);
         setActiveRoute(route);
+
       };
       window.addEventListener("popstate", handlePopState);
       return () => window.removeEventListener("popstate", handlePopState);
@@ -337,8 +337,8 @@ export const App = registerCustomElement(
         setNavigationOpen(false);
       }
     };
-    const handleNavigate = (item: NavigationItem) => {
-      const route = getNavigationRoute(item.id);
+    const handleNavigate = (navigationId: string) => {
+      const route = getNavigationRoute(navigationId);
       const destinationHref = new URL(getNavigationPath(route), window.location.href).href;
       const destinationChanged = hasNavigationDestinationChanged(
         activeRouteRef.current.id,
@@ -353,17 +353,25 @@ export const App = registerCustomElement(
       }
       activeRouteRef.current = route;
       activeRouteModuleRef.current = route.module;
-      setSelectedNavigationId(item.id);
+      setSelectedNavigationId(navigationId);
       setActiveRoute(route);
       historyIndexRef.current += 1;
       window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
-      window.requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
         document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+    };
+    navigateLeafRef.current = handleNavigate;
+    const handleNavigationBeforeSelect = (event: CustomEvent<{ item: Element; key: unknown }>) => {
+      const navigationId = typeof event.detail.key === "string" ? event.detail.key : event.detail.item.id;
+      if (!navigationId || event.detail.item.querySelector("ul")) return;
+      event.preventDefault();
+      navigateLeafRef.current(navigationId);
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
       if (nextFiscalYear === fiscalYearRef.current) return;
+      if (activeRouteRef.current.module === "weeklyActivities" && weeklyActivitiesDraftActiveRef.current) return;
       accountsWorkloadsRequestIdRef.current += 1;
       setAccountsWorkloadsRefreshing(false);
       fiscalYearRef.current = nextFiscalYear;
@@ -444,11 +452,11 @@ export const App = registerCustomElement(
               class="kpi-navigation-list"
               drillMode="sliding"
               rootLabel="Home"
-              selection={selectedNavigationId}
+              onojBeforeSelect={handleNavigationBeforeSelect}
               aria-label="KPI navigation">
               <ul>
                 {navItems.map((item) => (
-                  <NavigationEntry item={item} onNavigate={handleNavigate} />
+                  <NavigationEntry item={item} selectedNavigationId={selectedNavigationId} />
                 ))}
               </ul>
             </oj-navigation-list>
@@ -461,6 +469,7 @@ export const App = registerCustomElement(
             accountsWorkloadsLoadError={accountsWorkloadsLoadError}
             accountsWorkloadsQuery={accountsWorkloadsQuery}
             accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
+            weeklyActivitiesDraftActive={weeklyActivitiesDraftActive}
             accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
             accountsWorkloadsLoading={accountsWorkloadsLoading}
             accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
@@ -507,6 +516,7 @@ export const App = registerCustomElement(
             onAccountsWorkloadsDraftStateChange={setAccountsWorkloadsDraftActive}
             onWeeklyActivitiesDraftStateChange={(active) => {
               weeklyActivitiesDraftActiveRef.current = active;
+              setWeeklyActivitiesDraftActive(active);
             }}
             onFiscalYearChange={handleFiscalYearChange}
           />

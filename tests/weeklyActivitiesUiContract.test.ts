@@ -6,6 +6,7 @@ import { WeeklyActivitiesApiError, WeeklyActivitiesPage, WeeklyActivityRecord } 
 
 const page = readFileSync("src/components/content/WeeklyActivitiesPage.tsx", "utf8");
 const editor = readFileSync("src/components/content/SharedWeeklyActivityEditor.tsx", "utf8");
+const editorSession = readFileSync("src/components/content/weeklyActivityEditorSession.ts", "utf8");
 const css = readFileSync("src/styles/app.css", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 const app = readFileSync("src/components/app.tsx", "utf8");
@@ -56,7 +57,7 @@ assert.match(page, /resolveFocusAfterRemoval\(items, record\.activityId\)/, "del
 assert.match(page, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "reload warns while a weekly draft is genuinely dirty");
 assert.match(page, /onDirtyStateChange\?\.\(editSessionDirty\)/, "the page reports baseline-derived dirty state instead of editor presence");
 assert.match(page, /isWeeklyActivityDraftDirty\(/, "date and both content drafts are compared with their baseline");
-assert.match(content, /<WeeklyActivitiesPage onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} \/>/);
+assert.match(content, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\} onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} \/>/);
 assert.match(app, /confirmWeeklyActivitiesNavigation[\s\S]*weeklyActivitiesDraftActiveRef\.current[\s\S]*window\.confirm\(UNSAVED_WEEKLY_ACTIVITY_MESSAGE\)/, "navigation confirmation is centralized around the active weekly draft ref");
 assert.match(app, /handlePopState[\s\S]*confirmWeeklyActivitiesNavigation\(route, window\.location\.href\)/, "browser Back and Forward pass the full destination URL, including hash, to the dirty guard");
 assert.match(app, /window\.history\.replaceState\(withHistoryIndex\(window\.history\.state, currentHistoryIndex\)/, "the current browser entry is indexed without replacing the stack");
@@ -64,11 +65,11 @@ assert.match(app, /getRejectedPopstateDelta\(historyIndexRef\.current, event\.st
 assert.doesNotMatch(app, /restoreOnReject[\s\S]*history\.pushState/, "popstate rejection never duplicates or destroys entries with pushState");
 assert.match(app, /shouldReleaseWeeklyActivityDraft\(previousRoute\.id, route\.id\)[\s\S]*weeklyActivitiesDraftActiveRef\.current = false/, "approval releases ownership only when navigation unmounts WeeklyActivitiesPage");
 assert.match(app, /handleNavigate[\s\S]*confirmWeeklyActivitiesNavigation\(route, destinationHref\)/, "side navigation confirms before discarding a weekly draft");
-assert.match(app, /handleItemClick[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopPropagation\(\)[\s\S]*onNavigate\(item\)/, "handled leaf navigation suppresses JET's later native-hash rewrite after the indexed app route push");
-assert.match(app, /handleItemClick[\s\S]*event\.button !== 0[\s\S]*event\.ctrlKey[\s\S]*return;/, "modifier and non-primary side-navigation clicks keep their native non-current-context behavior");
+assert.match(app, /anchor\.dataset\.appNavigation === "true"[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopImmediatePropagation\(\)[\s\S]*navigateLeafRef\.current\(navigationId\)/, "one capture path suppresses JET/native duplicate handling and performs the indexed app route push");
+assert.match(app, /event\.button === 0 && !event\.ctrlKey && !event\.metaKey && !event\.shiftKey && !event\.altKey/, "modifier and non-primary side-navigation clicks keep their native non-current-context behavior");
 assert.match(app, /document\.addEventListener\("click", handleDocumentNavigationClick, true\)/, "capture-phase anchor guard protects unsaved weekly drafts before JET link defaults");
 assert.match(app, /isDialogPlaceholderControlAnchor\(anchor\.getAttribute\("href"\), Boolean\(anchor\.closest\("\[role=\\"dialog\\"\] \[role=\\"grid\\"\]"\)\)\)/, "only date-grid placeholder controls are excluded before application navigation confirmation");
-assert.match(app, /handleDocumentNavigationClick[\s\S]*anchor\.closest\("oj-navigation-list"\)[\s\S]*anchor\.dataset\.appNavigation === "true"[\s\S]*event\.preventDefault\(\)[\s\S]*return;/, "the global hash guard preserves JET side-navigation routing while suppressing only a handled leaf anchor's native hash default");
+assert.match(app, /handleDocumentNavigationClick[\s\S]*anchor\.closest\("oj-navigation-list"\)[\s\S]*anchor\.dataset\.appNavigation === "true"[\s\S]*navigateLeafRef\.current\(navigationId\)[\s\S]*return;/, "the global guard owns exactly one handled leaf SPA navigation path");
 assert.match(app, /handleDocumentNavigationClick[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopImmediatePropagation\(\)/, "rejected anchor navigation is fully cancelled");
 assert.match(app, /href: anchor\.href/, "anchor navigation uses the browser-resolved full href and therefore respects document base URL semantics");
 assert.match(app, /isSameDocumentNavigation\(window\.location\.href, destinationHref\)[\s\S]*history\.pushState\(withHistoryIndex/, "approved hash navigation creates an indexed entry so rejected Back and Forward can restore without stack mutation");
@@ -101,8 +102,8 @@ assert.match(editor, /registerFlush/);
 assert.match(editor, /syncWeeklyActivityListMarkerStyles/);
 assert.match(editor, /quill\.history\.clear\(\)/);
 assert.doesNotMatch(editor, /indent|align/);
-assert.match(editor, /<option value="#C74634"><\/option>/, "the expanded palette exposes Oracle red");
-assert.match(editor, /<option value="#2458A6"><\/option>[\s\S]*<option value="#2E6B3F"><\/option>/, "the palette includes blue and green in addition to red");
+assert.match(editor, /WEEKLY_ACTIVITY_COLORS\.map\(\(color\) => <option value=\{color\}><\/option>\)/, "the picker renders the shared palette without a divergent duplicate list");
+assert.match(editorSession, /#C74634[\s\S]*#2458A6[\s\S]*#2E6B3F[\s\S]*#B3261E[\s\S]*#6E46A5/, "the shared palette contains Oracle red, existing colors, and the added high-contrast colors");
 
 assert.match(css, /\.weekly-activity-card__date-editor\s*\{[^}]*flex:\s*0 1 18rem;[^}]*margin-inline-end:\s*auto;[^}]*\}/, "the edit date stays left-aligned instead of consuming centered header space");
 assert.match(css, /\.weekly-activity-toolbar > button,[\s\S]*\.weekly-activity-toolbar \.ql-picker[^}]*height:\s*2\.5rem/, "toolbar controls share one Redwood-sized control height");
