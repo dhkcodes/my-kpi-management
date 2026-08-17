@@ -188,14 +188,6 @@ body {
 }
 
 .kpi-navigation-list { background: transparent; border-radius: 0; color: var(--kpi-side-nav-text); }
-.kpi-navigation-list .oj-navigationlist-toolbar { background: transparent; }
-.kpi-navigation-list .oj-navigationlist-previous-button {
-  background: transparent !important;
-  border-color: transparent !important;
-  color: var(--kpi-side-nav-text) !important;
-  margin: 0 0 0.35rem 0.2rem;
-}
-.kpi-navigation-list ul { list-style: none; }
 .kpi-navigation-list a {
   align-items: center;
   border-radius: 0.35rem;
@@ -206,36 +198,10 @@ body {
   padding-inline: 0.8rem 0.55rem;
   text-decoration: none;
 }
-.kpi-navigation-list a:hover,
-.kpi-navigation-list .oj-hover > a,
-.kpi-navigation-list .oj-selected > a,
-.kpi-navigation-list .oj-selected .oj-navigationlist-item-content,
-.kpi-navigation-list .kpi-navigation-item--selected > a,
-.kpi-navigation-list .kpi-navigation-item--selected > .oj-navigationlist-item-content,
-.kpi-navigation-list .kpi-navigation-item--selected > .oj-navigationlist-item-content > a { background: var(--kpi-side-nav-selected) !important; }
-.kpi-navigation-list .oj-navigationlist-item-label { align-items: center; display: flex; gap: 0.5rem; min-width: 0; width: 100%; }
+.kpi-navigation-list a:hover { background: var(--kpi-side-nav-hover); }
 .kpi-navigation-icon { color: var(--kpi-side-nav-text); flex: 0 0 auto; font-size: 1.15rem; line-height: 1; opacity: 0.95; }
 .kpi-navigation-label { color: var(--kpi-side-nav-text); flex: 1 1 auto; line-height: 1.25; min-width: 0; outline: none; position: relative; }
 .kpi-navigation-label__text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kpi-navigation-full-name {
-  background: #fff;
-  border-radius: 0.3rem;
-  box-shadow: 0 8px 24px rgba(22, 21, 19, 0.28);
-  color: var(--kpi-ink);
-  left: 0;
-  max-width: 15rem;
-  padding: 0.4rem 0.55rem;
-  pointer-events: none;
-  position: absolute;
-  top: calc(100% + 0.3rem);
-  visibility: hidden;
-  white-space: normal;
-  width: max-content;
-  z-index: 30;
-}
-.kpi-navigation-label:hover .kpi-navigation-full-name,
-.kpi-navigation-label:focus .kpi-navigation-full-name,
-.kpi-navigation-label:focus-visible .kpi-navigation-full-name { visibility: visible; }
 .kpi-navigation-code-badge,
 .kpi-detail-code-badge {
   background: rgba(64, 160, 88, 0.28);

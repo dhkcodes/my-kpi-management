@@ -1,18 +1,32 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { getNavigationPath, getNavigationRoute } from "../src/components/navigationRoutes";
+import { getNavigationRoute } from "../src/components/navigationRoutes";
 import { navItems, NavigationItem } from "../src/data/kpiMockData";
 
 const flattenLeaves = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => item.children ? flattenLeaves(item.children) : [item]);
 
-for (const item of flattenLeaves(navItems)) {
-  assert.equal(
-    item.href,
-    getNavigationPath(getNavigationRoute(item.id)),
-    `${item.id} must link to its canonical page instead of falling back to Home`
-  );
-}
+assert.equal(flattenLeaves(navItems).length, 12, "the provider exposes Home plus eleven real leaf destinations");
+
+assert.deepEqual(
+  navItems.map(({ id, label, children }) => ({ id, label, childIds: children?.map((child) => child.id) })),
+  [
+    { id: "home", label: "Home", childIds: undefined },
+    {
+      id: "my-customers",
+      label: "My Customers",
+      childIds: ["customers-overview", "accounts-workloads", "weekly-activities", "consumption"]
+    },
+    {
+      id: "kpis",
+      label: "KPIs",
+      childIds: ["activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
+    }
+  ],
+  "TreeDataProvider owns hierarchy and labels without duplicating Router href data"
+);
+assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a Router destination");
+assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
 
 const pageSource = readFileSync("src/components/content/WeeklyActivitiesPage.tsx", "utf8");
 const editorSource = readFileSync("src/components/content/SharedWeeklyActivityEditor.tsx", "utf8");
@@ -50,11 +64,22 @@ assert.match(editorSource, /weekly-activity-list-icon/, "list buttons use the ap
 assert.doesNotMatch(editorSource, /activeTarget === target \? "✓ " : ""/);
 assert.doesNotMatch(cssSource, /\.weekly-activity-card__sections section \.weekly-activity-editor-grid/);
 assert.match(cssSource, /\.weekly-activity-toolbar \.ql-size[\s\S]*width:\s*6(?:\.\d+)?rem/, "the size picker reserves one horizontal row for the number and chevron");
-assert.doesNotMatch(appSource, /data-app-navigation=\{item\.children \? undefined : "true"\} onClick=/, "leaf anchors do not compete with a second bubble click handler");
-assert.match(appSource, /navigateLeafRef\.current/, "the document capture path owns one stable SPA navigation callback");
-assert.match(appSource, /onojBeforeSelect=\{handleNavigationBeforeSelect\}/, "JET's cancelable lifecycle is intercepted before it follows the leaf href");
-assert.match(appSource, /handleNavigationBeforeSelect[\s\S]*event\.preventDefault\(\)[\s\S]*navigateLeafRef\.current\(navigationId\)/, "the JET interception prevents hard reload and delegates one SPA push");
-assert.match(appSource, /aria-current=\{selected \? "page" : undefined\}/, "the app-owned current-page marker follows the canonical route after the canceled JET default");
+assert.match(appSource, /ArrayTreeDataProvider/, "JET TreeDataProvider owns the hierarchy");
+assert.match(appSource, /data=\{navigationDataProvider\}/, "the navigation list consumes the one hierarchical provider");
+assert.match(appSource, /drillMode="sliding"/);
+assert.match(appSource, /item=\{\{[\s\S]*selectable:[\s\S]*!context\.data\.children/, "parent groups are non-selectable drill nodes based on the same provider data");
+assert.match(appSource, /selection=\{selectedNavigationId\}/, "JET owns selected row rendering");
+assert.match(appSource, /expanded=\{expandedNavigationKeys\}/, "the route ancestor restores the sliding drill stack");
+assert.match(appSource, /onexpandedChanged=\{handleExpandedNavigationChanged\}/);
+assert.match(appSource, /if \(anchor\.closest\("oj-navigation-list"\)\) return;/, "the document capture guard does not compete with JET navigation events");
+assert.match(appSource, /onojSelectionAction=\{handleNavigationSelectionAction\}/, "JET selection action is the single leaf Router handoff");
+assert.doesNotMatch(appSource, /href=\{leaf \? item\.href/, "JET owns leaf activation; the item template has no competing native current-tab navigation");
+assert.doesNotMatch(appSource, /onojBeforeSelect|handleNavigationBeforeSelect/, "the conflicting beforeSelect cancellation workaround is removed");
+assert.doesNotMatch(appSource, /function NavigationEntry/, "static nested UL rendering is removed in favor of TreeDataProvider");
+assert.doesNotMatch(appSource, /kpi-navigation-item--selected/, "app-owned selected DOM state does not compete with JET selection");
+assert.doesNotMatch(appSource, /kpi-navigation-full-name/, "hidden duplicate tooltip text cannot be copied into the sliding header");
+assert.doesNotMatch(cssSource, /\.oj-selected/, "JET internal selected classes are not overridden");
+assert.doesNotMatch(cssSource, /kpi-navigation-item--selected/, "selected background is not duplicated by an app-owned class");
 assert.match(contentSource, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\}/, "Weekly Activities remounts and queries by the common selected FY");
 assert.doesNotMatch(contentSource, /activeRoute\.module !== "weeklyActivities" && <section class="kpi-fiscal-year-panel"/, "the shared FY selector remains visible on Weekly Activities");
 

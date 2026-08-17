@@ -49,6 +49,8 @@ import {
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import "ojs/ojnavigationlist";
+import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
+import { KeySet, KeySetImpl } from "ojs/ojkeyset";
 
 type Props = Readonly<{
   appName?: string;
@@ -58,36 +60,52 @@ type Props = Readonly<{
 const defaultAccountWorkloadMetadata = getAccountWorkloadMetadata();
 const UNSAVED_WEEKLY_ACTIVITY_MESSAGE = "Discard the unsaved Weekly Activity changes?";
 
-type NavigationEntryProps = Readonly<{
-  item: NavigationItem;
-  selectedNavigationId: string;
+type NavigationItemTemplateContext = Readonly<{
+  data: NavigationItem;
+  key: string;
+  leaf: boolean;
 }>;
 
-function NavigationEntry({ item, selectedNavigationId }: NavigationEntryProps) {
-  const selected = item.id === selectedNavigationId;
+const navigationDataProvider = new ArrayTreeDataProvider<string, NavigationItem>(navItems, {
+  keyAttributes: "id",
+  childrenAttribute: "children"
+});
+
+const navigationItemsById = new Map<string, NavigationItem>();
+const navigationParentByLeafId = new Map<string, string>();
+for (const item of navItems) {
+  navigationItemsById.set(item.id, item);
+  for (const child of item.children ?? []) {
+    navigationItemsById.set(child.id, child);
+    navigationParentByLeafId.set(child.id, item.id);
+  }
+}
+
+const getExpandedNavigationKeys = (navigationId: string): KeySetImpl<string> => {
+  const parentId = navigationParentByLeafId.get(navigationId);
+  return new KeySetImpl(parentId ? [parentId] : []);
+};
+
+const isLeafNavigationId = (navigationId: string): boolean => {
+  const item = navigationItemsById.get(navigationId);
+  return Boolean(item && !item.children);
+};
+
+function renderNavigationItem(context: NavigationItemTemplateContext) {
+  const { data: item, leaf } = context;
   return (
-    <li id={item.id} class={selected ? "kpi-navigation-item--selected" : undefined}>
-      <a href={item.href} aria-current={selected ? "page" : undefined} data-app-navigation={item.children ? undefined : "true"} data-navigation-id={item.children ? undefined : item.id}>
-        {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
-        {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
-        <span
-          class="kpi-navigation-label"
-          title={item.label}
-          tabIndex={0}
-          aria-describedby={`${item.id}-full-name`}>
-          <span class="kpi-navigation-label__text">{item.label}</span>
-          <span id={`${item.id}-full-name`} class="kpi-navigation-full-name" role="tooltip">{item.label}</span>
-        </span>
-        {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
-      </a>
-      {item.children && (
-        <ul>
-          {item.children.map((child) => (
-            <NavigationEntry item={child} selectedNavigationId={selectedNavigationId} />
-          ))}
-        </ul>
-      )}
-    </li>
+    <a
+      data-app-navigation={leaf ? "true" : undefined}
+      data-navigation-id={leaf ? item.id : undefined}
+      data-navigation-parent-id={leaf ? undefined : item.id}
+      title={item.label}>
+      {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
+      {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
+      <span class="kpi-navigation-label">
+        <span class="kpi-navigation-label__text">{item.label}</span>
+      </span>
+      {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
+    </a>
   );
 }
 
@@ -104,6 +122,7 @@ export const App = registerCustomElement(
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const fiscalYearRef = useRef(fiscalYear);
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
+    const [expandedNavigationKeys, setExpandedNavigationKeys] = useState<KeySet<string>>(() => getExpandedNavigationKeys(initialRoute.id));
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
     const activeRouteRef = useRef(initialRoute);
     const activeRouteModuleRef = useRef(initialRoute.module);
@@ -127,7 +146,6 @@ export const App = registerCustomElement(
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
     const [weeklyActivitiesDraftActive, setWeeklyActivitiesDraftActive] = useState(false);
     const weeklyActivitiesDraftActiveRef = useRef(false);
-    const navigateLeafRef = useRef<(navigationId: string) => void>(() => undefined);
 
     const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
     const accountsWorkloadsRequestIdRef = useRef(0);
@@ -247,15 +265,7 @@ export const App = registerCustomElement(
         const anchor = event.target.closest("a[href]") as HTMLAnchorElement | null;
         if (!anchor) return;
         if (isDialogPlaceholderControlAnchor(anchor.getAttribute("href"), Boolean(anchor.closest("[role=\"dialog\"] [role=\"grid\"]")))) return;
-        if (anchor.closest("oj-navigation-list")) {
-          if (anchor.dataset.appNavigation === "true" && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            const navigationId = anchor.dataset.navigationId;
-            if (navigationId) navigateLeafRef.current(navigationId);
-          }
-          return;
-        }
+        if (anchor.closest("oj-navigation-list")) return;
         if (!isCurrentContextAnchorNavigation(event, {
           href: anchor.href,
           target: anchor.getAttribute("target"),
@@ -313,6 +323,7 @@ export const App = registerCustomElement(
         activeRouteRef.current = route;
         activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(route.id);
+        setExpandedNavigationKeys(getExpandedNavigationKeys(route.id));
         setActiveRoute(route);
 
       };
@@ -354,6 +365,7 @@ export const App = registerCustomElement(
       activeRouteRef.current = route;
       activeRouteModuleRef.current = route.module;
       setSelectedNavigationId(navigationId);
+      setExpandedNavigationKeys(getExpandedNavigationKeys(navigationId));
       setActiveRoute(route);
       historyIndexRef.current += 1;
       window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
@@ -361,12 +373,13 @@ export const App = registerCustomElement(
         document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     };
-    navigateLeafRef.current = handleNavigate;
-    const handleNavigationBeforeSelect = (event: CustomEvent<{ item: Element; key: unknown }>) => {
-      const navigationId = typeof event.detail.key === "string" ? event.detail.key : event.detail.item.id;
-      if (!navigationId || event.detail.item.querySelector("ul")) return;
-      event.preventDefault();
-      navigateLeafRef.current(navigationId);
+    const handleNavigationSelectionAction = (event: CustomEvent<{ value: unknown }>) => {
+      const navigationId = typeof event.detail.value === "string" ? event.detail.value : "";
+      if (!navigationId || !isLeafNavigationId(navigationId)) return;
+      handleNavigate(navigationId);
+    };
+    const handleExpandedNavigationChanged = (event: CustomEvent<{ value: KeySet<string> }>) => {
+      setExpandedNavigationKeys(event.detail.value);
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
@@ -450,15 +463,16 @@ export const App = registerCustomElement(
           <aside id="kpiSideNavigation" class={navigationOpen ? "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-open" : "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-closed"} aria-label="KPI workspace navigation">
             <oj-navigation-list
               class="kpi-navigation-list"
+              data={navigationDataProvider}
               drillMode="sliding"
+              expanded={expandedNavigationKeys}
+              item={{ selectable: (context) => !context.data.children }}
               rootLabel="Home"
-              onojBeforeSelect={handleNavigationBeforeSelect}
+              selection={selectedNavigationId}
+              onexpandedChanged={handleExpandedNavigationChanged}
+              onojSelectionAction={handleNavigationSelectionAction}
               aria-label="KPI navigation">
-              <ul>
-                {navItems.map((item) => (
-                  <NavigationEntry item={item} selectedNavigationId={selectedNavigationId} />
-                ))}
-              </ul>
+              <template slot="itemTemplate" render={renderNavigationItem}></template>
             </oj-navigation-list>
           </aside>
           <Content
