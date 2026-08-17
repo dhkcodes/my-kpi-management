@@ -18,6 +18,7 @@ import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accounts
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
+import { KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -537,6 +538,8 @@ export function Content({
             </div>
           </section>
         </>
+      ) : activeRoute.module === "kpiPage" ? (
+        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page
           fiscalYear={fiscalYear}
