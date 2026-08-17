@@ -30,6 +30,16 @@ import {
   fetchAccountsWorkloads,
   saveAccountsWorkloadsBatch
 } from "../data/accountsWorkloadsApi";
+import {
+  getHistoryIndex,
+  getRejectedPopstateDelta,
+  hasNavigationDestinationChanged,
+  isCurrentContextAnchorNavigation,
+  isDialogPlaceholderControlAnchor,
+  isSameDocumentNavigation,
+  shouldReleaseWeeklyActivityDraft,
+  withHistoryIndex
+} from "./weeklyActivityNavigationGuard";
 import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
 import {
   fetchFxRate,
@@ -39,6 +49,8 @@ import {
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import "ojs/ojnavigationlist";
+import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
+import { KeySet, KeySetImpl } from "ojs/ojkeyset";
 
 type Props = Readonly<{
   appName?: string;
@@ -46,43 +58,56 @@ type Props = Readonly<{
 }>;
 
 const defaultAccountWorkloadMetadata = getAccountWorkloadMetadata();
+const UNSAVED_WEEKLY_ACTIVITY_MESSAGE = "Discard the unsaved Weekly Activity changes?";
 
-type NavigationEntryProps = Readonly<{
-  item: NavigationItem;
-  onNavigate: (item: NavigationItem) => void;
+type NavigationItemTemplateContext = Readonly<{
+  data: NavigationItem;
+  key: string;
+  leaf: boolean;
 }>;
 
-function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
-  const handleItemClick = item.children
-    ? undefined
-    : (event: MouseEvent) => {
-        event.preventDefault();
-        onNavigate(item);
-      };
+const navigationDataProvider = new ArrayTreeDataProvider<string, NavigationItem>(navItems, {
+  keyAttributes: "id",
+  childrenAttribute: "children"
+});
 
+const navigationItemsById = new Map<string, NavigationItem>();
+const navigationParentByLeafId = new Map<string, string>();
+for (const item of navItems) {
+  navigationItemsById.set(item.id, item);
+  for (const child of item.children ?? []) {
+    navigationItemsById.set(child.id, child);
+    navigationParentByLeafId.set(child.id, item.id);
+  }
+}
+
+const getExpandedNavigationKeys = (navigationId: string): KeySetImpl<string> => {
+  const parentId = navigationParentByLeafId.get(navigationId);
+  return new KeySetImpl(parentId ? [parentId] : []);
+};
+
+const isLeafNavigationId = (navigationId: string): boolean => {
+  const item = navigationItemsById.get(navigationId);
+  return Boolean(item && !item.children);
+};
+
+function renderNavigationItem(context: NavigationItemTemplateContext) {
+  const { data: item, leaf } = context;
   return (
-    <li id={item.id}>
-      <a href={item.href} onClick={handleItemClick}>
+    <a
+      data-app-navigation={leaf ? "true" : undefined}
+      data-navigation-id={leaf ? item.id : undefined}
+      data-navigation-parent-id={leaf ? undefined : item.id}
+      title={item.label}>
+      <span class="kpi-navigation-row">
         {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
         {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
-        <span
-          class="kpi-navigation-label"
-          title={item.label}
-          tabIndex={0}
-          aria-describedby={`${item.id}-full-name`}>
+        <span class="kpi-navigation-label" title={item.label} tabIndex={0}>
           <span class="kpi-navigation-label__text">{item.label}</span>
-          <span id={`${item.id}-full-name`} class="kpi-navigation-full-name" role="tooltip">{item.label}</span>
         </span>
         {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
-      </a>
-      {item.children && (
-        <ul>
-          {item.children.map((child) => (
-            <NavigationEntry item={child} onNavigate={onNavigate} />
-          ))}
-        </ul>
-      )}
-    </li>
+      </span>
+    </a>
   );
 }
 
@@ -99,8 +124,13 @@ export const App = registerCustomElement(
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const fiscalYearRef = useRef(fiscalYear);
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
+    const [expandedNavigationKeys, setExpandedNavigationKeys] = useState<KeySet<string>>(() => getExpandedNavigationKeys(initialRoute.id));
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
+    const activeRouteRef = useRef(initialRoute);
     const activeRouteModuleRef = useRef(initialRoute.module);
+    const activeLocationHrefRef = useRef(typeof window === "undefined" ? getNavigationPath(initialRoute) : window.location.href);
+    const historyIndexRef = useRef(typeof window === "undefined" ? 0 : getHistoryIndex(window.history.state) ?? 0);
+    const restoringHistoryRef = useRef(false);
     const [guideOpen, setGuideOpen] = useState(false);
     const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
     const [guideLoading, setGuideLoading] = useState(false);
@@ -116,6 +146,9 @@ export const App = registerCustomElement(
     const [accountsWorkloadsLoading, setAccountsWorkloadsLoading] = useState(true);
     const [accountsWorkloadsLoadError, setAccountsWorkloadsLoadError] = useState("");
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
+    const [weeklyActivitiesDraftActive, setWeeklyActivitiesDraftActive] = useState(false);
+    const weeklyActivitiesDraftActiveRef = useRef(false);
+
     const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
     const accountsWorkloadsRequestIdRef = useRef(0);
     const [accountsWorkloadsQuery, setAccountsWorkloadsQuery] = useState<Omit<AccountsWorkloadsListQuery, "fiscalYear">>({
@@ -130,6 +163,11 @@ export const App = registerCustomElement(
 
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
+    }, []);
+
+    useEffect(() => {
+      const currentHistoryIndex = historyIndexRef.current;
+      window.history.replaceState(withHistoryIndex(window.history.state, currentHistoryIndex), "", window.location.href);
     }, []);
 
     useEffect(() => {
@@ -206,16 +244,90 @@ export const App = registerCustomElement(
       };
     }, [activeRoute.module, fiscalYear]);
 
+    const confirmWeeklyActivitiesNavigation = (
+      route: NavigationRouteDefinition,
+      destinationHref = new URL(getNavigationPath(route), window.location.href).href
+    ) => {
+      const previousRoute = activeRouteRef.current;
+      const previousHref = activeLocationHrefRef.current;
+      if (hasNavigationDestinationChanged(previousRoute.id, route.id, previousHref, destinationHref) && weeklyActivitiesDraftActiveRef.current && !window.confirm(UNSAVED_WEEKLY_ACTIVITY_MESSAGE)) {
+        return false;
+      }
+      if (shouldReleaseWeeklyActivityDraft(previousRoute.id, route.id)) {
+        weeklyActivitiesDraftActiveRef.current = false;
+        setWeeklyActivitiesDraftActive(false);
+      }
+      activeLocationHrefRef.current = destinationHref;
+      return true;
+    };
+
     useEffect(() => {
-      const handlePopState = () => {
+      const handleDocumentNavigationClick = (event: MouseEvent) => {
+        if (!(event.target instanceof Element)) return;
+        const anchor = event.target.closest("a[href]") as HTMLAnchorElement | null;
+        if (!anchor) return;
+        if (isDialogPlaceholderControlAnchor(anchor.getAttribute("href"), Boolean(anchor.closest("[role=\"dialog\"] [role=\"grid\"]")))) return;
+        if (anchor.closest("oj-navigation-list")) return;
+        if (!isCurrentContextAnchorNavigation(event, {
+          href: anchor.href,
+          target: anchor.getAttribute("target"),
+          download: anchor.hasAttribute("download")
+        }, window.location.href)) return;
+        const destinationHref = anchor.href;
+        const sameDocumentNavigation = isSameDocumentNavigation(window.location.href, destinationHref);
+        if (!weeklyActivitiesDraftActiveRef.current && !sameDocumentNavigation) return;
+        if (weeklyActivitiesDraftActiveRef.current && !window.confirm(UNSAVED_WEEKLY_ACTIVITY_MESSAGE)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        const destinationRoute = getNavigationRouteFromPath(new URL(destinationHref).pathname);
+        if (sameDocumentNavigation) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          historyIndexRef.current += 1;
+          window.history.pushState(withHistoryIndex({ routeId: destinationRoute.id }, historyIndexRef.current), "", destinationHref);
+          activeLocationHrefRef.current = destinationHref;
+          const targetId = new URL(destinationHref).hash.slice(1);
+          if (targetId) window.requestAnimationFrame(() => document.getElementById(decodeURIComponent(targetId))?.scrollIntoView());
+          return;
+        }
+        if (shouldReleaseWeeklyActivityDraft(activeRouteRef.current.id, destinationRoute.id)) {
+          weeklyActivitiesDraftActiveRef.current = false;
+        }
+        activeLocationHrefRef.current = destinationHref;
+      };
+      document.addEventListener("click", handleDocumentNavigationClick, true);
+      return () => document.removeEventListener("click", handleDocumentNavigationClick, true);
+    }, []);
+
+    useEffect(() => {
+      const handlePopState = (event: PopStateEvent) => {
+        if (restoringHistoryRef.current) {
+          restoringHistoryRef.current = false;
+          return;
+        }
         const route = getNavigationRouteFromPath(window.location.pathname);
+        if (!confirmWeeklyActivitiesNavigation(route, window.location.href)) {
+          const restorationDelta = getRejectedPopstateDelta(historyIndexRef.current, event.state);
+          if (restorationDelta !== null && restorationDelta !== 0) {
+            restoringHistoryRef.current = true;
+            window.history.go(restorationDelta);
+          }
+          return;
+        }
+        const destinationIndex = getHistoryIndex(event.state);
+        if (destinationIndex !== null) historyIndexRef.current = destinationIndex;
         if (route.module !== activeRouteModuleRef.current) {
           accountsWorkloadsRequestIdRef.current += 1;
           setAccountsWorkloadsRefreshing(false);
         }
+        activeRouteRef.current = route;
         activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(route.id);
+        setExpandedNavigationKeys(getExpandedNavigationKeys(route.id));
         setActiveRoute(route);
+
       };
       window.addEventListener("popstate", handlePopState);
       return () => window.removeEventListener("popstate", handlePopState);
@@ -238,23 +350,43 @@ export const App = registerCustomElement(
         setNavigationOpen(false);
       }
     };
-    const handleNavigate = (item: NavigationItem) => {
-      const route = getNavigationRoute(item.id);
+    const handleNavigate = (navigationId: string) => {
+      const route = getNavigationRoute(navigationId);
+      const destinationHref = new URL(getNavigationPath(route), window.location.href).href;
+      const destinationChanged = hasNavigationDestinationChanged(
+        activeRouteRef.current.id,
+        route.id,
+        activeLocationHrefRef.current,
+        destinationHref
+      );
+      if (!confirmWeeklyActivitiesNavigation(route, destinationHref) || !destinationChanged) return;
       if (route.module !== activeRouteModuleRef.current) {
         accountsWorkloadsRequestIdRef.current += 1;
         setAccountsWorkloadsRefreshing(false);
       }
+      activeRouteRef.current = route;
       activeRouteModuleRef.current = route.module;
-      setSelectedNavigationId(item.id);
+      setSelectedNavigationId(navigationId);
+      setExpandedNavigationKeys(getExpandedNavigationKeys(navigationId));
       setActiveRoute(route);
-      window.history.pushState({ routeId: route.id }, "", getNavigationPath(route));
-      window.requestAnimationFrame(() => {
+      historyIndexRef.current += 1;
+      window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
+      requestAnimationFrame(() => {
         document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+    };
+    const handleNavigationSelectionAction = (event: CustomEvent<{ value: unknown }>) => {
+      const navigationId = typeof event.detail.value === "string" ? event.detail.value : "";
+      if (!navigationId || !isLeafNavigationId(navigationId)) return;
+      handleNavigate(navigationId);
+    };
+    const handleExpandedNavigationChanged = (event: CustomEvent<{ value: KeySet<string> }>) => {
+      setExpandedNavigationKeys(event.detail.value);
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
       if (nextFiscalYear === fiscalYearRef.current) return;
+      if (activeRouteRef.current.module === "weeklyActivities" && weeklyActivitiesDraftActiveRef.current) return;
       accountsWorkloadsRequestIdRef.current += 1;
       setAccountsWorkloadsRefreshing(false);
       fiscalYearRef.current = nextFiscalYear;
@@ -333,15 +465,16 @@ export const App = registerCustomElement(
           <aside id="kpiSideNavigation" class={navigationOpen ? "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-open" : "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-closed"} aria-label="KPI workspace navigation">
             <oj-navigation-list
               class="kpi-navigation-list"
+              data={navigationDataProvider}
               drillMode="sliding"
+              expanded={expandedNavigationKeys}
+              item={{ selectable: (context) => !context.data.children }}
               rootLabel="Home"
               selection={selectedNavigationId}
+              onexpandedChanged={handleExpandedNavigationChanged}
+              onojSelectionAction={handleNavigationSelectionAction}
               aria-label="KPI navigation">
-              <ul>
-                {navItems.map((item) => (
-                  <NavigationEntry item={item} onNavigate={handleNavigate} />
-                ))}
-              </ul>
+              <template slot="itemTemplate" render={renderNavigationItem}></template>
             </oj-navigation-list>
           </aside>
           <Content
@@ -352,6 +485,7 @@ export const App = registerCustomElement(
             accountsWorkloadsLoadError={accountsWorkloadsLoadError}
             accountsWorkloadsQuery={accountsWorkloadsQuery}
             accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
+            weeklyActivitiesDraftActive={weeklyActivitiesDraftActive}
             accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
             accountsWorkloadsLoading={accountsWorkloadsLoading}
             accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
@@ -396,6 +530,10 @@ export const App = registerCustomElement(
             }}
             onAccountsWorkloadsQueryChange={(nextQuery) => void handleAccountsWorkloadsQueryChange(nextQuery)}
             onAccountsWorkloadsDraftStateChange={setAccountsWorkloadsDraftActive}
+            onWeeklyActivitiesDraftStateChange={(active) => {
+              weeklyActivitiesDraftActiveRef.current = active;
+              setWeeklyActivitiesDraftActive(active);
+            }}
             onFiscalYearChange={handleFiscalYearChange}
           />
         </div>
