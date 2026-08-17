@@ -199,6 +199,7 @@ body {
   text-decoration: none;
 }
 .kpi-navigation-list a:hover { background: var(--kpi-side-nav-hover); }
+.kpi-navigation-row { align-items: center; display: flex; gap: 0.5rem; min-width: 0; width: 100%; }
 .kpi-navigation-icon { color: var(--kpi-side-nav-text); flex: 0 0 auto; font-size: 1.15rem; line-height: 1; opacity: 0.95; }
 .kpi-navigation-label { color: var(--kpi-side-nav-text); flex: 1 1 auto; line-height: 1.25; min-width: 0; outline: none; position: relative; }
 .kpi-navigation-label__text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -543,6 +544,7 @@ body {
     overflow: hidden;
     padding-inline: 0.3rem;
   }
+  .kpi-navigation-row { justify-content: center; }
   .kpi-navigation-list ul { margin: 0; padding: 0; }
   .kpi-navigation-label,
   .kpi-navigation-list .oj-navigationlist-item-title { display: none; }
@@ -1572,6 +1574,7 @@ body {
 
 .weekly-activity-card--editing { border-color: var(--kpi-brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--kpi-brand) 18%, transparent); }
 .weekly-activity-card__header { background: var(--kpi-soft); min-height: 3.25rem; padding: 0.55rem 0.8rem; }
+.weekly-activity-card__header--expandable { cursor: pointer; }
 .weekly-activity-card__header h3 { flex: 1; font-size: 1rem; margin: 0; }
 
 .weekly-activity-disclosure {
@@ -1681,12 +1684,13 @@ h4.weekly-activity-section-label--next-week,
   width: 100%;
 }
 .weekly-activity-toolbar .ql-size .ql-picker-label {
+  align-items: center;
   flex-direction: row;
   gap: 0.35rem;
-  justify-content: space-between;
+  justify-content: center;
   white-space: nowrap;
 }
-.weekly-activity-toolbar .ql-size .ql-picker-label::before { flex: 1 1 auto; text-align: left; }
+.weekly-activity-toolbar .ql-size .ql-picker-label::before { flex: 0 0 auto; text-align: left; }
 .weekly-activity-toolbar.ql-snow.ql-toolbar > button svg,
 .weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg,
 .weekly-activity-toolbar > button > span {
@@ -1697,8 +1701,12 @@ h4.weekly-activity-section-label--next-week,
   min-width: 1.125rem;
   width: 1.125rem;
 }
-.weekly-activity-toolbar.ql-snow.ql-toolbar > button svg,
-.weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg { position: static; }
+.weekly-activity-toolbar.ql-snow.ql-toolbar > button svg { position: static; }
+.weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg {
+  margin-top: 0;
+  position: static;
+  top: auto;
+}
 .weekly-activity-toolbar .weekly-activity-list-icon {
   fill: currentColor;
   height: 1.125rem;

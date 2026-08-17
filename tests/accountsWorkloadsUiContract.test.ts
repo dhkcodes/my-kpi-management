@@ -34,8 +34,8 @@ assert.doesNotMatch(app, /onFiscalYearChange=\{\(year\) => \{[\s\S]*setSelectedN
 assert.match(styles, /@media \(min-width: 1025px\)[\s\S]*?\.kpi-side-nav[\s\S]*?width: 16\.5rem/, "desktop navigation is 16.5rem wide");
 assert.match(styles, /\.kpi-navigation-label[^}]*font-size: 0\.84rem/, "desktop navigation labels use the compact font size");
 assert.match(app, /class="kpi-navigation-label"[^>]*title=\{item\.label\}[^>]*tabIndex=\{0\}/, "every navigation label exposes its full name natively and accepts keyboard focus");
-assert.match(app, /class="kpi-navigation-full-name"[^>]*role="tooltip"[^>]*>\{item\.label\}/, "every navigation label renders a keyboard-focus full-name tooltip");
-assert.match(styles, /\.kpi-navigation-label:focus[\s\S]*\.kpi-navigation-full-name[\s\S]*visibility: visible/, "keyboard focus reveals the full navigation label");
+assert.doesNotMatch(app, /kpi-navigation-full-name/, "JET sliding navigation avoids duplicate hidden label text");
+assert.doesNotMatch(styles, /kpi-navigation-full-name/, "obsolete app-owned navigation tooltip CSS is removed");
 assert.match(page, /id="accountsWorkloadsSearchInput"[\s\S]*onInput=\{\(event\)[\s\S]*setSearchTerm\(search\)[\s\S]*onKeyDown=\{submitSearchOnEnter\}/, "search typing changes only the local draft and Enter submits");
 assert.match(page, /id="accountsWorkloadsSearchButton"[\s\S]*aria-label="Search accounts and workloads"[\s\S]*onClick=\{submitSearch\}/, "accessible search icon button submits the server query");
 assert.match(styles, /\.accounts-workloads-search__control\s*\{[^}]*display: flex[^}]*flex-wrap: nowrap/, "search input and button stay on one row at every viewport");

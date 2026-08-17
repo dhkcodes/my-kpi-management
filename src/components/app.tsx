@@ -99,12 +99,14 @@ function renderNavigationItem(context: NavigationItemTemplateContext) {
       data-navigation-id={leaf ? item.id : undefined}
       data-navigation-parent-id={leaf ? undefined : item.id}
       title={item.label}>
-      {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
-      {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
-      <span class="kpi-navigation-label">
-        <span class="kpi-navigation-label__text">{item.label}</span>
+      <span class="kpi-navigation-row">
+        {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
+        {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
+        <span class="kpi-navigation-label" title={item.label} tabIndex={0}>
+          <span class="kpi-navigation-label__text">{item.label}</span>
+        </span>
+        {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
       </span>
-      {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
     </a>
   );
 }

@@ -105,6 +105,14 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyA
     editSession.baselineDrafts
   ) : false;
 
+  const toggleExpanded = (activityId: number) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      next.has(activityId) ? next.delete(activityId) : next.add(activityId);
+      return next;
+    });
+  };
+
   const load = async (nextQuery: WeeklyActivitiesQuery, append = false, clearBeforeLoad = !append) => {
     const requestId = requestGuardRef.current.begin();
     append ? setLoadingMore(true) : setLoading(true);
@@ -485,14 +493,17 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyA
             const isEditing = editSession?.mode === "edit" && editSession.activityId === record.activityId;
             return (
               <article key={record.activityId} class={isEditing ? "weekly-activity-card weekly-activity-card--editing" : "weekly-activity-card"}>
-                <header class="weekly-activity-card__header">
-                  <button type="button" class="weekly-activity-disclosure" disabled={isEditing} aria-expanded={!isCollapsed} aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${formatWeekDate(record.weekOfDate)}`} onClick={() => setExpanded((current) => { const next = new Set(current); next.has(record.activityId) ? next.delete(record.activityId) : next.add(record.activityId); return next; })}>
+                <header class={`weekly-activity-card__header${isEditing ? "" : " weekly-activity-card__header--expandable"}`} onClick={(event: MouseEvent) => {
+                  if (isEditing || (event.target as Element).closest(".weekly-activity-card__actions")) return;
+                  toggleExpanded(record.activityId);
+                }}>
+                  <button type="button" class="weekly-activity-disclosure" disabled={isEditing} aria-expanded={!isCollapsed} aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${formatWeekDate(record.weekOfDate)}`}>
                     <span class={isCollapsed ? "oj-ux-ico-chevron-right" : "oj-ux-ico-chevron-down"} aria-hidden="true"></span>
                   </button>
                   {isEditing && editSession ? (
                     <oj-input-date ref={dateInputRef} id={`weeklyActivityWeekDate-${editSession.key}`} class="weekly-activity-card__date-editor" labelHint="Week Date" labelEdge="none" value={editSession.weekOfDate} disabled={saving} onvalueChanged={(event: CustomEvent) => setEditSession((current) => current ? { ...current, weekOfDate: `${event.detail.value ?? ""}` } : current)}></oj-input-date>
                   ) : <h3>{formatWeekDate(record.weekOfDate)}</h3>}
-                  <div class="weekly-activity-card__actions">
+                  <div class="weekly-activity-card__actions" onClick={(event: MouseEvent) => event.stopPropagation()}>
                     {isEditing ? (
                       <>
                         <oj-button key={`cancel-${record.activityId}`} chroming="outlined" disabled={saving} onojAction={cancelEdit}>Cancel</oj-button>
