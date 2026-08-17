@@ -314,7 +314,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
-  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
+  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) =>
     isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
 
@@ -468,7 +468,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
         </div>
       </div>
-      {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing ? (activeTab === "H" ? "Reflected requires Delivery Date." : "Reflected requires both SR Number and Delivery Date.") : "Complete required fields before saving."}</p>}
+      {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing ? "Reflected requires both SR Number and Delivery Date." : "Complete required fields before saving."}</p>}
       <Summary rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
       <div class="kpi-jet-table-wrap">
         <oj-table class="kpi-jet-editable-table" aria-label={`${activeTab} editable KPI activities`}

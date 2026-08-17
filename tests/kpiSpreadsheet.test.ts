@@ -37,7 +37,7 @@ assert.ok(d1Keys.indexOf("stage") < d1Keys.indexOf("acrK"));
 assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false, "C1 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.type, "manageTime", "Manage Time must be a Pending/Reflected select");
-assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H must not expose an SR Number editor");
+assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), true, "H must expose the shared SR Number editor");
 
 assert.equal(fiscalQuarterFromDeliveryDate("2026-06-01"), "Q1");
 assert.equal(fiscalQuarterFromDeliveryDate("2026-08-31"), "Q1");
@@ -84,7 +84,8 @@ assert.equal(isKpiDraftInvalid({ ...rows[0], id: "legacy", deliveryDate: "" }, {
 assert.equal(isKpiDraftInvalid(createEmptyKpiRow("A", "FY27")), true, "new rows require Delivery Date");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, srNumber: "" }, rows[0]), true, "Reflected requires SR Number");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, deliveryDate: "" }, rows[0]), true, "Reflected requires Delivery Date");
-assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), false, "H has no SR Number field, so Reflected requires Delivery Date only");
+assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), true, "Reflected H must require SR Number");
+assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "SR-H", deliveryDate: "2026-06-10" }), false, "Reflected H with SR Number and Delivery Date must be valid");
 const addAll = { isAddAll: () => true, values: () => new Set<string>(), deletedValues: () => new Set(["row-2"]) };
 assert.deepEqual(getSelectedKpiRowIds(addAll, ["row-1", "row-2", "row-3"]), ["row-1", "row-3"], "JET add-all selection must honor deleted keys");
 const explicit = { isAddAll: () => false, values: () => new Set(["row-2"]), deletedValues: () => new Set<string>() };
