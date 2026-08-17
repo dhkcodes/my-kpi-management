@@ -12,8 +12,8 @@ assert.equal(KPI_TABS.includes("G" as never), false, "KPI G must never be presen
 
 for (const code of KPI_TABS.filter((tab) => tab !== "Overview")) {
   const fields = KPI_FIELD_CONTRACTS[code];
-  assert.equal(fields.at(0)?.key, "manageTimeReflected", `${code} Manage Time must be first`);
-  assert.equal(fields.at(-1)?.key, "deliveryDate", `${code} Delivery Date must be final`);
+  assert.equal(fields[0]?.key, "manageTimeReflected", `${code} Manage Time must be first`);
+  assert.equal(fields[fields.length - 1]?.key, "deliveryDate", `${code} Delivery Date must be final`);
   assert.equal(createEmptyKpiRow(code, "FY27").kpiCode, code);
 }
 

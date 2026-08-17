@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { decodeKpiRows, listKpiRows, saveKpiRow, deleteKpiRow } from "../src/data/kpiSpreadsheetApi";
+import { decodeKpiRows, deleteKpiRow, getKpiActivitiesApiBase, listKpiRows, saveKpiRow } from "../src/data/kpiSpreadsheetApi";
 import { KpiSpreadsheetRow } from "../src/data/kpiSpreadsheet";
 
 const backend = {
@@ -15,6 +15,18 @@ const valid: KpiSpreadsheetRow = {
 };
 assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
 assert.throws(() => decodeKpiRows({ items: [{ ...backend, kpiCode: "G" }] }), /Invalid KPI code/);
+assert.equal(
+  getKpiActivitiesApiBase({ location: { protocol: "http:", hostname: "127.0.0.1", port: "8000" } }),
+  "http://127.0.0.1:18081/api/v1/kpi-activities"
+);
+assert.equal(
+  getKpiActivitiesApiBase({ location: { protocol: "https:", hostname: "127.0.0.1", port: "8000" } }),
+  "/api/v1/kpi-activities"
+);
+assert.equal(
+  getKpiActivitiesApiBase({ location: { protocol: "https:", hostname: "hermes-one-server.tail57dd1d.ts.net", port: "8443" } }),
+  "/api/v1/kpi-activities"
+);
 
 const calls: Array<{ url: string; init?: RequestInit }> = [];
 const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {

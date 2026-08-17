@@ -2,6 +2,20 @@ import { FiscalYear } from "./kpiExcelParser";
 import { KpiSpreadsheetRow, SpreadsheetKpiCode } from "./kpiSpreadsheet";
 
 const API_BASE = "/api/v1/kpi-activities";
+type KpiActivitiesRuntime = Readonly<{
+  location?: { protocol?: string; hostname?: string; port?: string };
+}>;
+
+export function getKpiActivitiesApiBase(runtime: KpiActivitiesRuntime = globalThis as KpiActivitiesRuntime): string {
+  if (
+    runtime.location?.protocol === "http:" &&
+    ["localhost", "127.0.0.1"].includes(runtime.location?.hostname ?? "") &&
+    runtime.location?.port === "8000"
+  ) {
+    return `http://${runtime.location?.hostname}:18081/api/v1/kpi-activities`;
+  }
+  return API_BASE;
+}
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 const monthNumbers: Record<string, string> = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
@@ -64,17 +78,18 @@ function payloadFor(row: KpiSpreadsheetRow) {
 }
 
 export async function listKpiRows(fiscalYear: FiscalYear, fetchImpl: FetchLike = fetch): Promise<KpiSpreadsheetRow[]> {
-  return decodeKpiRows(await request(fetchImpl, `${API_BASE}?fiscalYear=${encodeURIComponent(fiscalYear)}`));
+  return decodeKpiRows(await request(fetchImpl, `${getKpiActivitiesApiBase()}?fiscalYear=${encodeURIComponent(fiscalYear)}`));
 }
 
 export async function saveKpiRow(row: KpiSpreadsheetRow, fetchImpl: FetchLike = fetch): Promise<KpiSpreadsheetRow> {
   const isDraft = row.id.startsWith("draft-");
-  const url = isDraft ? API_BASE : `${API_BASE}/${encodeURIComponent(row.id)}`;
+  const apiBase = getKpiActivitiesApiBase();
+  const url = isDraft ? apiBase : `${apiBase}/${encodeURIComponent(row.id)}`;
   const body = isDraft ? payloadFor(row) : { versionNo: row.versionNo, ...payloadFor(row) };
   return decodeActivity(await request(fetchImpl, url, { method: isDraft ? "POST" : "PATCH", body: JSON.stringify(body) }));
 }
 
 export async function deleteKpiRow(row: KpiSpreadsheetRow, fetchImpl: FetchLike = fetch): Promise<void> {
   if (row.id.startsWith("draft-")) return;
-  await request(fetchImpl, `${API_BASE}/${encodeURIComponent(row.id)}?versionNo=${encodeURIComponent(String(row.versionNo ?? 0))}`, { method: "DELETE" });
+  await request(fetchImpl, `${getKpiActivitiesApiBase()}/${encodeURIComponent(row.id)}?versionNo=${encodeURIComponent(String(row.versionNo ?? 0))}`, { method: "DELETE" });
 }
