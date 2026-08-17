@@ -33,7 +33,7 @@ export function Header({ appName, userLogin, navigationOpen, onToggleNavigation 
             <span slot="startIcon" class="oj-ux-ico-menu"></span>
             Menu
           </oj-button>
-          <div class="kpi-brand-lockup" aria-label="Oracle KPI cockpit">
+          <div class="kpi-brand-lockup" aria-label="My KPI & Account Planner">
             <img class="oj-icon demo-oracle-icon" title="Oracle Logo" alt="Oracle Logo" />
           </div>
           <div class="kpi-title-block">

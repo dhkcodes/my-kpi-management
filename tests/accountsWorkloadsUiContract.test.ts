@@ -8,6 +8,15 @@ const page = read("src/components/content/AccountsWorkloadsPage.tsx");
 const content = read("src/components/content/index.tsx");
 const app = read("src/components/app.tsx");
 const styles = read("src/styles/app.css");
+const indexHtml = read("src/index.html");
+const header = read("src/components/header.tsx");
+const packageJson = read("package.json");
+
+assert.match(indexHtml, /<title>My KPI &amp; Account Planner<\/title>/, "browser title uses the finalized KAP product name");
+assert.match(app, /appName = "My KPI & Account Planner"/, "app header defaults to the finalized KAP product name");
+assert.match(header, /aria-label="My KPI & Account Planner"/, "header brand landmark uses the finalized accessible product name");
+assert.match(packageJson, /"description": "My KPI & Account Planner — Goals, Accounts and Next Actions"/, "package metadata uses the finalized KAP product name");
+assert.doesNotMatch(`${indexHtml}\n${app}\n${header}\n${packageJson}`, /KPI Management|Oracle KPI cockpit|KPI operating cockpit/, "legacy product names are removed from product metadata and the app shell");
 
 assert.match(page, /deleteMode === "permanent" \|\| deleteMode === "mixed"/, "deleted and mixed selections require confirmation");
 assert.match(page, /filter\(\(id\) => rows\.find\(\(row\) => row\.id === id\)\?\.isDeleted\)/, "permanent targets are isolated from selected deleted rows");
@@ -38,7 +47,19 @@ assert.match(page, /nextIncludeDeleted[\s\S]{0,350}onQueryChange\(\{ \.\.\.query
 assert.match(app, /handleAccountsWorkloadsRefresh[\s\S]*setAccountsWorkloadsRefreshing\(true\)[\s\S]*fetchAccountsWorkloads\(\{ fiscalYear, \.\.\.accountsWorkloadsQuery \}\)[\s\S]*setAccountsWorkloadsRows/, "Refresh re-fetches the lower table with the exact committed query");
 assert.doesNotMatch(app, /handleAccountsWorkloadsRefresh[\s\S]{0,800}setAccountsWorkloadsLoading\(true\)/, "Refresh does not replace the whole page with initial loading state");
 assert.doesNotMatch(app, /accountsWorkloadsRefreshVersion/, "Refresh does not replay the full-page loading effect");
+assert.match(app, /handleAccountsWorkloadsQueryChange[\s\S]*setAccountsWorkloadsRefreshing\(true\)[\s\S]*fetchAccountsWorkloads\(\{ fiscalYear, \.\.\.nextQuery \}\)[\s\S]*setAccountsWorkloadsQuery\(nextQuery\)[\s\S]*setAccountsWorkloadsRows/, "Search, Include deleted, and sort changes re-fetch only the table with the next committed query");
+assert.doesNotMatch(app, /handleAccountsWorkloadsQueryChange[\s\S]{0,1000}setAccountsWorkloadsLoading\(true\)/, "query changes never replace the whole page with initial loading state");
+assert.match(app, /accountsWorkloadsRequestIdRef[\s\S]*handleAccountsWorkloadsQueryChange[\s\S]*requestId = \+\+accountsWorkloadsRequestIdRef\.current[\s\S]*requestId !== accountsWorkloadsRequestIdRef\.current/, "stale query responses cannot overwrite a newer FY, route, refresh, or query request");
+assert.match(app, /handlePopState[\s\S]{0,400}if \(route\.module !== activeRouteModuleRef\.current\)[\s\S]{0,250}accountsWorkloadsRequestIdRef\.current \+= 1[\s\S]*handleNavigate[\s\S]{0,400}if \(route\.module !== activeRouteModuleRef\.current\)[\s\S]{0,250}accountsWorkloadsRequestIdRef\.current \+= 1/, "route transitions synchronously invalidate pending table requests only when a replacement load will run");
+assert.match(app, /handleFiscalYearChange[\s\S]{0,180}if \(nextFiscalYear === fiscalYearRef\.current\) return;[\s\S]{0,180}accountsWorkloadsRequestIdRef\.current \+= 1/, "reselecting the active FY cannot orphan an in-flight load");
+assert.match(app, /fetchAccountsWorkloads\(\{ fiscalYear, \.\.\.nextQuery \}\)[\s\S]*requestId !== accountsWorkloadsRequestIdRef\.current[\s\S]*setAccountsWorkloadsQuery\(nextQuery\)/, "the committed query advances only after the matching request succeeds");
+assert.match(page, /if \(!accountsWorkloadsRefreshing\)[\s\S]{0,500}setSearchTerm\(query\.search \?\? ""\)[\s\S]{0,500}\}, \[accountsWorkloadsRefreshing, query\.direction, query\.includeDeleted, query\.search, query\.sort\]\)/, "failed query changes restore the committed query controls");
+assert.match(app, /onAccountsWorkloadsQueryChange=\{\(nextQuery\) => void handleAccountsWorkloadsQueryChange\(nextQuery\)\}/, "the table routes committed query changes through table-only loading");
+assert.doesNotMatch(app, /\[activeRoute\.module, accountsWorkloadsQuery, fiscalYear\]/, "the full-page load effect does not replay for table query changes");
 assert.match(page, /accountsWorkloadsRefreshing[\s\S]*role="status"[\s\S]*Refreshing table/, "lower table exposes its own refresh pending state");
+assert.match(page, /id="accountsWorkloadsSearchInput"[\s\S]{0,180}disabled=\{draftActive \|\| accountsWorkloadsRefreshing\}/, "search input locks during table refresh");
+assert.match(page, /id="accountsWorkloadsSearchButton"[\s\S]{0,220}disabled=\{draftActive \|\| accountsWorkloadsRefreshing\}/, "search submit locks during table refresh");
+assert.match(page, /<oj-switch[\s\S]{0,180}disabled=\{draftActive \|\| accountsWorkloadsRefreshing\}/, "Include deleted locks during table refresh");
 assert.match(app, /setKpiGuides\(\[\]\)[\s\S]*fetchKpiGuides\(fiscalYear\)/, "KPI Guide reload clears stale FY data before fetching");
 assert.match(content, /guideRecords\.length === 0[\s\S]*getGuideDetails\(guide\)[\s\S]*setSavedGuideDetails\(authoritative\)[\s\S]*\}, \[guideRecords, fiscalYear\]\)/, "empty Guide responses reset child details to the current FY fallback");
 assert.match(app, /fiscalYearRef[\s\S]*draft\.fiscalYear !== fiscalYearRef\.current[\s\S]*updateKpiGuide\(draft\)[\s\S]*fiscalYearRef\.current !== authoritative\.fiscalYear/, "late Guide saves cannot overwrite a different current FY");
@@ -59,6 +80,9 @@ assert.match(content, /id="kpiGuideError"[\s\S]*role="alert"/, "KPI Guide expose
 assert.match(content, /class="kpi-guide-dialog__body"/, "KPI Guide uses an app-owned scroll body");
 assert.match(styles, /\.kpi-guide-dialog\s*\{[^}]*max-height: min\(92dvh, 58rem\)[^}]*display: flex[^}]*flex-direction: column/, "KPI Guide is constrained to the dynamic viewport");
 assert.match(styles, /\.kpi-guide-dialog__body\s*\{[^}]*min-height: 0[^}]*overflow-y: auto/, "KPI Guide body owns vertical scrolling so Notes remain reachable");
+assert.match(styles, /\.kpi-guide-layout\s*\{[^}]*min-height: 28rem/, "KPI Guide content is compact enough for one-screen desktop viewing");
+assert.match(styles, /\.kpi-guide-criteria-table th\s*\{[^}]*padding: 0\.62rem/, "KPI Guide headings use compact vertical spacing");
+assert.match(styles, /\.kpi-guide-criteria-table td\s*\{[^}]*line-height: 1\.35[^}]*padding: 0\.62rem/, "KPI Guide values use compact row height without removing wrapping");
 assert.doesNotMatch(styles, /\.oj-dialog|\.oj-dialog-content|\.oj-dialog-body/, "KPI Guide scrolling does not override JET internal DOM");
 assert.match(page, /id="accountsWorkloadsFxError"[\s\S]*role="alert"/, "FX exposes an error state");
 

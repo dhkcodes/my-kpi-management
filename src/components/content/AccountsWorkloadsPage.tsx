@@ -344,6 +344,15 @@ export function AccountsWorkloadsPage({
     moveHorizontally(event.key === "ArrowLeft" ? -1 : 1);
   };
 
+  useEffect(() => {
+    if (!accountsWorkloadsRefreshing) {
+      setSearchTerm(query.search ?? "");
+      setIncludeDeleted(Boolean(query.includeDeleted));
+      setSortField((query.sort as SortField | undefined) ?? "account");
+      setSortDirection(query.direction ?? "asc");
+    }
+  }, [accountsWorkloadsRefreshing, query.direction, query.includeDeleted, query.search, query.sort]);
+
   const visibleRows = useMemo(() => {
     const sourceRows = editCell ? rows : draftRows;
     if (dataSource === "api") {
@@ -717,7 +726,7 @@ export function AccountsWorkloadsPage({
             <input
               id="accountsWorkloadsSearchInput"
               value={searchTerm}
-              disabled={draftActive}
+              disabled={draftActive || accountsWorkloadsRefreshing}
               title={draftActive ? "Save or cancel changes before changing the server query." : undefined}
               onInput={(event) => {
                 const search = (event.currentTarget as HTMLInputElement).value;
@@ -731,7 +740,7 @@ export function AccountsWorkloadsPage({
               type="button"
               aria-label="Search accounts and workloads"
               title="Search"
-              disabled={draftActive}
+              disabled={draftActive || accountsWorkloadsRefreshing}
               onClick={submitSearch}>
               <span class="oj-ux-ico-search" aria-hidden="true"></span>
             </button>
@@ -741,7 +750,7 @@ export function AccountsWorkloadsPage({
           <span>Include deleted</span>
           <oj-switch
             value={includeDeleted}
-            disabled={draftActive}
+            disabled={draftActive || accountsWorkloadsRefreshing}
             onvalueChanged={(event: CustomEvent) => {
               const nextIncludeDeleted = Boolean(event.detail.value);
               setIncludeDeleted(nextIncludeDeleted);
@@ -797,17 +806,17 @@ export function AccountsWorkloadsPage({
               </th>
               <th class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">No</th>
               <th class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center">
-                <button type="button" disabled={draftActive} onClick={() => toggleSort("isImportant")}>! {sortIndicator("isImportant")}</button>
+                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("isImportant")}>! {sortIndicator("isImportant")}</button>
               </th>
               <th class="is-sticky accounts-workloads-plan-col">
-                <button type="button" disabled={draftActive} onClick={() => toggleSort("planNumber")}>{columnLabels.planNumber} {sortIndicator("planNumber")}</button>
+                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("planNumber")}>{columnLabels.planNumber} {sortIndicator("planNumber")}</button>
               </th>
               <th class="is-sticky accounts-workloads-account-col">
-                <button type="button" disabled={draftActive} onClick={() => toggleSort("account")}>{columnLabels.account} {sortIndicator("account")}</button>
+                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("account")}>{columnLabels.account} {sortIndicator("account")}</button>
               </th>
               {editableFields.filter((field) => !["planNumber", "account"].includes(field)).map((field) => (
                 <th key={field} class={fieldAlignmentClass(field)}>
-                  <button type="button" disabled={draftActive} onClick={() => toggleSort(field)}>{columnLabels[field]} {sortIndicator(field)}</button>
+                  <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort(field)}>{columnLabels[field]} {sortIndicator(field)}</button>
                 </th>
               ))}
             </tr>

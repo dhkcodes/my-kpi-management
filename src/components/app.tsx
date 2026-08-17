@@ -88,7 +88,7 @@ function NavigationEntry({ item, onNavigate }: NavigationEntryProps) {
 
 export const App = registerCustomElement(
   "app-root",
-  ({ appName = "KPI Management", userLogin = "donghu.kim@oracle.com" }: Props) => {
+  ({ appName = "My KPI & Account Planner", userLogin = "donghu.kim@oracle.com" }: Props) => {
     const initialRoute = typeof window === "undefined"
       ? getNavigationRoute("home")
       : getNavigationRouteFromPath(window.location.pathname);
@@ -100,6 +100,7 @@ export const App = registerCustomElement(
     const fiscalYearRef = useRef(fiscalYear);
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
+    const activeRouteModuleRef = useRef(initialRoute.module);
     const [guideOpen, setGuideOpen] = useState(false);
     const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
     const [guideLoading, setGuideLoading] = useState(false);
@@ -116,6 +117,7 @@ export const App = registerCustomElement(
     const [accountsWorkloadsLoadError, setAccountsWorkloadsLoadError] = useState("");
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
     const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
+    const accountsWorkloadsRequestIdRef = useRef(0);
     const [accountsWorkloadsQuery, setAccountsWorkloadsQuery] = useState<Omit<AccountsWorkloadsListQuery, "fiscalYear">>({
       search: "",
       includeDeleted: false,
@@ -157,16 +159,18 @@ export const App = registerCustomElement(
 
     useEffect(() => {
       let active = true;
+      const requestId = ++accountsWorkloadsRequestIdRef.current;
       const tableRoute = activeRoute.module === "accountsWorkloads";
       const query: AccountsWorkloadsListQuery = tableRoute
         ? { fiscalYear, ...accountsWorkloadsQuery }
         : { fiscalYear, search: "", includeDeleted: true, sort: "account", direction: "asc" };
       const load = async () => {
+        setAccountsWorkloadsRefreshing(false);
         setAccountsWorkloadsLoading(true);
         setAccountsWorkloadsLoadError("");
         try {
           const result = await fetchAccountsWorkloads(query);
-          if (!active) return;
+          if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
           setAccountWorkloadMetadata((current) => ({
             ...current,
             sourceWorkbook: "Accounts & Workloads API",
@@ -176,22 +180,22 @@ export const App = registerCustomElement(
           setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: result.items }));
         } catch (error) {
           if (!canUseDevelopmentDataFallback(error)) {
-            if (!active) return;
+            if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
             setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Accounts & Workloads API request failed.");
             return;
           }
           try {
             const { seed, source } = await loadAccountWorkloadStateSeed();
-            if (!active) return;
+            if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
             setAccountWorkloadMetadata(seed.metadata);
             setAccountsWorkloadsDataSource(source);
             setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: seed.metadata.fiscalYear === fiscalYear ? seed.rows : [] }));
           } catch (fallbackError) {
-            if (!active) return;
+            if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
             setAccountsWorkloadsLoadError(fallbackError instanceof Error ? fallbackError.message : "Development data could not be loaded.");
           }
         } finally {
-          if (active) setAccountsWorkloadsLoading(false);
+          if (active && requestId === accountsWorkloadsRequestIdRef.current) setAccountsWorkloadsLoading(false);
         }
       };
       const delay = tableRoute && (accountsWorkloadsQuery.search ?? "") !== "" ? 250 : 0;
@@ -200,11 +204,16 @@ export const App = registerCustomElement(
         active = false;
         window.clearTimeout(timer);
       };
-    }, [activeRoute.module, accountsWorkloadsQuery, fiscalYear]);
+    }, [activeRoute.module, fiscalYear]);
 
     useEffect(() => {
       const handlePopState = () => {
         const route = getNavigationRouteFromPath(window.location.pathname);
+        if (route.module !== activeRouteModuleRef.current) {
+          accountsWorkloadsRequestIdRef.current += 1;
+          setAccountsWorkloadsRefreshing(false);
+        }
+        activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(route.id);
         setActiveRoute(route);
       };
@@ -231,6 +240,11 @@ export const App = registerCustomElement(
     };
     const handleNavigate = (item: NavigationItem) => {
       const route = getNavigationRoute(item.id);
+      if (route.module !== activeRouteModuleRef.current) {
+        accountsWorkloadsRequestIdRef.current += 1;
+        setAccountsWorkloadsRefreshing(false);
+      }
+      activeRouteModuleRef.current = route.module;
       setSelectedNavigationId(item.id);
       setActiveRoute(route);
       window.history.pushState({ routeId: route.id }, "", getNavigationPath(route));
@@ -240,6 +254,9 @@ export const App = registerCustomElement(
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
+      if (nextFiscalYear === fiscalYearRef.current) return;
+      accountsWorkloadsRequestIdRef.current += 1;
+      setAccountsWorkloadsRefreshing(false);
       fiscalYearRef.current = nextFiscalYear;
       setFiscalYear(nextFiscalYear);
     };
@@ -266,17 +283,39 @@ export const App = registerCustomElement(
     };
 
     const handleAccountsWorkloadsRefresh = async () => {
+      const requestId = ++accountsWorkloadsRequestIdRef.current;
       setAccountsWorkloadsRefreshing(true);
       setAccountsWorkloadsLoadError("");
       try {
         const refreshed = await fetchAccountsWorkloads({ fiscalYear, ...accountsWorkloadsQuery });
+        if (requestId !== accountsWorkloadsRequestIdRef.current) return;
         setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
         setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
         setAccountsWorkloadsDataSource("api");
       } catch (error) {
+        if (requestId !== accountsWorkloadsRequestIdRef.current) return;
         setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Accounts & Workloads refresh failed.");
       } finally {
-        setAccountsWorkloadsRefreshing(false);
+        if (requestId === accountsWorkloadsRequestIdRef.current) setAccountsWorkloadsRefreshing(false);
+      }
+    };
+
+    const handleAccountsWorkloadsQueryChange = async (nextQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => {
+      const requestId = ++accountsWorkloadsRequestIdRef.current;
+      setAccountsWorkloadsRefreshing(true);
+      setAccountsWorkloadsLoadError("");
+      try {
+        const refreshed = await fetchAccountsWorkloads({ fiscalYear, ...nextQuery });
+        if (requestId !== accountsWorkloadsRequestIdRef.current) return;
+        setAccountsWorkloadsQuery(nextQuery);
+        setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
+        setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
+        setAccountsWorkloadsDataSource("api");
+      } catch (error) {
+        if (requestId !== accountsWorkloadsRequestIdRef.current) return;
+        setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Accounts & Workloads query failed.");
+      } finally {
+        if (requestId === accountsWorkloadsRequestIdRef.current) setAccountsWorkloadsRefreshing(false);
       }
     };
 
@@ -355,7 +394,7 @@ export const App = registerCustomElement(
               if (authoritative.fxRate) setFxRate(authoritative.fxRate);
               return authoritative;
             }}
-            onAccountsWorkloadsQueryChange={setAccountsWorkloadsQuery}
+            onAccountsWorkloadsQueryChange={(nextQuery) => void handleAccountsWorkloadsQueryChange(nextQuery)}
             onAccountsWorkloadsDraftStateChange={setAccountsWorkloadsDraftActive}
             onFiscalYearChange={handleFiscalYearChange}
           />
