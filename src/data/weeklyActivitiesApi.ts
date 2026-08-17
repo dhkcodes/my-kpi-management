@@ -1,6 +1,7 @@
 import { assertValidUtf8Content, hasValidUtf8Content } from "./utf8TextPolicy";
 
 export const WEEKLY_ACTIVITIES_API_BASE = "/api/v1";
+export const WEEKLY_ACTIVITY_MUTATION_TIMEOUT_MS = 15_000;
 
 export type WeeklyActivityRecord = Readonly<{
   activityId: number;
@@ -64,15 +65,32 @@ const apiBase = () => {
   return WEEKLY_ACTIVITIES_API_BASE;
 };
 
-const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<T> => {
+const requestResponse = async (
+  fetchImpl: FetchLike,
+  url: string,
+  init?: RequestInit,
+  timeoutMs?: number
+): Promise<Response> => {
   let response: Response;
+  const timeoutController = timeoutMs === undefined ? null : new AbortController();
+  const timeoutHandle = timeoutController === null ? null : globalThis.setTimeout(() => timeoutController.abort(), timeoutMs);
   try {
     response = await fetchImpl(url, {
       ...init,
+      signal: timeoutController?.signal ?? init?.signal,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
     });
   } catch {
+    if (timeoutController?.signal.aborted) {
+      throw new WeeklyActivitiesApiError(
+        0,
+        "REQUEST_TIMEOUT",
+        "The Weekly Activity save result could not be confirmed. Your draft is still open; reload before retrying."
+      );
+    }
     throw new WeeklyActivitiesApiError(0, "NETWORK_ERROR", "Weekly Activities API is unreachable.");
+  } finally {
+    if (timeoutHandle !== null) globalThis.clearTimeout(timeoutHandle);
   }
   if (!response.ok) {
     let payload: { code?: string; message?: string } = {};
@@ -84,14 +102,13 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
       : typeof payload.message === "string" && hasValidUtf8Content(payload.message)
         ? payload.message
         : `Weekly Activities request failed (${response.status}).`;
-    throw new WeeklyActivitiesApiError(
-      response.status,
-      responseCode,
-      responseMessage
-    );
+    throw new WeeklyActivitiesApiError(response.status, responseCode, responseMessage);
   }
-  return response.json() as Promise<T>;
+  return response;
 };
+
+const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestInit, timeoutMs?: number): Promise<T> =>
+  (await requestResponse(fetchImpl, url, init, timeoutMs)).json() as Promise<T>;
 
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -146,13 +163,14 @@ export const fetchWeeklyActivities = async (
 
 export const createWeeklyActivity = async (
   request: CreateWeeklyActivityRequest,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  timeoutMs = WEEKLY_ACTIVITY_MUTATION_TIMEOUT_MS
 ): Promise<WeeklyActivityRecord> => {
   assertValidUtf8Content([request.weekOfDate, request.thisWeekHtml, request.nextWeekHtml]);
   const payload = await requestJson<unknown>(fetchImpl, `${apiBase()}/weekly-activities`, {
     method: "POST",
     body: JSON.stringify(request)
-  });
+  }, timeoutMs);
   const record = parseRecord(payload);
   if (!record) throw new Error("Malformed Weekly Activities mutation response.");
   return record;
@@ -161,16 +179,28 @@ export const createWeeklyActivity = async (
 export const updateWeeklyActivity = async (
   activityId: number,
   request: UpdateWeeklyActivityRequest,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  timeoutMs = WEEKLY_ACTIVITY_MUTATION_TIMEOUT_MS
 ): Promise<WeeklyActivityRecord> => {
   assertValidUtf8Content([request.weekOfDate, request.thisWeekHtml, request.nextWeekHtml]);
   const payload = await requestJson<unknown>(fetchImpl, `${apiBase()}/weekly-activities/${activityId}`, {
     method: "PUT",
     body: JSON.stringify(request)
-  });
+  }, timeoutMs);
   const record = parseRecord(payload);
   if (!record) throw new Error("Malformed Weekly Activities mutation response.");
   return record;
+};
+
+export const deleteWeeklyActivity = async (
+  activityId: number,
+  versionNo: number,
+  fetchImpl: FetchLike = fetch
+): Promise<void> => {
+  await requestResponse(fetchImpl, `${apiBase()}/weekly-activities/${activityId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ versionNo })
+  }, WEEKLY_ACTIVITY_MUTATION_TIMEOUT_MS);
 };
 
 const isoDate = (year: number, monthIndex: number, day: number) =>

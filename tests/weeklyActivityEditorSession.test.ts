@@ -5,19 +5,24 @@ import {
   getRejectedPopstateDelta,
   hasNavigationDestinationChanged,
   isCurrentContextAnchorNavigation,
+  isDialogPlaceholderControlAnchor,
   isSameDocumentNavigation,
   shouldReleaseWeeklyActivityDraft,
   withHistoryIndex
 } from "../src/components/weeklyActivityNavigationGuard";
 import {
+  isWeeklyActivityDraftDirty,
   LatestRequestGuard,
   reconcileWeeklyActivityMutation,
   validateWeeklyActivityDraft
 } from "../src/components/content/weeklyActivitiesPageState";
 import {
   ALLOWED_QUILL_FORMATS,
+  WEEKLY_ACTIVITY_COLORS,
   deriveWeeklyActivityPlainText,
   hasWeeklyActivityVisibleBase,
+  hasWeeklyActivityFormattingParity,
+  promoteWeeklyActivityListMarkerStyles,
   sanitizeWeeklyActivityStyle,
   sanitizeWeeklyActivityHtml,
   SharedEditorSession,
@@ -58,6 +63,20 @@ const sameTarget: WeeklyActivityTarget = session.activeTarget;
 session.switchTarget(sameTarget);
 assert.equal(editor.focusCount, 3, "same-target selection focuses without creating another editor");
 assert.deepEqual(ALLOWED_QUILL_FORMATS, ["bold", "color", "size", "list"]);
+assert.deepEqual(WEEKLY_ACTIVITY_COLORS, ["#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B"]);
+
+const colorEditor = new FakeEditor();
+const colorSession = new SharedEditorSession(colorEditor, {
+  thisWeekHtml: '<p><span style="color:#C74634">red draft</span></p>',
+  nextWeekHtml: '<p><span style="color:#2458A6">blue draft</span></p>'
+});
+colorEditor.html = '<p><span style="color: rgb(199, 70, 52);">red edited</span></p>';
+colorSession.switchTarget("nextWeek");
+colorEditor.html = '<p><span style="color: rgb(36, 88, 166);">blue edited</span></p>';
+assert.deepEqual(colorSession.flush(), {
+  thisWeekHtml: '<p><span style="color: rgb(199, 70, 52);">red edited</span></p>',
+  nextWeekHtml: '<p><span style="color: rgb(36, 88, 166);">blue edited</span></p>'
+}, "both colored drafts survive single-editor target switching before the update payload is built");
 
 const currentUrl = "https://example.test/weekly-activities";
 const currentContextClick = { button: 0, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false };
@@ -68,6 +87,9 @@ assert.equal(isCurrentContextAnchorNavigation(currentContextClick, { href: "/exp
 assert.equal(isCurrentContextAnchorNavigation(currentContextClick, { href: "#details" }, currentUrl), true, "a same-document hash navigation still replaces the active application route and must protect its draft");
 assert.equal(isCurrentContextAnchorNavigation(currentContextClick, { href: currentUrl }, currentUrl), false, "a no-op link to the exact current URL cannot discard the draft");
 assert.equal(isCurrentContextAnchorNavigation(currentContextClick, { href: "mailto:owner@example.test" }, currentUrl), false, "external-protocol navigation cannot discard the current-page draft");
+assert.equal(isDialogPlaceholderControlAnchor("#", true), true, "a JET date-picker day anchor is a dialog control, not application navigation");
+assert.equal(isDialogPlaceholderControlAnchor("#details", true), false, "a real hash destination remains navigation even inside a dialog");
+assert.equal(isDialogPlaceholderControlAnchor("#", false), false, "placeholder anchors outside dialogs keep the existing navigation contract");
 assert.equal(hasNavigationDestinationChanged("weekly-activities", "weekly-activities", `${currentUrl}#one`, `${currentUrl}#two`), true, "same-route hash Back/Forward changes the active destination");
 assert.equal(hasNavigationDestinationChanged("weekly-activities", "weekly-activities", `${currentUrl}#one`, `${currentUrl}#one`), false, "the exact same route and URL are a no-op");
 assert.equal(shouldReleaseWeeklyActivityDraft("weekly-activities", "weekly-activities"), false, "same-route hash and no-op approvals retain draft ownership while the page remains mounted");
@@ -105,6 +127,17 @@ assert.equal(
 assert.equal(hasWeeklyActivityVisibleBase("\u0301\u200B\u00A0"), false, "standalone combining marks are not meaningful content");
 assert.equal(hasWeeklyActivityVisibleBase("e\u0301"), true, "combining marks attached to a visible base remain meaningful");
 const validDrafts = { thisWeekHtml: `<p>${"A".repeat(20_000)}</p>`, nextWeekHtml: `<p>${"B".repeat(20_000)}</p>` };
+const baselineDrafts = { thisWeekHtml: "<p>Done</p>", nextWeekHtml: "<p>Plan</p>" };
+assert.equal(isWeeklyActivityDraftDirty("2026-08-15", baselineDrafts, "2026-08-15", baselineDrafts), false, "opening an editor without changing data is not dirty");
+assert.equal(isWeeklyActivityDraftDirty(
+  "2026-08-15",
+  { thisWeekHtml: '<p><span style="color: rgb(199, 70, 52);">Done</span></p>', nextWeekHtml: "<p>Plan</p>" },
+  "2026-08-15",
+  { thisWeekHtml: '<p><span style="color:#C74634">Done</span></p>', nextWeekHtml: "<p>Plan</p>" }
+), false, "Quill RGB serialization that is canonically equivalent to the loaded hex does not create a false dirty state");
+assert.equal(isWeeklyActivityDraftDirty("2026-08-16", baselineDrafts, "2026-08-15", baselineDrafts), true, "a real date change is dirty for page-exit protection");
+assert.equal(isWeeklyActivityDraftDirty("2026-08-15", { ...baselineDrafts, nextWeekHtml: "<p>Changed</p>" }, "2026-08-15", baselineDrafts), true, "either content draft activates page-exit protection");
+assert.equal(isWeeklyActivityDraftDirty("2026-08-15", baselineDrafts, "2026-08-15", baselineDrafts), false, "restoring the baseline clears dirty ownership before Cancel or after rollback");
 assert.equal(validateWeeklyActivityDraft("2026-08-15", validDrafts), "", "20k per field and 40k total are accepted");
 assert.match(validateWeeklyActivityDraft("2026-08-15", { ...validDrafts, thisWeekHtml: `<p>${"A".repeat(20_001)}</p>` }), /20,000/, "a field over 20k is rejected using canonical text");
 assert.match(validateWeeklyActivityDraft("2026-08-15", { thisWeekHtml: "<p>\u0301</p>", nextWeekHtml: "<p>Plan</p>" }), /meaningful/, "standalone combining-mark content is rejected like the server");
@@ -119,6 +152,29 @@ assert.equal(
   "the frontend style allow-list and canonical output match the backend"
 );
 assert.equal(sanitizeWeeklyActivityStyle("color:red;font-size:13px"), "", "disallowed style values are removed");
+assert.equal(sanitizeWeeklyActivityStyle("color: rgb(199, 70, 52)"), "color:#C74634", "Quill RGB red is canonicalized instead of being stripped");
+assert.equal(sanitizeWeeklyActivityStyle("color:rgb(36,88,166)"), "color:#2458A6", "Quill RGB blue is canonicalized with optional whitespace");
+assert.equal(
+  promoteWeeklyActivityListMarkerStyles('<ol><li><span style="color:#C74634;font-size:18px">First item</span></li></ol>'),
+  '<ol><li style="color:#C74634;font-size:18px"><span style="color:#C74634;font-size:18px">First item</span></li></ol>',
+  "a list marker inherits the leading text color and size in persisted/view HTML"
+);
+assert.equal(
+  hasWeeklyActivityFormattingParity(
+    '<ol><li style="color:#C74634"><span style="color:#C74634">First</span></li></ol>',
+    '<ol><li><span>First</span></li></ol>'
+  ),
+  false,
+  "a stale Backend that silently strips requested color is detected before the editor is released"
+);
+assert.equal(
+  hasWeeklyActivityFormattingParity(
+    '<ul><li><span style="color:rgb(36,88,166);font-size:16px">Next</span></li></ul>',
+    '<ul><li style="font-size:16px"><span style="color:#2458A6;font-size:16px">Next</span></li></ul>'
+  ),
+  true,
+  "canonical RGB/hex and promoted list-marker style remain formatting-equivalent"
+);
 
 assert.equal(
   sanitizeWeeklyActivityHtml('<img src=x onerror="alert(1)"><script>alert(2)</script><p onclick="alert(3)">Safe & sound</p>'),

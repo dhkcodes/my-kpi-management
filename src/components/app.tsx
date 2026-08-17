@@ -35,6 +35,7 @@ import {
   getRejectedPopstateDelta,
   hasNavigationDestinationChanged,
   isCurrentContextAnchorNavigation,
+  isDialogPlaceholderControlAnchor,
   isSameDocumentNavigation,
   shouldReleaseWeeklyActivityDraft,
   withHistoryIndex
@@ -249,6 +250,7 @@ export const App = registerCustomElement(
         if (!(event.target instanceof Element)) return;
         const anchor = event.target.closest("a[href]") as HTMLAnchorElement | null;
         if (!anchor) return;
+        if (isDialogPlaceholderControlAnchor(anchor.getAttribute("href"), Boolean(anchor.closest("[role=\"dialog\"] [role=\"grid\"]")))) return;
         if (anchor.closest("oj-navigation-list")) {
           if (anchor.dataset.appNavigation === "true" && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
             event.preventDefault();

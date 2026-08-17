@@ -1619,8 +1619,7 @@ body {
 }
 .weekly-activity-disclosure:focus-visible { outline: 2px solid var(--kpi-brand); outline-offset: 1px; }
 
-.weekly-activity-card__sections,
-.weekly-activity-editor-grid {
+.weekly-activity-card__sections {
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1628,8 +1627,7 @@ body {
 }
 
 .weekly-activity-card__sections > section,
-.weekly-activity-active-editor,
-.weekly-activity-preview {
+.weekly-activity-edit-column {
   background: var(--kpi-surface);
   border: 1px solid var(--kpi-border);
   border-radius: 0.25rem;
@@ -1638,30 +1636,53 @@ body {
 }
 
 .weekly-activity-card__sections h4,
-.weekly-activity-editor-grid h4 { color: var(--kpi-ink); font-size: 0.82rem; margin: 0; }
-.weekly-activity-section__header {
-  align-items: center;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: space-between;
-  margin-bottom: 0.65rem;
-}
-.weekly-activity-card__sections section .weekly-activity-editor-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
+.weekly-activity-edit-column h4 { color: var(--kpi-ink); font-size: 0.82rem; margin: 0; }
 .weekly-activity-card__rich-text,
 .weekly-activity-preview__content { overflow-wrap: anywhere; }
+.weekly-activity-card__rich-text--editable {
+  border-radius: 0.2rem;
+  cursor: text;
+  margin: 0.25rem -0.35rem -0.35rem;
+  padding: 0.35rem;
+  transition: background-color 120ms ease;
+}
+.weekly-activity-card__rich-text--editable:hover { background: var(--kpi-soft); }
+.weekly-activity-section-label {
+  align-items: center;
+  border-left: 0.2rem solid currentColor;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  min-height: 1.6rem;
+  padding: 0.25rem 0.55rem;
+}
+h4.weekly-activity-section-label--this-week,
+.weekly-activity-section-label--this-week {
+  background: color-mix(in srgb, var(--kpi-brand) 9%, var(--kpi-surface));
+  color: #8f3327;
+}
+h4.weekly-activity-section-label--next-week,
+.weekly-activity-section-label--next-week {
+  background: color-mix(in srgb, var(--kpi-blue) 9%, var(--kpi-surface));
+  color: #245879;
+}
 .weekly-activity-direction { display: none; }
 
+.weekly-activity-card__actions { align-items: center; display: flex; gap: 0.25rem; }
+.weekly-activity-card__date-editor { flex: 0 1 18rem; margin-inline-end: auto; max-width: 18rem; }
+.weekly-activity-card__inline-edit { padding: 1rem; }
 .weekly-activity-inline-editor { border-top: 1px solid var(--kpi-border); padding: 1rem; }
 .weekly-activity-week-date { max-width: 18rem; }
-.weekly-activity-editor-composition { margin-top: 0.9rem; }
+.weekly-activity-editor-composition { display: grid; gap: 0.75rem; }
 
 .weekly-activity-toolbar {
   align-items: center;
   background: var(--kpi-soft);
   border: 1px solid var(--kpi-border);
-  border-radius: 0.25rem 0.25rem 0 0;
+  border-radius: 0.25rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;
@@ -1669,43 +1690,96 @@ body {
   padding: 0.35rem 0.5rem;
 }
 
-.weekly-activity-toolbar button,
-.weekly-activity-toolbar select { min-height: 2.25rem; min-width: 2.25rem; }
+.weekly-activity-toolbar > button,
+.weekly-activity-toolbar .ql-picker {
+  align-items: center;
+  display: inline-flex;
+  height: 2.5rem;
+  justify-content: center;
+  margin: 0;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+  padding: 0.45rem;
+}
+.weekly-activity-toolbar .ql-size { width: 4.75rem; }
+.weekly-activity-toolbar .ql-color { width: 2.5rem; }
+.weekly-activity-toolbar .ql-picker-label {
+  align-items: center;
+  display: inline-flex;
+  height: 100%;
+  justify-content: center;
+  padding: 0.45rem;
+  width: 100%;
+}
+.weekly-activity-toolbar.ql-snow.ql-toolbar > button svg,
+.weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg,
+.weekly-activity-toolbar > button > span {
+  font-size: 1.125rem;
+  flex: 0 0 1.125rem;
+  height: 1.125rem;
+  line-height: 1.125rem;
+  min-width: 1.125rem;
+  width: 1.125rem;
+}
+.weekly-activity-toolbar.ql-snow.ql-toolbar > button svg,
+.weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg { position: static; }
 
-.weekly-activity-target-selector {
+.weekly-activity-edit-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin-top: 0.75rem;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
-.weekly-activity-target-selector button {
-  background: var(--kpi-soft);
-  border: 1px solid var(--kpi-border);
-  color: var(--kpi-ink);
-  cursor: pointer;
-  font-weight: 700;
-  min-height: 2.75rem;
-  padding: 0.55rem;
-}
-.weekly-activity-target-selector button.is-selected {
-  background: color-mix(in srgb, var(--kpi-brand) 10%, var(--kpi-surface));
-  border-color: var(--kpi-brand);
-  color: var(--kpi-brand);
-  outline: 2px solid color-mix(in srgb, var(--kpi-brand) 38%, transparent);
-  outline-offset: -2px;
-}
-
-.weekly-activity-active-editor .ql-container { border-color: var(--kpi-border); height: auto; min-height: 12rem; }
-.weekly-activity-active-editor:focus-within {
+.weekly-activity-edit-columns--thisWeek .weekly-activity-edit-column--active { grid-column: 1; grid-row: 1; }
+.weekly-activity-edit-columns--thisWeek .weekly-activity-edit-column--inactive { grid-column: 2; grid-row: 1; }
+.weekly-activity-edit-columns--nextWeek .weekly-activity-edit-column--active { grid-column: 2; grid-row: 1; }
+.weekly-activity-edit-columns--nextWeek .weekly-activity-edit-column--inactive { grid-column: 1; grid-row: 1; }
+.weekly-activity-edit-column { min-height: 14rem; position: relative; }
+.weekly-activity-edit-column--active { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kpi-brand) 24%, transparent); }
+.weekly-activity-edit-column--active:focus-within {
   border-color: var(--kpi-brand);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--kpi-brand) 20%, transparent);
   outline: none;
 }
-.weekly-activity-active-editor .ql-editor { min-height: 12rem; }
-.weekly-activity-preview { background: var(--kpi-soft); }
+.weekly-activity-edit-column--inactive { color: var(--kpi-ink); }
+.weekly-activity-edit-column--inactive:hover,
+.weekly-activity-edit-column--inactive:focus-within { border-color: var(--kpi-brand); }
+.weekly-activity-edit-column__select {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.weekly-activity-edit-column__select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--kpi-brand) 38%, transparent);
+  outline-offset: 2px;
+}
+.weekly-activity-edit-column__heading { display: block; font-size: 0.82rem; font-weight: 800; }
+.weekly-activity-edit-column__heading.weekly-activity-section-label { display: inline-flex; }
+.weekly-activity-edit-column__status { color: var(--kpi-brand); display: block; font-size: 0.72rem; font-weight: 800; margin: 0.2rem 0 0.65rem; }
+.weekly-activity-edit-column--active .ql-container { border-color: var(--kpi-border); height: auto; min-height: 12rem; }
+.weekly-activity-edit-column--active .ql-editor { min-height: 12rem; }
+.weekly-activity-edit-column--active .ql-editor li > .ql-ui::before {
+  color: var(--weekly-list-marker-color, currentColor);
+  font-size: var(--weekly-list-marker-size, inherit);
+  font-weight: var(--weekly-list-marker-weight, inherit);
+}
+.weekly-activity-preview__content { display: block; }
 .weekly-activity-inline-editor__actions { justify-content: flex-end; padding-top: 0.75rem; }
+
+.weekly-activity-delete-dialog { --oj-dialog-border-radius: 0.4rem; --oj-dialog-width: min(28rem, calc(100vw - 2rem)); }
+.weekly-activity-delete-content { display: grid; gap: 1rem; padding: 0.5rem 1rem 1rem; }
+.weekly-activity-delete-content p { color: var(--kpi-muted); line-height: 1.45; margin: 0; }
+.weekly-activity-delete-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.weekly-activity-message--row { margin: 0 1rem 1rem; }
 
 .weekly-activity-message { margin: 0.75rem 0; padding: 0.75rem; }
 .weekly-activity-message--error { background: #fff2f0; border-left: 0.25rem solid #b3261e; color: #7a1a14; }
+.weekly-activity-message--warning { align-items: center; background: #fff8e7; border-left: 0.25rem solid #8a5b00; color: var(--kpi-ink); display: flex; gap: 0.75rem; justify-content: space-between; }
 .weekly-activity-state { align-items: center; display: flex; gap: 0.75rem; justify-content: center; min-height: 12rem; }
 .weekly-activities-page__footer { color: var(--kpi-muted); margin-top: 1rem; }
 
@@ -1722,9 +1796,15 @@ body {
   .weekly-activity-filters__actions { grid-column: 1; }
   .weekly-activity-filters__actions { display: grid; grid-template-columns: 1fr 1fr; }
   .weekly-activity-card__sections,
-  .weekly-activity-editor-grid { grid-template-columns: minmax(0, 1fr); }
+  .weekly-activity-edit-columns { grid-template-columns: minmax(0, 1fr); }
+  .weekly-activity-edit-columns--thisWeek .weekly-activity-edit-column--active { grid-column: 1; grid-row: 1; }
+  .weekly-activity-edit-columns--thisWeek .weekly-activity-edit-column--inactive { grid-column: 1; grid-row: 2; }
+  .weekly-activity-edit-columns--nextWeek .weekly-activity-edit-column--inactive { grid-column: 1; grid-row: 1; }
+  .weekly-activity-edit-columns--nextWeek .weekly-activity-edit-column--active { grid-column: 1; grid-row: 2; }
   .weekly-activity-direction { color: var(--kpi-brand); display: block; font-size: 1.4rem; font-weight: 800; text-align: center; }
-  .weekly-activity-target-selector button { min-height: 2.75rem; overflow-wrap: anywhere; }
+  .weekly-activity-card__header { align-items: stretch; flex-wrap: wrap; }
+  .weekly-activity-card__date-editor { max-width: none; min-width: 12rem; }
+  .weekly-activity-card__actions { margin-inline-start: auto; }
   .weekly-activity-toolbar button,
   .weekly-activity-toolbar .ql-picker,
   .weekly-activity-toolbar .ql-picker-label { min-height: 2.75rem; min-width: 2.75rem; }

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { getNavigationRouteFromPath } from "../src/components/navigationRoutes";
+import { executeWeeklyActivityDelete, resolveFocusAfterRemoval } from "../src/components/content/weeklyActivitiesPageState";
+import { WeeklyActivitiesApiError, WeeklyActivitiesPage, WeeklyActivityRecord } from "../src/data/weeklyActivitiesApi";
 
 const page = readFileSync("src/components/content/WeeklyActivitiesPage.tsx", "utf8");
 const editor = readFileSync("src/components/content/SharedWeeklyActivityEditor.tsx", "utf8");
@@ -16,14 +18,22 @@ assert.match(page, /Adaptive|weekly-activity-card__sections/);
 assert.match(page, /fetchWeeklyActivities/);
 assert.match(page, /createWeeklyActivity/);
 assert.match(page, /updateWeeklyActivity/);
+assert.match(page, /deleteWeeklyActivity/);
 assert.match(page, /From Date/);
 assert.match(page, /To Date/);
 assert.match(page, /Content/);
 assert.match(page, /oj-input-date/);
-assert.match(page, /Save Row/);
+assert.match(page, /saving \? "Saving…" : "Save"/);
+assert.match(page, /editorFlushRef\.current\?\.\(\)/, "Save synchronously flushes the one Quill instance before building its payload");
+assert.match(page, /hasWeeklyActivityFormattingParity/, "a stale Backend cannot silently release a draft after stripping requested formatting");
 assert.match(page, /Cancel/);
 assert.match(page, /This Week/);
 assert.match(page, /Next Week/);
+assert.match(page, /onDblClick=\{\(\) => startEdit\(record, target\)\}/, "double-clicking either view content column activates that target in the single editor");
+assert.match(page, /weekly-activity-section-label--this-week/);
+assert.match(page, /weekly-activity-section-label--next-week/);
+assert.match(page, /oj-dialog/);
+assert.match(page, /Delete weekly activity\?/);
 assert.doesNotMatch(page, /This Week · Completed/);
 assert.doesNotMatch(page, /Next Week · Planned/);
 assert.doesNotMatch(page, /ellipsis|overflow menu/i);
@@ -36,11 +46,16 @@ assert.match(page, /const requestId = requestGuardRef\.current\.begin\(\)/, "eac
 assert.match(page, /if \(!requestGuardRef\.current\.isLatest\(requestId\)\) return;/, "stale list responses are ignored");
 assert.match(page, /if \(clearBeforeLoad\) \{\s*setItems\(\[\]\);\s*setTotalElements\(0\);/, "new searches clear stale results before loading");
 assert.match(page, /reconcileWeeklyActivityMutation\(current, saved, query\)/, "the mutation response is reconciled against the active query before refresh");
-assert.match(page, /fetchWeeklyActivityLoadedWindow\(query\)[\s\S]*setItems\(authoritative\.items\)/, "post-save authoritative refresh preserves every loaded page");
+assert.match(page, /fetchWeeklyActivityLoadedWindow\(query\)[\s\S]*applyAuthoritativePage\(authoritative\)/, "post-save authoritative refresh preserves every loaded page");
 assert.doesNotMatch(page, /await load\(\{ \.\.\.query, page: 0 \}, false, false\)/, "post-save refresh does not collapse the loaded window back to page zero");
-assert.match(page, /const controlsBusy = loading \|\| loadingMore \|\| saving;/, "all conflicting controls share one busy state");
-assert.match(page, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "reload warns while an editor is open");
-assert.match(page, /onDirtyStateChange\?\.\(Boolean\(editSession\)\)/, "the page reports unsaved add and edit sessions");
+assert.match(page, /const controlsBusy = loading \|\| loadingMore \|\| saving \|\| deleting;/, "all conflicting controls share one busy state");
+assert.match(page, /Reload list/, "partial-success and stale-version recovery provides an explicit reload action");
+assert.match(page, /staleDeleteIds\.has\(record\.activityId\)/, "stale delete retries stay disabled until authoritative data is loaded");
+assert.match(page, /focusEditOrAdd\(savedMatchesQuery \? saved\.activityId : null\)/, "save success restores focus to the saved row or Add Activity");
+assert.match(page, /resolveFocusAfterRemoval\(items, record\.activityId\)/, "delete success resolves a deterministic next focus target");
+assert.match(page, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "reload warns while a weekly draft is genuinely dirty");
+assert.match(page, /onDirtyStateChange\?\.\(editSessionDirty\)/, "the page reports baseline-derived dirty state instead of editor presence");
+assert.match(page, /isWeeklyActivityDraftDirty\(/, "date and both content drafts are compared with their baseline");
 assert.match(content, /<WeeklyActivitiesPage onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} \/>/);
 assert.match(app, /confirmWeeklyActivitiesNavigation[\s\S]*weeklyActivitiesDraftActiveRef\.current[\s\S]*window\.confirm\(UNSAVED_WEEKLY_ACTIVITY_MESSAGE\)/, "navigation confirmation is centralized around the active weekly draft ref");
 assert.match(app, /handlePopState[\s\S]*confirmWeeklyActivitiesNavigation\(route, window\.location\.href\)/, "browser Back and Forward pass the full destination URL, including hash, to the dirty guard");
@@ -52,6 +67,7 @@ assert.match(app, /handleNavigate[\s\S]*confirmWeeklyActivitiesNavigation\(route
 assert.match(app, /handleItemClick[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopPropagation\(\)[\s\S]*onNavigate\(item\)/, "handled leaf navigation suppresses JET's later native-hash rewrite after the indexed app route push");
 assert.match(app, /handleItemClick[\s\S]*event\.button !== 0[\s\S]*event\.ctrlKey[\s\S]*return;/, "modifier and non-primary side-navigation clicks keep their native non-current-context behavior");
 assert.match(app, /document\.addEventListener\("click", handleDocumentNavigationClick, true\)/, "capture-phase anchor guard protects unsaved weekly drafts before JET link defaults");
+assert.match(app, /isDialogPlaceholderControlAnchor\(anchor\.getAttribute\("href"\), Boolean\(anchor\.closest\("\[role=\\"dialog\\"\] \[role=\\"grid\\"\]"\)\)\)/, "only date-grid placeholder controls are excluded before application navigation confirmation");
 assert.match(app, /handleDocumentNavigationClick[\s\S]*anchor\.closest\("oj-navigation-list"\)[\s\S]*anchor\.dataset\.appNavigation === "true"[\s\S]*event\.preventDefault\(\)[\s\S]*return;/, "the global hash guard preserves JET side-navigation routing while suppressing only a handled leaf anchor's native hash default");
 assert.match(app, /handleDocumentNavigationClick[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopImmediatePropagation\(\)/, "rejected anchor navigation is fully cancelled");
 assert.match(app, /href: anchor\.href/, "anchor navigation uses the browser-resolved full href and therefore respects document base URL semantics");
@@ -62,28 +78,94 @@ for (const document of [requirements, design, tasks]) {
   assert.match(document, /BOM/);
   assert.match(document, /mojibake|문자 깨짐/);
 }
-assert.match(css, /\.weekly-activity-active-editor:focus-within/, "the active editor surface exposes a visible focus state");
+assert.match(css, /\.weekly-activity-edit-column--active:focus-within/, "the active editor surface exposes a visible focus state");
 assert.doesNotMatch(css, /var\(--kpi-surface-soft\)|var\(--kpi-text\)/, "weekly activity styles use only declared KPI tokens");
 
 assert.equal((editor.match(/class="weekly-activity-toolbar"/g) ?? []).length, 1, "one shared toolbar composition");
-assert.equal((editor.match(/class="weekly-activity-target-selector"/g) ?? []).length, 1, "one target selector");
+assert.equal((editor.match(/class=\{`weekly-activity-edit-columns/g) ?? []).length, 1, "one inline two-column editor composition");
 assert.equal((editor.match(/new QuillRuntime\(/g) ?? []).length, 1, "one Quill constructor site");
 assert.match(editor, /thisWeek: "This Week"/);
 assert.match(editor, /nextWeek: "Next Week"/);
 assert.doesNotMatch(editor, /This Week · Completed/);
 assert.doesNotMatch(editor, /Next Week · Planned/);
-assert.match(editor, /Editing: \{TARGET_LABELS\[activeTarget\]\}/);
-assert.match(editor, /\{TARGET_LABELS\[inactiveTarget\]\} \(read only\)/);
+assert.match(editor, /weekly-activity-edit-columns/);
+assert.match(editor, /weekly-activity-edit-column--active/);
+assert.match(editor, /Select and edit/);
 assert.match(editor, /ql-list" value="bullet"/);
 assert.match(editor, /ql-list" value="ordered"/);
 assert.match(editor, /ql-undo/);
 assert.match(editor, /ql-redo/);
 assert.match(editor, /handlers:\s*\{/);
+assert.match(editor, /initialTarget/);
+assert.match(editor, /registerFlush/);
+assert.match(editor, /syncWeeklyActivityListMarkerStyles/);
 assert.match(editor, /quill\.history\.clear\(\)/);
 assert.doesNotMatch(editor, /indent|align/);
+assert.match(editor, /<option value="#C74634"><\/option>/, "the expanded palette exposes Oracle red");
+assert.match(editor, /<option value="#2458A6"><\/option>[\s\S]*<option value="#2E6B3F"><\/option>/, "the palette includes blue and green in addition to red");
 
-assert.match(css, /\.weekly-activity-card__sections,[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
-assert.match(css, /\.weekly-activity-active-editor \.ql-container \{[^}]*height: auto;/);
+assert.match(css, /\.weekly-activity-card__date-editor\s*\{[^}]*flex:\s*0 1 18rem;[^}]*margin-inline-end:\s*auto;[^}]*\}/, "the edit date stays left-aligned instead of consuming centered header space");
+assert.match(css, /\.weekly-activity-toolbar > button,[\s\S]*\.weekly-activity-toolbar \.ql-picker[^}]*height:\s*2\.5rem/, "toolbar controls share one Redwood-sized control height");
+assert.match(css, /\.weekly-activity-section-label--this-week/);
+assert.match(css, /\.weekly-activity-section-label--next-week/);
+assert.match(css, /\.weekly-activity-card__sections \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+assert.match(css, /\.weekly-activity-edit-columns[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+assert.match(css, /\.weekly-activity-edit-column--active \.ql-container \{[^}]*height: auto;/);
 assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.weekly-activity-card__sections,[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+assert.doesNotMatch(editor, /<button[\s\S]*weekly-activity-preview__content[\s\S]*<\/button>/, "rich block preview must not be nested inside a button");
 
-console.log("weeklyActivitiesUiContract tests passed");
+const record = (activityId: number, versionNo: number): WeeklyActivityRecord => ({
+  activityId,
+  weekOfDate: "2026-08-10",
+  thisWeekHtml: "<p>This week</p>",
+  thisWeekText: "This week",
+  nextWeekHtml: "<p>Next week</p>",
+  nextWeekText: "Next week",
+  versionNo,
+  createdAt: "2026-08-10T00:00:00Z",
+  createdBy: "test",
+  updatedAt: "2026-08-10T00:00:00Z",
+  updatedBy: "test"
+});
+
+const pageWith = (...items: WeeklyActivityRecord[]): WeeklyActivitiesPage => ({ items, totalElements: items.length, page: 0, size: 50 });
+
+const verifyDeleteStateTransitions = async () => {
+  const sequence: string[] = [];
+  const partialSuccess = await executeWeeklyActivityDelete(
+    record(7, 1),
+    async () => { sequence.push("deleted"); },
+    async () => { sequence.push("refresh"); throw new Error("refresh unavailable"); },
+    () => { sequence.push("committed"); }
+  );
+  assert.equal(partialSuccess.status, "deleted");
+  assert.equal(partialSuccess.page, undefined);
+  assert.equal(partialSuccess.refreshError?.message, "refresh unavailable");
+  assert.deepEqual(sequence, ["deleted", "committed", "refresh"], "a completed DELETE is committed before best-effort refresh");
+
+  const latest = record(7, 2);
+  const conflict = await executeWeeklyActivityDelete(
+    record(7, 1),
+    async () => { throw new WeeklyActivitiesApiError(409, "VERSION_CONFLICT", "stale"); },
+    async () => pageWith(latest),
+    () => assert.fail("a conflicted DELETE must not be committed")
+  );
+  assert.equal(conflict.status, "conflict");
+  assert.equal(conflict.page?.items[0]?.versionNo, 2, "409 refreshes the authoritative version before retry");
+
+  let refreshed = false;
+  const failure = await executeWeeklyActivityDelete(
+    record(8, 1),
+    async () => { throw new WeeklyActivitiesApiError(500, "SERVER_ERROR", "failed"); },
+    async () => { refreshed = true; return pageWith(); },
+    () => assert.fail("a failed DELETE must not be committed")
+  );
+  assert.equal(failure.status, "failed");
+  assert.equal(refreshed, false, "non-conflict delete errors preserve the row without an unrelated refresh");
+
+  assert.equal(resolveFocusAfterRemoval([record(1, 1), record(2, 1), record(3, 1)], 2), 3);
+  assert.equal(resolveFocusAfterRemoval([record(1, 1), record(2, 1)], 2), 1);
+  assert.equal(resolveFocusAfterRemoval([record(1, 1)], 1), null);
+};
+
+void verifyDeleteStateTransitions().then(() => console.log("weeklyActivitiesUiContract tests passed"));

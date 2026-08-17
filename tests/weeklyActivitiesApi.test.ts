@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   createWeeklyActivity,
+  deleteWeeklyActivity,
   fetchWeeklyActivities,
   getDefaultWeeklyActivityRange,
   updateWeeklyActivity,
@@ -87,6 +88,26 @@ assert.doesNotMatch(String(seen[seen.length - 1]?.init?.body), /versionNo/);
 await updateWeeklyActivity(7, { weekOfDate: "2026-08-15", thisWeekHtml: "<p>Completed</p>", nextWeekHtml: "<p>Planned</p>", versionNo: 1 }, mutationFetch);
 assert.equal(seen[seen.length - 1]?.init?.method, "PUT");
 assert.match(String(seen[seen.length - 1]?.init?.body), /"versionNo":1/);
+
+const hangingFetch = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => new Promise((_resolve, reject) => {
+  init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+});
+await assert.rejects(
+  () => updateWeeklyActivity(7, { weekOfDate: "2026-08-15", thisWeekHtml: "<ol><li>One</li></ol>", nextWeekHtml: "<p>Plan</p>", versionNo: 1 }, hangingFetch, 10),
+  (error: unknown) => error instanceof WeeklyActivitiesApiError
+    && error.code === "REQUEST_TIMEOUT"
+    && /could not be confirmed/i.test(error.message),
+  "a hung mutation aborts deterministically so Saving cannot remain active forever"
+);
+
+const deleteFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  seen.push({ url: String(input), init });
+  return new Response(null, { status: 204 });
+};
+await deleteWeeklyActivity(7, 2, deleteFetch);
+assert.equal(seen[seen.length - 1]?.url, "/api/v1/weekly-activities/7");
+assert.equal(seen[seen.length - 1]?.init?.method, "DELETE");
+assert.equal(seen[seen.length - 1]?.init?.body, JSON.stringify({ versionNo: 2 }));
 
 const conflictFetch = async () => new Response(JSON.stringify({ code: "VERSION_CONFLICT", message: "stale" }), {
   status: 409,

@@ -1,5 +1,6 @@
 import {
   fetchWeeklyActivities,
+  WeeklyActivitiesApiError,
   WeeklyActivitiesPage,
   WeeklyActivitiesQuery,
   WeeklyActivityRecord
@@ -8,8 +9,27 @@ import { hasValidUtf8Content } from "../../data/utf8TextPolicy";
 import {
   deriveWeeklyActivityPlainText,
   hasWeeklyActivityVisibleBase,
+  sanitizeWeeklyActivityHtml,
+  sanitizeWeeklyActivityStyle,
   WeeklyActivityDrafts
 } from "./weeklyActivityEditorSession";
+
+const canonicalizeWeeklyActivityDraftHtml = (html: string): string => {
+  const canonicalStyles = html.replace(/\s+style\s*=\s*(["'])(.*?)\1/gi, (_match, _quote, style: string) => {
+    const safeStyle = sanitizeWeeklyActivityStyle(style);
+    return safeStyle ? ` style="${safeStyle}"` : "";
+  });
+  return typeof DOMParser === "undefined" ? canonicalStyles : sanitizeWeeklyActivityHtml(canonicalStyles);
+};
+
+export const isWeeklyActivityDraftDirty = (
+  weekOfDate: string,
+  drafts: WeeklyActivityDrafts,
+  baselineWeekOfDate: string,
+  baselineDrafts: WeeklyActivityDrafts
+): boolean => weekOfDate !== baselineWeekOfDate ||
+  canonicalizeWeeklyActivityDraftHtml(drafts.thisWeekHtml) !== canonicalizeWeeklyActivityDraftHtml(baselineDrafts.thisWeekHtml) ||
+  canonicalizeWeeklyActivityDraftHtml(drafts.nextWeekHtml) !== canonicalizeWeeklyActivityDraftHtml(baselineDrafts.nextWeekHtml);
 
 export const validateWeeklyActivityDraft = (weekOfDate: string, drafts: WeeklyActivityDrafts): string => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(weekOfDate)) return "Select a valid Week Date.";
@@ -81,3 +101,61 @@ const compareWeeklyActivitiesNewestFirst = (left: WeeklyActivityRecord, right: W
   right.weekOfDate.localeCompare(left.weekOfDate) ||
   right.updatedAt.localeCompare(left.updatedAt) ||
   right.activityId - left.activityId;
+
+export type WeeklyActivityDeleteOutcome = Readonly<{
+  status: "deleted" | "conflict" | "failed";
+  error?: Error;
+  refreshError?: Error;
+  page?: WeeklyActivitiesPage;
+}>;
+
+type DeleteWeeklyActivityMutation = (activityId: number, versionNo: number) => Promise<void>;
+type CommitDeletedActivity = (activityId: number) => void;
+type RefreshLoadedWindow = () => Promise<WeeklyActivitiesPage>;
+
+const toError = (cause: unknown, fallback: string): Error =>
+  cause instanceof Error ? cause : new Error(fallback);
+
+export const executeWeeklyActivityDelete = async (
+  record: WeeklyActivityRecord,
+  deleteMutation: DeleteWeeklyActivityMutation,
+  refreshLoadedWindow: RefreshLoadedWindow,
+  commitDeleted: CommitDeletedActivity
+): Promise<WeeklyActivityDeleteOutcome> => {
+  try {
+    await deleteMutation(record.activityId, record.versionNo);
+  } catch (cause) {
+    const error = toError(cause, "Weekly Activity could not be deleted.");
+    if (!(cause instanceof WeeklyActivitiesApiError) || cause.code !== "VERSION_CONFLICT") {
+      return { status: "failed", error };
+    }
+    try {
+      return { status: "conflict", error, page: await refreshLoadedWindow() };
+    } catch (refreshCause) {
+      return {
+        status: "conflict",
+        error,
+        refreshError: toError(refreshCause, "The latest Weekly Activities could not be loaded.")
+      };
+    }
+  }
+
+  commitDeleted(record.activityId);
+  try {
+    return { status: "deleted", page: await refreshLoadedWindow() };
+  } catch (refreshCause) {
+    return {
+      status: "deleted",
+      refreshError: toError(refreshCause, "The latest Weekly Activities could not be loaded.")
+    };
+  }
+};
+
+export const resolveFocusAfterRemoval = (
+  items: WeeklyActivityRecord[],
+  removedActivityId: number
+): number | null => {
+  const removedIndex = items.findIndex(({ activityId }) => activityId === removedActivityId);
+  if (removedIndex < 0) return items[0]?.activityId ?? null;
+  return items[removedIndex + 1]?.activityId ?? items[removedIndex - 1]?.activityId ?? null;
+};

@@ -12,6 +12,9 @@ export interface SharedEditorAdapter {
 }
 
 export const ALLOWED_QUILL_FORMATS = ["bold", "color", "size", "list"] as const;
+export const WEEKLY_ACTIVITY_COLORS = [
+  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B"
+] as const;
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, "&amp;")
@@ -21,11 +24,15 @@ const escapeHtml = (value: string) => value
   .replace(/'/g, "&#39;");
 
 const ALLOWED_HTML_TAGS = new Set(["P", "BR", "STRONG", "UL", "OL", "LI", "SPAN"]);
-const ALLOWED_COLORS = new Map([
-  ["#161513", "#161513"],
-  ["#7a2e1e", "#7A2E1E"],
-  ["#0b5f66", "#0B5F66"],
-  ["#5f4b8b", "#5F4B8B"]
+const ALLOWED_COLORS = new Map<string, string>([
+  ["#161513", "#161513"], ["rgb(22,21,19)", "#161513"],
+  ["#c74634", "#C74634"], ["rgb(199,70,52)", "#C74634"],
+  ["#7a2e1e", "#7A2E1E"], ["rgb(122,46,30)", "#7A2E1E"],
+  ["#8a5b00", "#8A5B00"], ["rgb(138,91,0)", "#8A5B00"],
+  ["#0b5f66", "#0B5F66"], ["rgb(11,95,102)", "#0B5F66"],
+  ["#2458a6", "#2458A6"], ["rgb(36,88,166)", "#2458A6"],
+  ["#2e6b3f", "#2E6B3F"], ["rgb(46,107,63)", "#2E6B3F"],
+  ["#5f4b8b", "#5F4B8B"], ["rgb(95,75,139)", "#5F4B8B"]
 ]);
 const ALLOWED_SIZES = new Set(["12px", "14px", "16px", "18px", "20px"]);
 
@@ -61,10 +68,50 @@ export const sanitizeWeeklyActivityStyle = (style: string): string => {
     if (separator < 0) continue;
     const property = declaration.slice(0, separator).trim().toLowerCase();
     const value = declaration.slice(separator + 1).trim().toLowerCase();
-    if (property === "color" && ALLOWED_COLORS.has(value)) accepted.push(`color:${ALLOWED_COLORS.get(value)}`);
+    const normalizedValue = property === "color" ? value.replace(/\s+/g, "") : value;
+    if (property === "color" && ALLOWED_COLORS.has(normalizedValue)) accepted.push(`color:${ALLOWED_COLORS.get(normalizedValue)}`);
     else if (property === "font-size" && ALLOWED_SIZES.has(value)) accepted.push(`font-size:${value}`);
   }
   return accepted.join(";");
+};
+
+/**
+ * Native list markers inherit from the LI, while Quill writes inline formats
+ * on the leading SPAN. Promote only the existing color/size allow-list so the
+ * persisted marker and its first text run render consistently.
+ */
+export const promoteWeeklyActivityListMarkerStyles = (html: string): string =>
+  html.replace(/<li([^>]*)>([\s\S]*?)<\/li>/gi, (_match, rawAttributes: string, body: string) => {
+    const existingStyle = rawAttributes.match(/\sstyle=(?:"([^"]*)"|'([^']*)')/i);
+    const leadingStyle = body.match(/\sstyle=(?:"([^"]*)"|'([^']*)')/i);
+    const safeStyle = sanitizeWeeklyActivityStyle(
+      `${existingStyle?.[1] ?? existingStyle?.[2] ?? ""};${leadingStyle?.[1] ?? leadingStyle?.[2] ?? ""}`
+    );
+    const attributes = rawAttributes.replace(/\sstyle=(?:"[^"]*"|'[^']*')/gi, "");
+    return `<li${attributes}${safeStyle ? ` style="${safeStyle}"` : ""}>${body}</li>`;
+  });
+
+const formattingTokens = (html: string): ReadonlySet<string> => {
+  const tokens = new Set<string>();
+  for (const match of html.matchAll(/\sstyle=(?:"([^"]*)"|'([^']*)')/gi)) {
+    for (const declaration of sanitizeWeeklyActivityStyle(match[1] ?? match[2] ?? "").split(";")) {
+      if (declaration) tokens.add(declaration);
+    }
+  }
+  return tokens;
+};
+
+/** Detects a stale Backend that silently removed an allowed format. */
+export const hasWeeklyActivityFormattingParity = (requestedHtml: string, savedHtml: string): boolean => {
+  const requestedTokens = formattingTokens(requestedHtml);
+  const savedTokens = formattingTokens(savedHtml);
+  if (Array.from(requestedTokens).some((token) => !savedTokens.has(token))) return false;
+  for (const tag of ["ol", "ul", "li"] as const) {
+    const requestedCount = (requestedHtml.match(new RegExp(`<${tag}(?:\\s|>)`, "gi")) ?? []).length;
+    const savedCount = (savedHtml.match(new RegExp(`<${tag}(?:\\s|>)`, "gi")) ?? []).length;
+    if (savedCount < requestedCount) return false;
+  }
+  return true;
 };
 
 const normalizeDerivedText = (text: string): string => {

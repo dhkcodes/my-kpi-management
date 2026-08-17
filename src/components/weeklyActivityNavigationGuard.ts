@@ -51,6 +51,9 @@ export const hasNavigationDestinationChanged = (
   nextHref: string
 ): boolean => previousRouteId !== nextRouteId || previousHref !== nextHref;
 
+export const isDialogPlaceholderControlAnchor = (rawHref: string | null, insideDialog: boolean): boolean =>
+  insideDialog && (rawHref ?? "").trim() === "#";
+
 /** True only when the click can replace the document in the current browsing context. */
 export const isCurrentContextAnchorNavigation = (
   click: AnchorClickIntent,
