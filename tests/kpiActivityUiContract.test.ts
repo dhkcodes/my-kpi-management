@@ -36,14 +36,36 @@ assert.match(page, /import "ojs\/ojdialog"/, "navigation and delete confirmation
 assert.match(page, /import "ojs\/ojbutton"/, "KPI dialog actions must use Oracle JET buttons");
 assert.match(page, /<oj-popup/, "truncated SR Description must expose its full value in an Oracle JET Popup");
 assert.match(page, /kpi-workload-results-popup/, "workload search results must render in a popup layer outside oj-table clipping");
-assert.match(page, /const \[activated, setActivated\] = useState\(false\)/, "workload options must wait for an explicit editor click");
-assert.match(page, /onClick=\{\(\) => \{ setActivated\(true\)/, "workload search must activate only after the editor is explicitly clicked");
+assert.match(page, /classList\.contains\("oj-complete"\)[\s\S]*openPopup/,
+  "auto-open must wait until the Oracle JET popup is upgraded");
+assert.match(page, /autoActivate[\s\S]*useState\(autoActivate\)/, "double-clicked workload editors must activate their result popup immediately");
+assert.match(page, /onClick=\{\(\) => \{ activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
+assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/,
+  "KPI tables must keep one mutable DataProvider instead of replacing the whole table for each draft change");
+assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiSpreadsheetRow>\(\[\], \{ keyAttributes: "id" \}\), \[\]\)/,
+  "the KPI DataProvider identity must remain stable across all table edits");
+assert.match(page, /dataProvider\.data = visibleRows/,
+  "visible KPI row updates must be delivered through the stable DataProvider");
+assert.match(page, /tableRef\.current\?\.refresh\(\)/,
+  "entering an editor must refresh the table exactly on active-cell transition");
+const workloadChooseStart = page.indexOf("const choose = (option: KpiWorkloadOption)");
+const workloadResetEnd = page.indexOf("const loadMore =", workloadChooseStart);
+const workloadSelectionHandlers = page.slice(workloadChooseStart, workloadResetEnd);
+assert.ok(workloadChooseStart >= 0 && workloadResetEnd > workloadChooseStart);
+assert.doesNotMatch(workloadSelectionHandlers, /onCommit\(\)/,
+  "choosing or resetting a workload must keep the editor active instead of handing focus back to the oj-table header");
+assert.match(workloadSelectionHandlers, /activatedRef\.current = false/,
+  "choosing or resetting a workload must cancel pending popup-open retries before closing the list");
 assert.match(page, /event\.key === "Enter"[\s\S]*onCommit\(\)/, "Enter without choosing a workload must preserve the current value");
+assert.match(page, /const focusKpiEditor[\s\S]*requestAnimationFrame\(\(\) => focusKpiEditor\(\{ rowId: row\.id, field: field\.key \}\)\)/,
+  "Enter commits must restore the same editor focus instead of returning focus to an oj-table header");
+assert.doesNotMatch(page, /onCommit=\{\(\) => \{ if \(!row\.id\.startsWith\("draft-"\)\) setActiveCell\(null\); \}\}/,
+  "Enter must not unmount an existing-row editor and expose the Select header focus fallback");
 assert.doesNotMatch(page, /event\.key === "Enter" && options\[0\]/, "Enter must never auto-select the first workload result");
 assert.match(page, />선택 안함</, "workload results must offer restoration of the original value");
 assert.match(page, /collision:\s*"flipfit"/, "workload popup must fit or flip at the viewport edge");
-assert.match(page, /return \(\) => \{ if \(popup\?\.isOpen\(\)\) popup\.close\(\); \}/,
-  "an unmounted workload editor must close its relocated Oracle JET popup layer");
+assert.match(page, /return \(\) => \{ if \(popup\?\.classList\.contains\("oj-complete"\) && popup\.isOpen\(\)\) popup\.close\(\); \}/,
+  "an unmounted workload editor must safely close its upgraded Oracle JET popup layer");
 assert.match(page, /Save and Continue/);
 assert.match(page, /Discard and Continue/);
 assert.match(page, />Stay</);
