@@ -24,7 +24,7 @@ export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]
   C2: [...related, targetQuarter, delivery],
   D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
   F: [...base, targetQuarter, delivery],
-  H: [manageTime, field("title", "Content"), targetQuarter, delivery]
+  H: [manageTime, field("title", "Content", "textarea"), targetQuarter, delivery]
 };
 
 export type KpiSpreadsheetRow = {
@@ -120,15 +120,14 @@ export const getSelectedKpiRowIds = (keySet: JetRowKeySet, availableIds: readonl
 };
 
 export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadsheetRow) => {
-  const isNew = draft.id.startsWith("draft-");
   if (draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim()))) return true;
-  if (!draft.deliveryDate && (isNew || Boolean(saved?.deliveryDate))) return true;
+  if (!draft.deliveryDate && Boolean(saved?.deliveryDate)) return true;
   if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
-    && draft.workloadId == null && (isNew || saved?.workloadId != null)) return true;
+    && draft.workloadId == null && saved?.workloadId != null) return true;
   if (draft.kpiCode === "D1") {
     const missingDimension = !draft.stage || draft.acrK === null || !draft.targetQuarter;
     const savedHadDimension = Boolean(saved?.stage) || saved?.acrK !== null || Boolean(saved?.targetQuarter);
-    if (missingDimension && (isNew || savedHadDimension)) return true;
+    if (missingDimension && savedHadDimension) return true;
   }
   return false;
 };

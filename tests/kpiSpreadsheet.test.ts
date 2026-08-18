@@ -39,6 +39,7 @@ assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false,
 assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.type, "manageTime", "Manage Time must be a Pending/Reflected select");
 assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H must not expose an SR Number editor");
+assert.equal(KPI_FIELD_CONTRACTS.H.find((item) => item.key === "title")?.type, "textarea", "H Content must reuse the truncated long-text behavior");
 
 assert.equal(fiscalQuarterFromDeliveryDate("2026-06-01"), "Q1");
 assert.equal(fiscalQuarterFromDeliveryDate("2026-08-31"), "Q1");
@@ -86,7 +87,8 @@ assert.equal(isKpiRowChanged(rows[0], { ...rows[0], workloadId: 999, accountWork
   "a stable workload identity change remains dirty even when the formatted label is identical");
 assert.equal(isKpiDraftInvalid({ ...rows[0], deliveryDate: "" }, rows[0]), true, "clearing an existing Delivery Date must block Save");
 assert.equal(isKpiDraftInvalid({ ...rows[0], id: "legacy", deliveryDate: "" }, { ...rows[0], id: "legacy", deliveryDate: "" }), true, "a Reflected row without Delivery Date must be invalid");
-assert.equal(isKpiDraftInvalid(createEmptyKpiRow("A", "FY27")), true, "new rows require Delivery Date");
+assert.equal(isKpiDraftInvalid(createEmptyKpiRow("A", "FY27")), false, "a new Pending row must be saveable with Manage Time only");
+assert.equal(isKpiDraftInvalid({ ...createEmptyKpiRow("B", "FY27"), manageTimeReflected: true }), true, "Reflected new rows still require evidence fields");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, srNumber: "" }, rows[0]), true, "Reflected requires SR Number");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, deliveryDate: "" }, rows[0]), true, "Reflected requires Delivery Date");
 assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), false, "Reflected H requires Delivery Date but not SR Number");

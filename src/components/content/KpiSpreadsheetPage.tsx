@@ -51,6 +51,13 @@ const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
 const stageLabels: Record<WorkloadStage, string> = { identified: "Identified", validated: "Validated", onboarded: "Onboarded" };
 const stageTargets: Record<WorkloadStage, number> = { identified: 2000, validated: 1000, onboarded: 500 };
 const activities = ["Solution Design", "Solution Proposal", "Solution Deployment"];
+const stopTableInteraction = (event: Event) => event.stopPropagation();
+const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
+  Achieved: "kpi-quarter-status-label--achieved",
+  "Not Achieved": "kpi-quarter-status-label--not-achieved",
+  "In Progress": "kpi-quarter-status-label--in-progress",
+  "Not Started": "kpi-quarter-status-label--not-started"
+})[status];
 
 type ActiveCell = Readonly<{ rowId: string; field: KpiFieldKey }>;
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
@@ -105,20 +112,23 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
     return <section class="kpi-sheet-summary" aria-labelledby="kpiD1Summary">
       <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K</small></h3></div>
       <div class="kpi-d1-progress-grid" aria-label="Sales Stage ACR USD K by Delivery Date fiscal quarter">
-        {quarters.map((quarter) => <button type="button" class={cardClass(quarter, "kpi-d1-progress-quarter")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
-          <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em>{statusFor(quarter)}</em></span>
-          {stages.map((stage) => {
-            const actual = summary.d1[quarter][stage];
-            const target = stageTargets[stage];
-            const percent = Math.min(100, Math.round((actual / target) * 100));
-            return <span class="kpi-d1-progress-item">
-              <span class="kpi-d1-progress-label"><span>{stageLabels[stage]}</span><strong>{actual.toLocaleString()} / {target.toLocaleString()}K</strong></span>
-              <span class="kpi-d1-progress-track" role="progressbar" aria-label={`${quarter} ${stageLabels[stage]} ${actual} of ${target}K`} aria-valuemin={0} aria-valuemax={target} aria-valuenow={actual}>
-                <span class={`kpi-d1-progress-fill kpi-d1-progress-fill--${stage}`} style={{ width: `${percent}%` }}></span>
-              </span>
-            </span>;
-          })}
-        </button>)}
+        {quarters.map((quarter) => {
+          const status = statusFor(quarter);
+          return <button type="button" class={cardClass(quarter, "kpi-d1-progress-quarter")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
+            <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
+            {stages.map((stage) => {
+              const actual = summary.d1[quarter][stage];
+              const target = stageTargets[stage];
+              const percent = Math.min(100, Math.round((actual / target) * 100));
+              return <span class="kpi-d1-progress-item">
+                <span class="kpi-d1-progress-label"><span>{stageLabels[stage]}</span><strong>{actual.toLocaleString()} / {target.toLocaleString()}K</strong></span>
+                <span class="kpi-d1-progress-track" role="progressbar" aria-label={`${quarter} ${stageLabels[stage]} ${actual} of ${target}K`} aria-valuemin={0} aria-valuemax={target} aria-valuenow={actual}>
+                  <span class={`kpi-d1-progress-fill kpi-d1-progress-fill--${stage}`} style={{ width: `${percent}%` }}></span>
+                </span>
+              </span>;
+            })}
+          </button>;
+        })}
       </div>
     </section>;
   }
@@ -127,20 +137,23 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
     <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Target Quarter count</h3></div>
     <div class="kpi-quarter-summary">{quarters.map((quarter) => {
       const actual = isCombined ? summary.c1c2Combined[quarter].actual : summary.quarterly[tab][quarter];
+      const status = statusFor(quarter);
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
-        <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em>{statusFor(quarter)}</em></span>
-        <b>{actual}</b>{isCombined && <small>C1 + C2 reflected</small>}
+        <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
+        <b class={`kpi-quarter-count-label ${quarterStatusClass(status)}`}>{actual}</b>{isCombined && <small>C1 + C2 reflected</small>}
       </button>;
     })}</div>
   </section>;
 }
 
-function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
+function WorkloadCellEditor({ fiscalYear, row, onChange, onReset, onCommit }: Readonly<{
   fiscalYear: FiscalYear;
   row: KpiSpreadsheetRow;
   onChange: (option: KpiWorkloadOption) => void;
+  onReset: () => void;
   onCommit: () => void;
 }>) {
+  const [activated, setActivated] = useState(false);
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<KpiWorkloadOption[]>([]);
   const [offset, setOffset] = useState(0);
@@ -151,12 +164,25 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
   const inputRef = useRef<HTMLInputElement | null>(null);
   const popupRef = useRef<ojPopup | null>(null);
 
+  const openPopup = () => {
+    const popup = popupRef.current;
+    const launcher = inputRef.current;
+    if (!popup || !launcher) return;
+    if (popup.isOpen()) popup.refresh();
+    else popup.open(launcher, {
+      my: { horizontal: "start", vertical: "top" },
+      at: { horizontal: "start", vertical: "bottom" },
+      collision: "flipfit"
+    });
+  };
+
   useEffect(() => {
     const popup = popupRef.current;
     return () => { if (popup?.isOpen()) popup.close(); };
   }, []);
 
   useEffect(() => {
+    if (!activated) return;
     let active = true;
     const requestVersionAtStart = ++requestVersion.current;
     const timer = window.setTimeout(() => {
@@ -170,11 +196,16 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
       }).finally(() => { if (active && requestVersion.current === requestVersionAtStart) setLoading(false); });
     }, 200);
     return () => { active = false; requestVersion.current += 1; window.clearTimeout(timer); };
-  }, [fiscalYear, query]);
+  }, [activated, fiscalYear, query]);
 
   const choose = (option: KpiWorkloadOption) => {
     popupRef.current?.close();
     onChange(option);
+    onCommit();
+  };
+  const reset = () => {
+    popupRef.current?.close();
+    onReset();
     onCommit();
   };
   const loadMore = () => {
@@ -192,26 +223,24 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
   };
 
   useEffect(() => {
-    const popup = popupRef.current;
-    const launcher = inputRef.current;
-    if (!popup || !launcher || (options.length === 0 && !loading)) return;
-    if (popup.isOpen()) popup.refresh();
-    else popup.open(launcher, {
-      my: { horizontal: "start", vertical: "top" },
-      at: { horizontal: "start", vertical: "bottom" },
-      collision: "flipfit"
-    });
-  }, [loading, options]);
+    if (!activated) return;
+    openPopup();
+  }, [activated, loading, options]);
 
   return <div class="kpi-workload-cell-editor">
     <input ref={inputRef} type="search" value={query} aria-label="Search Account, Workload, or Oppty.No"
       placeholder={row.accountWorkload || "Search Account, Workload, or Oppty.No"}
+      onClick={() => { setActivated(true); window.setTimeout(openPopup, 0); }}
       onInput={(event) => { const next = (event.currentTarget as HTMLInputElement).value; queryRef.current = next; setQuery(next); }}
-      onKeyDown={(event) => { if (event.key === "Enter" && options[0]) { event.preventDefault(); choose(options[0]); } }} />
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); popupRef.current?.close(); onCommit(); } }} />
     <oj-popup ref={popupRef} class="kpi-workload-results-popup" autoDismiss="focusLoss" initialFocus="none" modality="modeless" tail="none"
       position={{ my: { horizontal: "start", vertical: "top" }, at: { horizontal: "start", vertical: "bottom" }, collision: "flipfit" }}>
       <div class="kpi-workload-cell-editor__results" role="listbox" aria-label="Workload search results"
         onScroll={(event) => { const target = event.currentTarget as HTMLDivElement; if (target.scrollTop + target.clientHeight >= target.scrollHeight - 8) loadMore(); }}>
+        <button type="button" role="option" class="kpi-workload-reset-option"
+          onMouseDown={(event) => event.preventDefault()} onClick={reset}>
+          <strong>선택 안함</strong><small>기존 값으로 되돌리기</small>
+        </button>
         {options.map((option) => <button type="button" role="option" title={formatKpiWorkloadOption(option)}
           onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option)}>
           <strong>{formatKpiWorkloadOption(option)}</strong><small>Workload ID {option.workloadId}</small>
@@ -247,19 +276,20 @@ function BufferedFieldEditor({ field, value, onChange, onCommit }: Readonly<{
     onInput={(event) => setEditorValue((event.currentTarget as HTMLInputElement).value)} onBlur={commit} onKeyDown={commitOnEnter} />;
 }
 
-function FieldEditor({ field, row, fiscalYear, onChange, onWorkloadChange, onCommit }: Readonly<{
+function FieldEditor({ field, row, fiscalYear, onChange, onWorkloadChange, onWorkloadReset, onCommit }: Readonly<{
   field: KpiField;
   row: KpiSpreadsheetRow;
   fiscalYear: FiscalYear;
   onChange: (key: KpiFieldKey, value: string) => void;
   onWorkloadChange: (option: KpiWorkloadOption) => void;
+  onWorkloadReset: () => void;
   onCommit: () => void;
 }>) {
   const value = row[field.key] === null ? "" : String(row[field.key]);
   const commitOnEnter = (event: KeyboardEvent) => {
     if (event.key === "Enter") { event.preventDefault(); onCommit(); }
   };
-  if (field.type === "workload") return <WorkloadCellEditor fiscalYear={fiscalYear} row={row} onChange={onWorkloadChange} onCommit={onCommit} />;
+  if (field.type === "workload") return <WorkloadCellEditor fiscalYear={fiscalYear} row={row} onChange={onWorkloadChange} onReset={onWorkloadReset} onCommit={onCommit} />;
   if (field.type === "date") return <oj-input-date class="kpi-cell-editor kpi-cell-editor--date" labelHint={field.label} labelEdge="none"
     value={value} onvalueChanged={(event: CustomEvent) => onChange(field.key, `${event.detail.value ?? ""}`)} onKeyDown={commitOnEnter}></oj-input-date>;
   if (field.type === "manageTime") return <select class="kpi-cell-editor" value={row.manageTimeReflected ? "Reflected" : "Pending"} aria-label="Manage Time"
@@ -408,6 +438,19 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       return reconcileDraft(current, updated);
     });
   };
+  const resetWorkload = (row: KpiSpreadsheetRow) => {
+    setDrafts((current) => {
+      const source = current.find((draft) => draft.id === row.id) ?? row;
+      const original = rows.find((item) => item.id === row.id);
+      const updated = {
+        ...source,
+        workloadId: original?.workloadId ?? null,
+        mappingStatus: original?.mappingStatus ?? "UNMATCHED",
+        accountWorkload: original?.accountWorkload ?? ""
+      } as KpiSpreadsheetRow;
+      return reconcileDraft(current, updated);
+    });
+  };
   const cancelDrafts = () => {
     setDrafts([]); setActiveCell(null); setSelectedIds(new Set()); setApiMessage("Unsaved KPI changes cancelled");
   };
@@ -434,7 +477,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const addDraft = () => {
     const draft = createEmptyKpiRow(activeTab as SpreadsheetKpiCode, fiscalYear);
     setDrafts((current) => [...current, draft]);
-    setActiveCell({ rowId: draft.id, field: KPI_FIELD_CONTRACTS[draft.kpiCode].find((field) => field.key !== "manageTimeReflected")?.key ?? "title" });
+    setActiveCell({ rowId: draft.id, field: "manageTimeReflected" });
   };
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
@@ -490,18 +533,23 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     ].filter(Boolean).join(" ");
     render(<Fragment>
       <td class="kpi-selector-cell">
+        <div onMouseDown={stopTableInteraction} onClick={stopTableInteraction} onKeyDown={stopTableInteraction}>
         <Selector rowKey={row.id} selectedKeys={new KeySetImpl(selectedIds)} selectionMode="multiple"
           aria-label={`Select KPI activity ${row.id}`}
           onSelectedKeysChanged={(keySet) => setSelectedIds(new Set(immutableSelectedIds(keySet, visibleRows.map((item) => item.id))))} />
+        </div>
       </td>
       {fields.map((field) => {
       const editing = row.id.startsWith("draft-") || (activeCell?.rowId === row.id && activeCell.field === field.key);
       const changed = !saved || isKpiFieldChanged(saved, row, field.key);
       return <td class={[editing ? "is-editing-cell" : "", changed ? "is-unsaved-cell" : ""].filter(Boolean).join(" ") || undefined}
         onDblClick={() => beginCellEdit(row, field)}>
-        {editing ? <div data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}><FieldEditor field={field} row={row} fiscalYear={fiscalYear}
+        {editing ? <div data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
+          onMouseDown={stopTableInteraction} onClick={stopTableInteraction} onDblClick={stopTableInteraction} onKeyDown={stopTableInteraction}>
+          <FieldEditor field={field} row={row} fiscalYear={fiscalYear}
           onChange={(key, value) => updateDraft(row, key, value)}
           onWorkloadChange={(option) => selectWorkload(row, option)}
+          onWorkloadReset={() => resetWorkload(row)}
           onCommit={() => { if (!row.id.startsWith("draft-")) setActiveCell(null); }} /></div>
           : field.type === "textarea" ? <span class="kpi-cell-description" tabIndex={0}
             onMouseEnter={(event) => openDescriptionPopup(event.currentTarget, displayValue(row, field.key))}
