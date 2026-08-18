@@ -24,7 +24,7 @@ export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]
   C2: [...related, targetQuarter, delivery],
   D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
   F: [...base, targetQuarter, delivery],
-  H: [manageTime, field("srNumber", "SR Number"), field("title", "Content"), targetQuarter, delivery]
+  H: [manageTime, field("title", "Content"), targetQuarter, delivery]
 };
 
 export type KpiSpreadsheetRow = {
@@ -94,6 +94,19 @@ export const isKpiFieldChanged = (
   key: KpiFieldKey
 ) => (saved[key] ?? "") !== (draft[key] ?? "");
 
+export const isKpiRowChanged = (
+  saved: KpiSpreadsheetRow,
+  draft: KpiSpreadsheetRow,
+  fields: readonly KpiField[]
+) => {
+  const usesWorkloadIdentity = ["B", "C1", "C2", "D1"].includes(saved.kpiCode);
+  const workloadIdentityChanged = usesWorkloadIdentity && (
+    (saved.workloadId ?? null) !== (draft.workloadId ?? null)
+    || (saved.mappingStatus ?? null) !== (draft.mappingStatus ?? null)
+  );
+  return workloadIdentityChanged || fields.some((item) => isKpiFieldChanged(saved, draft, item.key));
+};
+
 type JetRowKeySet = Readonly<{
   isAddAll: () => boolean;
   values: () => Set<string>;
@@ -108,7 +121,7 @@ export const getSelectedKpiRowIds = (keySet: JetRowKeySet, availableIds: readonl
 
 export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadsheetRow) => {
   const isNew = draft.id.startsWith("draft-");
-  if (draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim())) return true;
+  if (draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim()))) return true;
   if (!draft.deliveryDate && (isNew || Boolean(saved?.deliveryDate))) return true;
   if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
     && draft.workloadId == null && (isNew || saved?.workloadId != null)) return true;

@@ -23,15 +23,21 @@ assert.match(page, /is-unsaved-row/, "changed rows must be visually marked");
 assert.match(page, /kpi-manage-time-reflected-row/, "Manage Time Reflected must mark the full row");
 assert.match(page, /<oj-input-date/, "Delivery Date must use oj-input-date");
 assert.match(page, /<textarea/, "SR Description must use a textarea editor");
-assert.match(page, /<oj-dialog/, "navigation and delete confirmations must use Oracle JET Dialog");
+assert.match(page, /import "ojs\/ojdialog"/, "navigation and delete confirmations must use Oracle JET Dialog");
+assert.match(page, /import "ojs\/ojbutton"/, "KPI dialog actions must use Oracle JET buttons");
 assert.match(page, /<oj-popup/, "truncated SR Description must expose its full value in an Oracle JET Popup");
+assert.match(page, /kpi-workload-results-popup/, "workload search results must render in a popup layer outside oj-table clipping");
+assert.match(page, /collision:\s*"flipfit"/, "workload popup must fit or flip at the viewport edge");
+assert.match(page, /return \(\) => \{ if \(popup\?\.isOpen\(\)\) popup\.close\(\); \}/,
+  "an unmounted workload editor must close its relocated Oracle JET popup layer");
 assert.match(page, /Save and Continue/);
 assert.match(page, /Discard and Continue/);
 assert.match(page, />Stay</);
 assert.match(page, /Delete selected KPI activities/);
 assert.match(page, /selectedQuarter/);
-assert.match(page, />Refresh</);
-assert.match(page, /const selectQuarter[\s\S]*setSelectedIds\(new Set\(\)\)[\s\S]*setSelectedQuarter\(quarter\)/, "quarter cards and Refresh must clear row selection before changing the filter");
+assert.doesNotMatch(page, />Refresh</, "the redundant KPI Refresh button must be removed");
+assert.match(page, /setSelectedQuarter\(\(current\) => current === quarter \? null : quarter\)/, "clicking the selected Quarter again must clear the filter");
+assert.match(page, /const selectQuarter[\s\S]*setSelectedIds\(new Set\(\)\)/, "every quarter transition must clear row selection");
 assert.match(page, /const selectedRows = visibleRows\.filter/, "delete candidates must be scoped to currently visible rows");
 assert.match(page, /const closeDescriptionPopup[\s\S]*cancelDescriptionPopupOpen\(\)[\s\S]*descriptionPopupRef\.current\?\.close\(\)/, "mouseleave and blur must cancel a pending popup open");
 assert.match(page, /onMouseLeave=\{closeDescriptionPopup\}[\s\S]*onBlur=\{closeDescriptionPopup\}/);
@@ -59,6 +65,8 @@ assert.match(page, /sessionVersion\.current !== saveSession/, "late Save respons
 assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)/, "discarded mutation responses must trigger a fresh active-route fetch");
 assert.doesNotMatch(page, /deferredDraftsRef/, "navigation guard must replace deferred stale toolbar state");
 assert.match(page, /requestVersion\.current !== requestVersionAtStart/, "workload pagination must reject stale query responses");
+assert.match(page, /const \[editorValue, setEditorValue\] = useState\(value\)/, "text editors must buffer keystrokes locally instead of rebuilding the table per character");
+assert.doesNotMatch(page, /ensureDraft\(row\)/, "opening an unchanged editor must not create a dirty draft");
 assert.match(page, /setDrafts\(\[\]\)/, "Cancel\/save success must clear drafts");
 assert.match(api, /workloadId/, "save payload must preserve stable workloadId");
 assert.doesNotMatch(page, /<th>Rows<\/th>/);
@@ -74,5 +82,9 @@ assert.match(app, /pendingKpiPopstatePromptRef\.current = \{[\s\S]*confirmedKpiP
 assert.match(app, /if \(confirmedRetry\) confirmedKpiPopstateRetryRef\.current = null/, "the popstate retry bypass must be consumed exactly once");
 assert.match(app, /UNSAVED_WEEKLY_ACTIVITY_MESSAGE[\s\S]*window\.confirm/, "the existing Weekly Activity native guard must remain intact");
 assert.doesNotMatch(page, /window\.confirm/, "the KPI guard must keep the centrally mounted Oracle JET dialog");
+assert.match(page, /<oj-button[\s\S]*Save and Continue/, "navigation actions must use JET Button components");
+assert.match(page, /<oj-button[\s\S]*Delete/, "delete confirmation actions must use JET Button components");
+assert.match(page, /selectionMode=\{\{ row: "none", column: "none" \}\}/, "ordinary row and cell clicks must not control selection");
+assert.match(page, /<Selector/, "only an explicit Oracle JET selector checkbox may change selected rows");
 
 console.log("kpiActivityUiContract tests passed");

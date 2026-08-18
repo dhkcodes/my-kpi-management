@@ -1,11 +1,14 @@
 import { Fragment, h, render } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
-import { KeySetImpl } from "ojs/ojkeyset";
+import { ImmutableKeySet, KeySetImpl } from "ojs/ojkeyset";
 import "ojs/ojtable";
 import "ojs/ojdatetimepicker";
 import "ojs/ojdialog";
+import "ojs/ojbutton";
 import "ojs/ojpopup";
+import { ojPopup } from "ojs/ojpopup";
+import { Selector } from "oj-c/selector";
 import { FiscalYear, Quarter, WorkloadStage } from "../../data/kpiExcelParser";
 import {
   buildKpiSummary,
@@ -19,6 +22,7 @@ import {
   isD1QuarterAchieved,
   isKpiFieldChanged,
   isKpiDraftInvalid,
+  isKpiRowChanged,
   KPI_FIELD_CONTRACTS,
   KpiField,
   KpiFieldKey,
@@ -50,6 +54,15 @@ const activities = ["Solution Design", "Solution Proposal", "Solution Deployment
 
 type ActiveCell = Readonly<{ rowId: string; field: KpiFieldKey }>;
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
+
+const immutableSelectedIds = (keySet: ImmutableKeySet<string>, availableIds: readonly string[]) => {
+  const keys = keySet.keys;
+  if (keys.all) {
+    const deleted = keys.deletedKeys;
+    return availableIds.filter((id) => !deleted.has(id));
+  }
+  return Array.from(keys.keys.values());
+};
 
 const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "manageTimeReflected"
   ? (row.manageTimeReflected ? "Reflected" : "Pending")
@@ -90,7 +103,7 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   const cardClass = (quarter: Quarter, base: string) => `${base}${selectedQuarter === quarter ? " is-selected" : ""}`;
   if (tab === "D1") {
     return <section class="kpi-sheet-summary" aria-labelledby="kpiD1Summary">
-      <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K</small></h3><button type="button" onClick={() => onSelectQuarter(null)}>Refresh</button></div>
+      <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K</small></h3></div>
       <div class="kpi-d1-progress-grid" aria-label="Sales Stage ACR USD K by Delivery Date fiscal quarter">
         {quarters.map((quarter) => <button type="button" class={cardClass(quarter, "kpi-d1-progress-quarter")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
           <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em>{statusFor(quarter)}</em></span>
@@ -111,7 +124,7 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   }
   const isCombined = tab === "C1" || tab === "C2";
   return <section class="kpi-sheet-summary" aria-labelledby="kpiQuarterSummary">
-    <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Target Quarter count</h3><button type="button" onClick={() => onSelectQuarter(null)}>Refresh</button></div>
+    <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Target Quarter count</h3></div>
     <div class="kpi-quarter-summary">{quarters.map((quarter) => {
       const actual = isCombined ? summary.c1c2Combined[quarter].actual : summary.quarterly[tab][quarter];
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
@@ -135,6 +148,13 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
   const [loading, setLoading] = useState(false);
   const queryRef = useRef("");
   const requestVersion = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const popupRef = useRef<ojPopup | null>(null);
+
+  useEffect(() => {
+    const popup = popupRef.current;
+    return () => { if (popup?.isOpen()) popup.close(); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -152,7 +172,11 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
     return () => { active = false; requestVersion.current += 1; window.clearTimeout(timer); };
   }, [fiscalYear, query]);
 
-  const choose = (option: KpiWorkloadOption) => { onChange(option); onCommit(); };
+  const choose = (option: KpiWorkloadOption) => {
+    popupRef.current?.close();
+    onChange(option);
+    onCommit();
+  };
   const loadMore = () => {
     if (loading || !hasMore) return;
     const requestVersionAtStart = requestVersion.current;
@@ -167,21 +191,60 @@ function WorkloadCellEditor({ fiscalYear, row, onChange, onCommit }: Readonly<{
       .finally(() => { if (requestVersion.current === requestVersionAtStart) setLoading(false); });
   };
 
+  useEffect(() => {
+    const popup = popupRef.current;
+    const launcher = inputRef.current;
+    if (!popup || !launcher || (options.length === 0 && !loading)) return;
+    if (popup.isOpen()) popup.refresh();
+    else popup.open(launcher, {
+      my: { horizontal: "start", vertical: "top" },
+      at: { horizontal: "start", vertical: "bottom" },
+      collision: "flipfit"
+    });
+  }, [loading, options]);
+
   return <div class="kpi-workload-cell-editor">
-    <input type="search" value={query} aria-label="Search Account, Workload, or Oppty.No"
+    <input ref={inputRef} type="search" value={query} aria-label="Search Account, Workload, or Oppty.No"
       placeholder={row.accountWorkload || "Search Account, Workload, or Oppty.No"}
       onInput={(event) => { const next = (event.currentTarget as HTMLInputElement).value; queryRef.current = next; setQuery(next); }}
       onKeyDown={(event) => { if (event.key === "Enter" && options[0]) { event.preventDefault(); choose(options[0]); } }} />
-    <div class="kpi-workload-cell-editor__results" role="listbox" aria-label="Workload search results"
-      onScroll={(event) => { const target = event.currentTarget as HTMLDivElement; if (target.scrollTop + target.clientHeight >= target.scrollHeight - 8) loadMore(); }}>
-      {options.map((option) => <button type="button" role="option" onClick={() => choose(option)}>
-        <strong>{formatKpiWorkloadOption(option)}</strong><small>Workload ID {option.workloadId}</small>
-      </button>)}
-      {loading && <span>Loading…</span>}
-      {!loading && options.length === 0 && <span>No matching workload.</span>}
-      {hasMore && <button type="button" onClick={loadMore}>Load 10 more</button>}
-    </div>
+    <oj-popup ref={popupRef} class="kpi-workload-results-popup" autoDismiss="focusLoss" initialFocus="none" modality="modeless" tail="none"
+      position={{ my: { horizontal: "start", vertical: "top" }, at: { horizontal: "start", vertical: "bottom" }, collision: "flipfit" }}>
+      <div class="kpi-workload-cell-editor__results" role="listbox" aria-label="Workload search results"
+        onScroll={(event) => { const target = event.currentTarget as HTMLDivElement; if (target.scrollTop + target.clientHeight >= target.scrollHeight - 8) loadMore(); }}>
+        {options.map((option) => <button type="button" role="option" title={formatKpiWorkloadOption(option)}
+          onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option)}>
+          <strong>{formatKpiWorkloadOption(option)}</strong><small>Workload ID {option.workloadId}</small>
+        </button>)}
+        {loading && <span>Loading…</span>}
+        {!loading && options.length === 0 && <span>No matching workload.</span>}
+        {hasMore && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={loadMore}>Load 10 more</button>}
+      </div>
+    </oj-popup>
   </div>;
+}
+
+function BufferedFieldEditor({ field, value, onChange, onCommit }: Readonly<{
+  field: KpiField;
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+}>) {
+  const [editorValue, setEditorValue] = useState(value);
+  useEffect(() => setEditorValue(value), [value]);
+  const commit = () => onChange(editorValue);
+  const commitOnEnter = (event: KeyboardEvent) => {
+    if (event.key !== "Enter" || (field.type === "textarea" && event.shiftKey)) return;
+    event.preventDefault();
+    commit();
+    onCommit();
+  };
+  if (field.type === "textarea") return <textarea class="kpi-cell-editor kpi-cell-editor--textarea" value={editorValue}
+    aria-label={field.label} onInput={(event) => setEditorValue((event.currentTarget as HTMLTextAreaElement).value)}
+    onBlur={commit} onKeyDown={commitOnEnter}></textarea>;
+  return <input class="kpi-cell-editor" type={field.type === "number" ? "number" : "text"}
+    min={field.type === "number" ? "0" : undefined} value={editorValue} aria-label={field.label}
+    onInput={(event) => setEditorValue((event.currentTarget as HTMLInputElement).value)} onBlur={commit} onKeyDown={commitOnEnter} />;
 }
 
 function FieldEditor({ field, row, fiscalYear, onChange, onWorkloadChange, onCommit }: Readonly<{
@@ -210,12 +273,7 @@ function FieldEditor({ field, row, fiscalYear, onChange, onWorkloadChange, onCom
     onChange={(event) => onChange(field.key, (event.currentTarget as HTMLSelectElement).value)} onKeyDown={commitOnEnter}>
     {options.map((option) => <option value={option}>{field.type === "stage" ? stageLabels[option as WorkloadStage] : option}</option>)}
   </select>;
-  if (field.type === "textarea") return <textarea class="kpi-cell-editor kpi-cell-editor--textarea" value={value} aria-label={field.label}
-    onInput={(event) => onChange(field.key, (event.currentTarget as HTMLTextAreaElement).value)} onKeyDown={(event) => {
-      if (event.key === "Enter" && !event.shiftKey) commitOnEnter(event);
-    }}></textarea>;
-  return <input class="kpi-cell-editor" type={field.type === "number" ? "number" : "text"} min={field.type === "number" ? "0" : undefined}
-    value={value} aria-label={field.label} onInput={(event) => onChange(field.key, (event.currentTarget as HTMLInputElement).value)} onKeyDown={commitOnEnter} />;
+  return <BufferedFieldEditor field={field} value={value} onChange={(next) => onChange(field.key, next)} onCommit={onCommit} />;
 }
 
 export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigationGuardChange }: Readonly<{
@@ -240,6 +298,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const [descriptionPopup, setDescriptionPopup] = useState("");
   const navigationDialogRef = useRef<any>(null);
   const deleteDialogRef = useRef<any>(null);
+  const navigationStayButtonRef = useRef<any>(null);
+  const deleteCancelButtonRef = useRef<any>(null);
   const descriptionPopupRef = useRef<any>(null);
   const descriptionPopupOpenTimerRef = useRef(0);
   const sessionVersion = useRef(0);
@@ -314,17 +374,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
-  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
+  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected
+    && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) =>
     isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
 
-  const ensureDraft = (row: KpiSpreadsheetRow) => {
-    setDrafts((current) => current.some((draft) => draft.id === row.id) ? current : [...current, { ...row }]);
-  };
   const beginCellEdit = (row: KpiSpreadsheetRow, field: KpiField) => {
     if (saving) return;
-    ensureDraft(row);
     setActiveCell({ rowId: row.id, field: field.key });
+  };
+  const reconcileDraft = (current: KpiSpreadsheetRow[], updated: KpiSpreadsheetRow) => {
+    const saved = rows.find((item) => item.id === updated.id);
+    const keep = updated.id.startsWith("draft-") || !saved || isKpiRowChanged(saved, updated, fields);
+    if (!keep) return current.filter((draft) => draft.id !== updated.id);
+    return current.some((draft) => draft.id === updated.id)
+      ? current.map((draft) => draft.id === updated.id ? updated : draft)
+      : [...current, updated];
   };
   const updateDraft = (row: KpiSpreadsheetRow, key: KpiFieldKey, value: string) => {
     setDrafts((current) => {
@@ -333,26 +398,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         ...source,
         [key]: key === "acrK" ? (value === "" ? null : Number(value)) : key === "manageTimeReflected" ? value === "true" : value
       } as KpiSpreadsheetRow;
-      return current.some((draft) => draft.id === row.id)
-        ? current.map((draft) => draft.id === row.id ? updated : draft)
-        : [...current, updated];
+      return reconcileDraft(current, updated);
     });
   };
   const selectWorkload = (row: KpiSpreadsheetRow, option: KpiWorkloadOption) => {
     setDrafts((current) => {
       const source = current.find((draft) => draft.id === row.id) ?? row;
       const updated = { ...source, workloadId: option.workloadId, mappingStatus: "VERIFIED" as const, accountWorkload: formatKpiWorkloadOption(option) };
-      return current.some((draft) => draft.id === row.id)
-        ? current.map((draft) => draft.id === row.id ? updated : draft)
-        : [...current, updated];
+      return reconcileDraft(current, updated);
     });
   };
   const cancelDrafts = () => {
-    setDrafts([]); setActiveCell(null); setApiMessage("Unsaved KPI changes cancelled");
+    setDrafts([]); setActiveCell(null); setSelectedIds(new Set()); setApiMessage("Unsaved KPI changes cancelled");
   };
   const selectQuarter = (quarter: Quarter | null) => {
-    setSelectedIds(new Set());
-    setSelectedQuarter(quarter);
+    setSelectedIds(new Set()); setActiveCell(null);
+    setSelectedQuarter((current) => current === quarter ? null : quarter);
   };
   const cancelDescriptionPopupOpen = () => {
     window.clearTimeout(descriptionPopupOpenTimerRef.current);
@@ -421,13 +482,19 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const renderKpiRow = (context: { data: KpiSpreadsheetRow; parentElement: Element }) => {
     const row = context.data;
     const saved = authoritativeRows.find((item) => item.id === row.id);
-    const rowDirty = !saved || fields.some((field) => isKpiFieldChanged(saved, row, field.key));
+    const rowDirty = !saved || isKpiRowChanged(saved, row, fields);
     context.parentElement.className = [
       selectedIds.has(row.id) ? "is-selected" : "",
       rowDirty ? "is-unsaved-row" : "",
       row.manageTimeReflected ? "kpi-manage-time-reflected-row" : ""
     ].filter(Boolean).join(" ");
-    render(<Fragment>{fields.map((field) => {
+    render(<Fragment>
+      <td class="kpi-selector-cell">
+        <Selector rowKey={row.id} selectedKeys={new KeySetImpl(selectedIds)} selectionMode="multiple"
+          aria-label={`Select KPI activity ${row.id}`}
+          onSelectedKeysChanged={(keySet) => setSelectedIds(new Set(immutableSelectedIds(keySet, visibleRows.map((item) => item.id))))} />
+      </td>
+      {fields.map((field) => {
       const editing = row.id.startsWith("draft-") || (activeCell?.rowId === row.id && activeCell.field === field.key);
       const changed = !saved || isKpiFieldChanged(saved, row, field.key);
       return <td class={[editing ? "is-editing-cell" : "", changed ? "is-unsaved-cell" : ""].filter(Boolean).join(" ") || undefined}
@@ -468,38 +535,40 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
         </div>
       </div>
-      {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing ? "Reflected requires both SR Number and Delivery Date." : "Complete required fields before saving."}</p>}
+      {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
+        ? (activeTab === "H" ? "Reflected H requires Delivery Date." : "Reflected requires both SR Number and Delivery Date.")
+        : "Complete required fields before saving."}</p>}
       <Summary rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
       <div class="kpi-jet-table-wrap">
         <oj-table class="kpi-jet-editable-table" aria-label={`${activeTab} editable KPI activities`}
           data={dataProvider}
-          columns={fields.map((field) => ({ headerText: field.label, field: field.key }))}
+          columns={[{ headerText: "Select", id: "selector" }, ...fields.map((field) => ({ headerText: field.label, field: field.key }))]}
           display="grid" layout="contents" horizontalGridVisible="enabled" verticalGridVisible="enabled"
-          selectionMode={{ row: "multipleToggle", column: "none" }} selectAllControl="visible"
-          selected={{ row: new KeySetImpl(selectedIds), column: new KeySetImpl<string>() }}
-          onselectedChanged={(event: CustomEvent) => setSelectedIds(new Set(getSelectedKpiRowIds(event.detail.value.row, visibleRows.map((row) => row.id))))}
+          selectionMode={{ row: "none", column: "none" }}
           rowRenderer={renderKpiRow}></oj-table>
       </div>
       {visibleRows.length === 0 && <p class="kpi-sheet-empty">No {activeTab} activities for {selectedQuarter ?? fiscalYear}.</p>}
     </>}
     <oj-popup ref={descriptionPopupRef} class="kpi-description-popup" autoDismiss="focusLoss" tail="simple">{descriptionPopup}</oj-popup>
-    <oj-dialog ref={navigationDialogRef} dialogTitle="Unsaved KPI changes" initialVisibility="hide" cancelBehavior="none">
+    <oj-dialog ref={navigationDialogRef} dialogTitle="Unsaved KPI changes" initialVisibility="hide" cancelBehavior="escape"
+      onojOpen={() => navigationStayButtonRef.current?.focus()} onojClose={() => setPendingNavigation(null)}>
       <div slot="body"><p>You have unsaved KPI changes. Save them before continuing to {pendingNavigation?.label}, or discard them.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <button type="button" disabled={saving || saveDisabled} onClick={() => { void (async () => {
+        <oj-button ref={navigationStayButtonRef} disabled={saving} onojAction={() => { navigationDialogRef.current?.close(); setPendingNavigation(null); }}>Stay</oj-button>
+        <oj-button disabled={saving || saveDisabled} onojAction={() => { void (async () => {
           const continued = await saveDrafts();
           if (!continued) return;
           const action = pendingNavigation?.action; navigationDialogRef.current?.close(); setPendingNavigation(null); action?.();
-        })(); }}>Save and Continue</button>
-        <button type="button" disabled={saving} onClick={() => { const action = pendingNavigation?.action; cancelDrafts(); navigationDialogRef.current?.close(); setPendingNavigation(null); action?.(); }}>Discard and Continue</button>
-        <button type="button" disabled={saving} onClick={() => { navigationDialogRef.current?.close(); setPendingNavigation(null); }}>Stay</button>
+        })(); }}>Save and Continue</oj-button>
+        <oj-button disabled={saving} onojAction={() => { const action = pendingNavigation?.action; cancelDrafts(); navigationDialogRef.current?.close(); setPendingNavigation(null); action?.(); }}>Discard and Continue</oj-button>
       </div>
     </oj-dialog>
-    <oj-dialog ref={deleteDialogRef} dialogTitle="Delete selected KPI activities" initialVisibility="hide" cancelBehavior="icon">
+    <oj-dialog ref={deleteDialogRef} dialogTitle="Delete selected KPI activities" initialVisibility="hide" cancelBehavior="escape"
+      onojOpen={() => deleteCancelButtonRef.current?.focus()}>
       <div slot="body"><p>Delete {selectedRows.length} selected KPI activity row(s)? This action is applied only after confirmation.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <button type="button" class="kpi-delete-button" disabled={saving} onClick={() => { deleteDialogRef.current?.close(); void removeSelected(); }}>Delete</button>
-        <button type="button" disabled={saving} onClick={() => deleteDialogRef.current?.close()}>Cancel</button>
+        <oj-button ref={deleteCancelButtonRef} disabled={saving} onojAction={() => deleteDialogRef.current?.close()}>Cancel</oj-button>
+        <oj-button chroming="danger" disabled={saving} onojAction={() => { deleteDialogRef.current?.close(); void removeSelected(); }}>Delete</oj-button>
       </div>
     </oj-dialog>
   </section>;

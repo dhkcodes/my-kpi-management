@@ -1949,10 +1949,13 @@ h4.weekly-activity-section-label--next-week,
 .kpi-description-popup { max-width: min(34rem, 80vw); padding: .65rem; white-space: pre-wrap; }
 .kpi-draft-validation { background: #fff8e7; border-left: .25rem solid #8a5b00; color: #5f3f00; margin: 0 0 .8rem; padding: .65rem; }
 .kpi-dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
+.kpi-selector-cell { min-width: 3rem !important; text-align: center; width: 3rem; }
 .kpi-workload-cell-editor { min-width: 20rem; position: relative; }
 .kpi-workload-cell-editor > input { border: 1px solid var(--kpi-border); font: inherit; min-height: 2.3rem; padding: .4rem; width: 100%; }
-.kpi-workload-cell-editor__results { background: #fff; border: 1px solid var(--kpi-border); box-shadow: 0 10px 24px rgba(22,21,19,.16); left: 0; max-height: 13rem; overflow-y: auto; position: absolute; top: calc(100% + .2rem); width: min(28rem, 80vw); z-index: 30; }
-.kpi-workload-cell-editor__results button { background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); cursor: pointer; display: grid; gap: .15rem; padding: .55rem; text-align: left; width: 100%; }
+.kpi-workload-results-popup { box-sizing: border-box; max-width: calc(100vw - 2rem); width: min(42rem, calc(100vw - 2rem)); }
+.kpi-workload-cell-editor__results { background: #fff; border: 1px solid var(--kpi-border); box-shadow: 0 10px 24px rgba(22,21,19,.16); box-sizing: border-box; max-height: 16rem; overflow: auto; position: static; width: 100%; }
+.kpi-workload-cell-editor__results button { background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); cursor: pointer; display: grid; gap: .15rem; min-width: max-content; padding: .55rem; text-align: left; width: 100%; }
+.kpi-workload-cell-editor__results button strong { white-space: nowrap; }
 .kpi-workload-cell-editor__results button:hover, .kpi-workload-cell-editor__results button:focus-visible { background: #f3f1ef; }
 .kpi-workload-cell-editor__results span { color: var(--kpi-muted); display: block; padding: .55rem; }
 .kpi-activity-toolbar__right button.kpi-delete-button { background: #b42318; border-color: #b42318; color: #fff; }
