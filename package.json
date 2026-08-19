@@ -14,12 +14,15 @@
     "glob": "10.4.5",
     "typescript": "5.8.3",
     "underscore": "^1.10.2",
+    "ws": "^8.21.3",
     "yargs-parser": "13.1.2"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "npm run test:pulse-v2 && npm run test:weekly-activities && npm run typecheck",
     "test:pulse-v2": "rm -rf .test-dist && tsc tests/*.test.ts --outDir .test-dist --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --strict --skipLibCheck && node .test-dist/tests/accountsWorkloadsPulseV2.test.js && node .test-dist/tests/accountsWorkloadsDataSource.test.js && node .test-dist/tests/accountsWorkloadsApi.test.js && node .test-dist/tests/accountsWorkloadsSelection.test.js && node .test-dist/tests/accountsWorkloadsUiContract.test.js && node .test-dist/tests/navigationRoutes.test.js && node .test-dist/tests/kpiWorkspaceNavigation.test.js && node .test-dist/tests/kpiConfigurationApi.test.js && node .test-dist/tests/kpiSpreadsheet.test.js && node .test-dist/tests/kpiSpreadsheetApi.test.js && node .test-dist/tests/kpiActivityUiContract.test.js && node .test-dist/tests/kpiActivityEditArchitecture.test.js && rm -rf .test-dist",
+    "test:kpi-save-lifecycle": "node tests/browser/kpiActivitySaveLifecycle.cdp.cjs",
+    "test:kpi-regression": "npm run test:pulse-v2 && npm run test:kpi-save-lifecycle",
     "test:weekly-activities": "rm -rf .test-dist && tsc tests/*.test.ts --outDir .test-dist --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --strict --skipLibCheck && node .test-dist/tests/weeklyActivitiesApi.test.js && node .test-dist/tests/weeklyActivityEditorSession.test.js && node .test-dist/tests/weeklyActivitiesUiContract.test.js && node .test-dist/tests/navigationWeeklyActivitiesFixes.test.js && rm -rf .test-dist"
   },
   "engines": {

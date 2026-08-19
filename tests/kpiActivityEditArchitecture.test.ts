@@ -101,6 +101,10 @@ assert.match(page, /id={`kpi-workload-launcher-\$\{state\.generation\}`}/,
 assert.match(page, /getBoundingClientRect\(\)[\s\S]*width <= 0[\s\S]*popup\.open/,
   "workload results may open only after the real launcher has non-zero geometry");
 assert.match(page, /oj-progress-circle[\s\S]*Saving KPI activities/, "Save must expose a modal progress dialog");
+assert.match(page, /savingDialogDesiredRef[\s\S]*savingDialogGenerationRef[\s\S]*settleSavingDialogClosed/,
+  "saving dialog continuations must be generation-guarded and explicitly settled closed");
+assert.match(page, /settleSavingDialogClosed[\s\S]*whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*whenReady\(\)[\s\S]*!dialog\.isOpen\(\)/,
+  "terminal Save state must wait for the public close and BusyContext contract");
 assert.match(page, /Save changes[\s\S]*Discard changes[\s\S]*Keep editing/,
   "Cancel confirmation must provide save, discard, and keep-editing choices");
 assert.match(page, /kpi-grid-sort-button/, "sortable headers must use the public column header template");

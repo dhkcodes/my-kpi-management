@@ -401,6 +401,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const [editorRect, setEditorRect] = useState<EditorRect | null>(null);
   const editorAnchorRef = useRef<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
+  const savingDialogDesiredRef = useRef(false);
+  const savingDialogGenerationRef = useRef(0);
   const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
   const [reloadVersion, setReloadVersion] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState<Quarter | null>(null);
@@ -786,9 +788,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const dialog = savingDialogRef.current;
     if (!dialog) return;
     let active = true;
+    const generation = ++savingDialogGenerationRef.current;
     const busyContext = Context.getContext(dialog).getBusyContext();
     void busyContext.whenReady().then(() => {
-      if (!active || savingDialogRef.current !== dialog) return;
+      if (!active || generation !== savingDialogGenerationRef.current || savingDialogRef.current !== dialog || savingDialogDesiredRef.current !== saving) return;
       if (saving) {
         if (!dialog.isOpen()) dialog.open();
       } else if (dialog.isOpen()) {
@@ -800,6 +803,23 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     return () => { active = false; };
   }, [saving]);
 
+  const settleSavingDialogClosed = useCallback(async (): Promise<boolean> => {
+    savingDialogDesiredRef.current = false;
+    savingDialogGenerationRef.current += 1;
+    const dialog = savingDialogRef.current;
+    if (!dialog) return true;
+    try {
+      const busyContext = Context.getContext(dialog).getBusyContext();
+      await busyContext.whenReady();
+      if (dialog.isOpen()) dialog.close();
+      await busyContext.whenReady();
+      return !dialog.isOpen();
+    } catch (error) {
+      console.error("KPI saving dialog close failed", error);
+      return false;
+    }
+  }, []);
+
 
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
@@ -810,12 +830,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const saveSessionKey = sessionKeyRef.current;
     const draftSnapshot = drafts;
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save" }));
+    savingDialogDesiredRef.current = true;
     setSaving(true);
     const outcomes = await Promise.allSettled(draftSnapshot.map((draft) => saveKpiRow(draft)));
     await minimumProgress(startedAt);
     const saved = outcomes.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
     const failedDrafts = draftSnapshot.filter((_, index) => outcomes[index].status === "rejected");
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
+      await settleSavingDialogClosed();
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     draftSnapshot.forEach((draft, index) => {
@@ -839,12 +861,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const providerReady = providerSettled ? await providerSettled : true;
     if (!providerReady) {
       setApiMessage("Grid synchronization failed; KPI activities were reloaded");
+      await settleSavingDialogClosed();
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
+      await settleSavingDialogClosed();
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     setApiMessage(failedDrafts.length === 0 ? `${saved.length} KPI activity row(s) saved` : `${saved.length} saved · ${failedDrafts.length} failed`);
+    await settleSavingDialogClosed();
     setSaving(false);
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failedDrafts.length > 0 }));
     return failedDrafts.length === 0;
@@ -855,9 +880,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const rowsToDelete = [...selectedRows];
     const deleteSession = sessionVersion.current;
     const deleteSessionKey = sessionKeyRef.current;
+    savingDialogDesiredRef.current = true;
     setSaving(true);
     const outcomes = await Promise.allSettled(rowsToDelete.map((row) => deleteKpiRow(row)));
     if (sessionVersion.current !== deleteSession || sessionKeyRef.current !== deleteSessionKey) {
+      await settleSavingDialogClosed();
       setSaving(false);
       setReloadVersion((current) => current + 1);
       return;
@@ -869,6 +896,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     setDrafts((current) => current.filter((row) => !deletedIds.has(row.id)));
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);
+    await settleSavingDialogClosed();
     setSaving(false);
   };
 
