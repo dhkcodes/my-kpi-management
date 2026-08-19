@@ -38,10 +38,34 @@ assert.match(page, /event\.key === "Enter"/, "Enter must commit the active edito
 assert.match(page, /const stopGridInteraction = \(event: Event\) => event\.stopPropagation\(\)/, "KPI editors must isolate input events from oj-data-grid navigation");
 assert.match(page, /onInput=\{\(event\) => \{ const next = \(event\.currentTarget as HTML(?:TextArea|Input)Element\)\.value; setEditorValue\(next\); onChange\(next\); \}\}/,
   "buffered editors must continuously place the live control value in the draft before Enter reaches oj-data-grid");
-assert.doesNotMatch(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]{0,260}event\.key (?:===|!==) "Enter"/,
-  "the buffered editor key handler must not rerender the Data Grid during native Enter edit completion");
+assert.match(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]{0,320}event\.key === "Enter"[\s\S]{0,300}onChange\(\(event\.currentTarget as HTMLInputElement \| HTMLTextAreaElement\)\.value\)/,
+  "text and textarea Enter must synchronously publish the live DOM value before JET ends editing");
 assert.doesNotMatch(page, /event\.key !== "Enter"[\s\S]{0,220}event\.stopPropagation\(\)/,
   "Enter must bubble to oj-data-grid so the native cellEdit lifecycle exits the current editor");
+assert.match(page, /const closeWorkloadPopup = \(\) => \{[\s\S]{0,180}dispatchEvent\(new Event\("kpi-close-workload-popups"\)\)[\s\S]{0,320}querySelectorAll<ojPopup>[\s\S]{0,320}popup\.isOpen\(\)[\s\S]{0,120}popup\.close\(\)/,
+  "edit completion must synchronously close every cached workload popup and notify each owning editor");
+assert.match(page, /const closeCachedEditor = \(\) => \{[\s\S]{0,180}closeSession = \+\+popupSessionRef\.current[\s\S]{0,260}cancelAnimationFrame\(focusFrameRef\.current\)[\s\S]{0,260}getBusyContext\(\)\.whenReady\(\)\.then[\s\S]{0,300}popupSessionRef\.current === closeSession[\s\S]{0,220}!activatedRef\.current[\s\S]{0,350}addEventListener\("kpi-close-workload-popups", closeCachedEditor\)/,
+  "cached editors must cancel stale focus and guard asynchronous Popup close retries with the owning session");
+assert.match(page, /useEffect\(\(\) => \{[\s\S]{0,160}popupSessionRef\.current \+= 1[\s\S]{0,180}activatedRef\.current = autoActivate[\s\S]{0,180}setActivated\(autoActivate\)[\s\S]{0,160}\}, \[activationToken, autoActivate\]\)/,
+  "a reused cached workload editor must reactivate from each new edit-session token");
+assert.match(page, /const flushActiveEditorDraft[\s\S]{0,2200}querySelector[\s\S]{0,1000}commitDraftRow/,
+  "ojBeforeEditEnd must read the active DOM editor and commit its latest value before the Cell closes");
+assert.match(page, /const handleBeforeEditEnd[\s\S]{0,180}editEndingRef\.current = true[\s\S]{0,180}closeWorkloadPopup\(\)[\s\S]{0,380}flushActiveEditorDraft\(\)[\s\S]{0,520}editSnapshotRef\.current = null/,
+  "normal edit completion must block workload popup reactivation, close cached popups, and flush the latest Cell value before cleanup");
+assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing && !editEndingRef\.current\}/,
+  "workload renderers remounted by draft reconciliation must not auto-open once Cell edit is ending");
+assert.match(page, /editEndingRef\.current = false;\s*grid\.setProperty\("editCell", \{ indexes \}\)/,
+  "double-click entry must re-enable workload popup activation before Oracle JET renders the edit template");
+assert.match(page, /pendingProgrammaticEditRef\.current = null;\s*editEndingRef\.current = false;\s*grid\.setProperty\("editCell"/,
+  "new-row programmatic entry must re-enable workload popup activation before Oracle JET renders the edit template");
+assert.match(page, /field\.type === "manageTime"[\s\S]{0,650}onChange\(field\.key[\s\S]{0,220}onSelectionComplete\(\)/,
+  "Manage Time selection must update draft before ending native edit mode");
+assert.match(page, /field\.type === "date"[\s\S]{0,650}onChange\(field\.key[\s\S]{0,220}onSelectionComplete\(\)/,
+  "Delivery Date selection must update draft before ending native edit mode");
+assert.match(page, /if \(options\)[\s\S]{0,700}onChange\(field\.key[\s\S]{0,220}onSelectionComplete\(\)/,
+  "quarter, month, stage, and activity selection must update draft before ending native edit mode");
+assert.match(page, /const selectWorkload[\s\S]{0,1000}activeEditorDraftRef\.current = updated[\s\S]{0,500}commitDraftRow\(updated\)/,
+  "workload result selection must synchronously retain the selected row for Enter and before-edit-end");
 assert.doesNotMatch(page, /data-kpi-editor-row[\s\S]{0,300}onKeyDown=\{stopGridInteraction\}/,
   "an editor wrapper must not swallow Enter before the active control commits it");
 assert.match(page, /onDblClick=\{stopGridInteraction\}/, "double-clicking an active editor must keep focus in that editor");
@@ -67,7 +91,11 @@ assert.match(page, /of:\s*`#\$\{launcherId\}`/,
 assert.doesNotMatch(page, /setTimeout\(openPopup/,
   "workload popup positioning must not be hidden behind arbitrary retry timeouts");
 assert.match(page, /autoActivate[\s\S]*useState\(autoActivate\)/, "double-clicked workload editors must activate their result popup immediately");
-assert.match(page, /onClick=\{\(\) => \{ activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
+assert.match(page, /workloadActivationToken=\{field\.type === "workload" && editing \? editGenerationRef\.current : -1\}/,
+  "each workload edit attempt must provide a distinct activation token to cached renderers");
+assert.match(page, /onClick=\{\(\) => \{ popupSessionRef\.current \+= 1; activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
+assert.match(page, /focusFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,220}popupSessionRef\.current === focusSession[\s\S]{0,180}inputRef\.current\?\.isConnected/,
+  "choose/reset focus callbacks must not refocus a stale cached editor session");
 assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/,
   "KPI tables must keep one mutable DataProvider instead of replacing the whole table for each draft change");
 assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiSpreadsheetRow>\(\[\], \{ keyAttributes: "id" \}\), \[activeTab\]\)/,
@@ -88,8 +116,8 @@ assert.match(page, /setProperty\("currentCell", \{ type: "cell", indexes: \{ row
   "pointer edit entry must establish the native current cell before Oracle JET handles Escape");
 assert.match(page, /setProperty\("currentCell", \{ type: "cell", indexes: \{ row, column \} \}\)[\s\S]{0,1800}setProperty\("editCell", \{ indexes: \{ row, column \} \}\)/,
   "programmatic first-cell entry must keep currentCell and editCell aligned");
-assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing\}/,
-  "workload entry must retain popup activation after the native setProperty transition");
+assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing && !editEndingRef\.current\}/,
+  "workload entry must activate normally but a renderer remounted during native edit completion must stay closed");
 assert.doesNotMatch(page, /suppressWorkloadAutoActivateRef/,
   "workload popup activation must not depend on a global suppression flag that can survive a vetoed transition");
 assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,500}editEndFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,220}editGenerationRef\.current === generation\) finishCellEdit\(\)/,
@@ -125,6 +153,10 @@ assert.match(settleNavigationBlock, /navigationSettlingRef\.current = true[\s\S]
   "navigation must suppress newly arriving JET edit events before retiring the active edit");
 assert.match(settleNavigationBlock, /if \(navigationGenerationRef\.current !== generation\) return;\s*action\(\)/,
   "overlapping route changes must invalidate stale continuations before the route action executes");
+assert.match(settleNavigationBlock, /const sessionKey = sessionKeyRef\.current[\s\S]*action\(\)[\s\S]*requestAnimationFrame[\s\S]*sessionKeyRef\.current === sessionKey[\s\S]*navigationSettlingRef\.current = false/,
+  "a settled action that keeps the same route/FY must release edit suppression instead of locking the Grid");
+assert.match(page, /const selectQuarter[\s\S]{0,700}requestProtectedNavigation\(quarter \?\? "Fiscal Year", action\)/,
+  "clean and dirty quarter row-set changes must both pass through Data Grid BusyContext settlement");
 assert.match(page, /const settledAction = \(\) => settleNavigationRef\.current\(action\)/,
   "sidebar, history, fiscal-year, overview, and tab routes must share the same lifecycle settlement gate");
 assert.match(page, /onNavigationGuardChange\(requestProtectedNavigation, drafts\.length > 0\)/,
@@ -158,8 +190,8 @@ assert.doesNotMatch(page, /if \(event\.key === "Enter"\) \{[^}]*?(?:preventDefau
 assert.doesNotMatch(page, /event\.key === "Enter" && options\[0\]/, "Enter must never auto-select the first workload result");
 assert.match(page, />선택 안함</, "workload results must offer restoration of the original value");
 assert.match(page, /collision:\s*"flipfit"/, "workload popup must fit or flip at the viewport edge");
-assert.match(page, /return \(\) => \{ if \(popup\?\.classList\.contains\("oj-complete"\) && popup\.isOpen\(\)\) popup\.close\(\); \}/,
-  "an unmounted workload editor must safely close its upgraded Oracle JET popup layer");
+assert.match(page, /return \(\) => \{[\s\S]{0,180}popupSessionRef\.current \+= 1[\s\S]{0,180}cancelAnimationFrame\(focusFrameRef\.current\)[\s\S]{0,220}popup\?\.classList\.contains\("oj-complete"\)[\s\S]{0,120}popup\.close\(\)/,
+  "an unmounted workload editor must invalidate callbacks and safely close its upgraded Oracle JET popup layer");
 assert.match(page, /Save and Continue/);
 assert.match(page, /Discard and Continue/);
 assert.match(page, />Stay</);
@@ -168,8 +200,8 @@ assert.match(page, /selectedQuarter/);
 assert.doesNotMatch(page, />Refresh</, "the redundant KPI Refresh button must be removed");
 assert.match(page, /setSelectedQuarter\(\(current\) => current === quarter \? null : quarter\)/, "clicking the selected Quarter again must clear the filter");
 assert.match(page, /const selectQuarter[\s\S]*setSelectedIds\(new Set\(\)\)/, "every quarter transition must clear row selection");
-assert.match(page, /const selectQuarter[\s\S]{0,500}drafts\.length > 0[\s\S]{0,180}requestProtectedNavigation/,
-  "dirty quarter transitions must use the Stay, Save and Continue, or Discard and Continue dialog");
+assert.match(page, /const selectQuarter[\s\S]{0,500}requestProtectedNavigation/,
+  "quarter transitions must use the shared lifecycle guard, which prompts only when drafts exist");
 assert.match(page, /const selectedRows = visibleRows\.filter/, "delete candidates must be scoped to currently visible rows");
 assert.match(page, /const closeDescriptionPopup[\s\S]*cancelDescriptionPopupOpen\(\)[\s\S]*descriptionPopupRef\.current\?\.close\(\)/, "mouseleave and blur must cancel a pending popup open");
 assert.match(page, /onMouseLeave=\{closeDescriptionPopup\}[\s\S]*onBlur=\{closeDescriptionPopup\}/);
