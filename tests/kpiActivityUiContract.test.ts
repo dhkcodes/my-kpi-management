@@ -91,8 +91,8 @@ assert.match(page, /of:\s*`#\$\{launcherId\}`/,
 assert.doesNotMatch(page, /setTimeout\(openPopup/,
   "workload popup positioning must not be hidden behind arbitrary retry timeouts");
 assert.match(page, /autoActivate[\s\S]*useState\(autoActivate\)/, "double-clicked workload editors must activate their result popup immediately");
-assert.match(page, /workloadActivationToken=\{field\.type === "workload" && editing \? editGenerationRef\.current : -1\}/,
-  "each workload edit attempt must provide a distinct activation token to cached renderers");
+assert.match(page, /workloadActivationToken=\{editing \? editGenerationRef\.current : -1\}/,
+  "each cached editor instance must receive a distinct edit-session token");
 assert.match(page, /onClick=\{\(\) => \{ popupSessionRef\.current \+= 1; activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
 assert.match(page, /focusFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,220}popupSessionRef\.current === focusSession[\s\S]{0,180}inputRef\.current\?\.isConnected/,
   "choose/reset focus callbacks must not refocus a stale cached editor session");
@@ -167,7 +167,7 @@ assert.doesNotMatch(page, /onNavigationGuardChange\(drafts\.length > 0/,
   "clean-route navigation must not bypass Data Grid lifecycle settlement");
 assert.match(page, /const handleBeforeEdit[\s\S]{0,500}saving \|\| navigationSettlingRef\.current[\s\S]{0,120}event\.preventDefault\(\)/,
   "JET beforeEdit events arriving during route settlement must be vetoed before they can recreate activeCell state");
-assert.match(page, /const isCurrentEditRequest[\s\S]{0,500}navigationGenerationRef\.current === navigationGeneration[\s\S]{0,500}await busyContext\.whenReady\(\);[\s\S]{0,160}if \(!isCurrentEditRequest\(\)\) return/,
+assert.match(page, /const isCurrentEditRequest[\s\S]{0,500}navigationGenerationRef\.current === navigationGeneration[\s\S]{0,1200}await busyContext\.whenReady\(\);[\s\S]{0,420}if \(!isCurrentEditRequest\(\)\) return/,
   "double-click edit continuations must be invalidated when navigation starts while BusyContext is pending");
 assert.match(page, /tabEditFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,500}navigationGenerationRef\.current !== navigationGeneration[\s\S]{0,300}!grid\.isConnected/,
   "Tab-key edit callbacks must reject stale navigation generations and disconnected Grids");
@@ -179,8 +179,10 @@ const workloadChooseStart = page.indexOf("const choose = (option: KpiWorkloadOpt
 const workloadResetEnd = page.indexOf("const loadMore =", workloadChooseStart);
 const workloadSelectionHandlers = page.slice(workloadChooseStart, workloadResetEnd);
 assert.ok(workloadChooseStart >= 0 && workloadResetEnd > workloadChooseStart);
-assert.doesNotMatch(workloadSelectionHandlers, /onCommit\(\)/,
-  "choosing or resetting a workload must keep the editor active instead of handing focus back to the oj-data-grid header");
+assert.match(workloadSelectionHandlers, /onChange\(option\);[\s\S]{0,100}onCommit\(\);/,
+  "choosing a workload result must synchronously update the draft and end native edit mode without an extra Enter");
+assert.match(workloadSelectionHandlers, /onReset\(\);[\s\S]{0,100}onCommit\(\);/,
+  "resetting workload selection must synchronously reconcile the draft and end native edit mode");
 assert.match(workloadSelectionHandlers, /activatedRef\.current = false/,
   "choosing or resetting a workload must cancel pending popup-open retries before closing the list");
 assert.match(page, /if \(event\.key === "Enter"\) \{ activatedRef\.current = false; setActivated\(false\); closePopup\(\); \}/,
@@ -268,9 +270,39 @@ assert.match(styles, /\.kpi-reflected-grid-cell\s*\{[^}]*background:\s*#eaf4ec/,
   "the full reflected row, including the selector/title cell, must use one contiguous background");
 assert.match(styles, /\.kpi-jet-editable-grid\s*\{[^}]*min-width:\s*0[^}]*width:\s*100%/,
   "every KPI Data Grid must contract and expand with its window container");
-assert.match(page, /availableWidth = Math\.max\(grid\.clientWidth - 56, columnCount \* 64\)[\s\S]*availableWidth \/ columnCount/,
-  "data columns must derive responsive widths from the live Grid width");
+assert.match(page, /const columnWidth = Math\.max\(64, \(Math\.max\(0, width\) - 56\) \/ fields\.length\)/,
+  "data columns must derive responsive widths from the observed live Grid host width");
 assert.match(page, /const toolbarActions = getKpiToolbarActions\(drafts\.length, selectedRows\.length\)/,
   "Save and Cancel visibility must depend on real drafts, never on simple editor activation");
+assert.match(contract, /field\("title", "SR Description", "textarea"\)/,
+  "A, B, C1, C2, and F SR Description must be declared as textarea editors");
+assert.match(contract, /H:\s*\[manageTime, field\("title", "Content", "textarea"\)/,
+  "H Content must be declared as a textarea editor");
+assert.match(page, /<BufferedFieldEditor key=\{`\$\{row\.id\}:\$\{field\.key\}:\$\{workloadActivationToken\}`\}/,
+  "cached Data Grid templates must key buffered editors by row, field, and edit session so new-row text stays visible");
+assert.match(styles, /\.kpi-cell-editor--textarea\s*\{[^}]*box-sizing:\s*border-box[^}]*min-height:\s*(?:7|8|9|\d{2,})rem[^}]*min-width:\s*min\([^}]*padding:\s*\.75rem[^}]*resize:\s*vertical/,
+  "textarea editors must expose a comfortable Redwood-sized editing surface with internal padding");
+assert.match(page, /kpi-textarea-grid-cell/,
+  "textarea columns must receive a public Data Grid cell class for edit-height expansion");
+assert.match(styles, /\.kpi-textarea-grid-cell:has\([^}]*kpi-cell-editor--textarea[^}]*\)\s*\{[^}]*height:\s*(?:8|9)(?:\.5)?rem/,
+  "the public textarea cell class must expand the JET cell instead of clipping the editor to one row");
+assert.match(page, /new ResizeObserver\([\s\S]{0,500}applyAvailableWidth\(entry\.contentRect\.width\)[\s\S]{0,260}observer\.observe\(host\)/,
+  "Grid column sizing must react to content-box width changes through ResizeObserver");
+assert.match(page, /_WIDGET_INSTANCE\?\.grid[\s\S]{0,500}resizeApi\.m_resizingElement = header[\s\S]{0,160}resizeApi\.resizeColWidth\(oldWidth, columnWidth\)/,
+  "responsive sizing must use JET Data Grid's column-resize lifecycle so headers, Cells, and offsets move together");
+assert.doesNotMatch(page, /gridRef\.current\?*\.refresh\(\)|grid\.refresh\(\)/,
+  "responsive sizing must not use full Data Grid refresh as a resize workaround");
+assert.match(page, /flushActiveEditorDraft\(\);[\s\S]{0,260}setProperty\("editCell", null\)[\s\S]{0,260}busyContext\.whenReady\(\)[\s\S]{0,380}setActiveCellNow\(null\)[\s\S]{0,700}setProperty\("editCell", \{ indexes \}\)/,
+  "cross-cell double-click must flush and fully retire the previous editor before opening only the requested Cell");
+assert.match(page, /class="kpi-grid-header-title"/,
+  "every non-selector KPI header must expose a dedicated Redwood title class");
+assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*color:\s*#(?:8b3a2f|7f3b32|6f4b3e)/,
+  "KPI header titles must use a readable Redwood-family color");
+
+assert.match(page, /const requestProtectedNavigation[\s\S]{0,320}flushActiveEditorDraftRef\.current\(\)[\s\S]{0,420}drafts\.length === 0 && !hasLiveChange/,
+  "protected navigation must flush and compare the live editor value before allowing a clean navigation");
+
+assert.match(page, /const cancelDrafts = \(\) => \{[\s\S]{0,180}activeEditorDraftRef\.current = null[\s\S]{0,180}setActiveCellNow\(null\)[\s\S]{0,120}finishCellEdit\(\)[\s\S]{0,220}setDrafts\(\[\]\)[\s\S]{0,500}dataProvider\.data = getRowsForQuarter\(authoritativeRows, selectedQuarter\)/,
+  "Cancel must detach the live editor, clear drafts, and restamp authoritative rows after Grid BusyContext settlement");
 
 console.log("kpiActivityUiContract tests passed");

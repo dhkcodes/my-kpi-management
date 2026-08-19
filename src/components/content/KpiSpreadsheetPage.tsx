@@ -59,12 +59,9 @@ const activities = ["Solution Design", "Solution Proposal", "Solution Deployment
 const stopGridInteraction = (event: Event) => event.stopPropagation();
 const KPI_GRID_HEADER_OPTIONS = {
   column: {
-    style: (context: { componentElement: Element; index: number }) => {
+    style: (context: { index: number }) => {
       if (context.index === 0) return "width:56px";
-      const grid = context.componentElement as HTMLElement;
-      const columnCount = Number.parseInt(getComputedStyle(grid).getPropertyValue("--kpi-grid-data-columns"), 10) || 1;
-      const availableWidth = Math.max(grid.clientWidth - 56, columnCount * 64);
-      return `width:${availableWidth / columnCount}px`;
+      return "width:160px";
     }
   }
 };
@@ -85,6 +82,11 @@ type KpiGridElement = HTMLElement & {
   setProperty(property: "currentCell", value: KpiGridCurrentCell): void;
   setProperty(property: "editCell", value: KpiGridEditCell | null): void;
   getProperty(property: "currentCell"): ojDataGrid.CurrentCell<string> | null;
+  _ojBridge?: { _WIDGET_INSTANCE?: { grid?: KpiGridResizeApi } };
+};
+type KpiGridResizeApi = {
+  m_resizingElement: Element | null;
+  resizeColWidth(oldElementWidth: number, newElementWidth: number): void;
 };
 
 const waitForKpiGridRow = (grid: KpiGridElement, rowId: string, signal: AbortSignal): Promise<boolean> => {
@@ -268,13 +270,14 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   </section>;
 }
 
-function WorkloadCellEditor({ fiscalYear, row, autoActivate, activationToken, onChange, onReset, onMove }: Readonly<{
+function WorkloadCellEditor({ fiscalYear, row, autoActivate, activationToken, onChange, onReset, onCommit, onMove }: Readonly<{
   fiscalYear: FiscalYear;
   row: KpiSpreadsheetRow;
   autoActivate: boolean;
   activationToken: number;
   onChange: (option: KpiWorkloadOption) => void;
   onReset: () => void;
+  onCommit: () => void;
   onMove: (direction: -1 | 1) => void;
 }>) {
   const [activated, setActivated] = useState(autoActivate);
@@ -371,6 +374,7 @@ function WorkloadCellEditor({ fiscalYear, row, autoActivate, activationToken, on
     setActivated(false);
     setQuery(selectedLabel);
     onChange(option);
+    onCommit();
     window.cancelAnimationFrame(focusFrameRef.current);
     focusFrameRef.current = window.requestAnimationFrame(() => {
       focusFrameRef.current = 0;
@@ -385,6 +389,7 @@ function WorkloadCellEditor({ fiscalYear, row, autoActivate, activationToken, on
     setActivated(false);
     setQuery("");
     onReset();
+    onCommit();
     window.cancelAnimationFrame(focusFrameRef.current);
     focusFrameRef.current = window.requestAnimationFrame(() => {
       focusFrameRef.current = 0;
@@ -485,7 +490,7 @@ function FieldEditor({ field, row, fiscalYear, workloadAutoActivate, workloadAct
     if (event.key === "Tab") { event.preventDefault(); event.stopPropagation(); onMove(event.shiftKey ? -1 : 1); return; }
   };
   if (field.type === "workload") return <WorkloadCellEditor fiscalYear={fiscalYear} row={row} autoActivate={workloadAutoActivate} activationToken={workloadActivationToken}
-    onChange={onWorkloadChange} onReset={onWorkloadReset} onMove={onMove} />;
+    onChange={onWorkloadChange} onReset={onWorkloadReset} onCommit={onSelectionComplete} onMove={onMove} />;
   if (field.type === "date") return <oj-input-date class="kpi-cell-editor kpi-cell-editor--date" labelHint={field.label} labelEdge="none"
     value={value} onvalueChanged={(event: CustomEvent) => { onChange(field.key, `${event.detail.value ?? ""}`); onSelectionComplete(); }}
     onKeyDown={commitOnEnter}></oj-input-date>;
@@ -500,7 +505,7 @@ function FieldEditor({ field, row, fiscalYear, workloadAutoActivate, workloadAct
     onChange={(event) => { onChange(field.key, (event.currentTarget as HTMLSelectElement).value); onSelectionComplete(); }} onKeyDown={commitOnEnter}>
     {options.map((option) => <option value={option}>{field.type === "stage" ? stageLabels[option as WorkloadStage] : option}</option>)}
   </select>;
-  return <BufferedFieldEditor field={field} value={value} onChange={(next) => onChange(field.key, next)} onMove={onMove} />;
+  return <BufferedFieldEditor key={`${row.id}:${field.key}:${workloadActivationToken}`} field={field} value={value} onChange={(next) => onChange(field.key, next)} onMove={onMove} />;
 }
 
 export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigationGuardChange }: Readonly<{
@@ -547,15 +552,20 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const descriptionPopupRef = useRef<any>(null);
   const descriptionPopupOpenTimerRef = useRef(0);
   const settleNavigationRef = useRef<(action: () => void) => void>((action) => action());
+  const flushActiveEditorDraftRef = useRef<() => KpiSpreadsheetRow | null>(() => null);
   const sessionVersion = useRef(0);
   const sessionKeyRef = useRef(`${routeId}:${fiscalYear}`);
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
   const requestProtectedNavigation = useCallback<KpiNavigationGuard>((label, action) => {
+    const liveDraft = flushActiveEditorDraftRef.current();
+    const savedRow = liveDraft ? rows.find((row) => row.id === liveDraft.id) : null;
+    const liveFields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
+    const hasLiveChange = Boolean(liveDraft && (liveDraft.id.startsWith("draft-") || !savedRow || isKpiRowChanged(savedRow, liveDraft, liveFields)));
     const settledAction = () => settleNavigationRef.current(action);
-    if (drafts.length === 0) { settledAction(); return; }
+    if (drafts.length === 0 && !hasLiveChange) { settledAction(); return; }
     setPendingNavigation({ label, action: settledAction });
     window.setTimeout(() => navigationDialogRef.current?.open(), 0);
-  }, [drafts.length]);
+  }, [activeTab, drafts.length, rows]);
 
   useEffect(() => {
     onNavigationGuardChange(requestProtectedNavigation, drafts.length > 0);
@@ -611,6 +621,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
 
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? rows : rows.filter((row) => row.kpiCode === activeTab), [rows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
+  const fieldsRef = useRef(fields);
+  fieldsRef.current = fields;
   const effectiveRows = useMemo(() => {
     const draftById = new Map(drafts.map((draft) => [draft.id, draft]));
     return [...drafts.filter((draft) => draft.id.startsWith("draft-")), ...authoritativeRows.map((row) => draftById.get(row.id) ?? row)];
@@ -628,7 +640,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     className: (context: ojDataGrid.CellContext<string, KpiGridCellData>) => {
       const providerRow = (context.metadata as { rowItem?: { data?: KpiSpreadsheetRow } }).rowItem?.data;
       const row = providerRow ? (visibleRowsByIdRef.current.get(providerRow.id) ?? providerRow) : null;
-      return row?.manageTimeReflected ? "kpi-reflected-grid-cell" : null;
+      const field = fieldsRef.current[context.indexes.column - 1];
+      return [
+        context.indexes.column > 0 ? "kpi-data-grid-cell" : "kpi-selector-grid-cell",
+        row?.manageTimeReflected ? "kpi-reflected-grid-cell" : "",
+        field?.type === "textarea" ? "kpi-textarea-grid-cell" : ""
+      ].filter(Boolean).join(" ") || null;
     }
   }), []);
   const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiSpreadsheetRow>([], { keyAttributes: "id" }), [activeTab]);
@@ -638,8 +655,38 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     columnHeaders: { column: ["", ...fields.map((field) => field.label)] }
   }), [dataProvider, fields, gridColumns]);
   const gridRef = useRef<KpiGridElement | null>(null);
+  const gridHostRef = useRef<HTMLDivElement | null>(null);
+  const gridResizeGenerationRef = useRef(0);
   const navigationGenerationRef = useRef(0);
   const navigationSettlingRef = useRef(false);
+  useEffect(() => {
+    const host = gridHostRef.current;
+    const grid = gridRef.current;
+    if (!host || !grid || fields.length === 0) return;
+    const applyAvailableWidth = async (width: number) => {
+      const resizeGeneration = ++gridResizeGenerationRef.current;
+      const columnWidth = Math.max(64, (Math.max(0, width) - 56) / fields.length);
+      await Context.getContext(grid).getBusyContext().whenReady();
+      if (gridResizeGenerationRef.current !== resizeGeneration || !grid.isConnected) return;
+      const resizeApi = grid._ojBridge?._WIDGET_INSTANCE?.grid;
+      if (!resizeApi) return;
+      const headers = Array.from(grid.querySelectorAll<HTMLElement>(".oj-datagrid-column-header-cell"));
+      headers.slice(1).forEach((header) => {
+        const oldWidth = header.getBoundingClientRect().width;
+        if (Math.abs(oldWidth - columnWidth) < 0.5) return;
+        resizeApi.m_resizingElement = header;
+        resizeApi.resizeColWidth(oldWidth, columnWidth);
+      });
+      resizeApi.m_resizingElement = null;
+    };
+    void applyAvailableWidth(host.getBoundingClientRect().width);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find((item) => item.target === host);
+      if (entry) void applyAvailableWidth(entry.contentRect.width);
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [activeTab, fields.length, visibleRows.length]);
   useEffect(() => {
     if (activeCell) return;
     dataProvider.data = visibleRows;
@@ -796,7 +843,21 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     commitDraftRow(updated);
   };
   const cancelDrafts = () => {
-    setDrafts([]); finishCellEdit(); setSelectedIds(new Set()); setApiMessage("Unsaved KPI changes cancelled");
+    activeEditorDraftRef.current = null;
+    editSnapshotRef.current = null;
+    setActiveCellNow(null);
+    finishCellEdit();
+    const cancellationGeneration = editGenerationRef.current;
+    const cancellationGrid = gridRef.current;
+    setDrafts([]);
+    setSelectedIds(new Set());
+    setApiMessage("Unsaved KPI changes cancelled");
+    if (cancellationGrid) void (async () => {
+      await Context.getContext(cancellationGrid).getBusyContext().whenReady();
+      if (gridRef.current !== cancellationGrid || !cancellationGrid.isConnected
+        || editGenerationRef.current !== cancellationGeneration || activeCellRef.current) return;
+      dataProvider.data = getRowsForQuarter(authoritativeRows, selectedQuarter).map((row) => ({ ...row }));
+    })();
   };
   const moveCell = (rowId: string, field: KpiFieldKey, direction: -1 | 1) => {
     const editableCells = visibleRows.flatMap((row, rowIndex) => fields.map((item, fieldIndex) => ({
@@ -855,27 +916,29 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const grid = gridRef.current;
     if (grid?.editCell) grid.setProperty("editCell", null);
   };
-  const flushActiveEditorDraft = () => {
+  const flushActiveEditorDraft = (): KpiSpreadsheetRow | null => {
     const active = activeCellRef.current;
     const latest = activeEditorDraftRef.current;
-    if (!active || !latest || latest.id !== active.rowId) return;
+    if (!active || !latest || latest.id !== active.rowId) return null;
     const field = fields.find((item) => item.key === active.field);
     if (!field || field.type === "workload") {
       commitDraftRow(latest);
-      return;
+      return latest;
     }
     const wrapper = Array.from(gridRef.current?.querySelectorAll<HTMLElement>("[data-kpi-editor-row][data-kpi-editor-field]") ?? [])
       .find((element) => element.dataset.kpiEditorRow === active.rowId && element.dataset.kpiEditorField === active.field);
     const control = wrapper?.querySelector("input, textarea, select, oj-input-date") as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | (HTMLElement & { value?: string })) | null;
     if (!control || typeof control.value !== "string") {
       commitDraftRow(latest);
-      return;
+      return latest;
     }
     const value = field.type === "manageTime" ? String(control.value === "Reflected") : control.value;
     const updated = applyDraftValue(latest, field.key, value);
     activeEditorDraftRef.current = updated;
     commitDraftRow(updated);
+    return updated;
   };
+  flushActiveEditorDraftRef.current = flushActiveEditorDraft;
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
     if (saving || saveDisabled) return false;
@@ -945,7 +1008,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         }} />
     </div>;
     const headerData = context.item.data as unknown as { data?: unknown };
-    return <span>{String(headerData.data ?? "")}</span>;
+    return <span class="kpi-grid-header-title">{String(headerData.data ?? "")}</span>;
   }, []);
   const renderKpiCell = useCallback((context: ojDataGrid.CellTemplateContext<KpiGridCellData>) => {
     const state = cellRenderStateRef.current;
@@ -1001,9 +1064,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
           const busyContext = Context.getContext(grid).getBusyContext();
           const editCell = grid.editCell;
           if (editCell?.indexes && (editCell.indexes.row !== indexes.row || editCell.indexes.column !== indexes.column)) {
+            flushActiveEditorDraft();
+            editEndingRef.current = true;
+            closeWorkloadPopup();
             grid.setProperty("editCell", null);
             await busyContext.whenReady();
             if (!isCurrentEditRequest()) return;
+            editSnapshotRef.current = null;
+            activeEditorDraftRef.current = null;
+            setActiveCellNow(null);
           }
           if (!isCurrentEditRequest()) return;
           grid.setProperty("currentCell", { type: "cell", indexes });
@@ -1019,7 +1088,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
         <FieldEditor field={field} row={row} fiscalYear={fiscalYear}
           workloadAutoActivate={field.type === "workload" && editing && !editEndingRef.current}
-          workloadActivationToken={field.type === "workload" && editing ? editGenerationRef.current : -1}
+          workloadActivationToken={editing ? editGenerationRef.current : -1}
           onChange={(key, value) => updateDraft(row, key, value)}
           onWorkloadChange={(option) => selectWorkload(row, option)}
           onWorkloadReset={() => resetWorkload(row)}
@@ -1117,7 +1186,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         ? (activeTab === "H" ? "Reflected H requires Delivery Date." : "Reflected requires both SR Number and Delivery Date.")
         : "Complete required fields before saving."}</p>}
       <Summary rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
-      <div class="kpi-jet-table-wrap" style={`--kpi-grid-data-columns:${Math.max(fields.length, 1)}`}>
+      <div ref={gridHostRef} class="kpi-jet-table-wrap" style={`--kpi-grid-data-columns:${Math.max(fields.length, 1)}`}>
         <oj-data-grid ref={gridRef} class="kpi-jet-editable-grid" aria-label={`${activeTab} editable KPI activities`}
           data={dataGridProvider}
           editMode="cellEdit"

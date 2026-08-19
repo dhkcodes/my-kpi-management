@@ -1952,10 +1952,12 @@ h4.weekly-activity-section-label--next-week,
 .kpi-grid-cell.kpi-manage-time-reflected-row.is-unsaved-cell { background: #eaf4ec; box-shadow: inset 0 -3px 0 #d39b2a; }
 .kpi-grid-cell.is-selected { background: #f0f6f5; }
 .kpi-grid-cell > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kpi-grid-cell > [data-kpi-editor-row] { box-sizing: border-box; width: 100%; }
-.kpi-cell-editor { font: inherit; min-height: 2.3rem; width: 100%; }
-.kpi-cell-editor--textarea { min-height: 5.5rem; resize: vertical; }
-.kpi-cell-description { cursor: help; display: block; max-width: 24rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-grid-cell > [data-kpi-editor-row] { box-sizing: border-box; min-width: 0; width: 100%; }
+.kpi-cell-editor { box-sizing: border-box; font: inherit; min-height: 2.3rem; width: 100%; }
+.kpi-cell-editor--textarea { box-sizing: border-box; line-height: 1.45; min-height: 8rem; min-width: min(22rem, 100%); overflow: auto; padding: .75rem; resize: vertical; white-space: pre-wrap; }
+.kpi-textarea-grid-cell:has(.kpi-cell-editor--textarea) { height: 9.5rem; min-height: 9.5rem; }
+.kpi-cell-description { cursor: help; display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-grid-header-title { color: #8b3a2f; font-weight: 800; letter-spacing: .01em; }
 .kpi-description-popup { max-width: min(34rem, 80vw); padding: .65rem; white-space: pre-wrap; }
 .kpi-draft-validation { background: #fff8e7; border-left: .25rem solid #8a5b00; color: #5f3f00; margin: 0 0 .8rem; padding: .65rem; }
 .kpi-dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
