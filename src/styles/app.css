@@ -1940,15 +1940,18 @@ h4.weekly-activity-section-label--next-week,
   .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { justify-content: space-between; width: 100%; }
 }
 
-/* KPI-only editable Data Table interactions. Accounts & Workloads remains untouched. */
+/* KPI-only editable Data Grid interactions. Accounts & Workloads remains untouched. */
 .kpi-jet-table-wrap { border: 1px solid var(--kpi-border); min-height: 8rem; overflow-x: auto; }
-.kpi-jet-editable-table { min-width: 62rem; width: 100%; }
-.kpi-jet-editable-table td { min-width: 8rem; position: relative; }
-.kpi-jet-editable-table td.is-editing-cell { background: #fff; box-shadow: inset 0 0 0 2px #2f6f9f; padding: .25rem; }
-.kpi-jet-editable-table tr.is-unsaved-row td { border-bottom-color: #d39b2a; }
-.kpi-jet-editable-table td.is-unsaved-cell { background: #fff4ce; }
-.kpi-jet-editable-table tr.kpi-manage-time-reflected-row td { background: #eaf4ec; }
-.kpi-jet-editable-table tr.kpi-manage-time-reflected-row td.is-unsaved-cell { background: #f4edc7; }
+.kpi-jet-editable-grid { height: clamp(14rem, 48vh, 34rem); min-width: 62rem; width: 100%; }
+.kpi-grid-cell { align-items: center; box-sizing: border-box; display: flex; min-height: 3rem; padding: .5rem; width: 100%; }
+.kpi-grid-cell.is-editing-cell { background: #fff; box-shadow: inset 0 0 0 2px #2f6f9f; padding: .25rem; }
+.kpi-grid-cell.is-unsaved-row { box-shadow: inset 0 -2px 0 #d39b2a; }
+.kpi-grid-cell.is-unsaved-cell { background: #fff4ce; }
+.kpi-grid-cell.kpi-manage-time-reflected-row { background: #eaf4ec; }
+.kpi-grid-cell.kpi-manage-time-reflected-row.is-unsaved-cell { background: #f4edc7; }
+.kpi-grid-cell.is-selected { background: #f0f6f5; }
+.kpi-grid-cell > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-grid-cell > [data-kpi-editor-row] { box-sizing: border-box; width: 100%; }
 .kpi-cell-editor { font: inherit; min-height: 2.3rem; width: 100%; }
 .kpi-cell-editor--textarea { min-height: 5.5rem; resize: vertical; }
 .kpi-cell-description { cursor: help; display: block; max-width: 24rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
