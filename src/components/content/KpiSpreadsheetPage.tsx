@@ -1,6 +1,7 @@
 import { Fragment, h } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
+import Context = require("ojs/ojcontext");
 import { RowDataGridProvider } from "ojs/ojrowdatagridprovider";
 
 import { ImmutableKeySet, KeySetImpl } from "ojs/ojkeyset";
@@ -67,6 +68,34 @@ const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
 })[status];
 
 type ActiveCell = Readonly<{ rowId: string; field: KpiFieldKey }>;
+type KpiGridCurrentCell = { type: "cell"; indexes: { row: number; column: number } };
+type KpiGridEditCell = { indexes: { row: number; column: number } };
+type KpiGridElement = HTMLElement & {
+  setProperty(property: "currentCell", value: KpiGridCurrentCell): void;
+  setProperty(property: "editCell", value: KpiGridEditCell): void;
+  getProperty(property: "currentCell"): ojDataGrid.CurrentCell<string> | null;
+};
+
+const waitForKpiGridRow = (grid: KpiGridElement, rowId: string, signal: AbortSignal): Promise<boolean> => {
+  const hasRow = () => Array.from(grid.querySelectorAll("[data-kpi-grid-row]"))
+    .some((element) => element.getAttribute("data-kpi-grid-row") === rowId);
+  if (hasRow()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (!hasRow()) return;
+      observer.disconnect();
+      signal.removeEventListener("abort", abort);
+      resolve(true);
+    });
+    const abort = () => {
+      observer.disconnect();
+      resolve(false);
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    observer.observe(grid, { childList: true, subtree: true });
+  });
+};
+
 type CellRenderState = Readonly<{
   activeCell: ActiveCell | null;
   authoritativeRows: readonly KpiSpreadsheetRow[];
@@ -493,7 +522,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     columns: { databody: gridColumns },
     columnHeaders: { column: ["Select", ...fields.map((field) => field.label)] }
   }), [dataProvider, fields, gridColumns]);
-  const gridRef = useRef<(HTMLElement & { editCell: { indexes: { row: number; column: number } } }) | null>(null);
+  const gridRef = useRef<KpiGridElement | null>(null);
   useEffect(() => {
     if (activeCell) return;
     dataProvider.data = visibleRows;
@@ -504,20 +533,41 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const row = visibleRows.findIndex((item) => item.id === pending.rowId);
     const column = fields.findIndex((field) => field.key === pending.field) + 1;
     if (row < 0 || column < 1 || !gridMounted) return;
-    pendingProgrammaticEditRef.current = null;
-    requestAnimationFrame(() => {
-      if (gridRef.current) gridRef.current.editCell = { indexes: { row, column } };
-    });
+    const grid = gridRef.current;
+    if (!grid) return;
+    const controller = new AbortController();
+    void (async () => {
+      if (!await waitForKpiGridRow(grid, pending.rowId, controller.signal)) return;
+      await Context.getContext(grid).getBusyContext().whenReady();
+      if (controller.signal.aborted || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
+      if (activeCellRef.current) {
+        pendingProgrammaticEditRef.current = null;
+        return;
+      }
+      grid.setProperty("currentCell", { type: "cell", indexes: { row, column } });
+      await Context.getContext(grid).getBusyContext().whenReady();
+      const currentCell = grid.getProperty("currentCell");
+      if (controller.signal.aborted || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
+      if (activeCellRef.current || currentCell?.type !== "cell"
+        || currentCell.indexes?.row !== row || currentCell.indexes?.column !== column) {
+        pendingProgrammaticEditRef.current = null;
+        return;
+      }
+      pendingProgrammaticEditRef.current = null;
+      grid.setProperty("editCell", { indexes: { row, column } });
+    })();
+    return () => controller.abort();
   }, [fields, gridMounted, gridVersion, visibleRows]);
-  const finishCellEdit = () => {
+  const finishCellEdit = useCallback(() => {
     const popup = document.querySelector("oj-popup.kpi-workload-results-popup") as ojPopup | null;
     if (popup?.classList.contains("oj-complete") && popup.isOpen()) popup.close();
+    pendingProgrammaticEditRef.current = null;
     editSnapshotRef.current = null;
     setActiveCellNow(null);
     setGridMounted(false);
     setGridVersion((current) => current + 1);
     window.requestAnimationFrame(() => setGridMounted(true));
-  };
+  }, [setActiveCellNow]);
   const navigateFromGrid = (nextRouteId: string) => {
     if (drafts.length > 0) {
       onNavigate(nextRouteId);
@@ -593,7 +643,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     if (currentIndex < 0 || editableCells.length === 0) return;
     const next = editableCells[(currentIndex + direction + editableCells.length) % editableCells.length];
     window.requestAnimationFrame(() => {
-      if (gridRef.current) gridRef.current.editCell = { indexes: { row: next.row, column: next.column } };
+      gridRef.current?.setProperty("editCell", { indexes: { row: next.row, column: next.column } });
     });
   };
   const selectQuarter = (quarter: Quarter | null) => {
@@ -624,7 +674,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     descriptionPopupRef.current?.close();
   };
   const addDraft = () => {
-    finishCellEdit();
+    if (activeCellRef.current) return;
     const draft = createEmptyKpiRow(activeTab as SpreadsheetKpiCode, fiscalYear);
     const nextCell = { rowId: draft.id, field: "manageTimeReflected" as KpiFieldKey };
     pendingProgrammaticEditRef.current = nextCell;
@@ -713,7 +763,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const editing = context.mode === "edit";
     const changed = !saved || isKpiFieldChanged(saved, row, field.key);
     const cellClasses = [rowClasses, editing ? "is-editing-cell" : "", changed ? "is-unsaved-cell" : ""].filter(Boolean).join(" ");
-    return <div class={cellClasses} data-kpi-grid-row={row.id} data-kpi-grid-field={field.key}>
+    return <div class={cellClasses} data-kpi-grid-row={row.id} data-kpi-grid-field={field.key}
+      onMouseDown={() => {
+        gridRef.current?.setProperty("currentCell", { type: "cell", indexes: { row: context.item.rowIndex, column: context.item.columnIndex } });
+      }}>
       {editing ? <div data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
         onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}
         onFocusIn={stopGridInteraction}>
@@ -740,6 +793,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       event.preventDefault();
       return;
     }
+    gridRef.current?.setProperty("currentCell", { type: "cell", indexes: { row, column } });
     beginCellEdit(gridRow, field);
     window.requestAnimationFrame(() => {
       event.detail.focusCallback({});
@@ -757,11 +811,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       setDrafts((current) => reconcileDraft(current, snapshot));
     }
     editSnapshotRef.current = null;
+    if (event.detail.cancelEdit) {
+      window.setTimeout(finishCellEdit, 0);
+      return;
+    }
     const generation = editGenerationRef.current;
     window.setTimeout(() => {
       if (editGenerationRef.current === generation) setActiveCellNow(null);
     }, 0);
-  }, [fields, rows, setActiveCellNow]);
+  }, [fields, finishCellEdit, rows, setActiveCellNow]);
   const handleBeforeCurrentCell = useCallback((event: ojDataGrid.ojBeforeCurrentCell<string>) => {
     const nextCell = event.detail.currentCell;
     if (nextCell && (nextCell.type === "header" || nextCell.type === "label")) event.preventDefault();
@@ -783,7 +841,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       </section>
     </> : <>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
-        <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0} onClick={addDraft}>Add KPI Activity</button></div>
+        <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || activeCell !== null} onClick={addDraft}>Add KPI Activity</button></div>
         <div class="kpi-activity-toolbar__right">
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={cancelDrafts}>Cancel</button>}

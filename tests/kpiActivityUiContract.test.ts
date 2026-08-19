@@ -67,10 +67,38 @@ assert.doesNotMatch(page, /gridRef\.current\?*\.refresh\(\)/,
   "cell edit entry must never refresh the Data Grid or any row");
 assert.match(page, /event\.key === "Tab"[\s\S]{0,180}event\.preventDefault\(\)[\s\S]{0,180}onMove\(event\.shiftKey \? -1 : 1\)/,
   "Tab and Shift+Tab must invoke directional Data Grid cell navigation without activating a header cell");
-assert.match(page, /const moveCell[\s\S]{0,900}gridRef\.current\.editCell = \{ indexes: \{ row: next\.row, column: next\.column \} \}/,
+assert.match(page, /const moveCell[\s\S]{0,900}setProperty\("editCell", \{ indexes: \{ row: next\.row, column: next\.column \} \}\)/,
   "Tab navigation must move to the adjacent editable cell through native editCell without remounting the Grid");
 assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,180}reconcileDraft\(current, snapshot\)/,
   "Escape cancellation must restore the cell-entry snapshot and reconcile dirty state");
+assert.match(page, /setProperty\("currentCell", \{ type: "cell", indexes: \{ row: context\.item\.rowIndex, column: context\.item\.columnIndex \} \}\)/,
+  "pointer edit entry must establish the native current cell before Oracle JET handles Escape");
+assert.match(page, /setProperty\("currentCell", \{ type: "cell", indexes: \{ row, column \} \}\)[\s\S]{0,1800}setProperty\("editCell", \{ indexes: \{ row, column \} \}\)/,
+  "programmatic first-cell entry must keep currentCell and editCell aligned");
+assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing\}/,
+  "workload entry must retain popup activation after the native setProperty transition");
+assert.doesNotMatch(page, /suppressWorkloadAutoActivateRef/,
+  "workload popup activation must not depend on a global suppression flag that can survive a vetoed transition");
+assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,320}window\.setTimeout\(finishCellEdit, 0\)/,
+  "native Escape completion must cleanly remount after Oracle JET finishes its cancel stack");
+const addDraftBlock = page.match(/const addDraft = \(\) => \{([\s\S]*?)\n  \};/)?.[1] ?? "";
+assert.doesNotMatch(addDraftBlock, /finishCellEdit\(/,
+  "new draft insertion must not remount the Grid while JET property updates are batched");
+assert.match(addDraftBlock, /if \(activeCellRef\.current\) return/,
+  "new draft insertion must not overlap an existing native edit session");
+const pendingEditEffect = page.match(/useEffect\(\(\) => \{\n    const pending = pendingProgrammaticEditRef\.current;([\s\S]*?)\n  \}, \[fields, gridMounted, gridVersion, visibleRows\]\);/)?.[1] ?? "";
+assert.match(pendingEditEffect, /waitForKpiGridRow[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*setProperty\("currentCell"[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*setProperty\("editCell"/,
+  "programmatic first edit must wait for row reflection and JET readiness before each property transition");
+assert.match(pendingEditEffect, /currentCell\?\.type !== "cell"[\s\S]*currentCell\.indexes\?\.row[\s\S]*pendingProgrammaticEditRef\.current = null/,
+  "nullable or divergent JET currentCell state must retire the pending edit without throwing or replaying later");
+assert.match(page, /const finishCellEdit[\s\S]{0,320}pendingProgrammaticEditRef\.current = null/,
+  "edit-session cleanup must invalidate any pending programmatic first edit");
+assert.doesNotMatch(page, /(?:currentCell|editCell)\s*=\s*(?:null|undefined)/,
+  "Data Grid currentCell and editCell setters must never receive null or undefined");
+assert.doesNotMatch(page, /grid(?:Ref\.current)?\.(?:currentCell|editCell)\s*=/,
+  "imperative Data Grid transitions must use setProperty instead of Preact's queued property setter");
+assert.match(page, /disabled=\{saving \|\| drafts\.length > 0 \|\| activeCell !== null\}/,
+  "Add must be unavailable while a native cell edit is active");
 assert.match(page, /key=\{`\$\{activeTab\}-\$\{gridVersion\}`\}/,
   "Save, Cancel, and filter completion must remount a clean navigation-mode grid after an edit session");
 assert.match(page, /const navigateFromGrid[\s\S]{0,320}finishCellEdit\(\)[\s\S]{0,160}onNavigate\(nextRouteId\)/,
