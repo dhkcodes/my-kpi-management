@@ -8,6 +8,7 @@ const contract = fs.readFileSync(path.resolve("src/data/kpiSpreadsheet.ts"), "ut
 const main = fs.readFileSync(path.resolve("src/main.js"), "utf8");
 const content = fs.readFileSync(path.resolve("src/components/content/index.tsx"), "utf8");
 const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
+const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
 
 assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "KPI's expanded JET dependency graph must tolerate Tailnet load latency");
 assert.match(page, /import "ojs\/ojdatagrid"/, "KPI activities must use Oracle JET Data Grid");
@@ -16,12 +17,18 @@ assert.match(page, /import \{ RowDataGridProvider \} from "ojs\/ojrowdatagridpro
 assert.match(page, /import "ojs\/ojdatetimepicker"/, "date cells must load Oracle JET Date Picker");
 assert.match(page, /<oj-data-grid/, "detail tables must render an oj-data-grid");
 assert.match(page, /editMode="cellEdit"/, "KPI activities must use the official cellEdit lifecycle");
+assert.match(page, /onDblClick=\{\(event\) => \{[\s\S]*setProperty\("editCell", null\)[\s\S]*await busyContext\.whenReady\(\)[\s\S]*setProperty\("currentCell"[\s\S]*await busyContext\.whenReady\(\)[\s\S]*getProperty\("currentCell"\)[\s\S]*setProperty\("editCell"/,
+  "double-click must publicly end the previous editor, then settle currentCell through BusyContext before opening exactly the requested editor");
 assert.match(page, /slot="cellTemplate"[\s\S]*render=\{renderKpiCell\}/,
   "cell content must be stamped through the official Data Grid cellTemplate");
 assert.match(page, /onojBeforeEdit=\{handleBeforeEdit\}/,
   "Data Grid must expose the official before-edit event flow");
 assert.match(page, /onojBeforeEditEnd=\{handleBeforeEditEnd\}/,
   "Data Grid must expose the official before-edit-end event flow");
+assert.match(page, /const handleBeforeEditEnd[\s\S]*closeWorkloadPopup\(\)[\s\S]*event\.detail\.cancelEdit/,
+  "leaving an editor must close its workload popup without vetoing the native edit transition");
+assert.doesNotMatch(page, /popup\.isOpen\(\)[\s\S]{0,120}event\.preventDefault\(\)/,
+  "an open search popup must not trap the Data Grid in the previous editable cell");
 assert.doesNotMatch(page, />Edit</, "Edit button must be removed");
 assert.doesNotMatch(page, /data-kpi-grid-field=\{field\.key\}[\s\S]{0,120}onDblClick=\{\(\) => beginCellEdit/,
   "navigation cells must let oj-data-grid own double-click entry without a competing Preact state update");
@@ -29,10 +36,12 @@ assert.match(page, /requestAnimationFrame/, "cell editor focus must wait for JET
 assert.match(page, /\.focus\(\)/, "the opened cell editor must receive input focus");
 assert.match(page, /event\.key === "Enter"/, "Enter must commit the active editor to the draft");
 assert.match(page, /const stopGridInteraction = \(event: Event\) => event\.stopPropagation\(\)/, "KPI editors must isolate input events from oj-data-grid navigation");
-assert.match(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?onChange\(\(event\.currentTarget as HTML(?:TextArea|Input)Element\)\.value\)/,
-  "buffered editor Enter must commit the live control value before the event reaches oj-data-grid");
-assert.match(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?onCommit\(\)/,
-  "select and date editor Enter must complete before the event reaches oj-data-grid");
+assert.match(page, /onInput=\{\(event\) => \{ const next = \(event\.currentTarget as HTML(?:TextArea|Input)Element\)\.value; setEditorValue\(next\); onChange\(next\); \}\}/,
+  "buffered editors must continuously place the live control value in the draft before Enter reaches oj-data-grid");
+assert.doesNotMatch(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]{0,260}event\.key (?:===|!==) "Enter"/,
+  "the buffered editor key handler must not rerender the Data Grid during native Enter edit completion");
+assert.doesNotMatch(page, /event\.key !== "Enter"[\s\S]{0,220}event\.stopPropagation\(\)/,
+  "Enter must bubble to oj-data-grid so the native cellEdit lifecycle exits the current editor");
 assert.doesNotMatch(page, /data-kpi-editor-row[\s\S]{0,300}onKeyDown=\{stopGridInteraction\}/,
   "an editor wrapper must not swallow Enter before the active control commits it");
 assert.match(page, /onDblClick=\{stopGridInteraction\}/, "double-clicking an active editor must keep focus in that editor");
@@ -51,8 +60,12 @@ assert.match(page, /import "ojs\/ojdialog"/, "navigation and delete confirmation
 assert.match(page, /import "ojs\/ojbutton"/, "KPI dialog actions must use Oracle JET buttons");
 assert.match(page, /<oj-popup/, "truncated SR Description must expose its full value in an Oracle JET Popup");
 assert.match(page, /kpi-workload-results-popup/, "workload search results must render in a popup layer outside oj-data-grid clipping");
-assert.match(page, /classList\.contains\("oj-complete"\)[\s\S]*openPopup/,
-  "auto-open must wait until the Oracle JET popup is upgraded");
+assert.match(page, /getBusyContext\(\)\.whenReady\(\)[\s\S]*openPopup/,
+  "auto-open must wait for the Oracle JET popup BusyContext rather than an arbitrary timeout");
+assert.match(page, /of:\s*`#\$\{launcherId\}`/,
+  "every workload popup position must explicitly anchor to its live search input");
+assert.doesNotMatch(page, /setTimeout\(openPopup/,
+  "workload popup positioning must not be hidden behind arbitrary retry timeouts");
 assert.match(page, /autoActivate[\s\S]*useState\(autoActivate\)/, "double-clicked workload editors must activate their result popup immediately");
 assert.match(page, /onClick=\{\(\) => \{ activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
 assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/,
@@ -79,28 +92,30 @@ assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing
   "workload entry must retain popup activation after the native setProperty transition");
 assert.doesNotMatch(page, /suppressWorkloadAutoActivateRef/,
   "workload popup activation must not depend on a global suppression flag that can survive a vetoed transition");
-assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,320}window\.setTimeout\(finishCellEdit, 0\)/,
-  "native Escape completion must cleanly remount after Oracle JET finishes its cancel stack");
+assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,320}window\.requestAnimationFrame\(finishCellEdit\)/,
+  "native Escape completion must cleanly settle after Oracle JET finishes its cancel stack");
 const addDraftBlock = page.match(/const addDraft = \(\) => \{([\s\S]*?)\n  \};/)?.[1] ?? "";
 assert.doesNotMatch(addDraftBlock, /finishCellEdit\(/,
   "new draft insertion must not remount the Grid while JET property updates are batched");
 assert.match(addDraftBlock, /if \(activeCellRef\.current\) return/,
   "new draft insertion must not overlap an existing native edit session");
-const pendingEditEffect = page.match(/useEffect\(\(\) => \{\n    const pending = pendingProgrammaticEditRef\.current;([\s\S]*?)\n  \}, \[fields, gridMounted, gridVersion, visibleRows\]\);/)?.[1] ?? "";
+const pendingEditEffect = page.match(/useEffect\(\(\) => \{\n    const pending = pendingProgrammaticEditRef\.current;([\s\S]*?)\n  \}, \[fields, visibleRows\]\);/)?.[1] ?? "";
 assert.match(pendingEditEffect, /waitForKpiGridRow[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*setProperty\("currentCell"[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*setProperty\("editCell"/,
   "programmatic first edit must wait for row reflection and JET readiness before each property transition");
 assert.match(pendingEditEffect, /currentCell\?\.type !== "cell"[\s\S]*currentCell\.indexes\?\.row[\s\S]*pendingProgrammaticEditRef\.current = null/,
   "nullable or divergent JET currentCell state must retire the pending edit without throwing or replaying later");
 assert.match(page, /const finishCellEdit[\s\S]{0,320}pendingProgrammaticEditRef\.current = null/,
   "edit-session cleanup must invalidate any pending programmatic first edit");
-assert.doesNotMatch(page, /(?:currentCell|editCell)\s*=\s*(?:null|undefined)/,
-  "Data Grid currentCell and editCell setters must never receive null or undefined");
+assert.doesNotMatch(page, /grid(?:Ref\.current)?\.(?:currentCell|editCell)\s*=\s*(?:null|undefined)/,
+  "Data Grid lifecycle properties must never be assigned null or undefined directly");
+assert.match(page, /setProperty\("editCell", null\)[\s\S]*busyContext\.whenReady\(\)[\s\S]*setProperty\("currentCell"/,
+  "cross-cell transitions must use the official editCell null state and wait for JET completion before opening the next Cell");
 assert.doesNotMatch(page, /grid(?:Ref\.current)?\.(?:currentCell|editCell)\s*=/,
   "imperative Data Grid transitions must use setProperty instead of Preact's queued property setter");
 assert.match(page, /disabled=\{saving \|\| drafts\.length > 0 \|\| activeCell !== null\}/,
   "Add must be unavailable while a native cell edit is active");
-assert.match(page, /key=\{`\$\{activeTab\}-\$\{gridVersion\}`\}/,
-  "Save, Cancel, and filter completion must remount a clean navigation-mode grid after an edit session");
+assert.doesNotMatch(page, /setGridMounted\(false\)|setGridVersion/,
+  "edit completion must preserve the mounted Data Grid identity");
 assert.match(page, /const navigateFromGrid[\s\S]{0,320}finishCellEdit\(\)[\s\S]{0,160}onNavigate\(nextRouteId\)/,
   "clean tab navigation must finish the active cell before replacing the Data Grid");
 assert.doesNotMatch(page, /rowRenderer=/,
@@ -113,11 +128,10 @@ assert.doesNotMatch(workloadSelectionHandlers, /onCommit\(\)/,
   "choosing or resetting a workload must keep the editor active instead of handing focus back to the oj-data-grid header");
 assert.match(workloadSelectionHandlers, /activatedRef\.current = false/,
   "choosing or resetting a workload must cancel pending popup-open retries before closing the list");
-assert.match(page, /event\.key === "Enter"[\s\S]*onCommit\(\)/, "Enter without choosing a workload must preserve the current value");
-assert.match(page, /const focusKpiEditor[\s\S]*requestAnimationFrame\(\(\) => focusKpiEditor\(\{ rowId: row\.id, field: field\.key \}\)\)/,
-  "Enter commits must restore the same editor focus instead of returning focus to an oj-data-grid header");
-assert.doesNotMatch(page, /onCommit=\{\(\) => \{ if \(!row\.id\.startsWith\("draft-"\)\) setActiveCell\(null\); \}\}/,
-  "Enter must not unmount an existing-row editor and expose the Select header focus fallback");
+assert.match(page, /if \(event\.key === "Enter"\) \{ activatedRef\.current = false; setActivated\(false\); closePopup\(\); \}/,
+  "Enter without choosing a workload must close the popup without replacing the current value");
+assert.doesNotMatch(page, /if \(event\.key === "Enter"\) \{[^}]*?(?:preventDefault\(\)|stopPropagation\(\)|onCommit\(\))/,
+  "Enter must propagate to the native oj-data-grid cellEdit lifecycle after the draft value is buffered");
 assert.doesNotMatch(page, /event\.key === "Enter" && options\[0\]/, "Enter must never auto-select the first workload result");
 assert.match(page, />선택 안함</, "workload results must offer restoration of the original value");
 assert.match(page, /collision:\s*"flipfit"/, "workload popup must fit or flip at the viewport edge");
@@ -185,8 +199,22 @@ assert.match(page, /<oj-button[\s\S]*Save and Continue/, "navigation actions mus
 assert.match(page, /<oj-button[\s\S]*Delete/, "delete confirmation actions must use JET Button components");
 assert.match(page, /selectionMode=\{KPI_GRID_SELECTION_MODE\}/, "ordinary row and cell clicks must not control selection");
 assert.match(page, /<Selector/, "only an explicit Oracle JET selector checkbox may change selected rows");
+assert.match(page, /type="checkbox" aria-label="Select all KPI activities"/,
+  "the Select header must render a select-all checkbox");
+assert.match(page, /slot="columnHeaderTemplate"[\s\S]*render=\{renderKpiColumnHeader\}/,
+  "the first Data Grid header must be replaced by a select-all template");
+assert.doesNotMatch(page, /columnHeaders:\s*\{\s*column:\s*\["Select"/,
+  "the Select header text must be removed");
 assert.match(page, /function KpiRowSelector[\s\S]*useState<ImmutableKeySet<string>>\(new KeySetImpl[\s\S]*setSelectorKeys\(keySet\)[\s\S]*onSelectionChange\(nextSelected\)/,
   "each selector must own its visible KeySet so a checkbox updates without refreshing the whole table");
+assert.match(page, /className:[\s\S]*kpi-reflected-grid-cell/,
+  "Reflected state must be applied through the public Data Grid cell className contract to every cell in the row");
+assert.match(styles, /\.kpi-reflected-grid-cell\s*\{[^}]*background:\s*#eaf4ec/,
+  "the full reflected row, including the selector/title cell, must use one contiguous background");
+assert.match(styles, /\.kpi-jet-editable-grid\s*\{[^}]*min-width:\s*0[^}]*width:\s*100%/,
+  "every KPI Data Grid must contract and expand with its window container");
+assert.match(page, /availableWidth = Math\.max\(grid\.clientWidth - 56, columnCount \* 64\)[\s\S]*availableWidth \/ columnCount/,
+  "data columns must derive responsive widths from the live Grid width");
 assert.match(page, /const toolbarActions = getKpiToolbarActions\(drafts\.length, selectedRows\.length\)/,
   "Save and Cancel visibility must depend on real drafts, never on simple editor activation");
 
