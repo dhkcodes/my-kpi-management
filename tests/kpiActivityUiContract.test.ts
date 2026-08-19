@@ -19,7 +19,12 @@ assert.match(page, /requestAnimationFrame/, "cell editor focus must wait for JET
 assert.match(page, /\.focus\(\)/, "the opened cell editor must receive input focus");
 assert.match(page, /event\.key === "Enter"/, "Enter must commit the active editor to the draft");
 assert.match(page, /const stopTableInteraction = \(event: Event\) => event\.stopPropagation\(\)/, "KPI editors must isolate input events from oj-table navigation");
-assert.match(page, /onKeyDown=\{stopTableInteraction\}/, "editor Enter must not bubble to the Select column");
+assert.match(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?onChange\(\(event\.currentTarget as HTML(?:TextArea|Input)Element\)\.value\)/,
+  "buffered editor Enter must commit the live control value before the event reaches oj-table");
+assert.match(page, /const commitOnEnter = \(event: KeyboardEvent\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?onCommit\(\)/,
+  "select and date editor Enter must complete before the event reaches oj-table");
+assert.doesNotMatch(page, /data-kpi-editor-row[\s\S]{0,300}onKeyDown=\{stopTableInteraction\}/,
+  "an editor wrapper must not swallow Enter before the active control commits it");
 assert.match(page, /onDblClick=\{stopTableInteraction\}/, "double-clicking an active editor must keep focus in that editor");
 assert.match(page, /onMouseDown=\{stopTableInteraction\}/, "selector and editor pointer actions must not activate oj-table focus navigation");
 assert.match(page, /is-unsaved-cell/, "changed cells must be visually marked");
@@ -102,6 +107,10 @@ assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)/, "discarded
 assert.doesNotMatch(page, /deferredDraftsRef/, "navigation guard must replace deferred stale toolbar state");
 assert.match(page, /requestVersion\.current !== requestVersionAtStart/, "workload pagination must reject stale query responses");
 assert.match(page, /const \[editorValue, setEditorValue\] = useState\(value\)/, "text editors must buffer keystrokes locally instead of rebuilding the table per character");
+assert.match(page, /onInput=\{\(event\) => \{ const next = \(event\.currentTarget as HTML(?:TextArea|Input)Element\)\.value; setEditorValue\(next\); onChange\(next\); \}\}/,
+  "editable text must update its draft as the user types so Enter and Save never read stale buffered state");
+assert.doesNotMatch(page, /onBlur=\{commit\}/,
+  "Cancel must not be followed by an unmount blur commit that recreates a discarded draft");
 assert.doesNotMatch(page, /ensureDraft\(row\)/, "opening an unchanged editor must not create a dirty draft");
 assert.match(page, /setDrafts\(\[\]\)/, "Cancel\/save success must clear drafts");
 assert.match(api, /workloadId/, "save payload must preserve stable workloadId");
@@ -122,5 +131,9 @@ assert.match(page, /<oj-button[\s\S]*Save and Continue/, "navigation actions mus
 assert.match(page, /<oj-button[\s\S]*Delete/, "delete confirmation actions must use JET Button components");
 assert.match(page, /selectionMode=\{\{ row: "none", column: "none" \}\}/, "ordinary row and cell clicks must not control selection");
 assert.match(page, /<Selector/, "only an explicit Oracle JET selector checkbox may change selected rows");
+assert.match(page, /function KpiRowSelector[\s\S]*useState<ImmutableKeySet<string>>\(new KeySetImpl[\s\S]*setSelectorKeys\(keySet\)[\s\S]*onSelectionChange\(nextSelected\)/,
+  "each selector must own its visible KeySet so a checkbox updates without refreshing the whole table");
+assert.match(page, /const toolbarActions = getKpiToolbarActions\(drafts\.length, selectedRows\.length\)/,
+  "Save and Cancel visibility must depend on real drafts, never on simple editor activation");
 
 console.log("kpiActivityUiContract tests passed");

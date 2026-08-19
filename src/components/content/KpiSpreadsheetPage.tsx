@@ -71,7 +71,6 @@ type RowRenderState = Readonly<{
   selectWorkload: (row: KpiSpreadsheetRow, option: KpiWorkloadOption) => void;
   selectedIds: Set<string>;
   updateDraft: (row: KpiSpreadsheetRow, key: KpiFieldKey, value: string) => void;
-  visibleRows: readonly KpiSpreadsheetRow[];
 }>;
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
 
@@ -90,6 +89,22 @@ const immutableSelectedIds = (keySet: ImmutableKeySet<string>, availableIds: rea
   }
   return Array.from(keys.keys.values());
 };
+
+function KpiRowSelector({ rowId, selected, onSelectionChange }: Readonly<{
+  rowId: string;
+  selected: boolean;
+  onSelectionChange: (selected: boolean) => void;
+}>) {
+  const [selectorKeys, setSelectorKeys] = useState<ImmutableKeySet<string>>(new KeySetImpl(selected ? [rowId] : []));
+  useEffect(() => setSelectorKeys(new KeySetImpl(selected ? [rowId] : [])), [rowId, selected]);
+  return <Selector rowKey={rowId} selectedKeys={selectorKeys} selectionMode="multiple"
+    aria-label={`Select KPI activity ${rowId}`}
+    onSelectedKeysChanged={(keySet) => {
+      const nextSelected = immutableSelectedIds(keySet, [rowId]).includes(rowId);
+      setSelectorKeys(keySet);
+      onSelectionChange(nextSelected);
+    }} />;
+}
 
 const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "manageTimeReflected"
   ? (row.manageTimeReflected ? "Reflected" : "Pending")
@@ -271,7 +286,7 @@ function WorkloadCellEditor({ fiscalYear, row, autoActivate, onChange, onReset, 
       placeholder={row.accountWorkload || "Search Account, Workload, or Oppty.No"}
       onClick={() => { activatedRef.current = true; setActivated(true); window.setTimeout(openPopup, 0); }}
       onInput={(event) => { const next = (event.currentTarget as HTMLInputElement).value; queryRef.current = next; setQuery(next); }}
-      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); activatedRef.current = false; setActivated(false); closePopup(); onCommit(); } }} />
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); activatedRef.current = false; setActivated(false); closePopup(); onCommit(); } }} />
     <oj-popup ref={popupRef} class="kpi-workload-results-popup" autoDismiss="focusLoss" initialFocus="none" modality="modeless" tail="none"
       position={{ my: { horizontal: "start", vertical: "top" }, at: { horizontal: "start", vertical: "bottom" }, collision: "flipfit" }}>
       <div class="kpi-workload-cell-editor__results" role="listbox" aria-label="Workload search results"
@@ -300,19 +315,19 @@ function BufferedFieldEditor({ field, value, onChange, onCommit }: Readonly<{
 }>) {
   const [editorValue, setEditorValue] = useState(value);
   useEffect(() => setEditorValue(value), [value]);
-  const commit = () => onChange(editorValue);
   const commitOnEnter = (event: KeyboardEvent) => {
     if (event.key !== "Enter" || (field.type === "textarea" && event.shiftKey)) return;
     event.preventDefault();
-    commit();
+    event.stopPropagation();
+    onChange((event.currentTarget as HTMLInputElement).value);
     onCommit();
   };
   if (field.type === "textarea") return <textarea class="kpi-cell-editor kpi-cell-editor--textarea" value={editorValue}
-    aria-label={field.label} onInput={(event) => setEditorValue((event.currentTarget as HTMLTextAreaElement).value)}
-    onBlur={commit} onKeyDown={commitOnEnter}></textarea>;
+    aria-label={field.label} onInput={(event) => { const next = (event.currentTarget as HTMLTextAreaElement).value; setEditorValue(next); onChange(next); }}
+    onKeyDown={commitOnEnter}></textarea>;
   return <input class="kpi-cell-editor" type={field.type === "number" ? "number" : "text"}
     min={field.type === "number" ? "0" : undefined} value={editorValue} aria-label={field.label}
-    onInput={(event) => setEditorValue((event.currentTarget as HTMLInputElement).value)} onBlur={commit} onKeyDown={commitOnEnter} />;
+    onInput={(event) => { const next = (event.currentTarget as HTMLInputElement).value; setEditorValue(next); onChange(next); }} onKeyDown={commitOnEnter} />;
 }
 
 function FieldEditor({ field, row, fiscalYear, workloadAutoActivate, onChange, onWorkloadChange, onWorkloadReset, onCommit }: Readonly<{
@@ -327,7 +342,7 @@ function FieldEditor({ field, row, fiscalYear, workloadAutoActivate, onChange, o
 }>) {
   const value = row[field.key] === null ? "" : String(row[field.key]);
   const commitOnEnter = (event: KeyboardEvent) => {
-    if (event.key === "Enter") { event.preventDefault(); onCommit(); }
+    if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); onCommit(); }
   };
   if (field.type === "workload") return <WorkloadCellEditor fiscalYear={fiscalYear} row={row} autoActivate={workloadAutoActivate}
     onChange={onWorkloadChange} onReset={onWorkloadReset} onCommit={onCommit} />;
@@ -588,14 +603,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const rowRenderStateRef = useRef<RowRenderState | null>(null);
   rowRenderStateRef.current = {
     activeCell, authoritativeRows, beginCellEdit, fields, fiscalYear, resetWorkload,
-    selectWorkload, selectedIds, updateDraft, visibleRows
+    selectWorkload, selectedIds, updateDraft
   };
   const renderKpiRow = useCallback((context: { data: KpiSpreadsheetRow; parentElement: Element }) => {
     const state = rowRenderStateRef.current;
     if (!state) return;
     const {
       activeCell, authoritativeRows, beginCellEdit, fields, fiscalYear, resetWorkload,
-      selectWorkload, selectedIds, updateDraft, visibleRows
+      selectWorkload, selectedIds, updateDraft
     } = state;
     const row = context.data;
     const saved = authoritativeRows.find((item) => item.id === row.id);
@@ -607,13 +622,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     ].filter(Boolean).join(" ");
     render(<Fragment>
       <td class="kpi-selector-cell">
-        <div onMouseDown={stopTableInteraction} onClick={stopTableInteraction} onKeyDown={stopTableInteraction}>
-        <Selector rowKey={row.id} selectedKeys={new KeySetImpl(selectedIds)} selectionMode="multiple"
-          aria-label={`Select KPI activity ${row.id}`}
-          onSelectedKeysChanged={(keySet) => {
-            const next = new Set(immutableSelectedIds(keySet, visibleRows.map((item: KpiSpreadsheetRow) => item.id)));
-            context.parentElement.classList.toggle("is-selected", next.has(row.id));
-            setSelectedIds(next);
+        <div onMouseDown={stopTableInteraction} onClick={stopTableInteraction}>
+        <KpiRowSelector rowId={row.id} selected={selectedIds.has(row.id)}
+          onSelectionChange={(selected) => {
+            context.parentElement.classList.toggle("is-selected", selected);
+            setSelectedIds((current) => {
+              const next = new Set(current);
+              if (selected) next.add(row.id); else next.delete(row.id);
+              return next;
+            });
           }} />
         </div>
       </td>
@@ -625,7 +642,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         onDblClick={(event) => { stopTableInteraction(event); beginCellEdit(row, field); }}>
         {editing ? <div data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
           onMouseDown={stopTableInteraction} onClick={stopTableInteraction} onDblClick={stopTableInteraction}
-          onKeyDown={stopTableInteraction} onFocusIn={stopTableInteraction}>
+          onFocusIn={stopTableInteraction}>
           <FieldEditor field={field} row={row} fiscalYear={fiscalYear}
           workloadAutoActivate={activeCell?.rowId === row.id && activeCell.field === field.key}
           onChange={(key, value) => updateDraft(row, key, value)}
