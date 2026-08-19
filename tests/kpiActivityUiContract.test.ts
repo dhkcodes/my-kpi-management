@@ -70,8 +70,8 @@ assert.match(page, /autoActivate[\s\S]*useState\(autoActivate\)/, "double-clicke
 assert.match(page, /onClick=\{\(\) => \{ activatedRef\.current = true; setActivated\(true\)/, "new-row workload search must also activate when its input is selected");
 assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/,
   "KPI tables must keep one mutable DataProvider instead of replacing the whole table for each draft change");
-assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiSpreadsheetRow>\(\[\], \{ keyAttributes: "id" \}\), \[\]\)/,
-  "the KPI DataProvider identity must remain stable across all table edits");
+assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiSpreadsheetRow>\(\[\], \{ keyAttributes: "id" \}\), \[activeTab\]\)/,
+  "the mutable KPI DataProvider must remain stable within a tab but retire its model listeners when the tab changes");
 assert.match(page, /dataProvider\.data = visibleRows/,
   "visible KPI row updates must be delivered through the stable DataProvider");
 assert.match(page, /new RowDataGridProvider[\s\S]*dataProvider/,
@@ -116,8 +116,12 @@ assert.match(page, /disabled=\{saving \|\| drafts\.length > 0 \|\| activeCell !=
   "Add must be unavailable while a native cell edit is active");
 assert.doesNotMatch(page, /setGridMounted\(false\)|setGridVersion/,
   "edit completion must preserve the mounted Data Grid identity");
-assert.match(page, /const navigateFromGrid[\s\S]{0,320}finishCellEdit\(\)[\s\S]{0,160}onNavigate\(nextRouteId\)/,
-  "clean tab navigation must finish the active cell before replacing the Data Grid");
+assert.match(page, /const navigateFromGrid[\s\S]{0,1000}finishCellEdit\(\)[\s\S]{0,500}getBusyContext\(\)\.whenReady\(\)[\s\S]{0,500}gridRef\.current !== grid[\s\S]{0,300}onNavigate\(nextRouteId\)/,
+  "tab navigation must finish editing and await the mounted Data Grid BusyContext before replacing its provider");
+assert.match(page, /const navigateFromGrid[\s\S]{0,1000}setSelectedIds\(new Set\(\)\)/,
+  "tab navigation must retire selection references before replacing the Data Grid provider");
+assert.match(page, /const navigateFromGrid[\s\S]{0,1000}navigationGenerationRef\.current/,
+  "overlapping tab navigation attempts must invalidate stale async continuations");
 assert.doesNotMatch(page, /rowRenderer=/,
   "KPI activities must no longer use the row-level renderer lifecycle");
 const workloadChooseStart = page.indexOf("const choose = (option: KpiWorkloadOption)");

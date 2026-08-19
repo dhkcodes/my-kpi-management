@@ -565,13 +565,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       return row?.manageTimeReflected ? "kpi-reflected-grid-cell" : null;
     }
   }), []);
-  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiSpreadsheetRow>([], { keyAttributes: "id" }), []);
+  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiSpreadsheetRow>([], { keyAttributes: "id" }), [activeTab]);
   const gridColumns = useMemo<Array<keyof KpiSpreadsheetRow>>(() => ["id", ...fields.map((field) => field.key)], [fields]);
   const dataGridProvider = useMemo(() => new RowDataGridProvider<KpiGridCellValue, string, KpiSpreadsheetRow>(dataProvider, {
     columns: { databody: gridColumns },
     columnHeaders: { column: ["", ...fields.map((field) => field.label)] }
   }), [dataProvider, fields, gridColumns]);
   const gridRef = useRef<KpiGridElement | null>(null);
+  const navigationGenerationRef = useRef(0);
   useEffect(() => {
     if (activeCell) return;
     dataProvider.data = visibleRows;
@@ -616,12 +617,19 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     setActiveCellNow(null);
   }, [setActiveCellNow]);
   const navigateFromGrid = (nextRouteId: string) => {
-    if (drafts.length > 0) {
+    const generation = ++navigationGenerationRef.current;
+    void (async () => {
+      closeDescriptionPopup();
+      finishCellEdit();
+      setSelectedIds(new Set());
+      const grid = gridRef.current;
+      if (grid) {
+        await Context.getContext(grid).getBusyContext().whenReady();
+        if (navigationGenerationRef.current !== generation || gridRef.current !== grid || !grid.isConnected) return;
+      }
+      if (navigationGenerationRef.current !== generation) return;
       onNavigate(nextRouteId);
-      return;
-    }
-    finishCellEdit();
-    onNavigate(nextRouteId);
+    })();
   };
   const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id) && !row.id.startsWith("draft-"));
   const selectableVisibleIds = visibleRows.filter((row) => !row.id.startsWith("draft-")).map((row) => row.id);
