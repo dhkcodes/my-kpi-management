@@ -3,8 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  carryKpiGridRowKey,
   computeKpiColumnLayout,
   createKpiActivityEditState,
+  getKpiGridRowKey,
   nextKpiSort,
   sortKpiActivityRows,
   transitionKpiActivityEdit
@@ -47,6 +49,11 @@ state = transitionKpiActivityEdit(state, { type: "save" });
 assert.equal(state.phase, "saving");
 const blocked = transitionKpiActivityEdit(state, { type: "begin", cell: { rowId: "r2", field: "srNumber" }, value: "2" });
 assert.deepEqual(blocked, state, "saving must block another edit session");
+state = transitionKpiActivityEdit(state, { type: "save-result", hasFailures: true });
+assert.equal(state.phase, "dirty", "failed Save rows must leave the modal and remain retryable");
+state = transitionKpiActivityEdit(state, { type: "save" });
+state = transitionKpiActivityEdit(state, { type: "save-result", hasFailures: false });
+assert.equal(state.phase, "view", "successful Save reconciliation must return to view");
 state = transitionKpiActivityEdit(state, { type: "reset" });
 state = transitionKpiActivityEdit(state, { type: "cancel" });
 assert.equal(state.phase, "cancelling");
@@ -59,6 +66,10 @@ assert.deepEqual(ascending.map((item) => item.id), ["draft-a-1", "1", "2"], "new
 assert.deepEqual(source.map((item) => item.id), ["2", "draft-a-1", "1"], "sorting must not mutate the source collection");
 assert.deepEqual(nextKpiSort(null, "title"), { field: "title", direction: "asc" });
 assert.deepEqual(nextKpiSort({ field: "title", direction: "asc" }, "title"), { field: "title", direction: "desc" });
+
+const gridKeys = new Map<string, string>();
+carryKpiGridRowKey(gridKeys, "draft-a-1", "142");
+assert.equal(getKpiGridRowKey(gridKeys, "142"), "draft-a-1");
 
 for (const [code, fields] of Object.entries(KPI_FIELD_CONTRACTS)) {
   const narrow = computeKpiColumnLayout(fields, 860);
@@ -77,6 +88,14 @@ assert.doesNotMatch(page, /onojBeforeEdit|onojBeforeEditEnd|_ojBridge|resizeColW
   "retired cached-editor and private resize lifecycle must be removed");
 assert.match(page, /data-kpi-single-editor/, "one page-owned editor overlay must be the only editable DOM surface");
 assert.match(page, /KpiActivityEditState|transitionKpiActivityEdit/, "the explicit edit state contract must drive the page");
+assert.match(page, /providerMutationGenerationRef[\s\S]*getBusyContext\(\)[\s\S]*whenReady\(\)[\s\S]*isConnected/,
+  "Save reconciliation must serialize DataProvider mutation behind generation, BusyContext, and DOM connectivity guards");
+assert.match(page, /if \(saved\.length > 0\) \{[\s\S]*providerSettled = new Promise<boolean>/,
+  "all-failed Save results must not await a provider mutation that cannot occur");
+assert.match(page, /providerSettlementRef[\s\S]*pending\.resolve\(false\)/,
+  "unmount and failed reconciliation must release the Save settlement instead of hanging the modal");
+assert.match(page, /providerRowCacheRef[\s\S]*keyAttributes:\s*"__gridRowKey"/,
+  "draft-to-server reconciliation must keep one stable provider key without cloning unchanged rows");
 assert.match(page, /id={`kpi-workload-launcher-\$\{state\.generation\}`}/,
   "each workload edit generation must own one concrete launcher");
 assert.match(page, /getBoundingClientRect\(\)[\s\S]*width <= 0[\s\S]*popup\.open/,

@@ -15,6 +15,7 @@ export type KpiActivityEditAction =
   | Readonly<{ type: "input"; value: string; hasOtherDrafts: boolean }>
   | Readonly<{ type: "finish"; hasDrafts: boolean }>
   | Readonly<{ type: "save" }>
+  | Readonly<{ type: "save-result"; hasFailures: boolean }>
   | Readonly<{ type: "cancel" }>
   | Readonly<{ type: "reset" }>;
 
@@ -32,8 +33,18 @@ export const transitionKpiActivityEdit = (
 ): KpiActivityEditState => {
   if (action.type === "reset") return { ...createKpiActivityEditState(), generation: state.generation + 1 };
   if (action.type === "save") {
-    if (state.phase === "saving" || state.phase === "cancelling") return state;
+    if (state.phase !== "dirty") return state;
     return { ...state, phase: "saving", cell: null };
+  }
+  if (action.type === "save-result") {
+    if (state.phase !== "saving") return state;
+    return {
+      ...state,
+      phase: action.hasFailures ? "dirty" : "view",
+      cell: null,
+      originalValue: "",
+      value: ""
+    };
   }
   if (action.type === "cancel") {
     if (state.phase === "saving" || state.phase === "cancelling") return state;
@@ -72,6 +83,15 @@ export const transitionKpiActivityEdit = (
 };
 
 export type KpiSortState = Readonly<{ field: KpiFieldKey; direction: "asc" | "desc" }>;
+
+export const getKpiGridRowKey = (keys: ReadonlyMap<string, string>, rowId: string): string =>
+  keys.get(rowId) ?? rowId;
+
+export const carryKpiGridRowKey = (keys: Map<string, string>, previousRowId: string, nextRowId: string): void => {
+  const stableKey = getKpiGridRowKey(keys, previousRowId);
+  keys.delete(previousRowId);
+  keys.set(nextRowId, stableKey);
+};
 
 export const nextKpiSort = (current: KpiSortState | null, field: KpiFieldKey): KpiSortState => ({
   field,

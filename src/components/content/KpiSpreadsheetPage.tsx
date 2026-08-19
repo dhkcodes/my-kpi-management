@@ -15,8 +15,10 @@ import "ojs/ojprogress-circle";
 
 import { FiscalYear, Quarter, WorkloadStage } from "../../data/kpiExcelParser";
 import {
+  carryKpiGridRowKey,
   computeKpiColumnLayout,
   createKpiActivityEditState,
+  getKpiGridRowKey,
   KpiActivityEditState,
   KpiSortState,
   nextKpiSort,
@@ -80,6 +82,7 @@ const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
 
 type KpiGridCellValue = KpiSpreadsheetRow[keyof KpiSpreadsheetRow];
 type KpiGridCellData = { data: KpiGridCellValue };
+type KpiGridProviderRow = KpiSpreadsheetRow & Readonly<{ __gridRowKey: string }>;
 type KpiGridElement = HTMLElement;
 type EditorRect = Readonly<{ left: number; top: number; width: number; height: number }>;
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
@@ -407,6 +410,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const [descriptionPopup, setDescriptionPopup] = useState("");
   const gridRef = useRef<KpiGridElement | null>(null);
   const gridHostRef = useRef<HTMLDivElement | null>(null);
+  const providerMutationGenerationRef = useRef(0);
+  const providerSettlementRef = useRef<{ generation: number; resolve: (settled: boolean) => void } | null>(null);
   const navigationDialogRef = useRef<ojDialog | null>(null);
   const cancelDialogRef = useRef<ojDialog | null>(null);
   const deleteDialogRef = useRef<ojDialog | null>(null);
@@ -417,6 +422,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const deleteCancelButtonRef = useRef<any>(null);
   const sessionVersion = useRef(0);
   const sessionKeyRef = useRef(`${routeId}:${fiscalYear}`);
+  const gridRowKeysRef = useRef(new Map<string, string>());
+  const providerRowCacheRef = useRef(new Map<string, { source: KpiSpreadsheetRow; provider: KpiGridProviderRow }>());
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
 
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? rows : rows.filter((row) => row.kpiCode === activeTab), [rows, activeTab]);
@@ -432,6 +439,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   }, [drafts, rows]);
   const quarterRows = useMemo(() => getRowsForQuarter(effectiveRows, selectedQuarter), [effectiveRows, selectedQuarter]);
   const visibleRows = useMemo(() => sortKpiActivityRows(quarterRows, sortState), [quarterRows, sortState]);
+  const providerRows = useMemo<KpiGridProviderRow[]>(() => visibleRows.map((row) => {
+    const key = getKpiGridRowKey(gridRowKeysRef.current, row.id);
+    const cached = providerRowCacheRef.current.get(key);
+    if (cached?.source === row) return cached.provider;
+    const provider = { ...row, __gridRowKey: key };
+    providerRowCacheRef.current.set(key, { source: row, provider });
+    return provider;
+  }), [visibleRows]);
   const visibleRowsById = useMemo(() => new Map(visibleRows.map((row) => [row.id, row])), [visibleRows]);
   const visibleRowsByIdRef = useRef(visibleRowsById);
   visibleRowsByIdRef.current = visibleRowsById;
@@ -552,6 +567,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
 
   useEffect(() => {
     sessionVersion.current += 1;
+    gridRowKeysRef.current.clear();
+    providerRowCacheRef.current.clear();
     setDrafts([]); setSelectedIds(new Set()); setSelectedQuarter(null); setSortState(null);
     setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" }));
     setEditorRect(null); editorAnchorRef.current = null; editRowSnapshotRef.current = null;
@@ -605,13 +622,50 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     }
   }), []);
 
-  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiSpreadsheetRow>([], { keyAttributes: "id" }), [activeTab]);
+  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiGridProviderRow>([], { keyAttributes: "__gridRowKey" }), [activeTab]);
   const gridColumns = useMemo<Array<keyof KpiSpreadsheetRow>>(() => ["id", ...fields.map((field) => field.key)], [fields]);
-  const dataGridProvider = useMemo(() => new RowDataGridProvider<KpiGridCellValue, string, KpiSpreadsheetRow>(dataProvider, {
+  const dataGridProvider = useMemo(() => new RowDataGridProvider<KpiGridCellValue, string, KpiGridProviderRow>(dataProvider, {
     columns: { databody: gridColumns },
     columnHeaders: { column: ["", ...fields.map((field) => field.label)] }
   }), [dataProvider, fields, gridColumns]);
-  useEffect(() => { dataProvider.data = visibleRows; }, [dataProvider, visibleRows]);
+  useEffect(() => {
+    if (!saving) {
+      dataProvider.data = providerRows;
+      return;
+    }
+    const generation = ++providerMutationGenerationRef.current;
+    let cancelled = false;
+    void (async () => {
+      const settle = (settled: boolean) => {
+        const pending = providerSettlementRef.current;
+        if (pending && generation >= pending.generation) {
+          pending.resolve(settled);
+          providerSettlementRef.current = null;
+        }
+      };
+      try {
+        const grid = gridRef.current;
+        const busyContext = grid?.isConnected ? Context.getContext(grid).getBusyContext() : null;
+        if (busyContext) await busyContext.whenReady();
+        if (cancelled || generation !== providerMutationGenerationRef.current) return;
+        if (!grid?.isConnected || gridRef.current !== grid) { settle(false); return; }
+        dataProvider.data = providerRows;
+        if (busyContext && grid.isConnected && gridRef.current === grid) await busyContext.whenReady();
+        if (cancelled || generation !== providerMutationGenerationRef.current) return;
+        settle(grid.isConnected && gridRef.current === grid);
+      } catch (error) {
+        console.error("KPI grid provider reconciliation failed", error);
+        if (!cancelled && generation === providerMutationGenerationRef.current) settle(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [dataProvider, providerRows, saving]);
+
+  useEffect(() => () => {
+    const pending = providerSettlementRef.current;
+    if (pending) pending.resolve(false);
+    providerSettlementRef.current = null;
+  }, []);
 
   const selectableVisibleIds = visibleRows.filter((row) => !row.id.startsWith("draft-")).map((row) => row.id);
   const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id) && !row.id.startsWith("draft-"));
@@ -729,9 +783,23 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   }, []);
 
   useEffect(() => {
-    if (saving) savingDialogRef.current?.open();
-    else if (savingDialogRef.current?.isOpen()) savingDialogRef.current.close();
+    const dialog = savingDialogRef.current;
+    if (!dialog) return;
+    let active = true;
+    const busyContext = Context.getContext(dialog).getBusyContext();
+    void busyContext.whenReady().then(() => {
+      if (!active || savingDialogRef.current !== dialog) return;
+      if (saving) {
+        if (!dialog.isOpen()) dialog.open();
+      } else if (dialog.isOpen()) {
+        dialog.close();
+      }
+    }).catch((error) => {
+      if (active) console.error("KPI saving dialog synchronization failed", error);
+    });
+    return () => { active = false; };
   }, [saving]);
+
 
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
@@ -750,6 +818,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
+    draftSnapshot.forEach((draft, index) => {
+      if (outcomes[index].status === "fulfilled") {
+        carryKpiGridRowKey(gridRowKeysRef.current, draft.id, outcomes[index].value.id);
+      }
+    });
+    let providerSettled: Promise<boolean> | null = null;
+    if (saved.length > 0) {
+      providerSettled = new Promise<boolean>((resolve) => {
+        providerSettlementRef.current = { generation: providerMutationGenerationRef.current + 1, resolve };
+      });
+    }
     if (saved.length > 0) setRows((current) => {
       const savedByOldId = new Map(draftSnapshot.map((draft, index) => [draft.id, outcomes[index].status === "fulfilled" ? outcomes[index].value : null]));
       const next = current.map((row) => savedByOldId.get(row.id) ?? row).filter(Boolean) as KpiSpreadsheetRow[];
@@ -757,9 +836,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     });
     setDrafts(failedDrafts);
     setSelectedIds(new Set(failedDrafts.map((row) => row.id)));
+    const providerReady = providerSettled ? await providerSettled : true;
+    if (!providerReady) {
+      setApiMessage("Grid synchronization failed; KPI activities were reloaded");
+      setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
+    }
+    if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
+      setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
+    }
     setApiMessage(failedDrafts.length === 0 ? `${saved.length} KPI activity row(s) saved` : `${saved.length} saved · ${failedDrafts.length} failed`);
     setSaving(false);
-    setEditState((current) => transitionKpiActivityEdit(current, failedDrafts.length === 0 ? { type: "reset" } : { type: "finish", hasDrafts: true }));
+    setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failedDrafts.length > 0 }));
     return failedDrafts.length === 0;
   };
 
@@ -778,6 +865,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const deletedIds = new Set(rowsToDelete.filter((_, index) => outcomes[index].status === "fulfilled").map((row) => row.id));
     const failedIds = rowsToDelete.filter((_, index) => outcomes[index].status === "rejected").map((row) => row.id);
     setRows((current) => current.filter((row) => !deletedIds.has(row.id)));
+    deletedIds.forEach((id) => gridRowKeysRef.current.delete(id));
     setDrafts((current) => current.filter((row) => !deletedIds.has(row.id)));
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);

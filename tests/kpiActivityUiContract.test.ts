@@ -98,8 +98,8 @@ assert.match(styles, /\.kpi-jet-editable-grid\s*\{[^}]*min-width:\s*0[^}]*width:
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*#8b3a2f/);
 
 assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/);
-assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiSpreadsheetRow>\(\[\], \{ keyAttributes: "id" \}\), \[activeTab\]\)/);
-assert.match(page, /dataProvider\.data = visibleRows/);
+assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiGridProviderRow>\(\[\], \{ keyAttributes: "__gridRowKey" \}\), \[activeTab\]\)/);
+assert.match(page, /dataProvider\.data = providerRows/);
 assert.match(page, /new RowDataGridProvider[\s\S]*dataProvider/);
 assert.match(page, /selectionMode=\{KPI_GRID_SELECTION_MODE\}/);
 assert.match(page, /data-kpi-row-selector=\{rowId\}/);
