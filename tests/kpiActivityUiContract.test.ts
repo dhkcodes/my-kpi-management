@@ -80,7 +80,7 @@ assert.doesNotMatch(page, /gridRef\.current\?*\.refresh\(\)/,
   "cell edit entry must never refresh the Data Grid or any row");
 assert.match(page, /event\.key === "Tab"[\s\S]{0,180}event\.preventDefault\(\)[\s\S]{0,180}onMove\(event\.shiftKey \? -1 : 1\)/,
   "Tab and Shift+Tab must invoke directional Data Grid cell navigation without activating a header cell");
-assert.match(page, /const moveCell[\s\S]{0,900}setProperty\("editCell", \{ indexes: \{ row: next\.row, column: next\.column \} \}\)/,
+assert.match(page, /const moveCell[\s\S]{0,1500}setProperty\("editCell", \{ indexes: \{ row: next\.row, column: next\.column \} \}\)/,
   "Tab navigation must move to the adjacent editable cell through native editCell without remounting the Grid");
 assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,180}reconcileDraft\(current, snapshot\)/,
   "Escape cancellation must restore the cell-entry snapshot and reconcile dirty state");
@@ -92,8 +92,8 @@ assert.match(page, /workloadAutoActivate=\{field\.type === "workload" && editing
   "workload entry must retain popup activation after the native setProperty transition");
 assert.doesNotMatch(page, /suppressWorkloadAutoActivateRef/,
   "workload popup activation must not depend on a global suppression flag that can survive a vetoed transition");
-assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,320}window\.requestAnimationFrame\(finishCellEdit\)/,
-  "native Escape completion must cleanly settle after Oracle JET finishes its cancel stack");
+assert.match(page, /event\.detail\.cancelEdit[\s\S]{0,500}editEndFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,220}editGenerationRef\.current === generation\) finishCellEdit\(\)/,
+  "native Escape completion must settle after Oracle JET's cancel stack only when the edit generation is still current");
 const addDraftBlock = page.match(/const addDraft = \(\) => \{([\s\S]*?)\n  \};/)?.[1] ?? "";
 assert.doesNotMatch(addDraftBlock, /finishCellEdit\(/,
   "new draft insertion must not remount the Grid while JET property updates are batched");
@@ -104,7 +104,7 @@ assert.match(pendingEditEffect, /waitForKpiGridRow[\s\S]*getBusyContext\(\)\.whe
   "programmatic first edit must wait for row reflection and JET readiness before each property transition");
 assert.match(pendingEditEffect, /currentCell\?\.type !== "cell"[\s\S]*currentCell\.indexes\?\.row[\s\S]*pendingProgrammaticEditRef\.current = null/,
   "nullable or divergent JET currentCell state must retire the pending edit without throwing or replaying later");
-assert.match(page, /const finishCellEdit[\s\S]{0,320}pendingProgrammaticEditRef\.current = null/,
+assert.match(page, /const finishCellEdit[\s\S]{0,800}pendingProgrammaticEditRef\.current = null/,
   "edit-session cleanup must invalidate any pending programmatic first edit");
 assert.doesNotMatch(page, /grid(?:Ref\.current)?\.(?:currentCell|editCell)\s*=\s*(?:null|undefined)/,
   "Data Grid lifecycle properties must never be assigned null or undefined directly");
@@ -116,12 +116,31 @@ assert.match(page, /disabled=\{saving \|\| drafts\.length > 0 \|\| activeCell !=
   "Add must be unavailable while a native cell edit is active");
 assert.doesNotMatch(page, /setGridMounted\(false\)|setGridVersion/,
   "edit completion must preserve the mounted Data Grid identity");
-assert.match(page, /const navigateFromGrid[\s\S]{0,1000}finishCellEdit\(\)[\s\S]{0,500}getBusyContext\(\)\.whenReady\(\)[\s\S]{0,500}gridRef\.current !== grid[\s\S]{0,300}onNavigate\(nextRouteId\)/,
-  "tab navigation must finish editing and await the mounted Data Grid BusyContext before replacing its provider");
-assert.match(page, /const navigateFromGrid[\s\S]{0,1000}setSelectedIds\(new Set\(\)\)/,
-  "tab navigation must retire selection references before replacing the Data Grid provider");
-assert.match(page, /const navigateFromGrid[\s\S]{0,1000}navigationGenerationRef\.current/,
-  "overlapping tab navigation attempts must invalidate stale async continuations");
+const settleNavigationBlock = page.match(/settleNavigationRef\.current = \(action\) => \{([\s\S]*?)\n  \};/)?.[1] ?? "";
+assert.match(settleNavigationBlock, /finishCellEdit\(\)[\s\S]*setSelectedIds\(new Set\(\)\)[\s\S]*getBusyContext\(\)\.whenReady\(\)/,
+  "every KPI route action must finish editing, retire selection, and await the mounted Data Grid BusyContext");
+assert.match(settleNavigationBlock, /if \(navigationGenerationRef\.current !== generation\) return;[\s\S]*if \(gridRef\.current !== grid \|\| !grid\.isConnected\)/,
+  "navigation must reject a stale, replaced, or disconnected Grid after BusyContext settlement");
+assert.match(settleNavigationBlock, /navigationSettlingRef\.current = true[\s\S]*finishCellEdit\(\)/,
+  "navigation must suppress newly arriving JET edit events before retiring the active edit");
+assert.match(settleNavigationBlock, /if \(navigationGenerationRef\.current !== generation\) return;\s*action\(\)/,
+  "overlapping route changes must invalidate stale continuations before the route action executes");
+assert.match(page, /const settledAction = \(\) => settleNavigationRef\.current\(action\)/,
+  "sidebar, history, fiscal-year, overview, and tab routes must share the same lifecycle settlement gate");
+assert.match(page, /onNavigationGuardChange\(requestProtectedNavigation, drafts\.length > 0\)/,
+  "the lifecycle settlement gate must remain registered on clean and dirty routes while separately reporting unsaved state");
+assert.match(app, /if \(!kpiUnsavedChangesRef\.current\) return;[\s\S]{0,120}event\.preventDefault\(\)/,
+  "browser unload protection must depend on unsaved KPI data rather than lifecycle guard presence");
+assert.doesNotMatch(page, /onNavigationGuardChange\(drafts\.length > 0/,
+  "clean-route navigation must not bypass Data Grid lifecycle settlement");
+assert.match(page, /const handleBeforeEdit[\s\S]{0,500}saving \|\| navigationSettlingRef\.current[\s\S]{0,120}event\.preventDefault\(\)/,
+  "JET beforeEdit events arriving during route settlement must be vetoed before they can recreate activeCell state");
+assert.match(page, /const isCurrentEditRequest[\s\S]{0,500}navigationGenerationRef\.current === navigationGeneration[\s\S]{0,500}await busyContext\.whenReady\(\);[\s\S]{0,160}if \(!isCurrentEditRequest\(\)\) return/,
+  "double-click edit continuations must be invalidated when navigation starts while BusyContext is pending");
+assert.match(page, /tabEditFrameRef\.current = window\.requestAnimationFrame[\s\S]{0,500}navigationGenerationRef\.current !== navigationGeneration[\s\S]{0,300}!grid\.isConnected/,
+  "Tab-key edit callbacks must reject stale navigation generations and disconnected Grids");
+assert.match(page, /const finishCellEdit[\s\S]{0,300}editGenerationRef\.current \+= 1[\s\S]{0,300}cancelAnimationFrame\(tabEditFrameRef\.current\)/,
+  "navigation cleanup must invalidate and cancel queued edit callbacks before provider replacement");
 assert.doesNotMatch(page, /rowRenderer=/,
   "KPI activities must no longer use the row-level renderer lifecycle");
 const workloadChooseStart = page.indexOf("const choose = (option: KpiWorkloadOption)");
@@ -189,7 +208,7 @@ assert.match(api, /workloadId/, "save payload must preserve stable workloadId");
 assert.doesNotMatch(page, /<th>Rows<\/th>/);
 assert.match(page, /overview\?\.target/);
 assert.match(page, /listKpiOverview/);
-assert.match(page, /onNavigationGuardChange\(drafts\.length > 0 \? requestProtectedNavigation : null\)/, "the KPI page must register its JET-dialog guard only while drafts exist");
+assert.match(page, /onNavigationGuardChange\(requestProtectedNavigation, drafts\.length > 0\)/, "the KPI page must keep its lifecycle guard registered while reporting dirty state separately");
 assert.match(content, /onKpiNavigationGuardChange[\s\S]*onNavigationGuardChange=\{onKpiNavigationGuardChange\}/, "Content must forward the KPI guard registration to App");
 assert.match(app, /onKpiNavigationGuardChange=\{handleKpiNavigationGuardChange\}/);
 assert.match(app, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "KPI drafts must participate in browser unload protection");

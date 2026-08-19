@@ -134,6 +134,7 @@ export const App = registerCustomElement(
     const historyIndexRef = useRef(typeof window === "undefined" ? 0 : getHistoryIndex(window.history.state) ?? 0);
     const restoringHistoryRef = useRef(false);
     const kpiNavigationGuardRef = useRef<KpiNavigationGuard | null>(null);
+    const kpiUnsavedChangesRef = useRef(false);
     const pendingKpiPopstatePromptRef = useRef<null | { label: string; retry: () => void }>(null);
     const confirmedKpiPopstateRetryRef = useRef<null | { historyIndex: number | null; href: string }>(null);
     const [guideOpen, setGuideOpen] = useState(false);
@@ -177,7 +178,7 @@ export const App = registerCustomElement(
 
     useEffect(() => {
       const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-        if (!kpiNavigationGuardRef.current) return;
+        if (!kpiUnsavedChangesRef.current) return;
         event.preventDefault();
         event.returnValue = "";
       };
@@ -185,8 +186,9 @@ export const App = registerCustomElement(
       return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, []);
 
-    const handleKpiNavigationGuardChange = useCallback((guard: KpiNavigationGuard | null) => {
+    const handleKpiNavigationGuardChange = useCallback((guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => {
       kpiNavigationGuardRef.current = guard;
+      kpiUnsavedChangesRef.current = hasUnsavedChanges;
     }, []);
 
     useEffect(() => {

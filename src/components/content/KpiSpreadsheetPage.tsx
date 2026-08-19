@@ -455,7 +455,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   fiscalYear: FiscalYear;
   routeId: string;
   onNavigate: (routeId: string) => void;
-  onNavigationGuardChange: (guard: KpiNavigationGuard | null) => void;
+  onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
 }>) {
   const activeTab = getKpiTabForRoute(routeId);
   const [rows, setRows] = useState<KpiSpreadsheetRow[]>([]);
@@ -468,6 +468,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const editGenerationRef = useRef(0);
   const editSnapshotRef = useRef<KpiSpreadsheetRow | null>(null);
   const pendingProgrammaticEditRef = useRef<ActiveCell | null>(null);
+  const tabEditFrameRef = useRef(0);
+  const editFocusFrameRef = useRef(0);
+  const editEndFrameRef = useRef(0);
 
   const setActiveCellNow = useCallback((cell: ActiveCell | null) => {
     const current = activeCellRef.current;
@@ -489,24 +492,33 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const deleteCancelButtonRef = useRef<any>(null);
   const descriptionPopupRef = useRef<any>(null);
   const descriptionPopupOpenTimerRef = useRef(0);
+  const settleNavigationRef = useRef<(action: () => void) => void>((action) => action());
   const sessionVersion = useRef(0);
   const sessionKeyRef = useRef(`${routeId}:${fiscalYear}`);
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
   const requestProtectedNavigation = useCallback<KpiNavigationGuard>((label, action) => {
-    if (drafts.length === 0) { action(); return; }
-    setPendingNavigation({ label, action });
+    const settledAction = () => settleNavigationRef.current(action);
+    if (drafts.length === 0) { settledAction(); return; }
+    setPendingNavigation({ label, action: settledAction });
     window.setTimeout(() => navigationDialogRef.current?.open(), 0);
   }, [drafts.length]);
 
   useEffect(() => {
-    onNavigationGuardChange(drafts.length > 0 ? requestProtectedNavigation : null);
-    return () => onNavigationGuardChange(null);
+    onNavigationGuardChange(requestProtectedNavigation, drafts.length > 0);
+    return () => onNavigationGuardChange(null, false);
   }, [drafts.length, onNavigationGuardChange, requestProtectedNavigation]);
   useEffect(() => () => window.clearTimeout(descriptionPopupOpenTimerRef.current), []);
 
   useEffect(() => {
     sessionVersion.current += 1;
     setDrafts([]); setActiveCellNow(null); setSelectedIds(new Set()); setSelectedQuarter(null);
+    const grid = gridRef.current;
+    let cancelled = false;
+    void (async () => {
+      if (grid) await Context.getContext(grid).getBusyContext().whenReady();
+      if (!cancelled) navigationSettlingRef.current = false;
+    })();
+    return () => { cancelled = true; };
   }, [routeId, fiscalYear]);
   useEffect(() => {
     let active = true;
@@ -573,6 +585,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   }), [dataProvider, fields, gridColumns]);
   const gridRef = useRef<KpiGridElement | null>(null);
   const navigationGenerationRef = useRef(0);
+  const navigationSettlingRef = useRef(false);
   useEffect(() => {
     if (activeCell) return;
     dataProvider.data = visibleRows;
@@ -589,7 +602,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     void (async () => {
       if (!await waitForKpiGridRow(grid, pending.rowId, controller.signal)) return;
       await Context.getContext(grid).getBusyContext().whenReady();
-      if (controller.signal.aborted || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
+      if (controller.signal.aborted || navigationSettlingRef.current || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
       if (activeCellRef.current) {
         pendingProgrammaticEditRef.current = null;
         return;
@@ -597,7 +610,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       grid.setProperty("currentCell", { type: "cell", indexes: { row, column } });
       await Context.getContext(grid).getBusyContext().whenReady();
       const currentCell = grid.getProperty("currentCell");
-      if (controller.signal.aborted || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
+      if (controller.signal.aborted || navigationSettlingRef.current || gridRef.current !== grid || pendingProgrammaticEditRef.current !== pending) return;
       if (activeCellRef.current || currentCell?.type !== "cell"
         || currentCell.indexes?.row !== row || currentCell.indexes?.column !== column) {
         pendingProgrammaticEditRef.current = null;
@@ -609,6 +622,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     return () => controller.abort();
   }, [fields, visibleRows]);
   const finishCellEdit = useCallback(() => {
+    editGenerationRef.current += 1;
+    window.cancelAnimationFrame(tabEditFrameRef.current);
+    window.cancelAnimationFrame(editFocusFrameRef.current);
+    window.cancelAnimationFrame(editEndFrameRef.current);
+    tabEditFrameRef.current = 0;
+    editFocusFrameRef.current = 0;
+    editEndFrameRef.current = 0;
     closeWorkloadPopup();
     const grid = gridRef.current;
     if (grid?.editCell) grid.setProperty("editCell", null);
@@ -616,8 +636,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     editSnapshotRef.current = null;
     setActiveCellNow(null);
   }, [setActiveCellNow]);
-  const navigateFromGrid = (nextRouteId: string) => {
+  settleNavigationRef.current = (action) => {
     const generation = ++navigationGenerationRef.current;
+    navigationSettlingRef.current = true;
     void (async () => {
       closeDescriptionPopup();
       finishCellEdit();
@@ -625,12 +646,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       const grid = gridRef.current;
       if (grid) {
         await Context.getContext(grid).getBusyContext().whenReady();
-        if (navigationGenerationRef.current !== generation || gridRef.current !== grid || !grid.isConnected) return;
+        if (navigationGenerationRef.current !== generation) return;
+        if (gridRef.current !== grid || !grid.isConnected) {
+          navigationSettlingRef.current = false;
+          return;
+        }
       }
       if (navigationGenerationRef.current !== generation) return;
-      onNavigate(nextRouteId);
+      action();
     })();
   };
+  const navigateFromGrid = (nextRouteId: string) => onNavigate(nextRouteId);
   const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id) && !row.id.startsWith("draft-"));
   const selectableVisibleIds = visibleRows.filter((row) => !row.id.startsWith("draft-")).map((row) => row.id);
   useEffect(() => {
@@ -712,8 +738,18 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const currentIndex = editableCells.findIndex((cell) => cell.rowId === rowId && cell.field === field);
     if (currentIndex < 0 || editableCells.length === 0) return;
     const next = editableCells[(currentIndex + direction + editableCells.length) % editableCells.length];
-    window.requestAnimationFrame(() => {
-      gridRef.current?.setProperty("editCell", { indexes: { row: next.row, column: next.column } });
+    const grid = gridRef.current;
+    if (!grid) return;
+    const editGeneration = editGenerationRef.current;
+    const navigationGeneration = navigationGenerationRef.current;
+    window.cancelAnimationFrame(tabEditFrameRef.current);
+    tabEditFrameRef.current = window.requestAnimationFrame(() => {
+      tabEditFrameRef.current = 0;
+      if (editGenerationRef.current !== editGeneration
+        || navigationGenerationRef.current !== navigationGeneration
+        || navigationSettlingRef.current
+        || gridRef.current !== grid || !grid.isConnected) return;
+      grid.setProperty("editCell", { indexes: { row: next.row, column: next.column } });
     });
   };
   const selectQuarter = (quarter: Quarter | null) => {
@@ -866,15 +902,24 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         const grid = gridRef.current;
         if (!grid || saving) return;
         const indexes = { row: context.item.rowIndex, column: context.item.columnIndex };
+        const editGeneration = ++editGenerationRef.current;
+        const navigationGeneration = navigationGenerationRef.current;
         void (async () => {
+          const isCurrentEditRequest = () => editGenerationRef.current === editGeneration
+            && navigationGenerationRef.current === navigationGeneration
+            && !navigationSettlingRef.current
+            && gridRef.current === grid && grid.isConnected;
           const busyContext = Context.getContext(grid).getBusyContext();
           const editCell = grid.editCell;
           if (editCell?.indexes && (editCell.indexes.row !== indexes.row || editCell.indexes.column !== indexes.column)) {
             grid.setProperty("editCell", null);
             await busyContext.whenReady();
+            if (!isCurrentEditRequest()) return;
           }
+          if (!isCurrentEditRequest()) return;
           grid.setProperty("currentCell", { type: "cell", indexes });
           await busyContext.whenReady();
+          if (!isCurrentEditRequest()) return;
           const currentCell = grid.getProperty("currentCell");
           if (currentCell?.type !== "cell" || currentCell.indexes?.row !== indexes.row || currentCell.indexes?.column !== indexes.column) return;
           grid.setProperty("editCell", { indexes });
@@ -900,13 +945,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const { column, row } = event.detail.cellContext.indexes;
     const field = fields[column - 1];
     const gridRow = visibleRows[row];
-    if (!field || !gridRow || saving) {
+    if (!field || !gridRow || saving || navigationSettlingRef.current) {
       event.preventDefault();
       return;
     }
-    gridRef.current?.setProperty("currentCell", { type: "cell", indexes: { row, column } });
+    const grid = gridRef.current;
+    grid?.setProperty("currentCell", { type: "cell", indexes: { row, column } });
     beginCellEdit(gridRow, field);
-    window.requestAnimationFrame(() => {
+    const editGeneration = editGenerationRef.current;
+    const navigationGeneration = navigationGenerationRef.current;
+    window.cancelAnimationFrame(editFocusFrameRef.current);
+    editFocusFrameRef.current = window.requestAnimationFrame(() => {
+      editFocusFrameRef.current = 0;
+      if (!grid || editGenerationRef.current !== editGeneration
+        || navigationGenerationRef.current !== navigationGeneration
+        || navigationSettlingRef.current
+        || gridRef.current !== grid || !grid.isConnected) return;
       event.detail.focusCallback({});
       focusKpiEditor({ rowId: gridRow.id, field: field.key });
     });
@@ -918,12 +972,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       setDrafts((current) => reconcileDraft(current, snapshot));
     }
     editSnapshotRef.current = null;
+    const generation = editGenerationRef.current;
+    window.cancelAnimationFrame(editEndFrameRef.current);
     if (event.detail.cancelEdit) {
-      window.requestAnimationFrame(finishCellEdit);
+      editEndFrameRef.current = window.requestAnimationFrame(() => {
+        editEndFrameRef.current = 0;
+        if (editGenerationRef.current === generation) finishCellEdit();
+      });
       return;
     }
-    const generation = editGenerationRef.current;
-    window.requestAnimationFrame(() => {
+    editEndFrameRef.current = window.requestAnimationFrame(() => {
+      editEndFrameRef.current = 0;
       if (editGenerationRef.current === generation) setActiveCellNow(null);
     });
   }, [fields, finishCellEdit, rows, setActiveCellNow]);

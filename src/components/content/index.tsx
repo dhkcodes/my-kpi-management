@@ -56,7 +56,7 @@ type Props = Readonly<{
   onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
   onWeeklyActivitiesDraftStateChange: (active: boolean) => void;
-  onKpiNavigationGuardChange: (guard: KpiNavigationGuard | null) => void;
+  onKpiNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
 }>;
 
 type GuideDetails = Readonly<{
