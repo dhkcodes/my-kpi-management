@@ -1940,16 +1940,18 @@ h4.weekly-activity-section-label--next-week,
   .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { justify-content: space-between; width: 100%; }
 }
 
-/* KPI-only single-session Data Grid. Accounts & Workloads remains untouched. */
-.kpi-jet-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; min-height: 8rem; min-width: 0; max-width: 100%; overflow: hidden; width: 100%; }
-.kpi-jet-editable-grid { height: clamp(18rem, 52vh, 38rem); min-width: 0; width: 100%; }
-.kpi-reflected-grid-cell { background: #eaf4ec; }
-.kpi-grid-cell { align-items: center; box-sizing: border-box; display: flex; height: 100%; min-height: 3rem; padding: .5rem; position: relative; width: 100%; }
+/* KPI-only Preact-owned native table. Accounts & Workloads remains untouched. */
+.kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-height: clamp(18rem, 52vh, 38rem); max-width: 100%; min-height: 8rem; min-width: 0; overflow-x: auto; overflow-y: auto; width: 100%; }
+.kpi-activities-table { border-collapse: collapse; table-layout: fixed; width: max-content; }
+.kpi-activities-table th, .kpi-activities-table td { border-bottom: 1px solid #ddd6d0; border-right: 1px solid #ddd6d0; box-sizing: border-box; min-height: 3rem; vertical-align: middle; }
+.kpi-activities-table thead th { position: sticky; top: 0; z-index: 4; }
+.kpi-activities-table tbody tr:last-child td { border-bottom: 0; }
+.kpi-activities-table tbody tr.kpi-manage-time-reflected-row td, .kpi-activities-table td.kpi-manage-time-reflected-row { background: #eaf4ec; }
+.kpi-activities-table tbody tr.is-selected td, .kpi-activities-table td.is-selected { background: #f0f6f5; }
+.kpi-grid-cell { box-sizing: border-box; height: 3rem; min-height: 3rem; padding: .5rem; position: relative; }
 .kpi-grid-cell.is-unsaved-row { font-weight: inherit; }
 .kpi-grid-cell.is-unsaved-cell::after { background: #d9438f; bottom: 0; content: ""; height: 3px; left: .35rem; position: absolute; right: .35rem; z-index: 2; }
-.kpi-grid-cell.kpi-manage-time-reflected-row { background: #eaf4ec; }
-.kpi-grid-cell.is-selected { background: #f0f6f5; }
-.kpi-grid-cell > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-grid-cell > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kpi-grid-cell--fixed > span { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .kpi-cell-description { display: -webkit-box; line-height: 1.45; max-height: 7.25rem; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .kpi-grid-column-header { background: #f4f1ee; border-right: 1px solid #d9d2cc; box-sizing: border-box; height: 100%; min-width: 0; width: 100%; }

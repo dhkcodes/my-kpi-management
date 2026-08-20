@@ -12,22 +12,19 @@ const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
 
 assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "Tailnet JET loads must tolerate network latency");
-assert.match(page, /import "ojs\/ojdatagrid"/);
-assert.match(page, /import \{ RowDataGridProvider \} from "ojs\/ojrowdatagridprovider"/);
+assert.doesNotMatch(page, /ojdatagrid|RowDataGridProvider|MutableArrayDataProvider|oj-data-grid|loadSkeletons|fillViewport/,
+  "KPI Activities must not retain JET Data Grid or viewport lifecycle code");
 assert.match(page, /import "ojs\/ojdatetimepicker"/);
 assert.match(page, /import "ojs\/ojdialog"/);
 assert.match(page, /import "ojs\/ojprogress-circle"/);
-assert.match(page, /<oj-data-grid/);
-assert.match(page, /editMode="none"/, "JET cached cellEdit must be retired in favor of one page-owned session");
-assert.match(page, /slot="cellTemplate"[\s\S]*render=\{renderKpiCell\}/);
-assert.match(page, /slot="columnHeaderTemplate"[\s\S]*render=\{renderKpiColumnHeader\}/);
+assert.match(page, /<table[^>]*class="kpi-activities-table"/);
+assert.match(page, /<tr key=\{`\$\{tableScopeKey\}:\$\{row\.id\}`\} data-kpi-row-id=\{row\.id\}/);
+assert.match(page, /<td key=\{field\.key\} class=\{classes\} data-kpi-grid-row=\{row\.id\} data-kpi-grid-field=\{field\.key\}/);
 assert.doesNotMatch(page, /onojBeforeEdit|onojBeforeEditEnd|_WIDGET_INSTANCE|_ojBridge|resizeColWidth/);
-assert.doesNotMatch(page, /gridRef\.current\?*\.refresh\(\)|grid\.refresh\(\)/,
-  "selection reconciliation must not refresh a Grid that can be retiring during navigation");
-assert.match(page, /input\.checked = selectableVisibleIds\.length > 0[\s\S]*input\.indeterminate =/,
-  "the cached select-all template is synchronized from the page-owned selection model");
-assert.match(page, /input\[data-kpi-row-selector\][\s\S]*classList\.toggle\("is-selected"/,
-  "app-owned row hooks reconcile selector and row styling without refreshing a retiring Data Grid");
+assert.match(page, /inputRef\.current\.indeterminate = selectedCount > 0 && !allSelected/,
+  "the native select-all control must reflect the page-owned selection model");
+assert.match(page, /selected=\{selectedIds\.has\(row\.id\)\}/,
+  "native row selectors must be controlled by scoped selection state");
 
 assert.match(model, /"view" \| "editing" \| "dirty" \| "saving" \| "cancelling"/);
 assert.match(model, /generation:\s*state\.generation \+ 1/);
@@ -38,6 +35,9 @@ assert.match(page, /if \(saving \|\| editStateRef\.current\.phase === "saving"/)
 assert.match(page, /event\.key === "Enter"/);
 assert.match(page, /event\.key === "Escape"/);
 assert.match(page, /event\.key === "Tab"/);
+assert.match(page, /tabIndex=\{0\}[\s\S]*onKeyDown[\s\S]*onKeyUp[\s\S]*beginEditing\(row, field, event\.currentTarget\)/);
+assert.match(page, /aria-controls=\{`kpi-workload-options-[\s\S]*aria-activedescendant=/);
+assert.match(page, /aria-selected=\{activeWorkloadIndex ===/);
 assert.match(page, /document\.addEventListener\("pointerdown", finishOnOutsidePointer, true\)/);
 assert.match(page, /editRowSnapshotRef\.current/);
 assert.match(page, /reconcileDraft\(current, snapshot\)/);
@@ -49,7 +49,7 @@ assert.match(contract, /H:\s*\[manageTime, field\("title", "Content", "textarea"
 assert.match(styles, /\.kpi-cell-editor-overlay--textarea\s*\{[^}]*min-height:\s*8rem/);
 assert.match(styles, /\.kpi-cell-editor-control--textarea\s*\{[^}]*min-height:\s*8rem[^}]*overflow:\s*auto[^}]*padding:\s*\.75rem/);
 assert.doesNotMatch(page, /cellOptions[\s\S]{0,400}height:152px/,
-  "the editor overlay owns multiline height; the virtualized Data Grid row must not claim an ineffective fixed height");
+  "the editor overlay owns multiline height");
 
 assert.match(page, /id={`kpi-workload-launcher-\$\{state\.generation\}`}/);
 assert.match(page, /getBusyContext\(\)\.whenReady\(\)\.then\(\(\) => window\.requestAnimationFrame/);
@@ -67,7 +67,7 @@ assert.doesNotMatch(page, /setTimeout\(openPopup/);
 assert.match(page, /is-unsaved-cell/);
 assert.match(page, /kpi-manage-time-reflected-row/);
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*background:\s*#d9438f[^}]*bottom:\s*0[^}]*height:\s*3px/);
-assert.match(styles, /\.kpi-grid-cell\.kpi-manage-time-reflected-row\s*\{[^}]*background:\s*#eaf4ec/);
+assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*#eaf4ec/);
 assert.match(page, /setDrafts\(\[\]\)/);
 
 assert.match(page, /class="kpi-saving-dialog"/);
@@ -83,28 +83,29 @@ assert.match(page, /if \(drafts\.length === 0\) return/,
 assert.match(page, /nextKpiSort/);
 assert.match(page, /sortKpiActivityRows/);
 assert.match(page, /class="kpi-grid-sort-button"/);
-assert.match(page, /closest\('\[role="columnheader"\]'\)\?\.setAttribute\("aria-sort"/,
-  "sort state belongs on the public columnheader role, not the nested button");
+assert.match(page, /<th key=\{field\.key\} class="kpi-grid-column-header" scope="col" aria-sort=\{ariaSort\}/,
+  "sort state belongs directly on the native column header");
 assert.match(model, /if \(leftDraft !== rightDraft\) return leftDraft \? -1 : 1/,
   "new draft rows stay first under sorting");
 assert.match(model, /fixedWidthFor/);
 assert.match(model, /flexibleBudget/);
 assert.match(model, /flexibleMinimumTotal[\s\S]*Math\.max\(flexibleMinimumTotal/,
   "flexible columns retain readable minimums while fixed-width fields remain stable");
-assert.match(page, /new ResizeObserver/);
-assert.match(page, /computeKpiColumnLayout\(fields, width\)/);
-assert.match(page, /header=\{headerOptions\}/);
-assert.match(styles, /\.kpi-jet-editable-grid\s*\{[^}]*min-width:\s*0[^}]*width:\s*100%/);
+assert.doesNotMatch(page, /new ResizeObserver/,
+  "native table width calculation must not create a self-observing ResizeObserver loop");
+assert.match(page, /window\.addEventListener\("resize", schedule\)/);
+assert.match(page, /computeKpiColumnLayout\(fields, host\.getBoundingClientRect\(\)\.width\)/);
+assert.match(page, /<colgroup>[\s\S]*columnLayout\.widths\[field\.key\]/);
+assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*#8b3a2f/);
 
-assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/);
-assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiGridProviderRow>\(\[\], \{ keyAttributes: "__gridRowKey" \}\), \[gridSchemaKey\]\)/);
-assert.match(page, /dataProvider\.data = providerRows/);
-assert.match(page, /new RowDataGridProvider[\s\S]*dataProvider/);
-assert.match(page, /selectionMode=\{KPI_GRID_SELECTION_MODE\}/);
+assert.match(page, /const tableScopeKey = `\$\{fiscalYear\}:\$\{activeTab\}`/);
+assert.match(page, /selectionByScope\[tableScopeKey\]/);
+assert.match(page, /sortByScope\[tableScopeKey\]/);
+assert.doesNotMatch(page, /key=\{tableScopeKey\}/, "KPI/FY transitions must not remount the native table");
 assert.match(page, /data-kpi-row-selector=\{rowId\}/);
 assert.match(page, /type="checkbox" aria-label="Select all KPI activities"/);
-assert.match(page, /className:[\s\S]*kpi-reflected-grid-cell/);
+assert.match(page, /row\.manageTimeReflected \? "kpi-manage-time-reflected-row"/);
 
 assert.match(page, /Promise\.allSettled\(draftSnapshot\.map/);
 assert.match(page, /sessionVersion\.current !== saveSession/);

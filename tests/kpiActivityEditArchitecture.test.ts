@@ -94,21 +94,46 @@ assert.ok(d1Layout.totalWidth > 860, "narrow viewports retain fixed widths and s
 const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheetPage.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
 
-assert.match(page, /editMode="none"/, "KPI Activities must not delegate editor lifetime to cached JET cellEdit renderers");
+assert.doesNotMatch(page, /oj-data-grid|RowDataGridProvider|MutableArrayDataProvider|ojDataGrid|dataGridProvider|providerMutationGenerationRef|providerSettlementRef|loadSkeletons|fillViewport/,
+  "KPI Activities must not retain Oracle JET Data Grid providers or viewport lifecycle code");
+assert.match(page, /<table[^>]*class="kpi-activities-table"[\s\S]*<thead>[\s\S]*<tbody>/,
+  "KPI Activities must render a Preact-owned native table");
+assert.match(page, /<tr key=\{`\$\{tableScopeKey\}:\$\{row\.id\}`\}[\s\S]*data-kpi-row-id=\{row\.id\}/,
+  "each KPI activity row must be keyed by KPI\/FY scope plus canonical row identity");
 assert.doesNotMatch(page, /onojBeforeEdit|onojBeforeEditEnd|_ojBridge|resizeColWidth|editEndingRef|pendingProgrammaticEditRef/,
   "retired cached-editor and private resize lifecycle must be removed");
 assert.match(page, /data-kpi-single-editor/, "one page-owned editor overlay must be the only editable DOM surface");
 assert.match(page, /KpiActivityEditState|transitionKpiActivityEdit/, "the explicit edit state contract must drive the page");
-assert.match(page, /providerMutationGenerationRef[\s\S]*getBusyContext\(\)[\s\S]*whenReady\(\)[\s\S]*isConnected/,
-  "Save reconciliation must serialize DataProvider mutation behind generation, BusyContext, and DOM connectivity guards");
-assert.match(page, /if \(saved\.length > 0\) \{[\s\S]*providerSettled = new Promise<boolean>/,
-  "all-failed Save results must not await a provider mutation that cannot occur");
-assert.match(page, /providerSettlementRef[\s\S]*pending\.resolve\(false\)/,
-  "unmount and failed reconciliation must release the Save settlement instead of hanging the modal");
-assert.match(page, /providerRowCacheRef[\s\S]*keyAttributes:\s*"__gridRowKey"/,
-  "draft-to-server reconciliation must keep one stable provider key without cloning unchanged rows");
+assert.match(page, /tabIndex=\{0\}[\s\S]*\["Enter", " ", "Space", "Spacebar", "F2"\][\s\S]*onKeyUp[\s\S]*beginEditing\(row, field, event\.currentTarget\)/,
+  "native editable cells must support keyboard entry with Enter and Space");
 assert.match(page, /id={`kpi-workload-launcher-\$\{state\.generation\}`}/,
   "each workload edit generation must own one concrete launcher");
+assert.match(page, /aria-controls=\{`kpi-workload-options-[\s\S]*aria-expanded=\{workloadActive\}[\s\S]*aria-activedescendant=/,
+  "the workload combobox must expose its popup and active option state");
+assert.match(page, /event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"[\s\S]*setActiveWorkloadIndex/,
+  "the workload popup must support keyboard option traversal");
+assert.equal(KPI_FIELD_CONTRACTS.B.find((field) => field.key === "title")?.type, "textarea",
+  "SR Description must use the shared multiline textarea keyboard contract");
+assert.deepEqual(KPI_FIELD_CONTRACTS.H.find((field) => field.key === "title"), { key: "title", label: "Content", type: "textarea" },
+  "H Content must use the shared multiline textarea keyboard contract");
+assert.match(page, /const blockContractKey[\s\S]*field\.type === "workload"[\s\S]*ArrowDown[\s\S]*ArrowUp/,
+  "Arrow keys must be blocked only for the workload combobox so native select controls retain keyboard navigation");
+assert.match(page, /const blockContractKey[\s\S]*event\.target instanceof HTMLTextAreaElement[\s\S]*event\.key === "Enter"[\s\S]*event\.shiftKey[\s\S]*return/,
+  "Shift+Enter must bypass keydown blocking so multiline textarea editors retain the native newline action");
+assert.match(page, /const keyContract[\s\S]*event\.key === "Enter"[\s\S]*HTMLTextAreaElement[\s\S]*event\.shiftKey[\s\S]*closePopup\(\); onFinish\(\)/,
+  "plain Enter must finish textarea editing while Shift+Enter remains inside the editor");
+assert.match(page, /state\.generation[\s\S]*setActiveWorkloadIndex\(0\)/,
+  "each edit generation must reset the workload active option");
+assert.match(page, /setActiveWorkloadIndex\(\(current\) => Math\.min\(current, page\.items\.length\)\)/,
+  "replacement workload results must clamp the active option to the available boundary");
+assert.match(page, /role="combobox"[\s\S]*aria-controls=\{`kpi-workload-options-/,
+  "the workload search input must expose explicit combobox semantics");
+assert.match(page, /role="option" aria-selected=\{activeWorkloadIndex === 0\}[\s\S]*aria-selected=\{activeWorkloadIndex === index \+ 1\}/,
+  "workload options must expose the active option through aria-selected");
+assert.match(page, /window\.addEventListener\("keyup", finishKeyboardAfterFocusMove\)[\s\S]*onMove\(event\.shiftKey \? -1 : 1\)/,
+  "Escape and Tab must complete even when popup or native focus movement changes the keyup target");
+assert.match(page, /window\.addEventListener\("keydown", retainEditorFocusUntilKeyUp, true\)/,
+  "Tab and Escape default focus movement must be blocked at capture time");
 assert.match(page, /getBoundingClientRect\(\)[\s\S]*width <= 0[\s\S]*popup\.open/,
   "workload results may open only after the real launcher has non-zero geometry");
 assert.match(page, /oj-progress-circle[\s\S]*Saving KPI activities/, "Save must expose a modal progress dialog");
@@ -118,23 +143,22 @@ assert.match(page, /settleSavingDialogClosed[\s\S]*whenReady\(\)[\s\S]*dialog\.c
   "terminal Save state must wait for the public close and BusyContext contract");
 assert.match(page, /Save changes[\s\S]*Discard changes[\s\S]*Keep editing/,
   "Cancel confirmation must provide save, discard, and keep-editing choices");
-assert.match(page, /kpi-grid-sort-button/, "sortable headers must use the public column header template");
-assert.match(page, /const gridSchemaKey = `\$\{fiscalYear\}:\$\{activeTab\}`/,
-  "KPI and fiscal-year changes must create one explicit Grid schema generation");
+assert.match(page, /class="kpi-grid-column-header"[^>]*aria-sort=\{ariaSort\}[\s\S]*class="kpi-grid-sort-button"/,
+  "native table headers must expose clickable sorting and aria-sort");
+assert.match(page, /const tableScopeKey = `\$\{fiscalYear\}:\$\{activeTab\}`/,
+  "KPI and fiscal-year changes must create one explicit native-table state scope");
 assert.match(page, /row\.fiscalYear === fiscalYear/,
-  "rows from the previous fiscal-year render must not enter the replacement provider generation");
+  "rows from the previous fiscal-year must not enter the active native table");
 assert.match(page, /draft\.fiscalYear === fiscalYear[\s\S]*draft\.kpiCode === activeTab/,
-  "draft overlays must be scoped to the active KPI/FY generation");
-assert.match(page, /key=\{gridSchemaKey\}[\s\S]*data-kpi-grid-schema=\{gridSchemaKey\}/,
-  "the public Data Grid must restamp headers and columns on schema generation changes");
-assert.match(page, /settleGridBeforeNavigation[\s\S]*waitForFrame\(\)[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*grid !== gridRef\.current[\s\S]*!grid\.isConnected/,
-  "outgoing Grid generations must settle before a KPI/FY schema restamp");
-assert.match(page, /navigationQueueRef[\s\S]*navigationQueueRef\.current\.then\(\(\) => settleGridBeforeNavigation\(action\)\)/,
-  "rapid KPI/FY requests must settle in order instead of racing Grid generations");
-assert.match(page, /MutableArrayDataProvider[\s\S]*\[gridSchemaKey\]/,
-  "each schema generation must own its MutableArrayDataProvider");
-assert.match(styles, /\.kpi-jet-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/,
-  "Grid scrolling must remain contained without page-level horizontal overflow");
+  "draft overlays must be scoped to the active KPI/FY table state");
+assert.doesNotMatch(page, /key=\{(?:gridSchemaKey|tableScopeKey)\}/,
+  "the native table DOM identity must not be remounted on KPI/FY changes");
+assert.match(page, /requestProtectedNavigation[\s\S]*finishEditing\(\)[\s\S]*if \(drafts\.length === 0\)/,
+  "navigation must finish the single editor and preserve dirty-data protection without a JET settlement queue");
+assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/,
+  "native table scrolling must remain contained without page-level horizontal overflow");
+assert.match(styles, /\.kpi-activities-table\s*\{[^}]*border-collapse:\s*collapse[^}]*table-layout:\s*fixed/,
+  "native KPI activity table must own deterministic column geometry");
 assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*white-space:\s*nowrap/,
   "header titles must remain on one line");
 assert.match(styles, /\.kpi-grid-cell--fixed\s*>\s*span\s*\{[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/,

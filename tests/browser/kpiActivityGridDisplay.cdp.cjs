@@ -53,24 +53,29 @@ class Cdp {
 }
 
 const codes = ["A", "B", "C1", "C2", "D1", "F", "H"];
-const rowsFor = (fiscalYear) => codes.map((code, index) => ({
-  id: (fiscalYear === "FY27" ? 2700 : 2600) + index,
+const fixtureCounts = {
+  FY26: { A: 3, B: 37, C1: 14, C2: 14, D1: 40, F: 3, H: 3 },
+  FY27: { A: 0, B: 9, C1: 3, C2: 0, D1: 11, F: 0, H: 1 }
+};
+const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
+  Array.from({ length: fixtureCounts[fiscalYear][code] }, (_, rowIndex) => ({
+  id: (fiscalYear === "FY27" ? 270000 : 260000) + codeIndex * 1000 + rowIndex,
   versionNo: 1,
-  manageTimeReflected: true,
+  manageTimeReflected: rowIndex % 2 === 0,
   fiscalYear,
   kpiCode: code,
-  quarter: "Q1",
-  activityMonth: code === "A" ? "2026-08" : null,
-  rawWorkload: ["B", "C1", "C2", "D1"].includes(code) ? "PARAMETA - Superconnect / OPPTY-123456" : null,
-  workloadId: ["B", "C1", "C2", "D1"].includes(code) ? 4000 + index : null,
+  quarter: ["Q1", "Q2", "Q3", "Q4"][rowIndex % 4],
+  activityMonth: code === "A" ? `2026-${String((rowIndex % 12) + 1).padStart(2, "0")}` : null,
+  rawWorkload: ["B", "C1", "C2", "D1"].includes(code) ? `PARAMETA ${rowIndex} - Superconnect / OPPTY-${123456 + rowIndex}` : null,
+  workloadId: ["B", "C1", "C2", "D1"].includes(code) ? 4000 + codeIndex * 100 + rowIndex : null,
   mappingStatus: ["B", "C1", "C2", "D1"].includes(code) ? "VERIFIED" : "NOT_REQUIRED",
-  srNumber: code === "H" ? "SR0001234567" : "SR0007654321",
-  description: code === "D1" ? "Solution Deployment" : code === "H" ? "Technical content with full visible title" : `${code} complete operating description`,
-  salesStage: code === "D1" ? "VALIDATED" : null,
-  acrK: code === "D1" ? 2000 : null,
-  targetQuarter: code === "D1" ? "Q1" : null,
-  deliveryDate: "2026-08-19"
-}));
+  srNumber: `SR${String(7654321 + rowIndex).padStart(10, "0")}`,
+  description: code === "D1" ? ["Solution Design", "Solution Proposal", "Solution Deployment"][rowIndex % 3] : code === "H" ? `Technical content ${rowIndex} with full visible title` : `${code} complete operating description ${rowIndex}`,
+  salesStage: code === "D1" ? ["IDENTIFIED", "VALIDATED", "ONBOARDED"][rowIndex % 3] : null,
+  acrK: code === "D1" ? 500 + rowIndex * 10 : null,
+  targetQuarter: code === "D1" ? ["Q1", "Q2", "Q3", "Q4"][rowIndex % 4] : null,
+  deliveryDate: `2026-${String((rowIndex % 12) + 1).padStart(2, "0")}-${String((rowIndex % 27) + 1).padStart(2, "0")}`
+})));
 
 (async () => {
   const targets = await getJson(`http://127.0.0.1:${cdpPort}/json/list`);
@@ -98,14 +103,24 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
     if (url.pathname.endsWith("/overview")) return fulfill(200, {
       fiscalYear,
       asOf: "2026-08-19",
-      items: codes.map((code) => ({ code, rows: 1, target: "Fixture", status: "In Progress", explanation: "Fixture" }))
+      items: codes.map((code) => ({ code, rows: fixtureCounts[fiscalYear][code], target: "Fixture", status: "In Progress", explanation: "Fixture" }))
     });
-    if (url.pathname.endsWith("/workload-options")) return fulfill(200, { items: [], total: 0, hasMore: false });
+    if (url.pathname.endsWith("/workload-options")) return fulfill(200, {
+      items: [
+        { workloadId: 9101, accountName: "Keyboard Account A", workloadName: "Workload Alpha", opptyNo: "OPPTY-KB-001" },
+        { workloadId: 9102, accountName: "Keyboard Account B", workloadName: "Workload Beta", opptyNo: "OPPTY-KB-002" },
+        { workloadId: 9103, accountName: "Keyboard Account C", workloadName: "Workload Gamma", opptyNo: null }
+      ],
+      total: 3,
+      hasMore: false
+    });
     return fulfill(200, { items: rowsFor(fiscalYear) });
   });
 
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
   if (!realApi) await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/kpi-activities*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `
     window.__kpiGridDisplay = { errors: [], rejections: [] };
@@ -153,6 +168,8 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
         });
       };
       const tabIndex = { A: 1, B: 2, C1: 3, C2: 4, D1: 5, F: 6, H: 7 };
+      let stableTable = null;
+      let maxEditors = 0;
       const selectGrid = async (fy, code) => {
         const fyButton = buttonByText(fy, document);
         if (fyButton && fyButton.getAttribute("aria-pressed") !== "true" && !fyButton.classList.contains("is-active")) fyButton.click();
@@ -162,23 +179,28 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
           tabButton.click();
         }
         const schema = fy + ":" + code;
-        const grid = await waitFor(() => document.querySelector('oj-data-grid[data-kpi-grid-schema="' + schema + '"]'), schema);
-        await settle(grid);
-        await waitFor(() => grid.querySelectorAll(".kpi-grid-header-title").length > 0, schema + " headers");
-        return grid;
+        const wrapper = await waitFor(() => document.querySelector('.kpi-activities-table-wrap[data-kpi-table-scope="' + schema + '"]'), schema);
+        const table = await waitFor(() => wrapper.querySelector(".kpi-activities-table"), schema + " table");
+        await settle(table);
+        await waitFor(() => table.querySelectorAll(".kpi-grid-header-title").length === expected[code].length, schema + " headers");
+        maxEditors = Math.max(maxEditors, document.querySelectorAll("[data-kpi-single-editor]").length);
+        if (maxEditors > 1) throw new Error("duplicate KPI editors detected at " + schema);
+        if (stableTable === null) stableTable = table;
+        else if (table !== stableTable) throw new Error("native KPI table DOM identity changed at " + schema);
+        return table;
       };
       const inspectGrid = async (fy, code) => {
         const grid = await selectGrid(fy, code);
-        const wrapper = grid.closest(".kpi-jet-table-wrap");
-        const totalWidth = Number.parseFloat(getComputedStyle(wrapper).getPropertyValue("--kpi-grid-content-width")) || grid.clientWidth;
+        const wrapper = grid.closest(".kpi-activities-table-wrap");
+        const totalWidth = grid.scrollWidth;
         const positions = [];
-        for (let x = 0; x <= Math.max(0, totalWidth - grid.clientWidth) + 400; x += 400) positions.push(Math.min(x, Math.max(0, totalWidth - grid.clientWidth)));
+        for (let x = 0; x <= Math.max(0, totalWidth - wrapper.clientWidth) + 400; x += 400) positions.push(Math.min(x, Math.max(0, totalWidth - wrapper.clientWidth)));
         const seen = new Set();
         const wrapFailures = [];
         const overlapFailures = [];
         const fixedEllipsis = [];
         for (const x of [...new Set(positions)]) {
-          grid.scrollPosition = { x, y: 0 };
+          wrapper.scrollLeft = x;
           await settle(grid);
           for (const title of grid.querySelectorAll(".kpi-grid-header-title")) {
             const text = title.textContent.trim();
@@ -195,12 +217,13 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
           }
         }
         const missing = expected[code].filter(label => !seen.has(label));
-        return { fy, code, schema: grid.dataset.kpiGridSchema, missing, wrapFailures, overlapFailures, fixedEllipsis,
-          totalWidth, viewportWidth: grid.clientWidth, documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        return { fy, code, schema: wrapper.dataset.kpiTableScope, missing, wrapFailures, overlapFailures, fixedEllipsis,
+          rowCount: grid.querySelectorAll("tbody tr").length, totalWidth, viewportWidth: wrapper.clientWidth,
+          documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
       };
 
-      const gridA = await selectGrid(${JSON.stringify(realApi ? "FY26" : "FY27")}, "A");
-      gridA.scrollPosition = { x: 0, y: 0 };
+      const gridA = await selectGrid("FY26", "A");
+      gridA.closest(".kpi-activities-table-wrap").scrollLeft = 0;
       await settle(gridA);
       const reflected = await waitFor(() => gridA.querySelector('.kpi-grid-cell.kpi-manage-time-reflected-row[data-kpi-grid-field="title"]'), "reflected title");
       reflected.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
@@ -222,6 +245,13 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
       const sortedCell = await waitFor(() => [...gridA.querySelectorAll('.is-unsaved-cell[data-kpi-grid-field="title"]')].find(cell => cell.textContent.includes(marker)), "sorted draft cell");
       const lineAfterSort = getComputedStyle(sortedCell, "::after");
       const draftAfterSort = { text: sortedCell.textContent.trim(), background: lineAfterSort.backgroundColor, height: lineAfterSort.height };
+      const draftViewport = gridA.closest(".kpi-activities-table-wrap");
+      draftViewport.scrollLeft = draftViewport.scrollWidth;
+      draftViewport.dispatchEvent(new Event("scroll"));
+      await new Promise(resolve => window.setTimeout(resolve, 32));
+      const viewportCell = await waitFor(() => [...gridA.querySelectorAll('.is-unsaved-cell[data-kpi-grid-field="title"]')].find(cell => cell.textContent.includes(marker)), "viewport draft cell");
+      const lineAfterViewport = getComputedStyle(viewportCell, "::after");
+      const draftAfterViewport = { text: viewportCell.textContent.trim(), background: lineAfterViewport.backgroundColor, height: lineAfterViewport.height };
       const currentTab = buttonByText("1 to many", document.querySelector('[aria-label="KPI Activities tabs"]') || document);
       if (!currentTab) throw new Error("current KPI tab missing: " + [...document.querySelectorAll("button, oj-button")].map(button => button.textContent.replace(/\s+/g, " ").trim()).join(" | "));
       currentTab.click();
@@ -230,17 +260,67 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
       const cancelButton = buttonByText("Cancel", document.querySelector(".kpi-activity-toolbar") || document);
       if (!cancelButton) throw new Error("Cancel missing in phase " + page.dataset.kpiEditPhase + ": " + document.querySelector(".kpi-activity-toolbar")?.textContent);
       cancelButton.click();
-      const cancelDialog = await waitFor(() => [...document.querySelectorAll("oj-dialog")].find(dialog => dialog.isOpen?.() && dialog.textContent.includes("Discard changes")), "cancel dialog");
+      let cancelDialog = await waitFor(() => [...document.querySelectorAll("oj-dialog")].find(dialog => dialog.isOpen?.() && dialog.textContent.includes("Discard changes")), "cancel dialog");
+      const cancelOptions = ["Save changes", "Keep editing", "Discard changes"].filter(label => cancelDialog.textContent.includes(label));
+      const keepLeaf = [...cancelDialog.querySelectorAll("*")].find(element => element.childElementCount === 0 && element.textContent.trim() === "Keep editing");
+      const keepButton = keepLeaf?.closest("oj-button") || keepLeaf;
+      if (!keepButton) throw new Error("Keep editing missing: " + cancelDialog.textContent);
+      keepButton.dispatchEvent(new CustomEvent("ojAction", { bubbles: true, composed: true }));
+      await waitFor(() => !cancelDialog.isOpen?.(), "keep editing close");
+      const draftAfterKeepEditing = Boolean(document.querySelector(".is-unsaved-cell"));
+      cancelButton.click();
+      cancelDialog = await waitFor(() => [...document.querySelectorAll("oj-dialog")].find(dialog => dialog.isOpen?.() && dialog.textContent.includes("Discard changes")), "cancel dialog reopen");
       const discardLeaf = [...document.querySelectorAll("*")].find(element => element.childElementCount === 0 && element.textContent.trim() === "Discard changes");
       const discardButton = discardLeaf?.closest("oj-button") || discardLeaf;
       if (!discardButton) throw new Error("Discard changes missing: " + cancelDialog.textContent);
       discardButton.dispatchEvent(new CustomEvent("ojAction", { bubbles: true, composed: true }));
       await waitFor(() => page.dataset.kpiEditPhase === "view" && !document.querySelector(".is-unsaved-cell"), "discard settled");
 
-      for (const fy of ["FY26", "FY27"]) {
-        for (const code of ${JSON.stringify(codes)}) results.push(await inspectGrid(fy, code));
+      const gridB = await selectGrid("FY26", "B");
+      const selectedRow = gridB.querySelector("tbody tr");
+      const selectedRowId = selectedRow?.dataset.kpiRowId;
+      const rowCheckbox = selectedRow?.querySelector('input[data-kpi-row-selector]');
+      if (!selectedRowId || !rowCheckbox) throw new Error("B selection fixture missing");
+      rowCheckbox.click();
+      await waitFor(() => rowCheckbox.checked, "B row selected");
+      const workloadSort = gridB.querySelector('[data-kpi-sort-field="accountWorkload"]');
+      workloadSort.click();
+      await waitFor(() => workloadSort.closest("th")?.getAttribute("aria-sort") === "ascending", "B workload sort");
+      const toolbarLabels = [...document.querySelectorAll(".kpi-activity-toolbar button")].map(button => button.textContent.trim());
+      const deleteOnly = {
+        delete: toolbarLabels.includes("Delete"),
+        save: toolbarLabels.includes("Save"),
+        cancel: toolbarLabels.includes("Cancel")
+      };
+      await selectGrid("FY26", "C1");
+      const gridBAgain = await selectGrid("FY26", "B");
+      const restoredCheckbox = gridBAgain.querySelector('input[data-kpi-row-selector="' + selectedRowId + '"]');
+      const restoredSort = gridBAgain.querySelector('[data-kpi-sort-field="accountWorkload"]')?.closest("th")?.getAttribute("aria-sort");
+      const scopedState = { selection: Boolean(restoredCheckbox?.checked), sort: restoredSort };
+      const workloadCell = await waitFor(() => gridBAgain.querySelector('[data-kpi-grid-field="accountWorkload"]'), "workload cell");
+      workloadCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
+      const workloadInput = await waitFor(() => document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]'), "workload editor");
+      const workloadPopup = await waitFor(() => [...document.querySelectorAll("oj-popup.kpi-workload-results-popup")].find(popup => popup.isOpen?.()), "workload popup");
+      maxEditors = Math.max(maxEditors, document.querySelectorAll("[data-kpi-single-editor]").length);
+      const workloadRect = workloadCell.getBoundingClientRect();
+      const editorRect = document.querySelector("[data-kpi-single-editor]").getBoundingClientRect();
+      const popupPosition = workloadPopup.getProperty("position");
+      const popupContract = {
+        open: workloadPopup.isOpen(),
+        anchoredToLauncher: popupPosition?.of === "#" + workloadInput.id,
+        editorMatchesCell: Math.abs(editorRect.left - workloadRect.left) <= 1 && Math.abs(editorRect.top - workloadRect.top) <= 1
+      };
+      document.querySelector(".kpi-activity-toolbar").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+      await waitFor(() => !document.querySelector("[data-kpi-single-editor]"), "workload editor close");
+
+      const forward = ["FY26", "FY27"].flatMap(fy => ${JSON.stringify(codes)}.map(code => [fy, code]));
+      const reverse = [...forward].reverse();
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        for (const [fy, code] of forward) results.push({ cycle, direction: "forward", ...(await inspectGrid(fy, code)) });
+        for (const [fy, code] of reverse) results.push({ cycle, direction: "reverse", ...(await inspectGrid(fy, code)) });
       }
-      return { results, draftBeforeSort, draftAfterSort, draftAfterCurrentTab,
+      return { results, draftBeforeSort, draftAfterSort, draftAfterViewport, draftAfterCurrentTab, cancelOptions, draftAfterKeepEditing, deleteOnly, scopedState, popupContract,
+        maxEditors, jetGridCount: document.querySelectorAll("oj-data-grid").length,
         errors: window.__kpiGridDisplay.errors, rejections: window.__kpiGridDisplay.rejections };
     })()`,
     awaitPromise: true,
@@ -248,6 +328,119 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
   });
   if (evaluation.exceptionDetails) throw new Error(evaluation.exceptionDetails.exception?.description || evaluation.exceptionDetails.text);
   const result = evaluation.result.value;
+  const evalPage = async (expression) => {
+    const response = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text);
+    return response.result.value;
+  };
+  const waitPage = async (expression, label, timeoutMs = 18000) => {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const value = await evalPage(expression);
+      if (value) return value;
+      await delay(40);
+    }
+    throw new Error(`wait timeout: ${label}`);
+  };
+  const pressKey = async (key, code, windowsVirtualKeyCode, modifiers = 0, text = undefined) => {
+    await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code, windowsVirtualKeyCode, nativeVirtualKeyCode: windowsVirtualKeyCode, modifiers, text });
+    await delay(20);
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode, nativeVirtualKeyCode: windowsVirtualKeyCode, modifiers });
+  };
+
+  await cdp.send("Page.bringToFront");
+  await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
+  await waitPage(`location.pathname.endsWith("activity-b") && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')`, "keyboard B route");
+  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]')`, "trusted Enter workload editor");
+  await waitPage(`document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]').length > 1`, "trusted workload options");
+  const keyboardAria = await evalPage(`(() => {
+    const input = document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]');
+    const options = [...document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]')];
+    const cell = document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]');
+    const editor = document.querySelector('[data-kpi-single-editor]');
+    const popup = [...document.querySelectorAll('oj-popup.kpi-workload-results-popup')].find(item => item.isOpen?.());
+    const cellRect = cell.getBoundingClientRect(); const editorRect = editor.getBoundingClientRect();
+    return { controls: input.getAttribute("aria-controls"), expanded: input.getAttribute("aria-expanded"),
+      activeDescendant: input.getAttribute("aria-activedescendant"), selected: options.map(option => option.getAttribute("aria-selected")),
+      anchor: popup.getProperty("position")?.of === "#" + input.id,
+      editorMatchesCell: Math.abs(editorRect.left - cellRect.left) <= 1 && Math.abs(editorRect.top - cellRect.top) <= 1 };
+  })()`);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 });
+  await delay(20);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 });
+  await waitPage(`(() => { const input=document.querySelector('[data-kpi-single-editor] input'); const options=document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]'); return input?.getAttribute("aria-activedescendant")?.endsWith("-1") && options[1]?.getAttribute("aria-selected") === "true"; })()`, "ArrowDown option");
+  await pressKey("ArrowUp", "ArrowUp", 38);
+  await waitPage(`(() => { const input=document.querySelector('[data-kpi-single-editor] input'); const options=document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]'); return input?.getAttribute("aria-activedescendant")?.endsWith("-0") && options[0]?.getAttribute("aria-selected") === "true"; })()`, "ArrowUp option");
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 });
+  await delay(20);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 });
+  const selectedWorkloadText = await evalPage(`document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]')[1].querySelector("strong").textContent.trim()`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]') && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')?.textContent.includes(${JSON.stringify(selectedWorkloadText)})`, "Enter workload draft");
+
+  await evalPage(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+  await waitPage(`(() => { const cell=document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]'); cell?.focus(); return document.activeElement === cell; })()`, "Space title focus");
+  await delay(80);
+  if (!(await evalPage(`document.activeElement === document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]')`))) {
+    await waitPage(`(() => { const cell=document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]'); cell?.focus(); return document.activeElement === cell; })()`, "Space title refocus");
+  }
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: " ", code: "Space", text: " ", windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  await delay(20);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: " ", code: "Space", windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "trusted Space title editor");
+  await pressKey("Escape", "Escape", 27);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "title Space Escape close");
+
+  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]')`, "workload Escape editor");
+  await waitPage(`document.querySelector('[data-kpi-single-editor] input')?.getAttribute("aria-activedescendant")?.endsWith("-0")`, "workload generation active option reset");
+  await pressKey("Escape", "Escape", 27);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "workload Escape close");
+
+  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]').focus(); true`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title Enter editor");
+  await waitPage(`document.activeElement === document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title textarea focus before Shift Enter");
+  const titleBeforeShiftEnter = await evalPage(`document.querySelector('[data-kpi-editor-field="title"] textarea').value`);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", text: "\r", unmodifiedText: "\r", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, modifiers: 8 });
+  await delay(20);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, modifiers: 8 });
+  await waitPage(`document.querySelectorAll('[data-kpi-single-editor]').length === 1 && document.querySelector('[data-kpi-editor-field="title"] textarea')`, "Shift Enter keeps one textarea editor");
+  await cdp.send("Input.insertText", { text: "\n" });
+  const titleAfterShiftEnter = await waitPage(`(() => { const textarea=document.querySelector('[data-kpi-editor-field="title"] textarea'); return textarea && textarea.value.includes("\\n") && textarea.value !== ${JSON.stringify(titleBeforeShiftEnter)} ? textarea.value : false; })()`, "Shift Enter native newline");
+  await waitPage(`document.querySelectorAll('[data-kpi-single-editor]').length === 1 && document.querySelector('[data-kpi-editor-field="title"] textarea')`, "Shift Enter keeps one textarea editor");
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]') && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]')?.textContent.includes(${JSON.stringify(titleAfterShiftEnter)})`, "plain Enter commits multiline draft and closes");
+  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]').focus(); true`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title re-enter before Tab");
+  await pressKey("Tab", "Tab", 9);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="quarter"] select')`, "Tab next editor");
+  await pressKey("Escape", "Escape", 27);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "quarter Escape close before Shift Tab");
+  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]').focus(); true`);
+  await pressKey("Enter", "Enter", 13);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title editor before Shift Tab");
+  await pressKey("Tab", "Tab", 9);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="quarter"] select')`, "Tab next editor before Shift Tab");
+  await pressKey("Tab", "Tab", 9, 8);
+  await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "Shift Tab previous editor");
+  await pressKey("Escape", "Escape", 27);
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "title Escape close");
+
+  const maxTrustedEditors = await evalPage(`document.querySelectorAll('[data-kpi-single-editor]').length`);
+  await evalPage(`[...document.querySelectorAll('.kpi-activity-toolbar button')].find(button => button.textContent.trim() === "Cancel").click(); true`);
+  await waitPage(`[...document.querySelectorAll("oj-dialog")].some(dialog => dialog.isOpen?.() && dialog.textContent.includes("Discard changes"))`, "keyboard cleanup dialog");
+  await evalPage(`(() => { const dialog=[...document.querySelectorAll("oj-dialog")].find(item => item.isOpen?.() && item.textContent.includes("Discard changes")); const leaf=[...dialog.querySelectorAll("*")].find(element => element.childElementCount===0 && element.textContent.trim()==="Discard changes"); (leaf.closest("oj-button") || leaf).dispatchEvent(new CustomEvent("ojAction",{bubbles:true,composed:true})); return true; })()`);
+  await waitPage(`document.querySelector('.kpi-spreadsheet-page')?.dataset.kpiEditPhase === "view" && !document.querySelector(".is-unsaved-cell")`, "keyboard cleanup settled");
+  const postKeyboardRuntime = await evalPage(`({ errors: window.__kpiGridDisplay.errors, rejections: window.__kpiGridDisplay.rejections })`);
+  result.errors = postKeyboardRuntime.errors;
+  result.rejections = postKeyboardRuntime.rejections;
+  result.keyboardContract = { enter: true, shiftEnter: titleAfterShiftEnter.includes("\n"), space: true, tab: true, shiftTab: true, escape: true,
+    workloadDraft: true, aria: keyboardAria, maxEditors: Math.max(result.maxEditors, maxTrustedEditors) };
   cdp.close();
   console.log(JSON.stringify({ realApi, result, mutationCalls, cdpExceptions }, null, 2));
 
@@ -255,18 +448,36 @@ const rowsFor = (fiscalYear) => codes.map((code, index) => ({
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.rejections, []);
   assert.deepEqual(cdpExceptions, []);
+  assert.equal(result.jetGridCount, 0, "KPI Activities path must not render a JET Data Grid");
+  assert.ok(result.maxEditors <= 1, "KPI Activities must own at most one external editor");
   assert.equal(result.draftAfterCurrentTab, true, "reselecting the current KPI must retain the draft render");
-  for (const draft of [result.draftBeforeSort, result.draftAfterSort]) {
+  assert.deepEqual(result.cancelOptions, ["Save changes", "Keep editing", "Discard changes"]);
+  assert.equal(result.draftAfterKeepEditing, true, "Keep editing must retain the draft");
+  assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
+  assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
+  assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
+  assert.deepEqual({ enter: result.keyboardContract.enter, shiftEnter: result.keyboardContract.shiftEnter, space: result.keyboardContract.space, tab: result.keyboardContract.tab,
+    shiftTab: result.keyboardContract.shiftTab, escape: result.keyboardContract.escape, workloadDraft: result.keyboardContract.workloadDraft },
+    { enter: true, shiftEnter: true, space: true, tab: true, shiftTab: true, escape: true, workloadDraft: true });
+  assert.ok(result.keyboardContract.maxEditors <= 1);
+  assert.ok(result.keyboardContract.aria.controls?.startsWith("kpi-workload-options-"));
+  assert.equal(result.keyboardContract.aria.expanded, "true");
+  assert.ok(result.keyboardContract.aria.activeDescendant?.endsWith("-0"));
+  assert.equal(result.keyboardContract.aria.selected[0], "true");
+  assert.equal(result.keyboardContract.aria.anchor, true);
+  assert.equal(result.keyboardContract.aria.editorMatchesCell, true);
+  for (const draft of [result.draftBeforeSort, result.draftAfterSort, result.draftAfterViewport]) {
     assert.equal(draft.text, "A changed reflected draft value");
     assert.equal(draft.background, "rgb(217, 67, 143)");
     assert.equal(draft.height, "3px");
   }
-  assert.equal(result.results.length, 14);
+  assert.equal(result.results.length, 84);
   for (const item of result.results) {
     assert.deepEqual(item.missing, [], `${item.schema} header titles`);
     assert.deepEqual(item.wrapFailures, [], `${item.schema} one-line headers`);
     assert.deepEqual(item.overlapFailures, [], `${item.schema} sort indicator separation`);
     assert.deepEqual(item.fixedEllipsis, [], `${item.schema} fixed values`);
+    if (!realApi) assert.equal(item.rowCount, fixtureCounts[item.fy][item.code], `${item.schema} fixture row count`);
     assert.ok(item.documentOverflow <= 1, `${item.schema} must not create page-level horizontal overflow`);
   }
 })().catch((error) => {

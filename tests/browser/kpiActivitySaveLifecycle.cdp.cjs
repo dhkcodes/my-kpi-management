@@ -107,6 +107,8 @@ class Cdp {
 
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
   await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/kpi-activities*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `
     window.__kpiSaveLifecycle = { errors: [], rejections: [], phases: [], dialogEvents: [], closeCalls: [], busyReadyAt: null };
@@ -141,7 +143,7 @@ class Cdp {
       };
       recordPhase();
       new MutationObserver(recordPhase).observe(page, { attributes: true, attributeFilter: ["data-kpi-edit-phase"] });
-      await waitFor(() => document.querySelector(".kpi-jet-table-wrap"), "grid");
+      await waitFor(() => document.querySelector('.kpi-activities-table-wrap[data-kpi-table-scope="FY27:A"]'), "native table");
       const contextModule = await new Promise((resolve, reject) => window.require(["ojs/ojcontext"], resolve, reject));
       const Context = contextModule.default || contextModule;
       await Context.getContext(page).getBusyContext().whenReady();
@@ -149,8 +151,7 @@ class Cdp {
       add.click();
       const draftCell = await waitFor(() => document.querySelector('[data-kpi-grid-row^="draft-"]'), "draft row");
       const draftKey = draftCell.dataset.kpiGridRow;
-      await waitFor(() => document.querySelector("[data-kpi-single-editor]"), "draft editor");
-      const titleCell = document.querySelector('[data-kpi-grid-row="' + draftKey + '"][data-kpi-grid-field="title"]');
+      const titleCell = await waitFor(() => document.querySelector('[data-kpi-grid-row="' + draftKey + '"][data-kpi-grid-field="title"]'), "draft title cell");
       titleCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
       const textarea = await waitFor(() => document.querySelector('[data-kpi-editor-field="title"] textarea'), "title textarea");
       textarea.value = ${JSON.stringify(marker)};
