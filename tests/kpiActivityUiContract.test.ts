@@ -94,10 +94,17 @@ assert.match(model, /flexibleMinimumTotal[\s\S]*Math\.max\(flexibleMinimumTotal/
 assert.doesNotMatch(page, /new ResizeObserver/,
   "native table width calculation must not create a self-observing ResizeObserver loop");
 assert.match(page, /window\.addEventListener\("resize", schedule\)/);
-assert.match(page, /computeKpiColumnLayout\(fields, host\.getBoundingClientRect\(\)\.width\)/);
+assert.match(page, /computeKpiColumnLayout\(fields, Math\.max\(0, host\.clientWidth - 1\)\)/,
+  "column layout must use the border-excluded viewport with one pixel of collapse\/rounding safety");
 assert.match(page, /<colgroup>[\s\S]*columnLayout\.widths\[field\.key\]/);
 assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*#8b3a2f/);
+assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align-content:\s*start/);
+assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/);
+assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*min-height:/,
+  "empty and one-row KPI tables must not reserve an artificial vertical spacer");
+assert.match(page, /class="kpi-summary-toggle"[\s\S]*aria-controls=\{summaryId\}[\s\S]*aria-expanded=\{summaryExpanded\}/);
+assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/);
 
 assert.match(page, /const tableScopeKey = `\$\{fiscalYear\}:\$\{activeTab\}`/);
 assert.match(page, /selectionByScope\[tableScopeKey\]/);

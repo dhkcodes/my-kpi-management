@@ -134,10 +134,10 @@ export type KpiColumnLayout = Readonly<{
 
 const fixedWidthFor = (field: KpiField): number | null => {
   if (field.type === "workload" || field.type === "textarea") return null;
-  if (field.type === "manageTime") return 132;
+  if (field.type === "manageTime") return 140;
   if (field.key === "srNumber") return 144;
   if (field.type === "date") return 140;
-  if (field.type === "quarter") return 148;
+  if (field.type === "quarter") return 156;
   if (field.type === "activity") return 164;
   if (field.type === "stage") return 132;
   if (field.key === "acrK") return 104;
@@ -147,7 +147,7 @@ const fixedWidthFor = (field: KpiField): number | null => {
 };
 
 const flexibleWeight = (field: KpiField) => field.type === "workload" ? 1.2 : 1;
-const flexibleMinimum = (_field: KpiField) => 320;
+const flexibleMinimum = (field: KpiField) => field.type === "workload" ? 220 : 200;
 
 export const computeKpiColumnLayout = (
   fields: readonly KpiField[],

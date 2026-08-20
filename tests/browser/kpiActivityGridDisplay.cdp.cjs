@@ -120,6 +120,7 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
   await cdp.send("Network.enable");
+  await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
   if (!realApi) await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/kpi-activities*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `
@@ -217,8 +218,14 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
           }
         }
         const missing = expected[code].filter(label => !seen.has(label));
+        const pagePanel = document.querySelector(".kpi-spreadsheet-page");
+        const previousPanel = pagePanel.previousElementSibling;
         return { fy, code, schema: wrapper.dataset.kpiTableScope, missing, wrapFailures, overlapFailures, fixedEllipsis,
           rowCount: grid.querySelectorAll("tbody tr").length, totalWidth, viewportWidth: wrapper.clientWidth,
+          wrapperOverflow: wrapper.scrollWidth - wrapper.clientWidth,
+          tableHeight: wrapper.getBoundingClientRect().height,
+          contentAlign: getComputedStyle(pagePanel.parentElement).alignContent,
+          topGap: pagePanel.getBoundingClientRect().top - previousPanel.getBoundingClientRect().bottom,
           documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
       };
 
@@ -313,6 +320,85 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
       document.querySelector(".kpi-activity-toolbar").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
       await waitFor(() => !document.querySelector("[data-kpi-single-editor]"), "workload editor close");
 
+      const discardDrafts = async () => {
+        const cancel = buttonByText("Cancel", document.querySelector(".kpi-activity-toolbar") || document);
+        if (!cancel) return;
+        cancel.click();
+        const dialog = await waitFor(() => [...document.querySelectorAll("oj-dialog")].find(item => item.isOpen?.() && item.textContent.includes("Discard changes")), "discard dialog");
+        const leaf = [...dialog.querySelectorAll("*")].find(element => element.childElementCount === 0 && element.textContent.trim() === "Discard changes");
+        (leaf.closest("oj-button") || leaf).dispatchEvent(new CustomEvent("ojAction", { bubbles: true, composed: true }));
+        await waitFor(() => page.dataset.kpiEditPhase === "view" && !document.querySelector(".is-unsaved-cell"), "discard clean");
+      };
+
+      await selectGrid("FY26", "A");
+      const quarterToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiTargetQuarterCountSummary"]'), "quarter summary toggle");
+      const quarterSummary = document.getElementById("kpiTargetQuarterCountSummary");
+      const tableBeforeQuarterHide = document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top;
+      quarterToggle.click();
+      await waitFor(() => quarterToggle.getAttribute("aria-expanded") === "false" && quarterSummary.hidden, "quarter summary hidden");
+      const quarterHidden = { height: quarterSummary.getBoundingClientRect().height, tableMoved: document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top < tableBeforeQuarterHide };
+      await selectGrid("FY26", "D1");
+      const salesToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiSalesStageAcrSummary"]'), "sales summary toggle");
+      const salesSummary = document.getElementById("kpiSalesStageAcrSummary");
+      salesToggle.click();
+      await waitFor(() => salesToggle.getAttribute("aria-expanded") === "false" && salesSummary.hidden, "sales summary hidden");
+      await selectGrid("FY27", "B");
+      const quarterRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
+      await selectGrid("FY27", "D1");
+      const salesRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiSalesStageAcrSummary")?.hidden;
+      document.querySelector('.kpi-summary-toggle').click();
+      await selectGrid("FY26", "A");
+      document.querySelector('.kpi-summary-toggle').click();
+      const summaryContract = { quarterHidden, quarterRetained, salesRetained };
+
+      const deliveryExisting = [];
+      for (const code of ${JSON.stringify(codes)}) {
+        const dateGrid = await selectGrid("FY26", code);
+        const wrapper = dateGrid.closest(".kpi-activities-table-wrap");
+        wrapper.scrollLeft = wrapper.scrollWidth;
+        wrapper.dispatchEvent(new Event("scroll"));
+        await settle(dateGrid);
+        const dateCell = await waitFor(() => dateGrid.querySelector('tbody [data-kpi-grid-field="deliveryDate"]'), code + " existing date cell");
+        const original = dateCell.textContent.trim();
+        dateCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
+        const dateInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), code + " date editor");
+        dateInput.show();
+        const popup = await waitFor(() => [...document.querySelectorAll('.oj-datepicker-popup')].find(item => item.getAttribute('aria-hidden') !== 'true'), code + " date popup");
+        const day = [...popup.querySelectorAll('td[data-handler="selectDay"]')].find(item => item.textContent.trim() === "2" && !item.classList.contains("oj-datepicker-unselectable"));
+        if (!day) throw new Error(code + " selectable date missing");
+        day.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true, pointerId: 1, pointerType: "mouse" }));
+        (day.querySelector("a") || day).click();
+        const changed = await waitFor(() => {
+          const cell = dateGrid.querySelector('tbody [data-kpi-grid-field="deliveryDate"]');
+          return !document.querySelector('[data-kpi-single-editor]') && cell?.classList.contains("is-unsaved-cell") && cell.textContent.trim() !== original ? cell : null;
+        }, code + " date draft");
+        const line = getComputedStyle(changed, "::after");
+        deliveryExisting.push({ code, value: changed.textContent.trim(), line: line.height, save: Boolean(buttonByText("Save", document.querySelector(".kpi-activity-toolbar") || document)), cancel: Boolean(buttonByText("Cancel", document.querySelector(".kpi-activity-toolbar") || document)) });
+        await discardDrafts();
+      }
+
+      const sameGrid = await selectGrid("FY26", "A");
+      sameGrid.closest(".kpi-activities-table-wrap").scrollLeft = sameGrid.scrollWidth;
+      const sameCell = sameGrid.querySelector('tbody [data-kpi-grid-field="deliveryDate"]');
+      const sameValue = sameCell.textContent.trim();
+      sameCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
+      const sameInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), "same date editor");
+      sameInput.dispatchEvent(new CustomEvent("valueChanged", { detail: { value: sameValue }, bubbles: true, composed: true }));
+      await waitFor(() => !document.querySelector('[data-kpi-single-editor]'), "same date finish");
+      const sameDateNoDirty = !sameCell.classList.contains("is-unsaved-cell") && !buttonByText("Save", document.querySelector(".kpi-activity-toolbar") || document);
+
+      buttonByText("Add KPI Activity", document.querySelector(".kpi-activity-toolbar") || document).click();
+      const draftRow = await waitFor(() => sameGrid.querySelector('tbody tr[data-kpi-row-id^="draft-"]'), "new row");
+      document.querySelector(".kpi-activity-toolbar").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }));
+      await waitFor(() => !document.querySelector('[data-kpi-single-editor]'), "new row first editor finish");
+      sameGrid.closest(".kpi-activities-table-wrap").scrollLeft = sameGrid.scrollWidth;
+      const newDateCell = draftRow.querySelector('[data-kpi-grid-field="deliveryDate"]');
+      newDateCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
+      const newDateInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), "new row date editor");
+      newDateInput.dispatchEvent(new CustomEvent("valueChanged", { detail: { value: "2026-08-19" }, bubbles: true, composed: true }));
+      const newDateDraft = await waitFor(() => !document.querySelector('[data-kpi-single-editor]') && newDateCell.textContent.includes("2026-08-19") && newDateCell.classList.contains("is-unsaved-cell"), "new row date draft");
+      await discardDrafts();
+
       const forward = ["FY26", "FY27"].flatMap(fy => ${JSON.stringify(codes)}.map(code => [fy, code]));
       const reverse = [...forward].reverse();
       for (let cycle = 0; cycle < 3; cycle += 1) {
@@ -320,6 +406,7 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
         for (const [fy, code] of reverse) results.push({ cycle, direction: "reverse", ...(await inspectGrid(fy, code)) });
       }
       return { results, draftBeforeSort, draftAfterSort, draftAfterViewport, draftAfterCurrentTab, cancelOptions, draftAfterKeepEditing, deleteOnly, scopedState, popupContract,
+        summaryContract, deliveryExisting, sameDateNoDirty, newDateDraft: Boolean(newDateDraft),
         maxEditors, jetGridCount: document.querySelectorAll("oj-data-grid").length,
         errors: window.__kpiGridDisplay.errors, rejections: window.__kpiGridDisplay.rejections };
     })()`,
@@ -456,6 +543,15 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
   assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
   assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
+  assert.deepEqual(result.summaryContract, { quarterHidden: { height: 0, tableMoved: true }, quarterRetained: true, salesRetained: true });
+  assert.equal(result.deliveryExisting.length, 7);
+  for (const item of result.deliveryExisting) {
+    assert.equal(item.line, "3px", `${item.code} Delivery Date draft line`);
+    assert.equal(item.save, true, `${item.code} Delivery Date Save action`);
+    assert.equal(item.cancel, true, `${item.code} Delivery Date Cancel action`);
+  }
+  assert.equal(result.sameDateNoDirty, true, "selecting the saved Delivery Date must remain clean");
+  assert.equal(result.newDateDraft, true, "new rows must show the selected Delivery Date immediately");
   assert.deepEqual({ enter: result.keyboardContract.enter, shiftEnter: result.keyboardContract.shiftEnter, space: result.keyboardContract.space, tab: result.keyboardContract.tab,
     shiftTab: result.keyboardContract.shiftTab, escape: result.keyboardContract.escape, workloadDraft: result.keyboardContract.workloadDraft },
     { enter: true, shiftEnter: true, space: true, tab: true, shiftTab: true, escape: true, workloadDraft: true });
@@ -479,6 +575,11 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
     assert.deepEqual(item.fixedEllipsis, [], `${item.schema} fixed values`);
     if (!realApi) assert.equal(item.rowCount, fixtureCounts[item.fy][item.code], `${item.schema} fixture row count`);
     assert.ok(item.documentOverflow <= 1, `${item.schema} must not create page-level horizontal overflow`);
+    assert.equal(item.wrapperOverflow, 0, `${item.schema} ordinary desktop viewport must not create a table scrollbar`);
+    assert.equal(item.contentAlign, "start", `${item.schema} KPI content grid must stay top-aligned`);
+    assert.ok(item.topGap <= 33, `${item.schema} must stay directly below the preceding KPI layout item`);
+    if (item.rowCount === 0) assert.ok(item.tableHeight < 80, `${item.schema} empty table must not reserve a vertical spacer`);
+    if (item.rowCount === 1) assert.ok(item.tableHeight < 130, `${item.schema} one-row table must not reserve a vertical spacer`);
   }
 })().catch((error) => {
   console.error(error.stack || error);

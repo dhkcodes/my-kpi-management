@@ -73,21 +73,23 @@ assert.equal(getKpiGridRowKey(gridKeys, "142"), "draft-a-1");
 
 for (const [code, fields] of Object.entries(KPI_FIELD_CONTRACTS)) {
   const narrow = computeKpiColumnLayout(fields, 860);
-  const wide = computeKpiColumnLayout(fields, 1280);
+  const desktop = computeKpiColumnLayout(fields, 1280);
+  const wide = computeKpiColumnLayout(fields, 1680);
   assert.equal(narrow.selectorWidth, 52, `${code} selector width`);
   assert.equal(Object.keys(narrow.widths).length, fields.length, `${code} every data field has a width`);
-  assert.ok(wide.totalWidth >= narrow.totalWidth, `${code} layout grows with available width`);
+  assert.ok(wide.totalWidth >= desktop.totalWidth, `${code} layout grows with available width`);
+  assert.ok(desktop.totalWidth <= 1280, `${code} fits an ordinary desktop host without an internal scrollbar`);
   for (const field of fields) assert.ok((narrow.widths[field.key] ?? 0) >= 96, `${code}.${field.key} remains usable`);
 }
 
 const d1Layout = computeKpiColumnLayout(KPI_FIELD_CONTRACTS.D1, 860);
-assert.ok((d1Layout.widths.accountWorkload ?? 0) >= 320, "Account / Workload / Oppty.No keeps its full one-line header and useful content space");
-assert.ok((d1Layout.widths.manageTimeReflected ?? 0) >= 132, "Manage Time fits its one-line header and Reflected value");
+assert.ok((d1Layout.widths.accountWorkload ?? 0) >= 180, "Account / Workload / Oppty.No remains usable on narrow viewports");
+assert.ok((d1Layout.widths.manageTimeReflected ?? 0) >= 140, "Manage Time fits its one-line header, sort icon, and Reflected value");
 assert.ok((d1Layout.widths.srNumber ?? 0) >= 144, "SR Number fits operating 12-character SR values");
 assert.ok((d1Layout.widths.title ?? 0) >= 164, "D1 Activity fits Solution Deployment without ellipsis");
 assert.ok((d1Layout.widths.stage ?? 0) >= 132, "Sales Stage fits its one-line header and Identified value");
 assert.ok((d1Layout.widths.acrK ?? 0) >= 104, "ACR (K) reserves title and sort-indicator space");
-assert.ok((d1Layout.widths.targetQuarter ?? 0) >= 148, "Target Quarter remains one line");
+assert.ok((d1Layout.widths.targetQuarter ?? 0) >= 156, "Target Quarter keeps its title and sort icon visibly separated");
 assert.ok((d1Layout.widths.deliveryDate ?? 0) >= 140, "Delivery Date fits ISO dates without ellipsis");
 assert.ok(d1Layout.totalWidth > 860, "narrow viewports retain fixed widths and scroll inside the Grid");
 
@@ -155,8 +157,24 @@ assert.doesNotMatch(page, /key=\{(?:gridSchemaKey|tableScopeKey)\}/,
   "the native table DOM identity must not be remounted on KPI/FY changes");
 assert.match(page, /requestProtectedNavigation[\s\S]*finishEditing\(\)[\s\S]*if \(drafts\.length === 0\)/,
   "navigation must finish the single editor and preserve dirty-data protection without a JET settlement queue");
+assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/,
+  "the reparented public JET datepicker popup must remain inside the active edit interaction boundary");
+assert.match(page, /onvalueChanged=\{\(event: CustomEvent\) => \{[\s\S]*onInput\(field\.key,[\s\S]*onFinish\(\)/,
+  "Delivery Date valueChanged must apply the latest value before closing the one-cell editor");
+assert.match(page, /quarterSummaryExpanded[\s\S]*salesSummaryExpanded/,
+  "quarter-count and Sales Stage ACR summaries must retain independent page-local visibility state");
+assert.match(page, /aria-controls=\{summaryId\}[\s\S]*aria-expanded=\{summaryExpanded\}/,
+  "the summary visibility control must expose its controlled region and expansion state");
+assert.match(page, /Math\.max\(0, host\.clientWidth - 1\)/,
+  "native table layout must reserve one pixel for collapsed-border rounding without showing a desktop scrollbar");
+assert.match(page, /<Summary[^>]*expanded=\{summaryExpanded\}/,
+  "the active summary must receive the retained visibility state");
 assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/,
   "native table scrolling must remain contained without page-level horizontal overflow");
+assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align-content:\s*start/,
+  "KPI Activities must stay directly below the fiscal-year panel instead of stretching grid rows across the viewport");
+assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/,
+  "a hidden summary must contribute no height, margin, or padding");
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*border-collapse:\s*collapse[^}]*table-layout:\s*fixed/,
   "native KPI activity table must own deterministic column geometry");
 assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*white-space:\s*nowrap/,

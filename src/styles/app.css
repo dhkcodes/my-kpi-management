@@ -235,6 +235,8 @@ body {
   gap: 0.25rem;
 }
 
+.kpi-content:has(.kpi-spreadsheet-page) { align-content: start; }
+
 .kpi-panel,
 .kpi-fiscal-year-panel {
   background: var(--kpi-surface);
@@ -1825,6 +1827,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-sheet-overview article div { display: grid; gap: .35rem; grid-template-columns: repeat(4, 1fr); }
 .kpi-sheet-overview article div span { background: #fff; border: 1px solid #ebe7e3; font-size: .75rem; padding: .4rem; text-align: center; }
 .kpi-sheet-summary { background: #f7f4f1; border: 1px solid var(--kpi-border); margin-bottom: .9rem; padding: .8rem; }
+.kpi-sheet-summary[hidden] { display: none; }
 .kpi-sheet-summary h3 { font-size: .9rem; margin: 0 0 .65rem; }
 .kpi-sheet-summary h3 small { color: var(--kpi-muted); font-weight: 500; }
 .kpi-quarter-summary, .kpi-month-summary { display: grid; gap: .55rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1914,6 +1917,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { align-items: center; display: flex; flex-wrap: wrap; gap: .45rem; }
 .kpi-activity-toolbar button { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; font-weight: 700; min-height: 2.35rem; padding: .45rem .75rem; }
 .kpi-activity-toolbar__left button:first-child, .kpi-activity-toolbar__right button:first-child { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
+.kpi-activity-toolbar__left button.kpi-summary-toggle { background: #fff; border-color: var(--kpi-border); color: var(--kpi-ink); }
 .kpi-activity-toolbar__right button:last-child { border-color: #c74634; color: #a63122; }
 .kpi-activity-toolbar button:disabled { cursor: default; opacity: .45; }
 .kpi-status-badge { border-radius: 999px; display: inline-block; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; white-space: nowrap; }
@@ -1941,7 +1945,7 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* KPI-only Preact-owned native table. Accounts & Workloads remains untouched. */
-.kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-height: clamp(18rem, 52vh, 38rem); max-width: 100%; min-height: 8rem; min-width: 0; overflow-x: auto; overflow-y: auto; width: 100%; }
+.kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-height: clamp(18rem, 52vh, 38rem); max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: auto; width: 100%; }
 .kpi-activities-table { border-collapse: collapse; table-layout: fixed; width: max-content; }
 .kpi-activities-table th, .kpi-activities-table td { border-bottom: 1px solid #ddd6d0; border-right: 1px solid #ddd6d0; box-sizing: border-box; min-height: 3rem; vertical-align: middle; }
 .kpi-activities-table thead th { position: sticky; top: 0; z-index: 4; }

@@ -119,13 +119,15 @@ function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
   </nav>;
 }
 
-function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter }: Readonly<{
+function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter, id, expanded }: Readonly<{
   rows: KpiSpreadsheetRow[];
   tab: SpreadsheetKpiCode;
   fiscalYear: FiscalYear;
   asOf: string;
   selectedQuarter: Quarter | null;
   onSelectQuarter: (quarter: Quarter | null) => void;
+  id: string;
+  expanded: boolean;
 }>) {
   const summary = buildKpiSummary(rows);
   const statusFor = (quarter: Quarter) => {
@@ -138,7 +140,7 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   };
   const cardClass = (quarter: Quarter, base: string) => `${base}${selectedQuarter === quarter ? " is-selected" : ""}`;
   if (tab === "D1") {
-    return <section class="kpi-sheet-summary" aria-labelledby="kpiD1Summary">
+    return <section id={id} class="kpi-sheet-summary" aria-labelledby="kpiD1Summary" hidden={!expanded}>
       <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K</small></h3></div>
       <div class="kpi-d1-progress-grid" aria-label="Sales Stage ACR USD K by Delivery Date fiscal quarter">
         {quarters.map((quarter) => {
@@ -162,7 +164,7 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
     </section>;
   }
   const combined = tab === "C1" || tab === "C2";
-  return <section class="kpi-sheet-summary" aria-labelledby="kpiQuarterSummary">
+  return <section id={id} class="kpi-sheet-summary" aria-labelledby="kpiQuarterSummary" hidden={!expanded}>
     <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Target Quarter count</h3></div>
     <div class="kpi-quarter-summary">{quarters.map((quarter) => {
       const actual = combined ? summary.c1c2Combined[quarter].actual : summary.quarterly[tab][quarter];
@@ -184,7 +186,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   onInput: (key: KpiFieldKey, value: string) => void;
   onWorkload: (option: KpiWorkloadOption) => void;
   onWorkloadReset: () => void;
-  onFinish: () => void;
+  onFinish: (currentCellDirty?: boolean) => void;
   onCancelCell: () => void;
   onMove: (direction: -1 | 1) => void;
 }>) {
@@ -379,7 +381,11 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
       aria-label={field.label} onInput={(event) => onInput(field.key, (event.currentTarget as HTMLTextAreaElement).value)} onKeyDown={blockContractKey} onKeyUp={keyContract}></textarea>;
   } else if (field.type === "date") {
     editor = <oj-input-date ref={editorRef as any} class="kpi-cell-editor-control kpi-cell-editor-control--date" labelHint={field.label} labelEdge="none"
-      value={value} onvalueChanged={(event: CustomEvent) => { onInput(field.key, `${event.detail.value ?? ""}`); onFinish(); }} onKeyDown={blockContractKey} onKeyUp={keyContract}></oj-input-date>;
+      value={value} onvalueChanged={(event: CustomEvent) => {
+        const nextValue = `${event.detail.value ?? ""}`;
+        onInput(field.key, nextValue);
+        onFinish(nextValue !== state.originalValue);
+      }} onKeyDown={blockContractKey} onKeyUp={keyContract}></oj-input-date>;
   } else if (field.type === "manageTime") {
     editor = <select ref={editorRef as any} class="kpi-cell-editor-control" value={row.manageTimeReflected ? "Reflected" : "Pending"} aria-label="Manage Time"
       onChange={(event) => { onInput(field.key, String((event.currentTarget as HTMLSelectElement).value === "Reflected")); onFinish(); }} onKeyDown={blockContractKey} onKeyUp={keyContract}>
@@ -429,6 +435,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
   const [reloadVersion, setReloadVersion] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState<Quarter | null>(null);
+  const [quarterSummaryExpanded, setQuarterSummaryExpanded] = useState(true);
+  const [salesSummaryExpanded, setSalesSummaryExpanded] = useState(true);
   const [sortByScope, setSortByScope] = useState<Record<string, KpiSortState | null>>({});
   const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
   const [pendingNavigation, setPendingNavigation] = useState<null | { label: string; action: () => void }>(null);
@@ -496,8 +504,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     [key]: key === "acrK" ? (value === "" ? null : Number(value)) : key === "manageTimeReflected" ? value === "true" : value
   } as KpiSpreadsheetRow);
 
-  const finishEditing = useCallback(() => {
-    setEditState((current) => transitionKpiActivityEdit(current, { type: "finish", hasDrafts: drafts.length > 0 }));
+  const finishEditing = useCallback((currentCellDirty = false) => {
+    setEditState((current) => transitionKpiActivityEdit(current, { type: "finish", hasDrafts: currentCellDirty || drafts.length > 0 }));
     setEditorRect(null);
     editorAnchorRef.current = null;
     editRowSnapshotRef.current = null;
@@ -607,7 +615,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     if (!editState.cell) return;
     const finishOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target as Element | null;
-      if (!target || target.closest("[data-kpi-single-editor]") || target.closest("oj-popup.kpi-workload-results-popup")) return;
+      if (!target || target.closest("[data-kpi-single-editor]") || target.closest("oj-popup.kpi-workload-results-popup") || target.closest(".oj-datepicker-popup")) return;
       finishEditing();
     };
     document.addEventListener("pointerdown", finishOnOutsidePointer, true);
@@ -648,7 +656,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     let frame = 0;
     const apply = () => {
       frame = 0;
-      setColumnLayout(computeKpiColumnLayout(fields, host.getBoundingClientRect().width));
+      setColumnLayout(computeKpiColumnLayout(fields, Math.max(0, host.clientWidth - 1)));
     };
     const schedule = () => {
       if (frame) window.cancelAnimationFrame(frame);
@@ -710,6 +718,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
   const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
+  const salesSummary = activeTab === "D1";
+  const summaryExpanded = salesSummary ? salesSummaryExpanded : quarterSummaryExpanded;
+  const summaryId = salesSummary ? "kpiSalesStageAcrSummary" : "kpiTargetQuarterCountSummary";
+  const summaryLabel = salesSummary ? "Sales Stage / ACR summary" : "Target Quarter count summary";
+  const toggleSummary = () => salesSummary
+    ? setSalesSummaryExpanded((current) => !current)
+    : setQuarterSummaryExpanded((current) => !current);
 
   const addDraft = () => {
     if (saving || drafts.length > 0 || editState.cell || activeTab === "Overview") return;
@@ -861,7 +876,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
-        <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button></div>
+        <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
+          <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
+            {summaryExpanded ? "Hide" : "Show"} {summaryLabel}
+          </button>
+        </div>
         <div class="kpi-activity-toolbar__right">
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
@@ -871,7 +890,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
         ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
-      <Summary rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
+      <Summary id={summaryId} expanded={summaryExpanded} rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
       <div ref={tableHostRef} class="kpi-activities-table-wrap" data-kpi-table-scope={tableScopeKey}>
         <table ref={tableRef} class="kpi-activities-table" aria-label={`${activeTab} editable KPI activities`}
           style={{ width: `${columnLayout.totalWidth}px` }}>
