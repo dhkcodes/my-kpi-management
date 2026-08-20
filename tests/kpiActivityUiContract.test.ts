@@ -66,7 +66,7 @@ assert.doesNotMatch(page, /setTimeout\(openPopup/);
 
 assert.match(page, /is-unsaved-cell/);
 assert.match(page, /kpi-manage-time-reflected-row/);
-assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*bottom:\s*0[^}]*height:\s*2px/);
+assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*background:\s*#d9438f[^}]*bottom:\s*0[^}]*height:\s*3px/);
 assert.match(styles, /\.kpi-grid-cell\.kpi-manage-time-reflected-row\s*\{[^}]*background:\s*#eaf4ec/);
 assert.match(page, /setDrafts\(\[\]\)/);
 
@@ -89,8 +89,8 @@ assert.match(model, /if \(leftDraft !== rightDraft\) return leftDraft \? -1 : 1/
   "new draft rows stay first under sorting");
 assert.match(model, /fixedWidthFor/);
 assert.match(model, /flexibleBudget/);
-assert.match(model, /Math\.max\(flexible\.length \* 96/,
-  "flexible columns must contract responsively while fixed-width fields remain stable");
+assert.match(model, /flexibleMinimumTotal[\s\S]*Math\.max\(flexibleMinimumTotal/,
+  "flexible columns retain readable minimums while fixed-width fields remain stable");
 assert.match(page, /new ResizeObserver/);
 assert.match(page, /computeKpiColumnLayout\(fields, width\)/);
 assert.match(page, /header=\{headerOptions\}/);
@@ -98,7 +98,7 @@ assert.match(styles, /\.kpi-jet-editable-grid\s*\{[^}]*min-width:\s*0[^}]*width:
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*#8b3a2f/);
 
 assert.match(page, /import MutableArrayDataProvider = require\("ojs\/ojmutablearraydataprovider"\)/);
-assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiGridProviderRow>\(\[\], \{ keyAttributes: "__gridRowKey" \}\), \[activeTab\]\)/);
+assert.match(page, /useMemo\(\(\) => new MutableArrayDataProvider<string, KpiGridProviderRow>\(\[\], \{ keyAttributes: "__gridRowKey" \}\), \[gridSchemaKey\]\)/);
 assert.match(page, /dataProvider\.data = providerRows/);
 assert.match(page, /new RowDataGridProvider[\s\S]*dataProvider/);
 assert.match(page, /selectionMode=\{KPI_GRID_SELECTION_MODE\}/);

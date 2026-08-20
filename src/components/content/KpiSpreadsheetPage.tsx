@@ -414,6 +414,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const gridHostRef = useRef<HTMLDivElement | null>(null);
   const providerMutationGenerationRef = useRef(0);
   const providerSettlementRef = useRef<{ generation: number; resolve: (settled: boolean) => void } | null>(null);
+  const navigationQueueRef = useRef(Promise.resolve());
   const navigationDialogRef = useRef<ojDialog | null>(null);
   const cancelDialogRef = useRef<ojDialog | null>(null);
   const deleteDialogRef = useRef<ojDialog | null>(null);
@@ -428,19 +429,25 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const providerRowCacheRef = useRef(new Map<string, { source: KpiSpreadsheetRow; provider: KpiGridProviderRow }>());
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
 
-  const authoritativeRows = useMemo(() => activeTab === "Overview" ? rows : rows.filter((row) => row.kpiCode === activeTab), [rows, activeTab]);
+  const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
+  const authoritativeRows = useMemo(() => activeTab === "Overview" ? activeRows : activeRows.filter((row) => row.kpiCode === activeTab), [activeRows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
-  const draftById = useMemo(() => new Map(drafts.map((draft) => [draft.id, draft])), [drafts]);
+  const gridSchemaKey = `${fiscalYear}:${activeTab}`;
+  const activeDrafts = useMemo(() => drafts.filter((draft) =>
+    draft.fiscalYear === fiscalYear && (activeTab === "Overview" || draft.kpiCode === activeTab)), [drafts, fiscalYear, activeTab]);
+  const fiscalYearDrafts = useMemo(() => drafts.filter((draft) => draft.fiscalYear === fiscalYear), [drafts, fiscalYear]);
+  const draftById = useMemo(() => new Map(activeDrafts.map((draft) => [draft.id, draft])), [activeDrafts]);
   const effectiveRows = useMemo(() => [
-    ...drafts.filter((draft) => draft.id.startsWith("draft-")),
+    ...activeDrafts.filter((draft) => draft.id.startsWith("draft-")),
     ...authoritativeRows.map((row) => draftById.get(row.id) ?? row)
-  ], [authoritativeRows, draftById, drafts]);
+  ], [authoritativeRows, draftById, activeDrafts]);
   const summaryRows = useMemo(() => {
-    const byId = new Map(drafts.map((draft) => [draft.id, draft]));
-    return [...drafts.filter((draft) => draft.id.startsWith("draft-")), ...rows.map((row) => byId.get(row.id) ?? row)];
-  }, [drafts, rows]);
+    const byId = new Map(fiscalYearDrafts.map((draft) => [draft.id, draft]));
+    return [...fiscalYearDrafts.filter((draft) => draft.id.startsWith("draft-")), ...activeRows.map((row) => byId.get(row.id) ?? row)];
+  }, [fiscalYearDrafts, activeRows]);
+  const activeSortState = sortState && fields.some((field) => field.key === sortState.field) ? sortState : null;
   const quarterRows = useMemo(() => getRowsForQuarter(effectiveRows, selectedQuarter), [effectiveRows, selectedQuarter]);
-  const visibleRows = useMemo(() => sortKpiActivityRows(quarterRows, sortState), [quarterRows, sortState]);
+  const visibleRows = useMemo(() => sortKpiActivityRows(quarterRows, activeSortState), [quarterRows, activeSortState]);
   const providerRows = useMemo<KpiGridProviderRow[]>(() => visibleRows.map((row) => {
     const key = getKpiGridRowKey(gridRowKeysRef.current, row.id);
     const cached = providerRowCacheRef.current.get(key);
@@ -624,7 +631,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     }
   }), []);
 
-  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiGridProviderRow>([], { keyAttributes: "__gridRowKey" }), [activeTab]);
+  const dataProvider = useMemo(() => new MutableArrayDataProvider<string, KpiGridProviderRow>([], { keyAttributes: "__gridRowKey" }), [gridSchemaKey]);
   const gridColumns = useMemo<Array<keyof KpiSpreadsheetRow>>(() => ["id", ...fields.map((field) => field.key)], [fields]);
   const dataGridProvider = useMemo(() => new RowDataGridProvider<KpiGridCellValue, string, KpiGridProviderRow>(dataProvider, {
     columns: { databody: gridColumns },
@@ -699,7 +706,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const cellRenderStateRef = useRef<CellRenderState | null>(null);
   cellRenderStateRef.current = { authoritativeRows, beginEditing, fields, selectedIds, setRowSelection, visibleRowsById };
   const headerRenderStateRef = useRef<HeaderRenderState | null>(null);
-  headerRenderStateRef.current = { availableIds: selectableVisibleIds, fields, selectedIds, setVisibleSelection, sort: sortState, toggleSort };
+  headerRenderStateRef.current = { availableIds: selectableVisibleIds, fields, selectedIds, setVisibleSelection, sort: activeSortState, toggleSort };
 
   const renderKpiCell = useCallback((context: ojDataGrid.CellTemplateContext<KpiGridCellData>) => {
     const state = cellRenderStateRef.current;
@@ -716,7 +723,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     const field = state.fields[context.item.columnIndex - 1];
     if (!field) return null;
     const changed = !saved || isKpiFieldChanged(saved, row, field.key);
-    const classes = [baseClasses, rowDirty ? "is-unsaved-row" : "", changed ? "is-unsaved-cell" : ""].filter(Boolean).join(" ");
+    const fixedValue = field.type !== "workload" && field.type !== "textarea";
+    const classes = [baseClasses, fixedValue ? "kpi-grid-cell--fixed" : "", rowDirty ? "is-unsaved-row" : "", changed ? "is-unsaved-cell" : ""].filter(Boolean).join(" ");
     return <div class={classes} data-kpi-grid-row={row.id} data-kpi-grid-field={field.key}
       onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); state.beginEditing(row, field, event.currentTarget); }}>
       {field.type === "textarea" ? <span class="kpi-cell-description">{displayValue(row, field.key)}</span> : <span>{displayValue(row, field.key)}</span>}
@@ -759,7 +767,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
-  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
+  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
 
   const addDraft = () => {
@@ -900,12 +908,32 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
     setSaving(false);
   };
 
+  const settleGridBeforeNavigation = useCallback(async (action: () => void) => {
+    await waitForFrame();
+    const grid = gridRef.current;
+    if (grid?.isConnected) {
+      try {
+        await Context.getContext(grid).getBusyContext().whenReady();
+      } catch (error) {
+        setApiMessage(error instanceof Error ? error.message : "KPI Grid did not settle before navigation.");
+        return;
+      }
+      await waitForFrame();
+      if (grid !== gridRef.current || !grid.isConnected) return;
+    }
+    setSelectedIds(new Set());
+    action();
+  }, []);
+
   const requestProtectedNavigation = useCallback<KpiNavigationGuard>((label, action) => {
     finishEditing();
-    if (drafts.length === 0) { setSelectedIds(new Set()); action(); return; }
-    setPendingNavigation({ label, action });
+    const settledAction = () => {
+      navigationQueueRef.current = navigationQueueRef.current.then(() => settleGridBeforeNavigation(action));
+    };
+    if (drafts.length === 0) { settledAction(); return; }
+    setPendingNavigation({ label, action: settledAction });
     void waitForFrame().then(() => navigationDialogRef.current?.open());
-  }, [drafts.length, finishEditing]);
+  }, [drafts.length, finishEditing, settleGridBeforeNavigation]);
   useEffect(() => {
     onNavigationGuardChange(requestProtectedNavigation, drafts.length > 0);
     return () => onNavigationGuardChange(null, false);
@@ -944,11 +972,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         </div>
       </div>
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
-        ? (activeTab === "H" ? "Reflected H requires Delivery Date." : "Reflected requires both SR Number and Delivery Date.")
+        ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
       <Summary rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
       <div ref={gridHostRef} class="kpi-jet-table-wrap" style={`--kpi-grid-content-width:${columnLayout.totalWidth}px`}>
-        <oj-data-grid ref={gridRef} class="kpi-jet-editable-grid" aria-label={`${activeTab} editable KPI activities`}
+        <oj-data-grid key={gridSchemaKey} data-kpi-grid-schema={gridSchemaKey}
+          ref={gridRef} class="kpi-jet-editable-grid" aria-label={`${activeTab} editable KPI activities`}
           data={dataGridProvider} editMode="none" cell={cellOptions} gridlines={KPI_GRIDLINES}
           header={headerOptions} selectionMode={KPI_GRID_SELECTION_MODE}>
           <template slot="cellTemplate" render={renderKpiCell} />

@@ -134,18 +134,20 @@ export type KpiColumnLayout = Readonly<{
 
 const fixedWidthFor = (field: KpiField): number | null => {
   if (field.type === "workload" || field.type === "textarea") return null;
-  if (field.type === "manageTime") return 88;
-  if (field.type === "date") return 116;
-  if (field.type === "quarter") return 104;
-  if (field.type === "activity") return 112;
-  if (field.type === "stage") return 100;
-  if (field.type === "number") return 88;
-  if (field.type === "month") return 88;
-  if (field.key === "srNumber") return 104;
-  return 96;
+  if (field.type === "manageTime") return 132;
+  if (field.key === "srNumber") return 144;
+  if (field.type === "date") return 140;
+  if (field.type === "quarter") return 148;
+  if (field.type === "activity") return 164;
+  if (field.type === "stage") return 132;
+  if (field.key === "acrK") return 104;
+  if (field.type === "number") return 104;
+  if (field.type === "month") return 96;
+  return 104;
 };
 
 const flexibleWeight = (field: KpiField) => field.type === "workload" ? 1.2 : 1;
+const flexibleMinimum = (_field: KpiField) => 320;
 
 export const computeKpiColumnLayout = (
   fields: readonly KpiField[],
@@ -161,10 +163,12 @@ export const computeKpiColumnLayout = (
     widths[field.key] = width;
     fixedTotal += width;
   });
-  const flexibleBudget = Math.max(flexible.length * 96, Math.floor(availableWidth) - selectorWidth - fixedTotal);
+  const flexibleMinimumTotal = flexible.reduce((sum, field) => sum + flexibleMinimum(field), 0);
+  const flexibleBudget = Math.max(flexibleMinimumTotal, Math.floor(availableWidth) - selectorWidth - fixedTotal);
+  const extraBudget = flexibleBudget - flexibleMinimumTotal;
   const totalWeight = flexible.reduce((sum, field) => sum + flexibleWeight(field), 0) || 1;
-  const allocated: number[] = [];
-  flexible.forEach((field) => allocated.push(Math.round(flexibleBudget * flexibleWeight(field) / totalWeight)));
+  const allocated: number[] = flexible.map((field) => flexibleMinimum(field)
+    + Math.round(extraBudget * flexibleWeight(field) / totalWeight));
   if (allocated.length > 0) {
     const allocatedTotal = allocated.reduce((sum, width) => sum + width, 0);
     allocated[allocated.length - 1] += flexibleBudget - allocatedTotal;

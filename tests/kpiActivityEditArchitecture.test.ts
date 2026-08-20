@@ -77,8 +77,19 @@ for (const [code, fields] of Object.entries(KPI_FIELD_CONTRACTS)) {
   assert.equal(narrow.selectorWidth, 52, `${code} selector width`);
   assert.equal(Object.keys(narrow.widths).length, fields.length, `${code} every data field has a width`);
   assert.ok(wide.totalWidth >= narrow.totalWidth, `${code} layout grows with available width`);
-  for (const field of fields) assert.ok((narrow.widths[field.key] ?? 0) >= 88, `${code}.${field.key} remains usable`);
+  for (const field of fields) assert.ok((narrow.widths[field.key] ?? 0) >= 96, `${code}.${field.key} remains usable`);
 }
+
+const d1Layout = computeKpiColumnLayout(KPI_FIELD_CONTRACTS.D1, 860);
+assert.ok((d1Layout.widths.accountWorkload ?? 0) >= 320, "Account / Workload / Oppty.No keeps its full one-line header and useful content space");
+assert.ok((d1Layout.widths.manageTimeReflected ?? 0) >= 132, "Manage Time fits its one-line header and Reflected value");
+assert.ok((d1Layout.widths.srNumber ?? 0) >= 144, "SR Number fits operating 12-character SR values");
+assert.ok((d1Layout.widths.title ?? 0) >= 164, "D1 Activity fits Solution Deployment without ellipsis");
+assert.ok((d1Layout.widths.stage ?? 0) >= 132, "Sales Stage fits its one-line header and Identified value");
+assert.ok((d1Layout.widths.acrK ?? 0) >= 104, "ACR (K) reserves title and sort-indicator space");
+assert.ok((d1Layout.widths.targetQuarter ?? 0) >= 148, "Target Quarter remains one line");
+assert.ok((d1Layout.widths.deliveryDate ?? 0) >= 140, "Delivery Date fits ISO dates without ellipsis");
+assert.ok(d1Layout.totalWidth > 860, "narrow viewports retain fixed widths and scroll inside the Grid");
 
 const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheetPage.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
@@ -108,7 +119,29 @@ assert.match(page, /settleSavingDialogClosed[\s\S]*whenReady\(\)[\s\S]*dialog\.c
 assert.match(page, /Save changes[\s\S]*Discard changes[\s\S]*Keep editing/,
   "Cancel confirmation must provide save, discard, and keep-editing choices");
 assert.match(page, /kpi-grid-sort-button/, "sortable headers must use the public column header template");
-assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[\s\S]*bottom:\s*0[\s\S]*height:\s*2px/,
+assert.match(page, /const gridSchemaKey = `\$\{fiscalYear\}:\$\{activeTab\}`/,
+  "KPI and fiscal-year changes must create one explicit Grid schema generation");
+assert.match(page, /row\.fiscalYear === fiscalYear/,
+  "rows from the previous fiscal-year render must not enter the replacement provider generation");
+assert.match(page, /draft\.fiscalYear === fiscalYear[\s\S]*draft\.kpiCode === activeTab/,
+  "draft overlays must be scoped to the active KPI/FY generation");
+assert.match(page, /key=\{gridSchemaKey\}[\s\S]*data-kpi-grid-schema=\{gridSchemaKey\}/,
+  "the public Data Grid must restamp headers and columns on schema generation changes");
+assert.match(page, /settleGridBeforeNavigation[\s\S]*waitForFrame\(\)[\s\S]*getBusyContext\(\)\.whenReady\(\)[\s\S]*grid !== gridRef\.current[\s\S]*!grid\.isConnected/,
+  "outgoing Grid generations must settle before a KPI/FY schema restamp");
+assert.match(page, /navigationQueueRef[\s\S]*navigationQueueRef\.current\.then\(\(\) => settleGridBeforeNavigation\(action\)\)/,
+  "rapid KPI/FY requests must settle in order instead of racing Grid generations");
+assert.match(page, /MutableArrayDataProvider[\s\S]*\[gridSchemaKey\]/,
+  "each schema generation must own its MutableArrayDataProvider");
+assert.match(styles, /\.kpi-jet-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/,
+  "Grid scrolling must remain contained without page-level horizontal overflow");
+assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*white-space:\s*nowrap/,
+  "header titles must remain on one line");
+assert.match(styles, /\.kpi-grid-cell--fixed\s*>\s*span\s*\{[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/,
+  "fixed-width cells must show their complete values without ellipsis");
+assert.match(styles, /\.kpi-grid-column-header\s*\{[^}]*background:\s*#f4f1ee[^}]*border-right:/,
+  "public header templates must provide the Accounts & Workloads-aligned surface and boundary");
+assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[\s\S]*background:\s*#d9438f[\s\S]*bottom:\s*0[\s\S]*height:\s*3px/,
   "dirty cells must use the Accounts & Workloads-style bottom draft line");
 assert.match(styles, /\.kpi-grid-sort-button[\s\S]*color:\s*#8b3a2f/,
   "public header-template controls must own the Redwood title color");

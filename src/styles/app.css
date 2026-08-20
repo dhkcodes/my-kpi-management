@@ -1941,21 +1941,22 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* KPI-only single-session Data Grid. Accounts & Workloads remains untouched. */
-.kpi-jet-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; min-height: 8rem; min-width: 0; overflow: hidden; width: 100%; }
+.kpi-jet-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; min-height: 8rem; min-width: 0; max-width: 100%; overflow: hidden; width: 100%; }
 .kpi-jet-editable-grid { height: clamp(18rem, 52vh, 38rem); min-width: 0; width: 100%; }
 .kpi-reflected-grid-cell { background: #eaf4ec; }
 .kpi-grid-cell { align-items: center; box-sizing: border-box; display: flex; height: 100%; min-height: 3rem; padding: .5rem; position: relative; width: 100%; }
 .kpi-grid-cell.is-unsaved-row { font-weight: inherit; }
-.kpi-grid-cell.is-unsaved-cell::after { background: #c74634; bottom: 0; content: ""; height: 2px; left: .35rem; position: absolute; right: .35rem; z-index: 1; }
+.kpi-grid-cell.is-unsaved-cell::after { background: #d9438f; bottom: 0; content: ""; height: 3px; left: .35rem; position: absolute; right: .35rem; z-index: 2; }
 .kpi-grid-cell.kpi-manage-time-reflected-row { background: #eaf4ec; }
 .kpi-grid-cell.is-selected { background: #f0f6f5; }
 .kpi-grid-cell > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-grid-cell--fixed > span { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .kpi-cell-description { display: -webkit-box; line-height: 1.45; max-height: 7.25rem; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
-.kpi-grid-column-header { height: 100%; min-width: 0; width: 100%; }
-.kpi-grid-sort-button { align-items: center; background: transparent; border: 0; color: #8b3a2f; cursor: pointer; display: flex; font: inherit; font-weight: 800; gap: .4rem; height: 100%; justify-content: space-between; letter-spacing: .01em; padding: .4rem .5rem; text-align: left; width: 100%; }
+.kpi-grid-column-header { background: #f4f1ee; border-right: 1px solid #d9d2cc; box-sizing: border-box; height: 100%; min-width: 0; width: 100%; }
+.kpi-grid-sort-button { align-items: center; background: transparent; border: 0; color: #8b3a2f; cursor: pointer; display: grid; font: inherit; font-weight: 800; gap: .55rem; grid-template-columns: minmax(max-content, 1fr) auto; height: 100%; letter-spacing: .01em; padding: .4rem .65rem; text-align: left; width: 100%; }
 .kpi-grid-sort-button:hover, .kpi-grid-sort-button:focus-visible { background: color-mix(in srgb, #8b3a2f 8%, transparent); }
-.kpi-grid-sort-indicator { flex: 0 0 auto; font-size: .72rem; }
-.kpi-grid-header-title { color: inherit; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: normal; }
+.kpi-grid-sort-indicator { flex: 0 0 auto; font-size: .72rem; justify-self: end; }
+.kpi-grid-header-title { color: inherit; min-width: max-content; overflow: visible; text-overflow: clip; white-space: nowrap; }
 .kpi-description-popup { max-width: min(34rem, 80vw); padding: .65rem; white-space: pre-wrap; }
 .kpi-draft-validation { background: #fff8e7; border-left: .25rem solid #8a5b00; color: #5f3f00; margin: 0 0 .8rem; padding: .65rem; }
 .kpi-dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
