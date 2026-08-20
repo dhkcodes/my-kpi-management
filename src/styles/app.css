@@ -1945,7 +1945,7 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* KPI-only Preact-owned native table. Accounts & Workloads remains untouched. */
-.kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-height: clamp(18rem, 52vh, 38rem); max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: auto; width: 100%; }
+.kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-width: 100%; min-width: 0; overflow-x: auto; width: 100%; }
 .kpi-activities-table { border-collapse: collapse; table-layout: fixed; width: max-content; }
 .kpi-activities-table th, .kpi-activities-table td { border-bottom: 1px solid #ddd6d0; border-right: 1px solid #ddd6d0; box-sizing: border-box; min-height: 3rem; vertical-align: middle; }
 .kpi-activities-table thead th { position: sticky; top: 0; z-index: 4; }
@@ -1968,6 +1968,39 @@ h4.weekly-activity-section-label--next-week,
 .kpi-dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
 .kpi-selector-cell { min-width: 3rem !important; text-align: center; width: 3rem; }
 .kpi-select-all-header { align-items: center; display: flex; justify-content: center; min-height: 2.5rem; width: 100%; }
+.kpi-summary-toggle, .kpi-guide-toggle { align-items: center; display: inline-flex; gap: .35rem; }
+.kpi-toggle-chevron { display: inline-block; font-size: 1.15rem; font-weight: 800; line-height: 1; width: .8rem; }
+.kpi-activity-guide { background: #fbfaf9; border: 1px solid var(--kpi-border); border-left: 4px solid var(--kpi-brand); margin: 0 0 .9rem; padding: 1rem; }
+.kpi-activity-guide[hidden] { display: none; height: 0; margin: 0; padding: 0; }
+.kpi-activity-guide__heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .85rem; }
+.kpi-activity-guide__heading h3 { margin: .15rem 0 0; }
+.kpi-activity-guide__heading > span { color: var(--kpi-muted); font-size: .78rem; font-weight: 800; }
+.kpi-activity-guide__facts { display: grid; gap: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.kpi-activity-guide__facts > div { border: 1px solid #e4ded8; display: grid; grid-template-columns: minmax(8rem, 32%) minmax(0, 1fr); margin: -1px 0 0 -1px; }
+.kpi-activity-guide__facts dt { background: #f4f1ee; color: var(--kpi-muted); font-size: .75rem; font-weight: 800; padding: .6rem; }
+.kpi-activity-guide__facts dd { margin: 0; padding: .6rem; white-space: pre-line; }
+.kpi-activity-guide__detail { color: var(--kpi-muted); line-height: 1.45; padding-top: .75rem; }
+.kpi-activity-guide__detail p { margin: .35rem 0 0; white-space: pre-line; }
+.kpi-activity-guide__error { color: #a63122; }
+
+/* KPI Activities route: short content pins the Footer to the viewport; long tables grow in document flow. */
+.kpi-shell:has(.kpi-spreadsheet-page) { display: flex; flex-direction: column; min-height: 100vh; }
+.kpi-shell:has(.kpi-spreadsheet-page) .kpi-shell__body { flex: 1 0 auto; min-height: 0; }
+.kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-open) .kpi-footer { margin-left: 18rem; width: calc(100% - 19.5rem); }
+.kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-closed) .kpi-footer { margin-left: 1.5rem; width: calc(100% - 3rem); }
+.kpi-shell:has(.kpi-spreadsheet-page) .kpi-footer .oj-web-applayout-footer-item { justify-content: center; max-width: none; text-align: center; width: 100%; }
+.kpi-shell:has(.kpi-spreadsheet-page) .kpi-footer ul { justify-content: center; }
+
+@media (max-width: 1024px) {
+  .kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-open) .kpi-footer,
+  .kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-closed) .kpi-footer { margin-left: 6rem; width: calc(100% - 7.5rem); }
+}
+
+@media (max-width: 720px) {
+  .kpi-activity-guide__facts { grid-template-columns: minmax(0, 1fr); }
+  .kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-open) .kpi-footer,
+  .kpi-shell:has(.kpi-spreadsheet-page):has(.kpi-side-nav.is-closed) .kpi-footer { margin-left: 5rem; width: calc(100% - 5.75rem); }
+}
 .kpi-cell-editor-overlay { background: #fff; border: 2px solid #2f6f9f; box-shadow: 0 8px 24px rgba(22,21,19,.2); box-sizing: border-box; display: flex; padding: .2rem; position: fixed; z-index: 120; }
 .kpi-cell-editor-overlay--textarea { min-height: 8rem; overflow: auto; padding: .75rem; }
 .kpi-cell-editor-control, .kpi-workload-launcher > input { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; font: inherit; height: 100%; min-height: 2.4rem; padding: .5rem; width: 100%; }

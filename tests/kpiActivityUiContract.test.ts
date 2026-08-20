@@ -23,6 +23,8 @@ assert.match(page, /<td key=\{field\.key\} class=\{classes\} data-kpi-grid-row=\
 assert.doesNotMatch(page, /onojBeforeEdit|onojBeforeEditEnd|_WIDGET_INSTANCE|_ojBridge|resizeColWidth/);
 assert.match(page, /inputRef\.current\.indeterminate = selectedCount > 0 && !allSelected/,
   "the native select-all control must reflect the page-owned selection model");
+assert.match(page, /<th class="kpi-grid-column-header kpi-selector-cell" scope="col">[\s\S]*?<div class="kpi-select-all-header"/,
+  "Select All must share the data-column header surface and keep its checkbox in the centered wrapper");
 assert.match(page, /selected=\{selectedIds\.has\(row\.id\)\}/,
   "native row selectors must be controlled by scoped selection state");
 
@@ -103,7 +105,14 @@ assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align
 assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/);
 assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*min-height:/,
   "empty and one-row KPI tables must not reserve an artificial vertical spacer");
+assert.match(page, /summaryLabel = salesSummary \? "Stage \/ ACR" : "Quarter Summary"/);
 assert.match(page, /class="kpi-summary-toggle"[\s\S]*aria-controls=\{summaryId\}[\s\S]*aria-expanded=\{summaryExpanded\}/);
+assert.match(page, /class="kpi-guide-toggle"[\s\S]*aria-controls=\{guideId\}[\s\S]*aria-expanded=\{guideExpanded\}/);
+assert.match(page, /<span>KPI Guide<\/span>/);
+assert.match(page, /activeGuide\?\.targetPerQuarter[\s\S]*activeGuide\?\.activity[\s\S]*activeGuide\?\.measuring/,
+  "active KPI Guide content must include target, activity, and measurement contracts");
+assert.match(content, /activeRoute\.module !== "kpiPage"[\s\S]*kpi-guide-entry-button/,
+  "KPI routes must use the contextual Guide control instead of the legacy global drawer entry");
 assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/);
 
 assert.match(page, /const tableScopeKey = `\$\{fiscalYear\}:\$\{activeTab\}`/);

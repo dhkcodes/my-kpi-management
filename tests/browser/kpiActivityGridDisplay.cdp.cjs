@@ -76,6 +76,21 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   targetQuarter: code === "D1" ? ["Q1", "Q2", "Q3", "Q4"][rowIndex % 4] : null,
   deliveryDate: `2026-${String((rowIndex % 12) + 1).padStart(2, "0")}-${String((rowIndex % 27) + 1).padStart(2, "0")}`
 })));
+const guidesFor = (fiscalYear) => codes.map((code, index) => ({
+  kpiGuideId: index + 1,
+  fiscalYear,
+  kpiCode: code,
+  srType: `${code} SR Type`,
+  businessSrType: `${code} Business SR Type`,
+  combinedSrType: code === "H" ? "H combined non-SR activity" : null,
+  targetPerQuarter: `${fiscalYear} ${code} target per quarter`,
+  activity: `${fiscalYear} ${code} guide activity`,
+  taskType: "Delivery",
+  measuring: `${fiscalYear} ${code} guide measurement`,
+  details: `${code} guide details`,
+  notes: `${code} guide notes`,
+  versionNo: 1
+}));
 
 (async () => {
   const targets = await getJson(`http://127.0.0.1:${cdpPort}/json/list`);
@@ -85,6 +100,7 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   await cdp.open();
   const cdpExceptions = [];
   const mutationCalls = [];
+  let guideFixtureMode = "full";
   cdp.on("Runtime.exceptionThrown", ({ exceptionDetails }) => cdpExceptions.push(exceptionDetails.exception?.description || exceptionDetails.text));
   cdp.on("Fetch.requestPaused", async ({ requestId, request }) => {
     const fulfill = (status, payload) => cdp.send("Fetch.fulfillRequest", {
@@ -94,6 +110,17 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
       body: encodeBody(payload)
     });
     const url = new URL(request.url);
+    if (url.pathname.endsWith("/api/v1/__test-guide-mode") && request.method === "GET") {
+      guideFixtureMode = url.searchParams.get("mode") || "full";
+      return fulfill(200, { mode: guideFixtureMode });
+    }
+    if (url.pathname.endsWith("/api/v1/kpi-guides") && request.method === "GET") {
+      const guideFiscalYear = url.searchParams.get("fiscalYear") || "FY27";
+      if (guideFiscalYear === "FY27") await delay(120);
+      if (guideFixtureMode === "empty") return fulfill(200, { items: [] });
+      if (guideFixtureMode === "error") return fulfill(503, { message: `Guide fixture error ${guideFiscalYear}` });
+      return fulfill(200, { items: guidesFor(guideFiscalYear) });
+    }
     if (!url.pathname.includes("/api/v1/kpi-activities")) return cdp.send("Fetch.continueRequest", { requestId });
     if (request.method !== "GET") {
       mutationCalls.push({ method: request.method, url: request.url });
@@ -122,7 +149,8 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   await cdp.send("Network.enable");
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
-  if (!realApi) await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/kpi-activities*", requestStage: "Request" }] });
+  await cdp.send("Network.clearBrowserCache");
+  if (!realApi) await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `
     window.__kpiGridDisplay = { errors: [], rejections: [] };
     addEventListener("error", event => window.__kpiGridDisplay.errors.push(String(event.error?.stack || event.error || event.message)));
@@ -333,23 +361,86 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
       await selectGrid("FY26", "A");
       const quarterToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiTargetQuarterCountSummary"]'), "quarter summary toggle");
       const quarterSummary = document.getElementById("kpiTargetQuarterCountSummary");
-      const tableBeforeQuarterHide = document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top;
+      const quarterDefaultHidden = quarterToggle.getAttribute("aria-expanded") === "false" && quarterSummary.hidden && quarterSummary.getBoundingClientRect().height === 0;
+      const tableBeforeQuarterShow = document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top;
       quarterToggle.click();
-      await waitFor(() => quarterToggle.getAttribute("aria-expanded") === "false" && quarterSummary.hidden, "quarter summary hidden");
-      const quarterHidden = { height: quarterSummary.getBoundingClientRect().height, tableMoved: document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top < tableBeforeQuarterHide };
+      await waitFor(() => quarterToggle.getAttribute("aria-expanded") === "true" && !quarterSummary.hidden, "quarter summary shown");
+      const quarterShown = { tableMoved: document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top > tableBeforeQuarterShow, label: quarterToggle.textContent.replace(/\s+/g, " ").trim() };
+      await selectGrid("FY26", "B");
+      const bDefaultHidden = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
+      await selectGrid("FY27", "A");
+      const quarterRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
       await selectGrid("FY26", "D1");
       const salesToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiSalesStageAcrSummary"]'), "sales summary toggle");
       const salesSummary = document.getElementById("kpiSalesStageAcrSummary");
+      const salesDefaultHidden = salesToggle.getAttribute("aria-expanded") === "false" && salesSummary.hidden;
       salesToggle.click();
-      await waitFor(() => salesToggle.getAttribute("aria-expanded") === "false" && salesSummary.hidden, "sales summary hidden");
-      await selectGrid("FY27", "B");
-      const quarterRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
+      await waitFor(() => salesToggle.getAttribute("aria-expanded") === "true" && !salesSummary.hidden, "sales summary shown");
       await selectGrid("FY27", "D1");
-      const salesRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiSalesStageAcrSummary")?.hidden;
+      const salesRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiSalesStageAcrSummary")?.hidden;
       document.querySelector('.kpi-summary-toggle').click();
       await selectGrid("FY26", "A");
       document.querySelector('.kpi-summary-toggle').click();
-      const summaryContract = { quarterHidden, quarterRetained, salesRetained };
+      const summaryContract = { quarterDefaultHidden, quarterShown, bDefaultHidden, quarterRetained, salesDefaultHidden, salesRetained };
+
+      const guideContract = [];
+      for (const code of ${JSON.stringify(codes)}) {
+        await selectGrid("FY26", code);
+        const toggle = await waitFor(() => document.querySelector('.kpi-guide-toggle'), code + " guide toggle");
+        const guide = document.getElementById("kpiActivityGuide" + code);
+        const defaultHidden = toggle.getAttribute("aria-expanded") === "false" && guide.hidden && guide.getBoundingClientRect().height === 0;
+        toggle.click();
+        await waitFor(() => toggle.getAttribute("aria-expanded") === "true" && !guide.hidden && guide.textContent.includes("FY26 " + code + " guide measurement"), code + " guide shown");
+        guideContract.push({ code, defaultHidden, label: toggle.textContent.replace(/\s+/g, " ").trim(), controls: toggle.getAttribute("aria-controls"), content: guide.textContent.includes("FY26 " + code + " guide activity") && guide.textContent.includes("FY26 " + code + " target per quarter") });
+      }
+      await selectGrid("FY27", "A");
+      const guideTransitionText = document.getElementById("kpiActivityGuideA")?.textContent || "";
+      const guideTransition = { staleFy26: guideTransitionText.includes("FY26 A guide"), loading: guideTransitionText.includes("Loading KPI Guide") };
+      const guideRetained = await waitFor(() => {
+        const toggle = document.querySelector('.kpi-guide-toggle');
+        const guide = document.getElementById("kpiActivityGuideA");
+        return toggle?.getAttribute("aria-expanded") === "true" && !guide?.hidden && guide?.textContent.includes("FY27 A guide measurement") && !guide.textContent.includes("FY26 A guide")
+          ? { expanded: true, currentFy: true, staleFy: false } : null;
+      }, "FY27 A Guide replacement");
+
+      await fetch("/api/v1/__test-guide-mode?mode=empty");
+      await selectGrid("FY26", "A");
+      await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("No KPI Guide is available for A"), "FY26 empty Guide result");
+      await fetch("/api/v1/__test-guide-mode?mode=full");
+      await selectGrid("FY27", "A");
+      const emptyTransitionText = document.getElementById("kpiActivityGuideA")?.textContent || "";
+      const emptyTransition = {
+        loading: emptyTransitionText.includes("Loading KPI Guide"),
+        staleEmpty: emptyTransitionText.includes("No KPI Guide is available for A")
+      };
+      await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("FY27 A guide measurement"), "FY27 Guide after empty result");
+
+      await fetch("/api/v1/__test-guide-mode?mode=error");
+      await selectGrid("FY26", "A");
+      await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("Guide fixture error FY26"), "FY26 Guide error");
+      await fetch("/api/v1/__test-guide-mode?mode=full");
+      await selectGrid("FY27", "A");
+      const errorTransitionText = document.getElementById("kpiActivityGuideA")?.textContent || "";
+      const errorTransition = {
+        loading: errorTransitionText.includes("Loading KPI Guide"),
+        staleError: errorTransitionText.includes("KPI Guide API request failed") || errorTransitionText.includes("Guide fixture error")
+      };
+      await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("FY27 A guide measurement"), "FY27 Guide after error result");
+
+      await selectGrid("FY26", "D1");
+      document.querySelector('.kpi-summary-toggle[aria-expanded="true"]')?.click();
+      document.querySelector('.kpi-guide-toggle[aria-expanded="true"]')?.click();
+      const longTable = document.querySelector(".kpi-activities-table-wrap");
+      const longFooter = document.querySelector(".kpi-footer");
+      const longContentContract = { rows: longTable.querySelectorAll("tbody tr").length, wrapperVerticalOverflow: longTable.scrollHeight - longTable.clientHeight,
+        documentScroll: document.documentElement.scrollHeight > innerHeight + 1, footerAfterTable: longFooter.getBoundingClientRect().top >= longTable.getBoundingClientRect().bottom - 1 };
+      await selectGrid("FY26", "A");
+      document.querySelector('.kpi-guide-toggle[aria-expanded="true"]')?.click();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const shortPage = document.querySelector(".kpi-spreadsheet-page").getBoundingClientRect();
+      const shortFooter = document.querySelector(".kpi-footer").getBoundingClientRect();
+      const shortFooterContract = { documentOverflow: document.documentElement.scrollHeight - innerHeight, bottom: Math.abs(shortFooter.bottom - innerHeight),
+        left: Math.abs(shortFooter.left - shortPage.left), right: Math.abs(shortFooter.right - shortPage.right), linksCentered: getComputedStyle(document.querySelector(".kpi-footer .oj-web-applayout-footer-item")).justifyContent };
 
       const deliveryExisting = [];
       for (const code of ${JSON.stringify(codes)}) {
@@ -406,7 +497,7 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
         for (const [fy, code] of reverse) results.push({ cycle, direction: "reverse", ...(await inspectGrid(fy, code)) });
       }
       return { results, draftBeforeSort, draftAfterSort, draftAfterViewport, draftAfterCurrentTab, cancelOptions, draftAfterKeepEditing, deleteOnly, scopedState, popupContract,
-        summaryContract, deliveryExisting, sameDateNoDirty, newDateDraft: Boolean(newDateDraft),
+        summaryContract, guideContract, guideTransition, guideRetained, emptyTransition, errorTransition, longContentContract, shortFooterContract, deliveryExisting, sameDateNoDirty, newDateDraft: Boolean(newDateDraft),
         maxEditors, jetGridCount: document.querySelectorAll("oj-data-grid").length,
         errors: window.__kpiGridDisplay.errors, rejections: window.__kpiGridDisplay.rejections };
     })()`,
@@ -435,7 +526,25 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
     await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode, nativeVirtualKeyCode: windowsVirtualKeyCode, modifiers });
   };
 
+
   await cdp.send("Page.bringToFront");
+  const initialSelectAll = await evalPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return { checked: input.checked, indeterminate: input.indeterminate }; })()`);
+  if (initialSelectAll.indeterminate) {
+    await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
+    await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "normalize Select All checked");
+  }
+  if (initialSelectAll.checked || initialSelectAll.indeterminate) {
+    await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
+    await waitPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return !input?.checked && !input?.indeterminate; })()`, "normalize Select All unchecked");
+  }
+  await evalPage(`document.querySelector('tbody input[data-kpi-row-selector]').click(); true`);
+  const selectAllIndeterminate = await waitPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return input?.indeterminate && !input.checked ? { checked: input.checked, indeterminate: input.indeterminate } : null; })()`, "Select All indeterminate");
+  await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
+  const selectAllChecked = await waitPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return input?.checked && !input.indeterminate ? { checked: input.checked, indeterminate: input.indeterminate } : null; })()`, "Select All checked");
+  await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
+  const selectAllUnchecked = await waitPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return !input?.checked && !input?.indeterminate ? { checked: input.checked, indeterminate: input.indeterminate } : null; })()`, "Select All unchecked");
+  result.selectAllContract = { indeterminate: selectAllIndeterminate, checked: selectAllChecked, unchecked: selectAllUnchecked };
+
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
   await waitPage(`location.pathname.endsWith("activity-b") && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')`, "keyboard B route");
   await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
@@ -528,6 +637,30 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   result.rejections = postKeyboardRuntime.rejections;
   result.keyboardContract = { enter: true, shiftEnter: titleAfterShiftEnter.includes("\n"), space: true, tab: true, shiftTab: true, escape: true,
     workloadDraft: true, aria: keyboardAria, maxEditors: Math.max(result.maxEditors, maxTrustedEditors) };
+  await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[1].click(); true`);
+  await delay(80);
+  await evalPage(`(() => {
+    const dialog=[...document.querySelectorAll("oj-dialog")].find(item => item.isOpen?.() && item.textContent.includes("Discard and Continue"));
+    if (!dialog) return false;
+    const leaf=[...dialog.querySelectorAll("*")].find(element => element.childElementCount===0 && element.textContent.trim()==="Discard and Continue");
+    (leaf?.closest("oj-button") || leaf)?.dispatchEvent(new CustomEvent("ojAction",{bubbles:true,composed:true}));
+    return true;
+  })()`);
+  await waitPage(`location.pathname.endsWith("activity-a") && document.querySelector('[data-kpi-table-scope$=":A"]')`, "viewport A route");
+  const viewportContracts = [];
+  for (const viewport of [{ width: 1857, height: 920 }, { width: 1280, height: 900 }]) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: 1, mobile: false });
+    await delay(80);
+    viewportContracts.push(await evalPage(`(() => {
+      const footer=document.querySelector('.kpi-footer').getBoundingClientRect();
+      const page=document.querySelector('.kpi-spreadsheet-page').getBoundingClientRect();
+      const wrapper=document.querySelector('.kpi-activities-table-wrap');
+      return { width: innerWidth, height: innerHeight, documentX: document.documentElement.scrollWidth-document.documentElement.clientWidth,
+        documentY: document.documentElement.scrollHeight-document.documentElement.clientHeight, footerBottom: Math.abs(footer.bottom-innerHeight),
+        footerLeft: Math.abs(footer.left-page.left), footerRight: Math.abs(footer.right-page.right), wrapperX: wrapper.scrollWidth-wrapper.clientWidth };
+    })()`));
+  }
+  result.viewportContracts = viewportContracts;
   cdp.close();
   console.log(JSON.stringify({ realApi, result, mutationCalls, cdpExceptions }, null, 2));
 
@@ -543,7 +676,36 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
   assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
   assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
-  assert.deepEqual(result.summaryContract, { quarterHidden: { height: 0, tableMoved: true }, quarterRetained: true, salesRetained: true });
+  assert.deepEqual(result.summaryContract, { quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, bDefaultHidden: true, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
+  assert.equal(result.guideContract.length, 7);
+  for (const guide of result.guideContract) {
+    assert.equal(guide.defaultHidden, true, `${guide.code} Guide defaults collapsed`);
+    assert.equal(guide.label, "⌄KPI Guide", `${guide.code} Guide fixed label`);
+    assert.equal(guide.controls, `kpiActivityGuide${guide.code}`);
+    assert.equal(guide.content, true, `${guide.code} Guide content`);
+  }
+  assert.deepEqual(result.guideTransition, { staleFy26: false, loading: true }, "Guide transition must synchronously hide the previous fiscal year");
+  assert.deepEqual(result.guideRetained, { expanded: true, currentFy: true, staleFy: false }, "Guide expansion must survive FY switching with only current-FY content");
+  assert.deepEqual(result.emptyTransition, { loading: true, staleEmpty: false }, "Guide transition must hide a prior-FY empty result synchronously");
+  assert.deepEqual(result.errorTransition, { loading: true, staleError: false }, "Guide transition must hide a prior-FY error synchronously");
+
+  assert.deepEqual(result.selectAllContract, {
+    indeterminate: { checked: false, indeterminate: true },
+    checked: { checked: true, indeterminate: false },
+    unchecked: { checked: false, indeterminate: false }
+  });
+  assert.deepEqual(result.longContentContract, { rows: 40, wrapperVerticalOverflow: 0, documentScroll: true, footerAfterTable: true });
+  assert.ok(result.shortFooterContract.documentOverflow <= 1, "three-row content must not create a document scrollbar");
+  assert.ok(result.shortFooterContract.bottom <= 1, "short-content Footer must rest on the viewport bottom");
+  assert.ok(result.shortFooterContract.left <= 1 && result.shortFooterContract.right <= 1, "Footer must match the KPI page wrapper edges");
+  assert.equal(result.shortFooterContract.linksCentered, "center");
+  assert.deepEqual(result.viewportContracts.map(item => [item.width, item.height]), [[1857, 920], [1280, 900]]);
+  for (const viewport of result.viewportContracts) {
+    assert.ok(viewport.documentX <= 1, `${viewport.width} document horizontal overflow`);
+    assert.ok(viewport.documentY <= 1, `${viewport.width} short-content document scrollbar`);
+    assert.ok(viewport.footerBottom <= 1, `${viewport.width} Footer viewport bottom`);
+    assert.ok(viewport.footerLeft <= 1 && viewport.footerRight <= 1, `${viewport.width} Footer wrapper alignment`);
+  }
   assert.equal(result.deliveryExisting.length, 7);
   for (const item of result.deliveryExisting) {
     assert.equal(item.line, "3px", `${item.code} Delivery Date draft line`);

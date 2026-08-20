@@ -139,6 +139,7 @@ export const App = registerCustomElement(
     const confirmedKpiPopstateRetryRef = useRef<null | { historyIndex: number | null; href: string }>(null);
     const [guideOpen, setGuideOpen] = useState(false);
     const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
+    const [guideDataFiscalYear, setGuideDataFiscalYear] = useState<FiscalYear | null>(null);
     const [guideLoading, setGuideLoading] = useState(false);
     const [guideSaving, setGuideSaving] = useState(false);
     const [guideError, setGuideError] = useState("");
@@ -192,8 +193,9 @@ export const App = registerCustomElement(
     }, []);
 
     useEffect(() => {
-      if (!guideOpen) return;
+      if (!(guideOpen || activeRoute.module === "kpiPage")) return;
       let active = true;
+      setGuideDataFiscalYear(fiscalYear);
       setKpiGuides([]);
       setGuideLoading(true);
       setGuideError("");
@@ -202,7 +204,7 @@ export const App = registerCustomElement(
         .catch((error) => { if (active) setGuideError(error instanceof Error ? error.message : "KPI Guide API request failed."); })
         .finally(() => { if (active) setGuideLoading(false); });
       return () => { active = false; };
-    }, [fiscalYear, guideOpen]);
+    }, [activeRoute.module, fiscalYear, guideOpen]);
 
     useEffect(() => {
       let active = true;
@@ -573,6 +575,7 @@ export const App = registerCustomElement(
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}
+            guideDataFiscalYear={guideDataFiscalYear}
             guideRecords={kpiGuides}
             guideLoading={guideLoading}
             guideSaving={guideSaving}

@@ -46,6 +46,7 @@ import {
   listKpiWorkloadOptions,
   saveKpiRow
 } from "../../data/kpiSpreadsheetApi";
+import { KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import {
   getKpiTabForRoute,
   KPI_ACTIVITY_TABS,
@@ -58,6 +59,15 @@ const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
 const stageLabels: Record<WorkloadStage, string> = { identified: "Identified", validated: "Validated", onboarded: "Onboarded" };
 const stageTargets: Record<WorkloadStage, number> = { identified: 2000, validated: 1000, onboarded: 500 };
 const activities = ["Solution Design", "Solution Proposal", "Solution Deployment"];
+const collapsedKpiState = (): Record<SpreadsheetKpiCode, boolean> => ({
+  A: false,
+  B: false,
+  C1: false,
+  C2: false,
+  D1: false,
+  F: false,
+  H: false
+});
 const stopGridInteraction = (event: Event) => event.stopPropagation();
 const waitForFrame = () => new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 const minimumProgress = (startedAt: number, minimumMs = 450) => new Promise<void>((resolve) => {
@@ -409,9 +419,13 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigationGuardChange }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange }: Readonly<{
   fiscalYear: FiscalYear;
   routeId: string;
+  guideDataFiscalYear: FiscalYear | null;
+  guideRecords: KpiGuideRecord[];
+  guideLoading: boolean;
+  guideError: string;
   onNavigate: (routeId: string) => void;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
 }>) {
@@ -435,8 +449,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
   const [reloadVersion, setReloadVersion] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState<Quarter | null>(null);
-  const [quarterSummaryExpanded, setQuarterSummaryExpanded] = useState(true);
-  const [salesSummaryExpanded, setSalesSummaryExpanded] = useState(true);
+  const [summaryExpandedByTab, setSummaryExpandedByTab] = useState<Record<SpreadsheetKpiCode, boolean>>(collapsedKpiState);
+  const [guideExpandedByTab, setGuideExpandedByTab] = useState<Record<SpreadsheetKpiCode, boolean>>(collapsedKpiState);
   const [sortByScope, setSortByScope] = useState<Record<string, KpiSortState | null>>({});
   const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
   const [pendingNavigation, setPendingNavigation] = useState<null | { label: string; action: () => void }>(null);
@@ -719,12 +733,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
   const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
   const salesSummary = activeTab === "D1";
-  const summaryExpanded = salesSummary ? salesSummaryExpanded : quarterSummaryExpanded;
+  const activityTab = activeTab as SpreadsheetKpiCode;
+  const summaryExpanded = summaryExpandedByTab[activityTab] ?? false;
   const summaryId = salesSummary ? "kpiSalesStageAcrSummary" : "kpiTargetQuarterCountSummary";
-  const summaryLabel = salesSummary ? "Sales Stage / ACR summary" : "Target Quarter count summary";
-  const toggleSummary = () => salesSummary
-    ? setSalesSummaryExpanded((current) => !current)
-    : setQuarterSummaryExpanded((current) => !current);
+  const summaryLabel = salesSummary ? "Stage / ACR" : "Quarter Summary";
+  const guideId = `kpiActivityGuide${activityTab}`;
+  const guideExpanded = guideExpandedByTab[activityTab] ?? false;
+  const guideRecordsStale = guideDataFiscalYear !== fiscalYear;
+  const activeGuide = guideRecords.find((item) => item.kpiCode === activeTab && item.fiscalYear === fiscalYear);
+  const toggleSummary = () => setSummaryExpandedByTab((current) => ({
+    ...current,
+    [activityTab]: !current[activityTab]
+  }));
+  const toggleGuide = () => setGuideExpandedByTab((current) => ({
+    ...current,
+    [activityTab]: !current[activityTab]
+  }));
 
   const addDraft = () => {
     if (saving || drafts.length > 0 || editState.cell || activeTab === "Overview") return;
@@ -878,7 +902,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
         <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
           <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
-            {summaryExpanded ? "Hide" : "Show"} {summaryLabel}
+            <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
+            <span>{summaryLabel}</span>
+          </button>
+          <button type="button" class="kpi-guide-toggle" aria-controls={guideId} aria-expanded={guideExpanded} onClick={toggleGuide}>
+            <span class="kpi-toggle-chevron" aria-hidden="true">{guideExpanded ? "⌄" : "›"}</span>
+            <span>KPI Guide</span>
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
@@ -891,6 +920,28 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
         ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
       <Summary id={summaryId} expanded={summaryExpanded} rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
+      <section id={guideId} class="kpi-activity-guide" hidden={!guideExpanded} aria-labelledby={`${guideId}Title`}>
+        <div class="kpi-activity-guide__heading">
+          <div><span class="kpi-eyebrow">{activeTab} KPI Guide</span><h3 id={`${guideId}Title`}>{activeDefinition?.name}</h3></div>
+          <span>{fiscalYear}</span>
+        </div>
+        {(guideLoading || guideRecordsStale) ? <p role="status">Loading KPI Guide…</p> : guideError ? <p class="kpi-activity-guide__error" role="alert">{guideError}</p> : activeGuide ? <Fragment>
+          <dl class="kpi-activity-guide__facts">
+            {activeGuide.combinedSrType ? <div><dt>SR / Business SR Type</dt><dd>{activeGuide.combinedSrType}</dd></div> : <Fragment>
+              <div><dt>SR Type</dt><dd>{activeGuide.srType}</dd></div>
+              <div><dt>Business SR Type</dt><dd>{activeGuide.businessSrType}</dd></div>
+            </Fragment>}
+            <div><dt>Target</dt><dd>{activeGuide?.targetPerQuarter}</dd></div>
+            <div><dt>Activity</dt><dd>{activeGuide?.activity}</dd></div>
+            <div><dt>Task Type</dt><dd>{activeGuide.taskType}</dd></div>
+            <div><dt>What are we measuring?</dt><dd>{activeGuide?.measuring}</dd></div>
+          </dl>
+          {(activeGuide.details || activeGuide.notes) && <div class="kpi-activity-guide__detail">
+            {activeGuide.details && <p>{activeGuide.details}</p>}
+            {activeGuide.notes && <p><strong>Notes</strong><br />{activeGuide.notes}</p>}
+          </div>}
+        </Fragment> : <p role="status">No KPI Guide is available for {activeTab}.</p>}
+      </section>
       <div ref={tableHostRef} class="kpi-activities-table-wrap" data-kpi-table-scope={tableScopeKey}>
         <table ref={tableRef} class="kpi-activities-table" aria-label={`${activeTab} editable KPI activities`}
           style={{ width: `${columnLayout.totalWidth}px` }}>
@@ -899,7 +950,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, onNavigate, onNavigati
             {fields.map((field) => <col key={field.key} style={{ width: `${columnLayout.widths[field.key] ?? 112}px` }} />)}
           </colgroup>
           <thead><tr>
-            <th class="kpi-selector-cell" scope="col">
+            <th class="kpi-grid-column-header kpi-selector-cell" scope="col">
               <div class="kpi-select-all-header" onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
                 <KpiSelectAll availableIds={selectableVisibleIds} selectedIds={selectedIds} onSelectionChange={setVisibleSelection} />
               </div>

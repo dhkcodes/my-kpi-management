@@ -94,6 +94,8 @@ assert.ok((d1Layout.widths.deliveryDate ?? 0) >= 140, "Delivery Date fits ISO da
 assert.ok(d1Layout.totalWidth > 860, "narrow viewports retain fixed widths and scroll inside the Grid");
 
 const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheetPage.tsx"), "utf8");
+const content = fs.readFileSync(path.resolve("src/components/content/index.tsx"), "utf8");
+const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
 
 assert.doesNotMatch(page, /oj-data-grid|RowDataGridProvider|MutableArrayDataProvider|ojDataGrid|dataGridProvider|providerMutationGenerationRef|providerSettlementRef|loadSkeletons|fillViewport/,
@@ -161,10 +163,34 @@ assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/,
   "the reparented public JET datepicker popup must remain inside the active edit interaction boundary");
 assert.match(page, /onvalueChanged=\{\(event: CustomEvent\) => \{[\s\S]*onInput\(field\.key,[\s\S]*onFinish\(\)/,
   "Delivery Date valueChanged must apply the latest value before closing the one-cell editor");
-assert.match(page, /quarterSummaryExpanded[\s\S]*salesSummaryExpanded/,
-  "quarter-count and Sales Stage ACR summaries must retain independent page-local visibility state");
+assert.match(page, /collapsedKpiState[\s\S]*A:\s*false[\s\S]*B:\s*false[\s\S]*C1:\s*false[\s\S]*C2:\s*false[\s\S]*D1:\s*false[\s\S]*F:\s*false[\s\S]*H:\s*false/,
+  "every KPI tab summary must default collapsed and retain independent page-local visibility state");
+assert.match(page, /summaryExpandedByTab[\s\S]*useState<Record<SpreadsheetKpiCode, boolean>>\(collapsedKpiState\)/,
+  "summary visibility must use the per-KPI collapsed initializer");
 assert.match(page, /aria-controls=\{summaryId\}[\s\S]*aria-expanded=\{summaryExpanded\}/,
   "the summary visibility control must expose its controlled region and expansion state");
+assert.match(page, /summaryLabel = salesSummary \? "Stage \/ ACR" : "Quarter Summary"/,
+  "summary controls must use short fixed labels");
+assert.match(page, /class="kpi-toggle-chevron"[^>]*aria-hidden="true"/,
+  "summary expansion state must be visible through a chevron without changing the label");
+assert.match(page, /guideExpandedByTab[\s\S]*useState<Record<SpreadsheetKpiCode, boolean>>\(collapsedKpiState\)/,
+  "KPI Guide must default collapsed with independent state for every KPI tab");
+assert.match(page, /aria-controls=\{guideId\}[\s\S]*aria-expanded=\{guideExpanded\}[\s\S]*KPI Guide/,
+  "the KPI Guide control must expose native keyboard and expansion semantics");
+assert.match(page, /guideRecords\.find\(\(item\) => item\.kpiCode === activeTab && item\.fiscalYear === fiscalYear\)/,
+  "the expanded Guide must never select a record from another fiscal year");
+assert.match(page, /guideDataFiscalYear:\s*FiscalYear \| null/,
+  "KPI Activities must receive the fiscal year associated with Guide records, errors, or empty results");
+assert.match(page, /guideDataFiscalYear !== fiscalYear/,
+  "the Guide must synchronously treat records, errors, and empty results from a prior fiscal year as stale");
+assert.match(content, /guideDataFiscalYear=\{guideDataFiscalYear\}[\s\S]*guideRecords=\{guideRecords\}[\s\S]*guideLoading=\{guideLoading\}[\s\S]*guideError=\{guideError\}/,
+  "Content must pass Guide response scope and data into KPI Activities");
+assert.match(app, /const \[guideDataFiscalYear, setGuideDataFiscalYear\] = useState<FiscalYear \| null>\(null\)/,
+  "App must track the fiscal year associated with every Guide response state");
+assert.match(app, /setGuideDataFiscalYear\(fiscalYear\)[\s\S]*setKpiGuides\(\[\]\)[\s\S]*setGuideLoading\(true\)/,
+  "Guide reload must atomically move its response scope before clearing and loading");
+assert.match(app, /guideOpen \|\| activeRoute\.module === "kpiPage"/,
+  "KPI Activities must load existing Guide records without opening the legacy global drawer");
 assert.match(page, /Math\.max\(0, host\.clientWidth - 1\)/,
   "native table layout must reserve one pixel for collapsed-border rounding without showing a desktop scrollbar");
 assert.match(page, /<Summary[^>]*expanded=\{summaryExpanded\}/,
@@ -175,6 +201,20 @@ assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align
   "KPI Activities must stay directly below the fiscal-year panel instead of stretching grid rows across the viewport");
 assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/,
   "a hidden summary must contribute no height, margin, or padding");
+assert.match(styles, /\.kpi-activity-guide\[hidden\]\s*\{[^}]*display:\s*none/,
+  "a collapsed KPI Guide must contribute no layout geometry");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
+  "the KPI route shell must use viewport-based column flow");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\) \.kpi-shell__body\s*\{[^}]*flex:\s*1 0 auto[^}]*min-height:\s*0/,
+  "the KPI route body must fill short viewports without forced overflow");
+assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-height:/,
+  "KPI tables must grow in document flow instead of creating a short-data vertical scroll container");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\):has\(\.kpi-side-nav\.is-open\) \.kpi-footer\s*\{[^}]*margin-left:\s*18rem[^}]*width:\s*calc\(100% - 19\.5rem\)/,
+  "KPI Footer must align with the page wrapper rather than applying the navigation offset twice");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\) \.kpi-footer \.oj-web-applayout-footer-item[\s\S]*justify-content:\s*center/,
+  "KPI Footer links and copyright must be visually balanced");
+assert.match(page, /<th class="kpi-grid-column-header kpi-selector-cell"/,
+  "the Select All header must use the same header surface as data columns");
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*border-collapse:\s*collapse[^}]*table-layout:\s*fixed/,
   "native KPI activity table must own deterministic column geometry");
 assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*white-space:\s*nowrap/,

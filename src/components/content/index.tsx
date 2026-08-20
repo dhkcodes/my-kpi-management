@@ -40,6 +40,7 @@ type Props = Readonly<{
   fiscalYear: FiscalYear;
   fiscalYears: FiscalYear[];
   guideOpen: boolean;
+  guideDataFiscalYear: FiscalYear | null;
   guideRecords: KpiGuideRecord[];
   guideLoading: boolean;
   guideSaving: boolean;
@@ -293,6 +294,7 @@ export function Content({
   fiscalYear,
   fiscalYears,
   guideOpen,
+  guideDataFiscalYear,
   guideRecords,
   guideLoading,
   guideSaving,
@@ -424,7 +426,7 @@ export function Content({
             ))}
           </div>
         </div>
-        {activeRoute.module !== "weeklyActivities" && <button
+        {activeRoute.module !== "weeklyActivities" && activeRoute.module !== "kpiPage" && <button
           type="button"
           class="kpi-guide-entry-button"
           aria-label="Open KPI Guide"
@@ -543,7 +545,9 @@ export function Content({
           </section>
         </>
       ) : activeRoute.module === "kpiPage" ? (
-        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id} onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange} />
+        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
+          guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
+          onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page
           fiscalYear={fiscalYear}
