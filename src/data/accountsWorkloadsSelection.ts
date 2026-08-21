@@ -32,6 +32,15 @@ export const overlayEditableAccountWorkloadChanges = (
   });
 };
 
+export const applyPermanentDeletesLocally = (
+  rows: readonly AccountWorkloadRow[],
+  permanentDeleteIds: readonly string[] = []
+) => {
+  if (permanentDeleteIds.length === 0) return [...rows];
+  const permanentIds = new Set(permanentDeleteIds);
+  return rows.filter((row) => !permanentIds.has(row.id));
+};
+
 export const classifyAccountDeleteTargets = (
   savedRows: readonly AccountWorkloadRow[],
   selectedRowIds: readonly string[],

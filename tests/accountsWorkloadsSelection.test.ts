@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   applyDraftDelete,
   applyDraftRestore,
+  applyPermanentDeletesLocally,
   classifyAccountDeleteTargets,
   hasEditableAccountWorkloadChanges,
   hasSelectedDeletedRows,
@@ -74,6 +75,16 @@ assert.equal(mergedAfterHighlight[0].isImportant, false, "authoritative action s
 assert.deepEqual(classifyAccountDeleteTargets(savedRows, ["new-1", "1", "2"], "new-1"), {
   draftIds: ["new-1"], activeIds: ["1"], permanentIds: ["2"]
 }, "draft, saved active, and saved deleted targets are distinguished before confirmation");
+assert.deepEqual(
+  applyPermanentDeletesLocally([row("1"), row("2", true), row("3", true)], ["2"]),
+  [row("1"), row("3", true)],
+  "local/fallback permanent delete removes only confirmed permanent targets"
+);
+assert.deepEqual(
+  applyPermanentDeletesLocally([row("1"), row("2", true)], []),
+  [row("1"), row("2", true)],
+  "local/fallback rows are preserved when no permanent delete was requested"
+);
 
 async function verifyMinimumPendingDuration() {
   let requestedDelay = 0;

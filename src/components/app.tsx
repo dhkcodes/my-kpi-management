@@ -43,6 +43,7 @@ import {
   withHistoryIndex
 } from "./weeklyActivityNavigationGuard";
 import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
+import { applyPermanentDeletesLocally } from "../data/accountsWorkloadsSelection";
 import {
   fetchFxRate,
   fetchKpiGuides,
@@ -590,8 +591,9 @@ export const App = registerCustomElement(
             onAccountsWorkloadsRowsChange={async (rows, permanentDeleteIds, draftFxRate) => {
               const savedRows = accountsWorkloadsRows[fiscalYear];
               if (accountsWorkloadsDataSource !== "api") {
-                const localResult = { items: rows, total: rows.length, ...(draftFxRate ? { fxRate: draftFxRate } : {}) };
-                setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: rows }));
+                const localRows = applyPermanentDeletesLocally(rows, permanentDeleteIds);
+                const localResult = { items: localRows, total: localRows.length, ...(draftFxRate ? { fxRate: draftFxRate } : {}) };
+                setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: localRows }));
                 if (draftFxRate) setFxRate(draftFxRate);
                 return localResult;
               }

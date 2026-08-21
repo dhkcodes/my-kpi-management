@@ -32,6 +32,8 @@ assert.match(page, /cancelBehavior="escape"/, "Escape closes the modal confirmat
 assert.match(page, /restoreDeleteLauncherFocus/, "dialog close restores focus to the launcher or stable Add Account fallback");
 assert.match(page, /draftIds\.length > 0[\s\S]*setAddingRow\(null\)/,
   "confirming an unsaved Draft delete removes it locally");
+assert.match(app, /accountsWorkloadsDataSource !== "api"[\s\S]{0,300}applyPermanentDeletesLocally\(rows, permanentDeleteIds\)[\s\S]{0,300}items: localRows[\s\S]{0,200}total: localRows\.length[\s\S]{0,300}\[fiscalYear\]: localRows/,
+  "the local/fallback adapter removes confirmed permanent targets from both its authoritative response and parent state");
 assert.doesNotMatch(page, /\{deleteMode ===|Selected rows:/, "dynamic top-action delete labels and selected count are absent");
 assert.match(page, /hasSelectedDeletedRows[\s\S]*&& \([\s\S]*>Restore<\/oj-button>/, "Restore is conditionally rendered for deleted selections");
 assert.match(page, />Refresh<\/oj-button>/, "Refresh action is rendered");
