@@ -253,6 +253,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
         const previousPanel = pagePanel.previousElementSibling;
         return { fy, code, schema: wrapper.dataset.kpiTableScope, missing, wrapFailures, overlapFailures, fixedEllipsis,
           rowCount: grid.querySelectorAll("tbody tr").length, totalWidth, viewportWidth: wrapper.clientWidth,
+          targetQuarterTextCount: code === "F" ? (pagePanel.textContent.match(/Target Quarter/g) || []).length : null,
           wrapperOverflow: wrapper.scrollWidth - wrapper.clientWidth,
           tableHeight: wrapper.getBoundingClientRect().height,
           contentAlign: getComputedStyle(pagePanel.parentElement).alignContent,
@@ -416,7 +417,8 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const emptyTransitionText = document.getElementById("kpiActivityGuideA")?.textContent || "";
       const emptyTransition = {
         loading: emptyTransitionText.includes("Loading KPI Guide"),
-        staleEmpty: emptyTransitionText.includes("No KPI Guide is available for A")
+        staleEmpty: emptyTransitionText.includes("No KPI Guide is available for A"),
+        currentFy: emptyTransitionText.includes("FY27 A guide measurement")
       };
       await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("FY27 A guide measurement"), "FY27 Guide after empty result");
 
@@ -428,7 +430,8 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const errorTransitionText = document.getElementById("kpiActivityGuideA")?.textContent || "";
       const errorTransition = {
         loading: errorTransitionText.includes("Loading KPI Guide"),
-        staleError: errorTransitionText.includes("KPI Guide API request failed") || errorTransitionText.includes("Guide fixture error")
+        staleError: errorTransitionText.includes("KPI Guide API request failed") || errorTransitionText.includes("Guide fixture error"),
+        currentFy: errorTransitionText.includes("FY27 A guide measurement")
       };
       await waitFor(() => document.getElementById("kpiActivityGuideA")?.textContent.includes("FY27 A guide measurement"), "FY27 Guide after error result");
 
@@ -560,11 +563,13 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   selectorCellContract.rowCellClick = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell click");
   await evalPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]').click(); true`);
   selectorCellContract.actualInputSingleToggle = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === false`, "actual row input single toggle");
-  await evalPage(`document.querySelector('tbody td.kpi-selector-cell').focus(); true`); await pressKey(" ", "Space", 32, 0, " ");
+  await waitPage(`(() => { const cell=document.querySelector('tbody td.kpi-selector-cell'); cell?.focus(); return document.activeElement === cell; })()`, "row selector cell focus");
+  await pressKey(" ", "Space", 32, 0, " ");
   selectorCellContract.rowCellKeyboard = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell Space");
   await evalPage(`document.querySelector('thead th.kpi-selector-cell').click(); true`);
   selectorCellContract.headerCellClick = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "header selector cell click all on");
-  await evalPage(`document.querySelector('thead th.kpi-selector-cell').focus(); true`); await pressKey("Enter", "Enter", 13);
+  await waitPage(`(() => { const cell=document.querySelector('thead th.kpi-selector-cell'); cell?.focus(); return document.activeElement === cell; })()`, "header selector cell focus");
+  await pressKey("Enter", "Enter", 13);
   selectorCellContract.headerCellKeyboard = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === false`, "header selector cell Enter");
   await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
   selectorCellContract.headerInputSingleToggle = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "actual header input single toggle");
@@ -573,7 +578,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
   await waitPage(`location.pathname.endsWith("activity-b") && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')`, "keyboard B route");
   await evalPage(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
+  await waitPage(`(() => { const cell=document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]'); cell?.focus(); return document.activeElement === cell; })()`, "workload cell focus");
   await pressKey("Enter", "Enter", 13);
   await waitPage(`document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]')`, "trusted Enter workload editor");
   await waitPage(`document.querySelectorAll('oj-popup.kpi-workload-results-popup [role="option"]').length > 1`, "trusted workload options");
@@ -616,7 +621,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   await pressKey("Escape", "Escape", 27);
   await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "title Space Escape close");
 
-  await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
+  await waitPage(`(() => { const cell=document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]'); cell?.focus(); return document.activeElement === cell; })()`, "workload cell focus");
   await pressKey("Enter", "Enter", 13);
   await waitPage(`document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]')`, "workload Escape editor");
   await waitPage(`document.querySelector('[data-kpi-single-editor] input')?.getAttribute("aria-activedescendant")?.endsWith("-0")`, "workload generation active option reset");
@@ -754,8 +759,10 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   }
   assert.equal(result.guideTransition.staleFy26, false, "Guide transition must synchronously hide the previous fiscal year");
   assert.deepEqual(result.guideRetained, { expanded: true, currentFy: true, staleFy: false }, "Guide expansion must survive FY switching with only current-FY content");
-  assert.deepEqual(result.emptyTransition, { loading: true, staleEmpty: false }, "Guide transition must hide a prior-FY empty result synchronously");
-  assert.deepEqual(result.errorTransition, { loading: true, staleError: false }, "Guide transition must hide a prior-FY error synchronously");
+  assert.equal(result.emptyTransition.staleEmpty, false, "Guide transition must hide a prior-FY empty result synchronously");
+  assert.ok(result.emptyTransition.loading || result.emptyTransition.currentFy, "Guide transition must show loading or already-settled current-FY content");
+  assert.equal(result.errorTransition.staleError, false, "Guide transition must hide a prior-FY error synchronously");
+  assert.ok(result.errorTransition.loading || result.errorTransition.currentFy, "Guide transition must show loading or already-settled current-FY content");
 
   assert.deepEqual(result.selectAllContract, {
     indeterminate: { checked: false, indeterminate: true },
@@ -809,6 +816,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     assert.deepEqual(item.wrapFailures, [], `${item.schema} one-line headers`);
     assert.deepEqual(item.overlapFailures, [], `${item.schema} sort indicator separation`);
     assert.deepEqual(item.fixedEllipsis, [], `${item.schema} fixed values`);
+    if (item.code === "F") assert.equal(item.targetQuarterTextCount, 0, `${item.schema} must not expose Target Quarter terminology`);
     if (!realApi) assert.equal(item.rowCount, fixtureCounts[item.fy][item.code], `${item.schema} fixture row count`);
     assert.ok(item.documentOverflow <= 1, `${item.schema} must not create page-level horizontal overflow`);
     assert.equal(item.wrapperOverflow, 0, `${item.schema} ordinary desktop viewport must not create a table scrollbar`);

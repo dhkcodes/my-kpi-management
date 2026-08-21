@@ -24,7 +24,7 @@ export const KPI_OVERVIEW_ROWS: readonly KpiOverviewRow[] = [
   { code: "C1", name: "Show and discover workshops", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Target Quarter count" },
   { code: "C2", name: "POCs in customer tenancy", target: "C1 + C2 combined · 6 / Quarter", summaryModel: "Target Quarter count" },
   { code: "D1", name: "New workload", target: "Identified 2,000K OR Validated 1,000K OR Onboarded 500K / Quarter", summaryModel: "Target Quarter × Sales Stage ACR matrix" },
-  { code: "F", name: "Customer references", target: "1 / Quarter", summaryModel: "Target Quarter count" },
+  { code: "F", name: "Customer references", target: "1 / Quarter", summaryModel: "Delivery evidence" },
   { code: "H", name: "Technical blogs", target: "1 / Quarter", summaryModel: "Target Quarter count" }
 ];
 

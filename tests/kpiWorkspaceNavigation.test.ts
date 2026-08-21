@@ -13,5 +13,6 @@ assert.equal(getRouteForKpiTab("Overview"), "kpis-overview");
 assert.equal(getRouteForKpiTab("H"), "activity-h");
 assert.equal(KPI_OVERVIEW_ROWS.length, 7);
 assert.equal(KPI_OVERVIEW_ROWS.find((row) => row.code === "D1")?.summaryModel, "Target Quarter × Sales Stage ACR matrix");
+assert.equal(KPI_OVERVIEW_ROWS.find((row) => row.code === "F")?.summaryModel, "Delivery evidence", "KPI F must not expose Target Quarter terminology");
 
 console.log("kpiWorkspaceNavigation tests passed");
