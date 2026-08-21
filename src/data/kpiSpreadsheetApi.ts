@@ -177,6 +177,16 @@ export async function saveKpiRow(row: KpiSpreadsheetRow, fetchImpl: FetchLike = 
   return decodeActivity(await request(fetchImpl, url, { method: isDraft ? "POST" : "PATCH", body: JSON.stringify(body) }));
 }
 
+export async function saveKpiRowsAtomic(rows: readonly KpiSpreadsheetRow[], fetchImpl: FetchLike = fetch): Promise<KpiSpreadsheetRow[]> {
+  const items = rows.map((row) => row.id.startsWith("draft-")
+    ? payloadFor(row)
+    : { id: Number(row.id), versionNo: row.versionNo, ...payloadFor(row) });
+  return decodeKpiRows(await request(fetchImpl, `${getKpiActivitiesApiBase()}/batch`, {
+    method: "POST",
+    body: JSON.stringify({ items })
+  }));
+}
+
 export async function deleteKpiRow(row: KpiSpreadsheetRow, fetchImpl: FetchLike = fetch): Promise<void> {
   if (row.id.startsWith("draft-")) return;
   await request(fetchImpl, `${getKpiActivitiesApiBase()}/${encodeURIComponent(row.id)}?versionNo=${encodeURIComponent(String(row.versionNo ?? 0))}`, { method: "DELETE" });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { decodeKpiOverview, decodeKpiRows, deleteKpiRow, getKpiActivitiesApiBase, listKpiOverview, listKpiRows, listKpiWorkloadOptions, saveKpiRow } from "../src/data/kpiSpreadsheetApi";
+import { decodeKpiOverview, decodeKpiRows, deleteKpiRow, getKpiActivitiesApiBase, listKpiOverview, listKpiRows, listKpiWorkloadOptions, saveKpiRow, saveKpiRowsAtomic } from "../src/data/kpiSpreadsheetApi";
 import { KpiSpreadsheetRow } from "../src/data/kpiSpreadsheet";
 
 const backend = {
@@ -42,7 +42,9 @@ assert.throws(() => decodeKpiOverview({ ...overviewPayload, items: [{ ...overvie
 const calls: Array<{ url: string; init?: RequestInit }> = [];
 const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push({ url: String(input), init });
-  const responseBody = String(input).includes("/overview")
+  const responseBody = String(input).endsWith("/batch")
+    ? { items: [backend, { ...backend, id: 42 }] }
+    : String(input).includes("/overview")
     ? overviewPayload
     : String(input).includes("workload-options")
       ? { items: [{ workloadId: 17, accountName: "Account A", workloadName: "Workload A", opptyNo: "D100" }], total: 1, hasMore: false }
@@ -61,14 +63,22 @@ async function run() {
   assert.equal(options.items[0].workloadId, 17);
   await saveKpiRow(valid, fetchImpl);
   await saveKpiRow({ ...valid, id: "draft-a-1", versionNo: undefined }, fetchImpl);
+  const batch = await saveKpiRowsAtomic([valid, { ...valid, id: "draft-a-2", versionNo: undefined }], fetchImpl);
+  assert.equal(batch.length, 2);
   await deleteKpiRow(valid, fetchImpl);
   assert.equal(calls[0].url, "/api/v1/kpi-activities?fiscalYear=FY27");
   assert.equal(calls[1].url, "/api/v1/kpi-activities/overview?fiscalYear=FY27");
   assert.match(calls[2].url, /workload-options\?fiscalYear=FY27&search=Account&offset=0&size=10$/);
   assert.equal(calls[3].init?.method, "PATCH");
   assert.equal(calls[4].init?.method, "POST");
-  assert.match(calls[5].url, /versionNo=2$/);
-  assert.equal(calls[5].init?.method, "DELETE");
+  assert.equal(calls[5].url, "/api/v1/kpi-activities/batch");
+  assert.equal(calls[5].init?.method, "POST");
+  const batchBody = JSON.parse(String(calls[5].init?.body));
+  assert.equal(batchBody.items[0].id, 41);
+  assert.equal(batchBody.items[0].versionNo, 2);
+  assert.equal(batchBody.items[1].id, undefined);
+  assert.match(calls[6].url, /versionNo=2$/);
+  assert.equal(calls[6].init?.method, "DELETE");
   console.log("kpiSpreadsheetApi tests passed");
 }
 

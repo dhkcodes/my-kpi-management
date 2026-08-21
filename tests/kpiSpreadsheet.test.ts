@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   KPI_TABS,
   KPI_FIELD_CONTRACTS,
+  applyManagedToSelection,
   buildKpiSummary,
   createEmptyKpiRow,
   fiscalQuarterFromDeliveryDate,
@@ -37,7 +38,7 @@ assert.equal(d1Keys.includes("quarter"), false, "D1 must expose one Target Quart
 assert.ok(d1Keys.indexOf("stage") < d1Keys.indexOf("acrK"));
 assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false, "C1 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
-assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.type, "manageTime", "Manage Time must be a Pending/Reflected select");
+assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.label, "Managed", "the status column must use the concise label");
 assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), true, "H must expose the shared SR Number editor");
 assert.equal(KPI_FIELD_CONTRACTS.H.find((item) => item.key === "title")?.type, "textarea", "H Content must reuse the truncated long-text behavior");
 
@@ -97,5 +98,19 @@ const addAll = { isAddAll: () => true, values: () => new Set<string>(), deletedV
 assert.deepEqual(getSelectedKpiRowIds(addAll, ["row-1", "row-2", "row-3"]), ["row-1", "row-3"], "JET add-all selection must honor deleted keys");
 const explicit = { isAddAll: () => false, values: () => new Set(["row-2"]), deletedValues: () => new Set<string>() };
 assert.deepEqual(getSelectedKpiRowIds(explicit, ["row-1", "row-2"]), ["row-2"]);
+
+const existingManaged = { ...rows[0], id: "existing-managed", manageTimeReflected: false };
+const newManaged = { ...createEmptyKpiRow("A", "FY27"), id: "draft-a-managed" };
+assert.deepEqual(applyManagedToSelection([existingManaged], [], [], true), [], "zero selection is a no-op");
+assert.deepEqual(
+  applyManagedToSelection([existingManaged], [], [existingManaged.id], true).map((row) => [row.id, row.manageTimeReflected]),
+  [[existingManaged.id, true]],
+  "one existing row becomes a draft"
+);
+const bulkManaged = applyManagedToSelection([existingManaged], [newManaged], [existingManaged.id, newManaged.id], true);
+assert.deepEqual(bulkManaged.map((row) => [row.id, row.manageTimeReflected]), [[newManaged.id, true], [existingManaged.id, true]],
+  "existing and new rows are updated together while preserving draft order");
+assert.deepEqual(applyManagedToSelection([existingManaged], [{ ...existingManaged, manageTimeReflected: true }], [existingManaged.id], false), [],
+  "reverting an existing row to its saved state removes the draft");
 
 console.log("kpiSpreadsheet tests passed");

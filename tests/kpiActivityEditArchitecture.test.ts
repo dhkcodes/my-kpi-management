@@ -203,16 +203,16 @@ assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/,
   "a hidden summary must contribute no height, margin, or padding");
 assert.match(styles, /\.kpi-activity-guide\[hidden\]\s*\{[^}]*display:\s*none/,
   "a collapsed KPI Guide must contribute no layout geometry");
-assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
-  "the KPI route shell must use viewport-based column flow");
-assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\) \.kpi-shell__body\s*\{[^}]*flex:\s*1 0 auto[^}]*min-height:\s*0/,
-  "the KPI route body must fill short viewports without forced overflow");
+assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
+  "the common App shell must use viewport-based column flow for every route");
+assert.match(styles, /\.kpi-shell__body\s*\{[^}]*flex:\s*1 0 auto[^}]*min-height:\s*0/,
+  "the common route body must fill short viewports without forced overflow");
 assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-height:/,
   "KPI tables must grow in document flow instead of creating a short-data vertical scroll container");
-assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\):has\(\.kpi-side-nav\.is-open\) \.kpi-footer\s*\{[^}]*margin-left:\s*18rem[^}]*width:\s*calc\(100% - 19\.5rem\)/,
-  "KPI Footer must align with the page wrapper rather than applying the navigation offset twice");
-assert.match(styles, /\.kpi-shell:has\(\.kpi-spreadsheet-page\) \.kpi-footer \.oj-web-applayout-footer-item[\s\S]*justify-content:\s*center/,
-  "KPI Footer links and copyright must be visually balanced");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-side-nav\.is-open\) \.kpi-footer\s*\{[^}]*margin-left:\s*18rem[^}]*width:\s*calc\(100% - 19\.5rem\)/,
+  "every route Footer must align with the page wrapper rather than applying the navigation offset twice");
+assert.match(styles, /\.kpi-footer \.oj-web-applayout-footer-item[\s\S]*justify-content:\s*center/,
+  "common Footer links and copyright must be visually balanced");
 assert.match(page, /<th class="kpi-grid-column-header kpi-selector-cell"/,
   "the Select All header must use the same header surface as data columns");
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*border-collapse:\s*collapse[^}]*table-layout:\s*fixed/,
@@ -221,10 +221,10 @@ assert.match(styles, /\.kpi-grid-header-title\s*\{[^}]*white-space:\s*nowrap/,
   "header titles must remain on one line");
 assert.match(styles, /\.kpi-grid-cell--fixed\s*>\s*span\s*\{[^}]*text-overflow:\s*clip[^}]*white-space:\s*nowrap/,
   "fixed-width cells must show their complete values without ellipsis");
-assert.match(styles, /\.kpi-grid-column-header\s*\{[^}]*background:\s*#f4f1ee[^}]*border-right:/,
-  "public header templates must provide the Accounts & Workloads-aligned surface and boundary");
-assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[\s\S]*background:\s*#d9438f[\s\S]*bottom:\s*0[\s\S]*height:\s*3px/,
-  "dirty cells must use the Accounts & Workloads-style bottom draft line");
+assert.match(styles, /\.kpi-grid-column-header\s*\{[^}]*background:\s*var\(--kap-grid-header-bg\)[^}]*border-right:\s*1px solid var\(--kap-grid-border\)/,
+  "public header templates must consume the Accounts & Workloads-aligned surface and boundary tokens");
+assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[\s\S]*background:\s*var\(--kap-grid-draft-line\)[\s\S]*bottom:\s*0[\s\S]*height:\s*3px/,
+  "dirty cells must use the shared Accounts & Workloads bottom draft line token");
 assert.match(styles, /\.kpi-grid-sort-button[\s\S]*color:\s*#8b3a2f/,
   "public header-template controls must own the Redwood title color");
 assert.match(styles, /\.kpi-cell-editor-overlay--textarea[\s\S]*min-height:\s*8rem[\s\S]*padding:\s*\.75rem[\s\S]*overflow:\s*auto/,

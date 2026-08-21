@@ -21,6 +21,7 @@ import {
 } from "../../data/kpiActivityGridModel";
 import {
   buildKpiSummary,
+  applyManagedToSelection,
   createEmptyKpiRow,
   formatKpiWorkloadOption,
   getKpiToolbarActions,
@@ -44,7 +45,7 @@ import {
   listKpiOverview,
   listKpiRows,
   listKpiWorkloadOptions,
-  saveKpiRow
+  saveKpiRowsAtomic
 } from "../../data/kpiSpreadsheetApi";
 import { KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import {
@@ -111,7 +112,7 @@ function KpiRowSelector({ rowId, selected, onSelectionChange }: Readonly<{
 }
 
 const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "manageTimeReflected"
-  ? (row.manageTimeReflected ? "Reflected" : "Pending")
+  ? (row.manageTimeReflected ? "Managed" : "Not managed")
   : key === "stage" && row.stage ? stageLabels[row.stage] : row[key] === null ? "—" : String(row[key] || "—");
 
 function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
@@ -396,11 +397,6 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
         onInput(field.key, nextValue);
         onFinish(nextValue !== state.originalValue);
       }} onKeyDown={blockContractKey} onKeyUp={keyContract}></oj-input-date>;
-  } else if (field.type === "manageTime") {
-    editor = <select ref={editorRef as any} class="kpi-cell-editor-control" value={row.manageTimeReflected ? "Reflected" : "Pending"} aria-label="Manage Time"
-      onChange={(event) => { onInput(field.key, String((event.currentTarget as HTMLSelectElement).value === "Reflected")); onFinish(); }} onKeyDown={blockContractKey} onKeyUp={keyContract}>
-      <option value="Pending">Pending</option><option value="Reflected">Reflected</option>
-    </select>;
   } else {
     const choices = field.type === "quarter" ? quarters
       : field.type === "month" ? getMonthsForQuarter(row.kpiCode === "D1" ? (row.targetQuarter || "Q1") : row.quarter)
@@ -553,6 +549,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
   const beginEditing = useCallback((row: KpiSpreadsheetRow, field: KpiField, element: HTMLElement) => {
     if (saving || editStateRef.current.phase === "saving" || editStateRef.current.phase === "cancelling") return;
+    if (field.type === "manageTime") return;
     if (editStateRef.current.cell?.rowId === row.id && editStateRef.current.cell.field === field.key) return;
     const latest = draftById.get(row.id) ?? row;
     editRowSnapshotRef.current = { ...latest };
@@ -570,11 +567,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     const rowId = pendingAutoEditRowIdRef.current;
     if (!rowId || editState.cell || fields.length === 0) return;
     const row = drafts.find((draft) => draft.id === rowId);
-    const field = fields[0];
+    const field = fields.find((item) => item.type !== "manageTime");
+    if (!row || !field) return;
     const element = tableRef.current?.querySelector<HTMLElement>(
       `[data-kpi-grid-row="${CSS.escape(rowId)}"][data-kpi-grid-field="${field.key}"]`
     );
-    if (!row || !element) return;
+    if (!element) return;
     pendingAutoEditRowIdRef.current = null;
     beginEditing(row, field, element);
   }, [beginEditing, drafts, editState.cell, fields]);
@@ -603,7 +601,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   }, [finishEditing, reconcileDraft]);
 
   const moveCell = useCallback((rowId: string, fieldKey: KpiFieldKey, direction: -1 | 1) => {
-    const cells = visibleRows.flatMap((row) => fields.map((field) => ({ row, field })));
+    const cells = visibleRows.flatMap((row) => fields.filter((field) => field.type !== "manageTime").map((field) => ({ row, field })));
     const index = cells.findIndex((item) => item.row.id === rowId && item.field.key === fieldKey);
     if (index < 0 || cells.length === 0) { finishEditing(); return; }
     const next = cells[(index + direction + cells.length) % cells.length];
@@ -684,12 +682,20 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     };
   }, [activeTab, fields]);
 
-  const selectableVisibleIds = visibleRows.filter((row) => !row.id.startsWith("draft-")).map((row) => row.id);
-  const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id) && !row.id.startsWith("draft-"));
+  const selectableVisibleIds = visibleRows.map((row) => row.id);
+  const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id));
   const setVisibleSelection = useCallback((ids: readonly string[]) => setSelectedIds(new Set(ids)), [setSelectedIds]);
   const setRowSelection = useCallback((rowId: string, selected: boolean) => setSelectedIds((current) => {
     const next = new Set(current); if (selected) next.add(rowId); else next.delete(rowId); return next;
   }), [setSelectedIds]);
+
+  const applyManaged = (managed: boolean) => {
+    if (saving || selectedRows.length === 0) return;
+    finishEditing();
+    const selected = selectedRows.map((row) => row.id);
+    setDrafts((current) => applyManagedToSelection(authoritativeRows, current, selected, managed));
+    setApiMessage(`${selected.length} KPI activity row(s) marked ${managed ? "managed" : "unmanaged"} in Draft`);
+  };
 
   const toggleSort = useCallback((field: KpiFieldKey) => {
     finishEditing();
@@ -709,6 +715,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       rowDirty ? "is-unsaved-row" : "",
       changed ? "is-unsaved-cell" : ""
     ].filter(Boolean).join(" ");
+    const editable = field.type !== "manageTime";
     return <td key={field.key} class={classes} data-kpi-grid-row={row.id} data-kpi-grid-field={field.key}
       tabIndex={0} aria-label={`${field.label}: ${displayValue(row, field.key) || "blank"}`}
       onKeyDown={(event) => {
@@ -717,10 +724,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       }}
       onKeyUp={(event) => {
         if (!["Enter", " ", "Space", "Spacebar", "F2"].includes(event.key)) return;
-        event.preventDefault(); event.stopPropagation(); beginEditing(row, field, event.currentTarget);
+        event.preventDefault(); event.stopPropagation(); if (editable) beginEditing(row, field, event.currentTarget);
       }}
-      onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); beginEditing(row, field, event.currentTarget); }}>
-      {field.type === "textarea" ? <span class="kpi-cell-description">{displayValue(row, field.key)}</span> : <span>{displayValue(row, field.key)}</span>}
+      onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); if (editable) beginEditing(row, field, event.currentTarget); }}>
+      {field.type === "manageTime"
+        ? <span class={`kpi-managed-status-icon ${row.manageTimeReflected ? "is-managed" : "is-unmanaged"}`} role="img"
+            aria-label={row.manageTimeReflected ? "Managed" : "Not managed"} title={row.manageTimeReflected ? "Managed" : "Not managed"}>
+            <span aria-hidden="true">{row.manageTimeReflected ? "✓" : "○"}</span>
+          </span>
+        : field.type === "textarea" ? <span class="kpi-cell-description">{displayValue(row, field.key)}</span> : <span>{displayValue(row, field.key)}</span>}
     </td>;
   };
 
@@ -814,30 +826,36 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save" }));
     savingDialogDesiredRef.current = true;
     setSaving(true);
-    const outcomes = await Promise.allSettled(draftSnapshot.map((draft) => saveKpiRow(draft)));
+    let saved: KpiSpreadsheetRow[] = [];
+    let failed = false;
+    try {
+      saved = await saveKpiRowsAtomic(draftSnapshot);
+    } catch {
+      failed = true;
+    }
     await minimumProgress(startedAt);
-    const saved = outcomes.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
-    const failedDrafts = draftSnapshot.filter((_, index) => outcomes[index].status === "rejected");
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
-    if (saved.length > 0) setRows((current) => {
-      const savedByOldId = new Map(draftSnapshot.map((draft, index) => [draft.id, outcomes[index].status === "fulfilled" ? outcomes[index].value : null]));
-      const next = current.map((row) => savedByOldId.get(row.id) ?? row).filter(Boolean) as KpiSpreadsheetRow[];
-      return [...next, ...draftSnapshot.flatMap((draft, index) => draft.id.startsWith("draft-") && outcomes[index].status === "fulfilled" ? [outcomes[index].value] : [])];
-    });
-    setDrafts(failedDrafts);
-    setSelectedIds(new Set(failedDrafts.map((row) => row.id)));
+    if (!failed) {
+      setRows((current) => {
+        const savedByOldId = new Map(draftSnapshot.map((draft, index) => [draft.id, saved[index]]));
+        const next = current.map((row) => savedByOldId.get(row.id) ?? row);
+        return [...next, ...draftSnapshot.flatMap((draft, index) => draft.id.startsWith("draft-") ? [saved[index]] : []).filter(Boolean)];
+      });
+      setDrafts([]);
+      setSelectedIds(new Set());
+    }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
       setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
-    setApiMessage(failedDrafts.length === 0 ? `${saved.length} KPI activity row(s) saved` : `${saved.length} saved · ${failedDrafts.length} failed`);
+    setApiMessage(failed ? "KPI changes could not be saved. Drafts are unchanged; retry when ready." : `${saved.length} KPI activity row(s) saved atomically`);
     await settleSavingDialogClosed();
     setSaving(false);
-    setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failedDrafts.length > 0 }));
-    return failedDrafts.length === 0;
+    setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failed }));
+    return !failed;
   };
 
   const removeSelected = async () => {
@@ -911,6 +929,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
+          <button type="button" class="kpi-managed-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(true)}>Mark managed</button>
+          <button type="button" class="kpi-managed-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(false)}>Mark unmanaged</button>
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}

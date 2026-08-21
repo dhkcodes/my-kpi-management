@@ -173,17 +173,20 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const ContextModule = await new Promise((resolve, reject) => window.require(["ojs/ojcontext"], resolve, reject));
       const Context = ContextModule.default || ContextModule;
       const settle = async (element) => {
-        await Context.getContext(element).getBusyContext().whenReady();
+        await Promise.race([
+          Context.getContext(element).getBusyContext().whenReady(),
+          new Promise(resolve => window.setTimeout(resolve, 3000))
+        ]);
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       };
       const expected = ${JSON.stringify({
-        A: ["Manage Time", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        B: ["Manage Time", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C1: ["Manage Time", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C2: ["Manage Time", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        D1: ["Manage Time", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
-        F: ["Manage Time", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        H: ["Manage Time", "Content", "SR Number", "Target Quarter", "Delivery Date"]
+        A: ["Managed", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        B: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        C1: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        C2: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        D1: ["Managed", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
+        F: ["Managed", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        H: ["Managed", "Content", "SR Number", "Target Quarter", "Delivery Date"]
       })};
       const labels = ${JSON.stringify({ A: "1 to many", B: "Early discovery", C1: "Workshops", C2: "POCs", D1: "New Workload", F: "References", H: "Blogs" })};
       const fixedFields = new Set(["manageTimeReflected", "srNumber", "title", "stage", "acrK", "targetQuarter", "quarter", "deliveryDate"]);
@@ -490,6 +493,12 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const newDateDraft = await waitFor(() => !document.querySelector('[data-kpi-single-editor]') && newDateCell.textContent.includes("2026-08-19") && newDateCell.classList.contains("is-unsaved-cell"), "new row date draft");
       await discardDrafts();
 
+      // Warm the native table through one schema transition before measuring widths.
+      // Oracle JET/Chromium can retain the initial scrollbar gutter until the first
+      // route-scoped table switch even after BusyContext resolves.
+      await selectGrid("FY26", "B");
+      await selectGrid("FY26", "A");
+
       const forward = ["FY26", "FY27"].flatMap(fy => ${JSON.stringify(codes)}.map(code => [fy, code]));
       const reverse = [...forward].reverse();
       for (let cycle = 0; cycle < 3; cycle += 1) {
@@ -547,6 +556,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
 
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
   await waitPage(`location.pathname.endsWith("activity-b") && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')`, "keyboard B route");
+  await evalPage(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
   await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]').focus(); true`);
   await pressKey("Enter", "Enter", 13);
   await waitPage(`document.querySelector('[data-kpi-single-editor] input[aria-label="Search Account, Workload, or Oppty.No"]')`, "trusted Enter workload editor");
@@ -561,6 +571,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     return { controls: input.getAttribute("aria-controls"), expanded: input.getAttribute("aria-expanded"),
       activeDescendant: input.getAttribute("aria-activedescendant"), selected: options.map(option => option.getAttribute("aria-selected")),
       anchor: popup.getProperty("position")?.of === "#" + input.id,
+      deltaLeft: Math.abs(editorRect.left - cellRect.left), deltaTop: Math.abs(editorRect.top - cellRect.top),
       editorMatchesCell: Math.abs(editorRect.left - cellRect.left) <= 1 && Math.abs(editorRect.top - cellRect.top) <= 1 };
   })()`);
   await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 });
@@ -637,6 +648,43 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   result.rejections = postKeyboardRuntime.rejections;
   result.keyboardContract = { enter: true, shiftEnter: titleAfterShiftEnter.includes("\n"), space: true, tab: true, shiftTab: true, escape: true,
     workloadDraft: true, aria: keyboardAria, maxEditors: Math.max(result.maxEditors, maxTrustedEditors) };
+
+  result.managedBulkContract = await evalPage(`(async () => {
+    const wait = async (fn, label) => { for (let i=0;i<250;i+=1) { const value=fn(); if (value) return value; await new Promise(r=>setTimeout(r,40)); } throw new Error(label); };
+    const button = text => [...document.querySelectorAll('.kpi-activity-toolbar button')].find(item => item.textContent.trim()===text);
+    const zero = { managedDisabled: button('Mark managed').disabled, unmanagedDisabled: button('Mark unmanaged').disabled };
+    const candidates = [...document.querySelectorAll('.kpi-activities-table tbody tr')].filter(row => row.querySelector('.kpi-managed-status-icon.is-unmanaged')).slice(0,2);
+    if (candidates.length !== 2) throw new Error('two unmanaged fixture rows required');
+    const candidateIds = candidates.map(row => row.dataset.kpiRowId);
+    const candidateRows = () => candidateIds.map(id => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id="' + id + '"]'));
+    candidates.forEach(row => row.querySelector('input[data-kpi-row-selector]').click());
+    await wait(() => !button('Mark managed').disabled && !button('Mark unmanaged').disabled, 'bulk toolbar enabled');
+    button('Mark managed').click();
+    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-managed')) && document.querySelectorAll('.kpi-grid-cell.is-unsaved-cell').length >= 2, 'bulk managed draft');
+    const managed = { selected: candidateIds.length, managed: candidateRows().filter(row => row?.querySelector('.kpi-managed-status-icon.is-managed')).length, save: Boolean(button('Save')) };
+    button('Mark unmanaged').click();
+    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-unmanaged')) && !button('Save'), 'bulk unmanaged revert');
+    const selectAll=document.querySelector('thead input[aria-label="Select all KPI activities"]'); if (selectAll.checked || selectAll.indeterminate) selectAll.click();
+    button('Add KPI Activity').click();
+    const draft = await wait(() => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id^="draft-"]'), 'new draft row');
+    const draftId = draft.dataset.kpiRowId;
+    const draftRow = () => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id="' + draftId + '"]');
+    document.querySelector('.kpi-activity-toolbar').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,composed:true}));
+    await wait(() => !document.querySelector('[data-kpi-single-editor]'), 'new draft editor close');
+    draft.querySelector('input[data-kpi-row-selector]').click();
+    await wait(() => !button('Mark managed').disabled, 'new draft toolbar enabled');
+    button('Mark managed').click();
+    await wait(() => draftRow()?.querySelector('.kpi-managed-status-icon.is-managed'), 'new draft managed');
+    const newManaged = draftRow().querySelector('.kpi-managed-status-icon').getAttribute('aria-label');
+    button('Mark unmanaged').click();
+    await wait(() => draftRow()?.querySelector('.kpi-managed-status-icon.is-unmanaged'), 'new draft unmanaged');
+    button('Cancel').click();
+    const dialog = await wait(() => [...document.querySelectorAll('oj-dialog')].find(item => item.isOpen?.() && item.textContent.includes('Discard changes')), 'new draft discard');
+    const leaf=[...dialog.querySelectorAll('*')].find(element => element.childElementCount===0 && element.textContent.trim()==='Discard changes');
+    (leaf.closest('oj-button')||leaf).dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));
+    await wait(() => !document.querySelector('tr[data-kpi-row-id^="draft-"]'), 'new draft removed');
+    return { zero, managed, reverted: candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-unmanaged')), newManaged, newReverted: true };
+  })()`);
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[1].click(); true`);
   await delay(80);
   await evalPage(`(() => {

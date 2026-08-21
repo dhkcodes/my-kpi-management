@@ -447,7 +447,10 @@ export const saveAccountsWorkloadsBatch = async (
       sort: query.sort ?? "account",
       direction: query.direction ?? "asc"
     },
-    creates: changes.filter((change) => change.kind === "create").map((change) => createPayload(change.draft)),
+    creates: changes.filter((change) => change.kind === "create").map((change) => ({
+      ...createPayload(change.draft),
+      fiscalYear: query.fiscalYear
+    })),
     patches: changes.filter((change) => change.kind === "patch").map((change) => ({ ...mutationRef(change), ...change.patch })),
     deletes: changes.filter((change) => change.kind === "delete").map(mutationRef),
     restores: changes.filter((change) => change.kind === "restore").map(mutationRef),

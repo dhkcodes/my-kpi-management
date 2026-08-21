@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
-import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError } from "../../data/accountsWorkloadsApi";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { applyDraftDelete, applyDraftRestore, hasSelectedDeletedRows, resolveDeleteMode, withMinimumPendingDuration } from "../../data/accountsWorkloadsSelection";
@@ -176,6 +176,18 @@ const createEmptyRow = (fiscalYear: FiscalYear): AccountWorkloadRow => ({
   deletedAt: null,
   deletedBy: null
 });
+
+const formatAccountsWorkloadsSaveError = (error: unknown) => {
+  const retry = "Your drafts are unchanged and can be retried.";
+  if (error instanceof AccountsWorkloadsNetworkError) return `The API could not be reached. ${retry}`;
+  if (error instanceof AccountsWorkloadsApiError) {
+    if (error.status === 409) return `Another user changed this data. Reload the latest data before saving again. ${retry}`;
+    if (error.code === "VALIDATION_ERROR" || error.status === 400) return `Validation failed (${error.code}). Check required values. ${retry}`;
+    if (error.code === "PERSISTENCE_ERROR" || error.status >= 500) return `The database rejected the save (${error.code}). ${retry}`;
+    return `The save request was rejected (${error.code}). ${retry}`;
+  }
+  return `The changes could not be saved. ${retry}`;
+};
 
 function EditableCell({
   row,
@@ -507,9 +519,7 @@ export function AccountsWorkloadsPage({
       setPermanentDeleteIds([]);
       setSelectedRowIds([]);
     } catch (error) {
-      setSaveError(error instanceof Error && error.name === "AccountsWorkloadsApiError" && "status" in error && error.status === 409
-        ? "Another user changed this data. Reload the latest data before saving again."
-        : "The changes could not be saved. Your drafts are unchanged; check the API connection and try again.");
+      setSaveError(formatAccountsWorkloadsSaveError(error));
     } finally {
       setSaving(false);
     }
@@ -760,7 +770,7 @@ export function AccountsWorkloadsPage({
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
-          <oj-button class="accounts-workloads-jet-button" chroming="callToAction" onojAction={addRow}>Add Row</oj-button>
+          <oj-button class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title="Add Account" onojAction={addRow}>Add Account</oj-button>
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing} onojAction={onRefresh}>Refresh</oj-button>
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={selectedCount === 0} onojAction={highlightSelected}>Highlight</oj-button>
           {selectedHasDeletedRows && (

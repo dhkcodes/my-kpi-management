@@ -11,7 +11,7 @@ export const getKpiToolbarActions = (draftCount: number, selectedCount: number):
   draftCount > 0 ? ["save", "cancel"] : selectedCount > 0 ? ["delete"] : [];
 
 const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text"): KpiField => ({ key, label, type });
-const manageTime = field("manageTimeReflected", "Manage Time", "manageTime");
+const manageTime = field("manageTimeReflected", "Managed", "manageTime");
 const targetQuarter = field("quarter", "Target Quarter", "quarter");
 const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
@@ -105,6 +105,33 @@ export const isKpiRowChanged = (
     || (saved.mappingStatus ?? null) !== (draft.mappingStatus ?? null)
   );
   return workloadIdentityChanged || fields.some((item) => isKpiFieldChanged(saved, draft, item.key));
+};
+
+export const applyManagedToSelection = (
+  savedRows: readonly KpiSpreadsheetRow[],
+  currentDrafts: readonly KpiSpreadsheetRow[],
+  selectedIds: readonly string[],
+  managed: boolean
+): KpiSpreadsheetRow[] => {
+  const selected = new Set(selectedIds);
+  if (selected.size === 0) return [...currentDrafts];
+  const savedById = new Map(savedRows.map((row) => [row.id, row]));
+  const handled = new Set<string>();
+  const next: KpiSpreadsheetRow[] = [];
+  for (const draft of currentDrafts) {
+    const updated = selected.has(draft.id) ? { ...draft, manageTimeReflected: managed } : draft;
+    handled.add(draft.id);
+    const saved = savedById.get(draft.id);
+    if (!saved || isKpiRowChanged(saved, updated, KPI_FIELD_CONTRACTS[updated.kpiCode])) next.push(updated);
+  }
+  for (const id of selected) {
+    if (handled.has(id)) continue;
+    const saved = savedById.get(id);
+    if (!saved) continue;
+    const updated = { ...saved, manageTimeReflected: managed };
+    if (isKpiRowChanged(saved, updated, KPI_FIELD_CONTRACTS[updated.kpiCode])) next.push(updated);
+  }
+  return next;
 };
 
 type JetRowKeySet = Readonly<{

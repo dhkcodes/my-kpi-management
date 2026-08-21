@@ -101,6 +101,7 @@ async function run() {
   );
   assert.equal(atomicBody.creates.length, 1);
   assert.equal(atomicBody.creates[0].account, "Atomic New");
+  assert.equal(atomicBody.creates[0].fiscalYear, "FY27", "atomic Add Account must satisfy the backend create DTO");
   assert.deepEqual(atomicBody.patches, []);
   assert.deepEqual(atomicBody.deletes, [{ commitmentId: 41, versionNo: 3 }]);
   assert.deepEqual(atomicBody.restores, []);

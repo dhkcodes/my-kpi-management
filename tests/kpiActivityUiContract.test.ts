@@ -68,8 +68,8 @@ assert.doesNotMatch(page, /setTimeout\(openPopup/);
 
 assert.match(page, /is-unsaved-cell/);
 assert.match(page, /kpi-manage-time-reflected-row/);
-assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*background:\s*#d9438f[^}]*bottom:\s*0[^}]*height:\s*3px/);
-assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*#eaf4ec/);
+assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*bottom:\s*0[^}]*height:\s*3px/);
+assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-reflected-bg\)/);
 assert.match(page, /setDrafts\(\[\]\)/);
 
 assert.match(page, /class="kpi-saving-dialog"/);
@@ -123,7 +123,8 @@ assert.match(page, /data-kpi-row-selector=\{rowId\}/);
 assert.match(page, /type="checkbox" aria-label="Select all KPI activities"/);
 assert.match(page, /row\.manageTimeReflected \? "kpi-manage-time-reflected-row"/);
 
-assert.match(page, /Promise\.allSettled\(draftSnapshot\.map/);
+assert.match(page, /saveKpiRowsAtomic\(draftSnapshot\)/, "Save must submit all KPI drafts as one atomic operation");
+assert.doesNotMatch(page, /Promise\.allSettled\(draftSnapshot\.map/, "row-by-row partial Save is forbidden");
 assert.match(page, /sessionVersion\.current !== saveSession/);
 assert.match(page, /sessionVersion\.current !== deleteSession \|\| sessionKeyRef\.current !== deleteSessionKey/,
   "delete completion must not mutate a replacement route or fiscal-year session");
@@ -150,5 +151,29 @@ assert.match(page, /kpi-quarter-status-label--in-progress/);
 assert.match(page, /kpi-quarter-status-label--not-started/);
 assert.doesNotMatch(page, />Edit</);
 assert.doesNotMatch(page, />Refresh</);
+assert.match(page, />Mark managed</, "selection toolbar exposes bulk managed action");
+assert.match(page, />Mark unmanaged</, "selection toolbar exposes bulk unmanaged action");
+assert.match(page, /aria-label=\{row\.manageTimeReflected \? "Managed" : "Not managed"\}/,
+  "cells expose accessible status icons");
+assert.doesNotMatch(page, /<select[^>]*kpi-cell-editor-control[^>]*>[\s\S]*Pending[\s\S]*Reflected[\s\S]*<\/select>/,
+  "Managed cells must not expose the old select editor");
+
+assert.match(styles, /--kap-grid-header-bg:\s*#f4f1ee/);
+assert.match(styles, /--kap-grid-cell-bg:\s*#fff/);
+assert.match(styles, /--kap-grid-border:\s*#ebe7e3/);
+assert.match(styles, /--kap-grid-hover-bg:\s*#fffaf8/);
+assert.match(styles, /--kap-grid-reflected-bg:\s*#fff8e5/);
+assert.match(styles, /--kap-grid-draft-bg:\s*#fff7ed/);
+assert.match(styles, /--kap-grid-draft-line:\s*#d9438f/);
+assert.match(styles, /\.accounts-workloads-grid th[^}]*background:\s*var\(--kap-grid-header-bg\)/,
+  "Accounts headers consume the shared grid header token");
+assert.match(styles, /\.kpi-grid-column-header[^}]*background:\s*var\(--kap-grid-header-bg\)/,
+  "KPI headers consume the Accounts-aligned grid header token");
+assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-reflected-bg\)/,
+  "KPI Reflected rows use the Accounts Highlight surface token");
+assert.match(styles, /\.accounts-workloads-grid td\.is-unsaved-cell::after[^{]*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
+  "Accounts drafts expose the shared pink 3px line");
+assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
+  "KPI drafts expose the same pink 3px line");
 
 console.log("kpiActivityUiContract tests passed");

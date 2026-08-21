@@ -95,12 +95,12 @@ class Cdp {
     }
     if (url.includes("/api/v1/kpi-activities/workload-options")) return fulfill(200, { total: 0, hasMore: false, items: [] });
     if (url.includes("/api/v1/kpi-activities") && method === "GET") return fulfill(200, { items: [] });
-    if (url.includes("/api/v1/kpi-activities") && method === "POST") {
+    if (url.includes("/api/v1/kpi-activities/batch") && method === "POST") {
       postCalls += 1;
       await delay(postDelayMs);
-      if (failPost) return fulfill(500, { message: "fixture failure" });
+      if (failPost) return fulfill(500, { code: "PERSISTENCE_ERROR", message: "fixture failure" });
       const submitted = JSON.parse(request.postData || "{}");
-      return fulfill(200, { id: 5999, versionNo: 1, ...submitted });
+      return fulfill(200, { items: (submitted.items || []).map((item, index) => ({ id: 5999 + index, versionNo: 1, ...item })) });
     }
     return cdp.send("Fetch.continueRequest", { requestId });
   });

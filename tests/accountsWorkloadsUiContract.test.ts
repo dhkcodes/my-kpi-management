@@ -86,4 +86,21 @@ assert.match(styles, /\.kpi-guide-criteria-table td\s*\{[^}]*line-height: 1\.35[
 assert.doesNotMatch(styles, /\.oj-dialog|\.oj-dialog-content|\.oj-dialog-body/, "KPI Guide scrolling does not override JET internal DOM");
 assert.match(page, /id="accountsWorkloadsFxError"[\s\S]*role="alert"/, "FX exposes an error state");
 
+assert.match(page, /aria-label="Add Account"[^>]*title="Add Account"[^>]*>Add Account<\/oj-button>/, "Accounts-only create action uses Add Account for text, accessibility, and tooltip");
+assert.doesNotMatch(page, />Add Row<\/oj-button>/, "legacy Accounts Add Row label is absent");
+
+assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
+  "the common App shell owns short-content Footer placement for every route");
+assert.match(styles, /\.kpi-shell__body\s*\{[^}]*flex:\s*1 0 auto[^}]*min-height:\s*0/,
+  "the common body grows for short routes and remains in document flow for long routes");
+assert.match(styles, /\.kpi-shell:has\(\.kpi-side-nav\.is-open\) \.kpi-footer\s*\{[^}]*margin-left:\s*18rem[^}]*width:\s*calc\(100% - 19\.5rem\)/,
+  "desktop Footer aligns to the open-navigation content wrapper edges");
+assert.doesNotMatch(styles, /:has\(\.kpi-spreadsheet-page\)[^{]*\.kpi-footer/,
+  "Footer layout is route-neutral rather than KPI Activities scoped");
+
+assert.match(page, /formatAccountsWorkloadsSaveError\(error\)/,
+  "Save failures must preserve and safely surface the Backend error category");
+assert.doesNotMatch(page, /check the API connection and try again/,
+  "validation and DB failures must not be mislabeled as generic connectivity errors");
+
 console.log("accountsWorkloadsUiContract tests passed");
