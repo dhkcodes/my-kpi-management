@@ -225,8 +225,8 @@ assert.match(styles, /\.kpi-grid-column-header\s*\{[^}]*background:\s*var\(--kap
   "public header templates must consume the Accounts & Workloads-aligned surface and boundary tokens");
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[\s\S]*background:\s*var\(--kap-grid-draft-line\)[\s\S]*bottom:\s*0[\s\S]*height:\s*3px/,
   "dirty cells must use the shared Accounts & Workloads bottom draft line token");
-assert.match(styles, /\.kpi-grid-sort-button[\s\S]*color:\s*#8b3a2f/,
-  "public header-template controls must own the Redwood title color");
+assert.match(styles, /\.kpi-grid-sort-button[\s\S]*color:\s*var\(--kap-grid-header-ink\)/,
+  "public header-template controls must own the calm shared slate title color");
 assert.match(styles, /\.kpi-cell-editor-overlay--textarea[\s\S]*min-height:\s*8rem[\s\S]*padding:\s*\.75rem[\s\S]*overflow:\s*auto/,
   "textarea overlay must provide visible multiline value, padding, and internal scroll");
 

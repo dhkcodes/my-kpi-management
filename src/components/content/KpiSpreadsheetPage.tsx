@@ -112,7 +112,7 @@ function KpiRowSelector({ rowId, selected, onSelectionChange }: Readonly<{
 }
 
 const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "manageTimeReflected"
-  ? (row.manageTimeReflected ? "Managed" : "Not managed")
+  ? (row.manageTimeReflected ? "Reflected in internal system" : "Not reflected in internal system")
   : key === "stage" && row.stage ? stageLabels[row.stage] : row[key] === null ? "—" : String(row[key] || "—");
 
 function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
@@ -466,6 +466,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? activeRows : activeRows.filter((row) => row.kpiCode === activeTab), [activeRows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
+  const showSummary = activeTab !== "Overview" && activeTab !== "A" && activeTab !== "H";
   const activeDrafts = useMemo(() => drafts.filter((draft) =>
     draft.fiscalYear === fiscalYear && (activeTab === "Overview" || draft.kpiCode === activeTab)), [drafts, fiscalYear, activeTab]);
   const fiscalYearDrafts = useMemo(() => drafts.filter((draft) => draft.fiscalYear === fiscalYear), [drafts, fiscalYear]);
@@ -495,7 +496,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     });
   }, [tableScopeKey]);
   const activeSortState = sortState && fields.some((field) => field.key === sortState.field) ? sortState : null;
-  const quarterRows = useMemo(() => getRowsForQuarter(effectiveRows, selectedQuarter), [effectiveRows, selectedQuarter]);
+  const quarterRows = useMemo(() => getRowsForQuarter(effectiveRows, showSummary ? selectedQuarter : null), [effectiveRows, selectedQuarter, showSummary]);
   const visibleRows = useMemo(() => sortKpiActivityRows(quarterRows, activeSortState), [quarterRows, activeSortState]);
   const visibleRowsById = useMemo(() => new Map(visibleRows.map((row) => [row.id, row])), [visibleRows]);
   const [columnLayout, setColumnLayout] = useState(() => computeKpiColumnLayout(fields, 960));
@@ -694,7 +695,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     finishEditing();
     const selected = selectedRows.map((row) => row.id);
     setDrafts((current) => applyManagedToSelection(authoritativeRows, current, selected, managed));
-    setApiMessage(`${selected.length} KPI activity row(s) marked ${managed ? "managed" : "unmanaged"} in Draft`);
+    setApiMessage(`${selected.length} KPI activity row(s) marked ${managed ? "reflected" : "not reflected"} in Draft`);
   };
 
   const toggleSort = useCallback((field: KpiFieldKey) => {
@@ -728,9 +729,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       }}
       onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); if (editable) beginEditing(row, field, event.currentTarget); }}>
       {field.type === "manageTime"
-        ? <span class={`kpi-managed-status-icon ${row.manageTimeReflected ? "is-managed" : "is-unmanaged"}`} role="img"
-            aria-label={row.manageTimeReflected ? "Managed" : "Not managed"} title={row.manageTimeReflected ? "Managed" : "Not managed"}>
-            <span aria-hidden="true">{row.manageTimeReflected ? "✓" : "○"}</span>
+        ? <span class={`kpi-reflected-status-badge ${row.manageTimeReflected ? "is-reflected" : "is-not-reflected"}`} role="img"
+            aria-label={row.manageTimeReflected ? "Reflected in internal system" : "Not reflected in internal system"}
+            title={row.manageTimeReflected ? "Reflected in internal system" : "Not reflected in internal system"}>
+            <span class={row.manageTimeReflected ? "oj-ux-ico-check-circle" : "oj-ux-ico-clock"} aria-hidden="true"></span>
+            <span aria-hidden="true">{row.manageTimeReflected ? "Reflected" : "Pending"}</span>
           </span>
         : field.type === "textarea" ? <span class="kpi-cell-description">{displayValue(row, field.key)}</span> : <span>{displayValue(row, field.key)}</span>}
     </td>;
@@ -742,10 +745,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
-  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim()));
+  const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected
+    && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
   const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
   const salesSummary = activeTab === "D1";
   const activityTab = activeTab as SpreadsheetKpiCode;
+
   const summaryExpanded = summaryExpandedByTab[activityTab] ?? false;
   const summaryId = salesSummary ? "kpiSalesStageAcrSummary" : "kpiTargetQuarterCountSummary";
   const summaryLabel = salesSummary ? "Stage / ACR" : "Quarter Summary";
@@ -919,18 +924,18 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
         <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
-          <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
+          {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>
-          </button>
+          </button>}
           <button type="button" class="kpi-guide-toggle" aria-controls={guideId} aria-expanded={guideExpanded} onClick={toggleGuide}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{guideExpanded ? "⌄" : "›"}</span>
             <span>KPI Guide</span>
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
-          <button type="button" class="kpi-managed-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(true)}>Mark managed</button>
-          <button type="button" class="kpi-managed-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(false)}>Mark unmanaged</button>
+          <button type="button" class="kpi-reflected-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(true)}>Mark reflected</button>
+          <button type="button" class="kpi-reflected-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(false)}>Mark not reflected</button>
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
@@ -939,7 +944,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
         ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
-      <Summary id={summaryId} expanded={summaryExpanded} rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />
+      {showSummary && <Summary id={summaryId} expanded={summaryExpanded} rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
       <section id={guideId} class="kpi-activity-guide" hidden={!guideExpanded} aria-labelledby={`${guideId}Title`}>
         <div class="kpi-activity-guide__heading">
           <div><span class="kpi-eyebrow">{activeTab} KPI Guide</span><h3 id={`${guideId}Title`}>{activeDefinition?.name}</h3></div>

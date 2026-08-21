@@ -69,7 +69,7 @@ assert.doesNotMatch(page, /setTimeout\(openPopup/);
 assert.match(page, /is-unsaved-cell/);
 assert.match(page, /kpi-manage-time-reflected-row/);
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after\s*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*bottom:\s*0[^}]*height:\s*3px/);
-assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-reflected-bg\)/);
+assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-kpi-reflected-bg\)/);
 assert.match(page, /setDrafts\(\[\]\)/);
 
 assert.match(page, /class="kpi-saving-dialog"/);
@@ -100,7 +100,8 @@ assert.match(page, /computeKpiColumnLayout\(fields, Math\.max\(0, host\.clientWi
   "column layout must use the border-excluded viewport with one pixel of collapse\/rounding safety");
 assert.match(page, /<colgroup>[\s\S]*columnLayout\.widths\[field\.key\]/);
 assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
-assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*#8b3a2f/);
+assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*var\(--kap-grid-header-ink\)/,
+  "KPI header titles use the calm slate token instead of red");
 assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align-content:\s*start/);
 assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/);
 assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*min-height:/,
@@ -151,26 +152,30 @@ assert.match(page, /kpi-quarter-status-label--in-progress/);
 assert.match(page, /kpi-quarter-status-label--not-started/);
 assert.doesNotMatch(page, />Edit</);
 assert.doesNotMatch(page, />Refresh</);
-assert.match(page, />Mark managed</, "selection toolbar exposes bulk managed action");
-assert.match(page, />Mark unmanaged</, "selection toolbar exposes bulk unmanaged action");
-assert.match(page, /aria-label=\{row\.manageTimeReflected \? "Managed" : "Not managed"\}/,
-  "cells expose accessible status icons");
+assert.match(page, />Mark reflected</, "selection toolbar exposes bulk reflected action");
+assert.match(page, />Mark not reflected</, "selection toolbar exposes bulk not-reflected action");
+assert.match(page, /aria-label=\{row\.manageTimeReflected \? "Reflected in internal system" : "Not reflected in internal system"\}/,
+  "cells expose accessible final-reflection status");
+assert.match(page, /kpi-reflected-status-badge/, "cells use a composed Redwood-aligned status badge");
+assert.doesNotMatch(page, /kpi-managed-status-icon|>✓<|>○</, "legacy text glyph status icons are removed");
 assert.doesNotMatch(page, /<select[^>]*kpi-cell-editor-control[^>]*>[\s\S]*Pending[\s\S]*Reflected[\s\S]*<\/select>/,
   "Managed cells must not expose the old select editor");
 
-assert.match(styles, /--kap-grid-header-bg:\s*#f4f1ee/);
+assert.match(styles, /--kap-grid-header-bg:\s*#eef2f5/);
+assert.match(styles, /--kap-grid-header-ink:\s*#334155/);
 assert.match(styles, /--kap-grid-cell-bg:\s*#fff/);
 assert.match(styles, /--kap-grid-border:\s*#ebe7e3/);
-assert.match(styles, /--kap-grid-hover-bg:\s*#fffaf8/);
+assert.match(styles, /--kap-grid-selected-bg:\s*#fffaf8/);
 assert.match(styles, /--kap-grid-reflected-bg:\s*#fff8e5/);
+assert.match(styles, /--kap-grid-kpi-reflected-bg:\s*#edf7f4/);
 assert.match(styles, /--kap-grid-draft-bg:\s*#fff7ed/);
-assert.match(styles, /--kap-grid-draft-line:\s*#d9438f/);
+assert.match(styles, /--kap-grid-draft-line:\s*#b3366f/);
 assert.match(styles, /\.accounts-workloads-grid th[^}]*background:\s*var\(--kap-grid-header-bg\)/,
   "Accounts headers consume the shared grid header token");
 assert.match(styles, /\.kpi-grid-column-header[^}]*background:\s*var\(--kap-grid-header-bg\)/,
   "KPI headers consume the Accounts-aligned grid header token");
-assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-reflected-bg\)/,
-  "KPI Reflected rows use the Accounts Highlight surface token");
+assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-kpi-reflected-bg\)/,
+  "KPI Reflected rows use the calm teal reflection surface token");
 assert.match(styles, /\.accounts-workloads-grid td\.is-unsaved-cell::after[^{]*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
   "Accounts drafts expose the shared pink 3px line");
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,

@@ -28,7 +28,7 @@ assert.deepEqual(getKpiToolbarActions(0, 2), ["delete"], "selection-only must ex
 for (const code of KPI_TABS.filter((tab) => tab !== "Overview")) {
   const fields = KPI_FIELD_CONTRACTS[code];
   assert.equal(fields[0]?.key, "manageTimeReflected", `${code} Manage Time must be first`);
-  assert.equal(fields[fields.length - 2]?.key, code === "D1" ? "targetQuarter" : "quarter", `${code} Target Quarter must be before Delivery Date`);
+  if (code !== "A" && code !== "H") assert.equal(fields[fields.length - 2]?.key, code === "D1" ? "targetQuarter" : "quarter", `${code} Target Quarter must be before Delivery Date`);
   assert.equal(fields[fields.length - 1]?.key, "deliveryDate", `${code} Delivery Date must be final`);
   assert.equal(createEmptyKpiRow(code, "FY27").kpiCode, code);
 }
@@ -38,8 +38,10 @@ assert.equal(d1Keys.includes("quarter"), false, "D1 must expose one Target Quart
 assert.ok(d1Keys.indexOf("stage") < d1Keys.indexOf("acrK"));
 assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false, "C1 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
-assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.label, "Managed", "the status column must use the concise label");
-assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), true, "H must expose the shared SR Number editor");
+assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.label, "Reflected", "the status column describes final internal-system reflection");
+assert.equal(KPI_FIELD_CONTRACTS.A.some((item) => item.key === "quarter"), false, "A Target Quarter is UI-hidden");
+assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H SR Number is UI-hidden");
+assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "quarter" || item.key === "targetQuarter"), false, "H Target Quarter is UI-hidden");
 assert.equal(KPI_FIELD_CONTRACTS.H.find((item) => item.key === "title")?.type, "textarea", "H Content must reuse the truncated long-text behavior");
 
 assert.equal(fiscalQuarterFromDeliveryDate("2026-06-01"), "Q1");
@@ -92,7 +94,7 @@ assert.equal(isKpiDraftInvalid(createEmptyKpiRow("A", "FY27")), false, "a new Pe
 assert.equal(isKpiDraftInvalid({ ...createEmptyKpiRow("B", "FY27"), manageTimeReflected: true }), true, "Reflected new rows still require evidence fields");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, srNumber: "" }, rows[0]), true, "Reflected requires SR Number");
 assert.equal(isKpiDraftInvalid({ ...rows[0], manageTimeReflected: true, deliveryDate: "" }, rows[0]), true, "Reflected requires Delivery Date");
-assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), true, "Reflected H requires the shared SR Number evidence");
+assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "2026-06-10" }), false, "Reflected H does not require the hidden SR Number field");
 assert.equal(isKpiDraftInvalid({ ...rows[0], id: "h-new", kpiCode: "H", manageTimeReflected: true, srNumber: "", deliveryDate: "" }), true, "Reflected H still requires Delivery Date");
 const addAll = { isAddAll: () => true, values: () => new Set<string>(), deletedValues: () => new Set(["row-2"]) };
 assert.deepEqual(getSelectedKpiRowIds(addAll, ["row-1", "row-2", "row-3"]), ["row-1", "row-3"], "JET add-all selection must honor deleted keys");

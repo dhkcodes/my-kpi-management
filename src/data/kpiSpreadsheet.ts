@@ -11,20 +11,20 @@ export const getKpiToolbarActions = (draftCount: number, selectedCount: number):
   draftCount > 0 ? ["save", "cancel"] : selectedCount > 0 ? ["delete"] : [];
 
 const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text"): KpiField => ({ key, label, type });
-const manageTime = field("manageTimeReflected", "Managed", "manageTime");
+const manageTime = field("manageTimeReflected", "Reflected", "manageTime");
 const targetQuarter = field("quarter", "Target Quarter", "quarter");
 const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const delivery = field("deliveryDate", "Delivery Date", "date");
 
 export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]> = {
-  A: [...base, targetQuarter, delivery],
+  A: [...base, delivery],
   B: [...related, targetQuarter, delivery],
   C1: [...related, targetQuarter, delivery],
   C2: [...related, targetQuarter, delivery],
   D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
   F: [...base, targetQuarter, delivery],
-  H: [manageTime, field("title", "Content", "textarea"), field("srNumber", "SR Number"), targetQuarter, delivery]
+  H: [manageTime, field("title", "Content", "textarea"), delivery]
 };
 
 export type KpiSpreadsheetRow = {
@@ -147,7 +147,7 @@ export const getSelectedKpiRowIds = (keySet: JetRowKeySet, availableIds: readonl
 };
 
 export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadsheetRow) => {
-  if (draft.manageTimeReflected && (!draft.deliveryDate || !draft.srNumber.trim())) return true;
+  if (draft.manageTimeReflected && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim()))) return true;
   if (!draft.deliveryDate && Boolean(saved?.deliveryDate)) return true;
   if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
     && draft.workloadId == null && saved?.workloadId != null) return true;

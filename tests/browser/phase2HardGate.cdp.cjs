@@ -14,12 +14,13 @@ class Cdp {
   close(){this.socket.close();}
 }
 const accountRow={id:"41",commitmentId:41,versionNo:3,sourceRowNumber:10,planNumber:"UCM 1",account:"Fixture Account",workloadName:"Fixture Workload",opptyNo:"D100",startDate:"2026-08-01",endDate:"2027-08-01",arrUsd:100,arrKrw:140000,acrUsd:80,acrKrw:112000,target:"FY27 Q2",winProbability:50,latestUpdate:"Fixture update",notes:"Fixture note",isImportant:true,isDeleted:false,deletedAt:null,deletedBy:null};
+const deletedAccountRows=[42,43].map(id=>({...accountRow,id:String(id),commitmentId:id,sourceRowNumber:id-30,account:`Deleted Fixture ${id}`,workloadName:`Deleted Workload ${id}`,isImportant:false,isDeleted:true,deletedAt:"2026-08-20T00:00:00Z",deletedBy:"fixture"}));
 const fx={fxRateId:9,fiscalYear:"FY27",fromCurrency:"USD",toCurrency:"KRW",rateValue:1400,sourceReference:"Fixture",versionNo:5};
 const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflected:index===0,fiscalYear:"FY27",kpiCode:"A",quarter:["Q1","Q2","Q3"][index],activityMonth:`2026-0${index+1}`,rawWorkload:null,workloadId:null,mappingStatus:"NOT_REQUIRED",srNumber:`SR000765432${index}`,description:`Fixture KPI ${index}`,salesStage:null,acrK:null,targetQuarter:null,deliveryDate:`2026-0${index+1}-0${index+1}`}));
 (async()=>{
   const targets=await getJson(`http://127.0.0.1:${cdpPort}/json/list`); const page=targets.find(t=>t.type==="page"&&!t.url.startsWith("devtools://")); if(!page)throw new Error("No CDP page");
   const cdp=new Cdp(page.webSocketDebuggerUrl); await cdp.open();
-  const exceptions=[]; const requests=[]; let saveMode="success"; let createdId=9000;
+  const exceptions=[]; const requests=[]; let saveMode="success"; let createdId=9000; let accountRows=[accountRow,...deletedAccountRows];
   cdp.on("Runtime.exceptionThrown",({exceptionDetails})=>exceptions.push(exceptionDetails.exception?.description||exceptionDetails.text));
   cdp.on("Fetch.requestPaused",async({requestId,request})=>{
     const fulfill=(status,payload)=>cdp.send("Fetch.fulfillRequest",{requestId,responseCode:status,responseHeaders:[{name:"Content-Type",value:"application/json"}],body:encodeBody(payload)});
@@ -30,10 +31,16 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
       if(saveMode==="conflict") return fulfill(409,{code:"VERSION_CONFLICT",message:"reload"});
       if(saveMode==="persistence") return fulfill(500,{code:"PERSISTENCE_ERROR",message:"Database operation failed"});
       const submitted=JSON.parse(request.postData||"{}");
+      const permanentCommitmentIds=new Set((submitted.permanentDeletes||[]).map(item=>Number(item.commitmentId)));
+      accountRows=accountRows.filter(row=>!permanentCommitmentIds.has(Number(row.commitmentId))).map(row=>{
+        const update=(submitted.updates||[]).find(item=>String(item.id)===String(row.id));
+        return update?{...row,...update,versionNo:row.versionNo+1}:row;
+      });
       const added=(submitted.creates||[]).map(item=>({...accountRow,...item,id:String(createdId),commitmentId:createdId++,sourceRowNumber:11,versionNo:1}));
-      return fulfill(200,{items:[accountRow,...added],total:1+added.length,fxRate:fx});
+      accountRows=[...accountRows,...added];
+      return fulfill(200,{items:accountRows,total:accountRows.length,fxRate:fx});
     }
-    if(path.endsWith("/api/v1/accounts-workloads")) return fulfill(200,{items:[accountRow],total:1});
+    if(path.endsWith("/api/v1/accounts-workloads")) return fulfill(200,{items:accountRows,total:accountRows.length});
     if(path.endsWith("/api/v1/fx-rates")) return fulfill(200,fx);
     if(path.endsWith("/api/v1/kpi-guides")) return fulfill(200,{items:[]});
     if(path.includes("/api/v1/kpi-activities")){
@@ -55,15 +62,35 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
   await waitPage(`document.querySelector('#accountsWorkloadsTitle')`,`accounts loaded`);
   const addContract=await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');const inner=b?.shadowRoot?.querySelector('button');return {text:b?.textContent.trim(),aria:b?.getAttribute('aria-label')||inner?.getAttribute('aria-label')||inner?.getAttribute('aria-labelledby')||inner?.textContent.trim()||b?.textContent.trim(),title:b?.getAttribute('title')};})()`);
   assert.deepEqual(addContract,{text:"Add Account",aria:"Add Account",title:"Add Account"});
+  const accountToolbarLabels=()=>evaluate(`[...new Set([...document.querySelectorAll('.accounts-workloads-actions button, .accounts-workloads-actions oj-button')].map(button=>button.textContent.trim()).filter(Boolean))]`);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),[]);
+  const draftDeleteRequestsBefore=requests.filter(r=>r.path.endsWith('/accounts-workloads/save')).length;
+  await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`document.querySelector('tr.is-adding-row')`,`draft delete row`);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),['Save','Cancel']);
+  await evaluate(`document.querySelector('tr.is-adding-row input[aria-label="Select unsaved Draft account"]').click();true`);
+  await waitPage(`[...document.querySelectorAll('.accounts-workloads-actions oj-button')].some(button=>button.textContent.trim()==='Delete')`,`draft delete action`);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),['Save','Cancel','Highlight','Delete']);
+  await evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  const draftDialog=await waitPage(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const active=document.activeElement?.textContent?.trim()||'';return d?.isOpen?.()&&d.textContent.includes('unsaved Draft')&&active.includes('Cancel')?{title:d.dialogTitle||d.getProperty?.('dialogTitle'),text:d.textContent,active}:false;})()`,`draft delete dialog`);
+  assert.equal(draftDialog.title,'Delete unsaved Draft?'); assert.match(draftDialog.text,/removed locally[\s\S]*No API request/); assert.match(draftDialog.active||'',/Cancel/);
+  await evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Cancel');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`!document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`draft cancel`); assert.equal(await evaluate(`Boolean(document.querySelector('tr.is-adding-row'))`),true);
+  await evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`draft dialog reopen`);
+  await evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`!document.querySelector('tr.is-adding-row')`,`draft deleted`);
+  assert.equal(requests.filter(r=>r.path.endsWith('/accounts-workloads/save')).length,draftDeleteRequestsBefore,'unsaved Draft Delete must not call API');
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),[]);
   const runAccountFailure=async(mode,expected)=>{
     saveMode=mode;
     await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
     await waitPage(`document.querySelector('tr.is-adding-row')`,`${mode} add row`);
     await evaluate(`(()=>{for(const [placeholder,value] of [['Account *','${mode} Account'],['Workload *','${mode} Workload']]){const input=document.querySelector('tr.is-adding-row input[placeholder="'+placeholder+'"]');input.value=value;input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:value}));}return true;})()`);
-    await evaluate(`document.querySelector('.accounts-workloads-footer-actions .accounts-workloads-button--primary').click();true`);
+    await evaluate(`[...document.querySelectorAll('.accounts-workloads-actions button')].find(button=>button.textContent.trim()==='Save').click();true`);
     const alert=await waitPage(`(()=>{const a=document.querySelector('.accounts-workloads-save-error');return a?.textContent||false;})()`,`${mode} alert`,25000);
     assert.match(alert,expected); assert.equal(await evaluate(`Boolean(document.querySelector('tr.is-adding-row'))`),true,`${mode} preserves draft`);
-    await evaluate(`document.querySelector('.accounts-workloads-footer-actions .accounts-workloads-button:not(.accounts-workloads-button--primary)').click();true`);
+    await evaluate(`[...document.querySelectorAll('.accounts-workloads-actions button')].find(button=>button.textContent.trim()==='Cancel').click();true`);
     await waitPage(`!document.querySelector('tr.is-adding-row')`,`${mode} cancel`);
   };
   await runAccountFailure("validation",/Validation failed \(VALIDATION_ERROR\)/);
@@ -74,16 +101,44 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
   await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
   await waitPage(`document.querySelector('tr.is-adding-row')`,`success add`);
   await evaluate(`(()=>{for(const [placeholder,value] of [['Account *','Success Account'],['Workload *','Success Workload']]){const input=document.querySelector('tr.is-adding-row input[placeholder="'+placeholder+'"]');input.value=value;input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:value}));}return true;})()`);
-  await evaluate(`document.querySelector('.accounts-workloads-footer-actions .accounts-workloads-button--primary').click();true`);
+  await evaluate(`[...document.querySelectorAll('.accounts-workloads-actions button')].find(button=>button.textContent.trim()==='Save').click();true`);
   await waitPage(`!document.querySelector('tr.is-adding-row')&&document.body.textContent.includes('Success Account')`,`success persisted`,25000);
   const saveBodies=requests.filter(r=>r.path.endsWith('/accounts-workloads/save')&&r.body).map(r=>JSON.parse(r.body));
   assert.ok(saveBodies.every(body=>body.creates?.[0]?.fiscalYear==="FY27"),"every Add Account payload carries fiscalYear");
   assert.equal(saveBodies.at(-1).creates.length,1,"successful retry creates one row");
 
-  const accountStyles=await evaluate(`(()=>{const root=getComputedStyle(document.documentElement);const h=getComputedStyle(document.querySelector('.accounts-workloads-grid th'));const c=getComputedStyle(document.querySelector('.accounts-workloads-grid tbody td'));const important=getComputedStyle(document.querySelector('.accounts-workloads-grid tbody tr.is-important'));const toolbar=getComputedStyle(document.querySelector('.accounts-workloads-toolbar'));return {tokens:['--kap-grid-header-bg','--kap-grid-cell-bg','--kap-grid-border','--kap-grid-hover-bg','--kap-grid-selected-bg','--kap-grid-draft-bg','--kap-grid-draft-line','--kap-grid-reflected-bg','--kap-grid-highlight-bg'].map(k=>[k,root.getPropertyValue(k).trim()]),header:{background:h.backgroundColor,border:h.borderBottomColor},cell:{background:c.backgroundColor,border:c.borderBottomColor},highlight:important.backgroundColor,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.accounts-workloads-grid thead input[type=checkbox]'))};})()`);
+  await evaluate(`(()=>{const s=document.querySelector('oj-switch');s.value=true;s.dispatchEvent(new CustomEvent('valueChanged',{detail:{value:true},bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`document.querySelector('tr[data-account-row-id="42"]')`,`deleted rows loaded`);
+  const selectAccountRow=id=>evaluate(`document.querySelector('tr[data-account-row-id="${id}"] input[type="checkbox"]').click();true`);
+  const clickAccountAction=label=>evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()===${JSON.stringify(label)});b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  const confirmAccountDelete=()=>evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+
+  await selectAccountRow('42'); await clickAccountAction('Delete');
+  const permanentDialog=await waitPage(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');return d?.isOpen?.()&&d.textContent.includes('cannot be undone')?d.textContent:false;})()`,`permanent delete dialog`);
+  assert.match(permanentDialog,/saved row/); saveMode='persistence'; await confirmAccountDelete();
+  await waitPage(`document.querySelector('.accounts-workloads-save-error')?.textContent.includes('PERSISTENCE_ERROR')`,`permanent failure`);
+  assert.equal(await evaluate(`Boolean(document.querySelector('tr[data-account-row-id="42"]'))`),true);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel'].includes(label)),[],`permanent failure must not create edit dirty actions`);
+  saveMode='success'; await confirmAccountDelete();
+  await waitPage(`!document.querySelector('tr[data-account-row-id="42"]')`,`permanent success`);
+  await waitPage(`document.activeElement?.textContent?.trim()==='Add Account'`,`delete focus restore`);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel'].includes(label)),[],`permanent success must not create edit dirty actions`);
+
+  await evaluate(`(()=>{const cell=document.querySelector('tr[data-account-row-id="41"] [data-account-field="notes"]');cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,composed:true,detail:2}));return true;})()`);
+  await waitPage(`document.querySelector('tr[data-account-row-id="41"] [data-account-field="notes"] textarea')`,`account notes editor`);
+  await evaluate(`(()=>{const input=document.querySelector('tr[data-account-row-id="41"] [data-account-field="notes"] textarea');input.value='Unsaved notes kept across delete';input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'Unsaved notes kept across delete'}));input.dispatchEvent(new Event('blur',{bubbles:true}));return true;})()`);
+  await waitPage(`[...document.querySelectorAll('.accounts-workloads-actions button')].some(button=>button.textContent.trim()==='Save')`,`dirty Save visible`);
+  await selectAccountRow('43'); await clickAccountAction('Delete'); await waitPage(`document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`second permanent dialog`); await confirmAccountDelete();
+  await waitPage(`!document.querySelector('tr[data-account-row-id="43"]')`,`second permanent success`);
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel'].includes(label)),['Save','Cancel'],`unrelated editable draft survives permanent delete`);
+  await waitPage(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions button')].find(button=>button.textContent.trim()==='Cancel');if(!b||b.disabled)return false;b.click();return true;})()`,`dirty Cancel enabled`);
+  await waitPage(`![...document.querySelectorAll('.accounts-workloads-actions button')].some(button=>button.textContent.trim()==='Save')`,`dirty cancel`);
+
+  await navigate("/accounts-workloads");
+  const accountStyles=await waitPage(`(()=>{try{const root=getComputedStyle(document.documentElement);const header=document.querySelector('.accounts-workloads-grid th');const cell=document.querySelector('.accounts-workloads-grid tbody td');const toolbarElement=document.querySelector('.accounts-workloads-toolbar');if(!header||!cell||!toolbarElement)return false;const h=getComputedStyle(header);const c=getComputedStyle(cell);const important=document.querySelector('.accounts-workloads-grid tbody tr.is-important');const toolbar=getComputedStyle(toolbarElement);return {tokens:['--kap-grid-header-bg','--kap-grid-cell-bg','--kap-grid-border','--kap-grid-hover-bg','--kap-grid-selected-bg','--kap-grid-draft-bg','--kap-grid-draft-line','--kap-grid-reflected-bg','--kap-grid-highlight-bg'].map(k=>[k,root.getPropertyValue(k).trim()]),header:{background:h.backgroundColor,border:h.borderBottomColor},cell:{background:c.backgroundColor,border:c.borderBottomColor},highlight:important?getComputedStyle(important).backgroundColor:null,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.accounts-workloads-grid thead input[type=checkbox]'))};}catch{return false;}})()`,`accounts styles ready`);
   await navigate("/activity-a");
-  const kpiStyles=await evaluate(`(()=>{const h=getComputedStyle(document.querySelector('.kpi-activities-table th'));const c=getComputedStyle(document.querySelector('.kpi-activities-table td'));const reflected=getComputedStyle(document.querySelector('.kpi-manage-time-reflected-row'));const toolbar=getComputedStyle(document.querySelector('.kpi-activity-toolbar'));const icon=document.querySelector('.kpi-managed-status-icon');return {header:{background:h.backgroundColor,border:h.borderBottomColor},cell:{background:c.backgroundColor,border:c.borderBottomColor},reflected:reflected.backgroundColor,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.kpi-activities-table thead input[type=checkbox]')),icon:{aria:icon.getAttribute('aria-label'),title:icon.getAttribute('title'),role:icon.getAttribute('role')}};})()`);
-  assert.deepEqual(accountStyles.header,kpiStyles.header); assert.deepEqual(accountStyles.cell,kpiStyles.cell); assert.equal(accountStyles.checkboxHeader,true); assert.equal(kpiStyles.checkboxHeader,true); assert.deepEqual(kpiStyles.icon,{aria:"Managed",title:"Managed",role:"img"});
+  const kpiStyles=await evaluate(`(()=>{const h=getComputedStyle(document.querySelector('.kpi-activities-table th'));const c=getComputedStyle(document.querySelector('.kpi-activities-table tr:not(.kpi-manage-time-reflected-row) td'));const reflected=getComputedStyle(document.querySelector('.kpi-manage-time-reflected-row'));const toolbar=getComputedStyle(document.querySelector('.kpi-activity-toolbar'));const icon=document.querySelector('.kpi-reflected-status-badge');const title=getComputedStyle(document.querySelector('.kpi-grid-sort-button'));return {header:{background:h.backgroundColor,border:h.borderBottomColor,title:title.color},cell:{background:c.backgroundColor,border:c.borderBottomColor},reflected:reflected.backgroundColor,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.kpi-activities-table thead input[type=checkbox]')),icon:{aria:icon.getAttribute('aria-label'),title:icon.getAttribute('title'),role:icon.getAttribute('role')}};})()`);
+  assert.equal(accountStyles.header.background,kpiStyles.header.background); assert.equal(accountStyles.header.border,kpiStyles.header.border); assert.equal(accountStyles.cell.border,kpiStyles.cell.border); assert.equal(kpiStyles.cell.background,"rgb(255, 255, 255)"); assert.equal(accountStyles.checkboxHeader,true); assert.equal(kpiStyles.checkboxHeader,true); assert.deepEqual(kpiStyles.icon,{aria:"Reflected in internal system",title:"Reflected in internal system",role:"img"}); assert.equal(kpiStyles.header.title,"rgb(51, 65, 85)");
 
   const routes=["/","/kpis-overview","/activity-a","/activity-b","/activity-c1","/activity-c2","/activity-d1","/activity-f","/activity-h","/customers-overview","/accounts-workloads","/weekly-activities","/consumption"];
   const footerMatrix=[];

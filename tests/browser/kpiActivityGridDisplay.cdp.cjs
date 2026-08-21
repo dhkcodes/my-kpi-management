@@ -180,13 +180,13 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       };
       const expected = ${JSON.stringify({
-        A: ["Managed", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        B: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C1: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C2: ["Managed", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        D1: ["Managed", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
-        F: ["Managed", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        H: ["Managed", "Content", "SR Number", "Target Quarter", "Delivery Date"]
+        A: ["Reflected", "SR Number", "SR Description", "Delivery Date"],
+        B: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        C1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        C2: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        D1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
+        F: ["Reflected", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        H: ["Reflected", "Content", "Delivery Date"]
       })};
       const labels = ${JSON.stringify({ A: "1 to many", B: "Early discovery", C1: "Workshops", C2: "POCs", D1: "New Workload", F: "References", H: "Blogs" })};
       const fixedFields = new Set(["manageTimeReflected", "srNumber", "title", "stage", "acrK", "targetQuarter", "quarter", "deliveryDate"]);
@@ -362,6 +362,8 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       };
 
       await selectGrid("FY26", "A");
+      const aSummaryHidden = !document.querySelector('.kpi-summary-toggle') && !document.getElementById("kpiTargetQuarterCountSummary");
+      await selectGrid("FY26", "B");
       const quarterToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiTargetQuarterCountSummary"]'), "quarter summary toggle");
       const quarterSummary = document.getElementById("kpiTargetQuarterCountSummary");
       const quarterDefaultHidden = quarterToggle.getAttribute("aria-expanded") === "false" && quarterSummary.hidden && quarterSummary.getBoundingClientRect().height === 0;
@@ -369,10 +371,10 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       quarterToggle.click();
       await waitFor(() => quarterToggle.getAttribute("aria-expanded") === "true" && !quarterSummary.hidden, "quarter summary shown");
       const quarterShown = { tableMoved: document.querySelector(".kpi-activities-table-wrap").getBoundingClientRect().top > tableBeforeQuarterShow, label: quarterToggle.textContent.replace(/\s+/g, " ").trim() };
-      await selectGrid("FY26", "B");
-      const bDefaultHidden = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "false" && document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
-      await selectGrid("FY27", "A");
+      await selectGrid("FY27", "B");
       const quarterRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
+      await selectGrid("FY26", "H");
+      const hSummaryHidden = !document.querySelector('.kpi-summary-toggle') && !document.getElementById("kpiTargetQuarterCountSummary");
       await selectGrid("FY26", "D1");
       const salesToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiSalesStageAcrSummary"]'), "sales summary toggle");
       const salesSummary = document.getElementById("kpiSalesStageAcrSummary");
@@ -382,9 +384,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       await selectGrid("FY27", "D1");
       const salesRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiSalesStageAcrSummary")?.hidden;
       document.querySelector('.kpi-summary-toggle').click();
-      await selectGrid("FY26", "A");
-      document.querySelector('.kpi-summary-toggle').click();
-      const summaryContract = { quarterDefaultHidden, quarterShown, bDefaultHidden, quarterRetained, salesDefaultHidden, salesRetained };
+      const summaryContract = { aSummaryHidden, hSummaryHidden, quarterDefaultHidden, quarterShown, quarterRetained, salesDefaultHidden, salesRetained };
 
       const guideContract = [];
       for (const code of ${JSON.stringify(codes)}) {
@@ -649,21 +649,25 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   result.keyboardContract = { enter: true, shiftEnter: titleAfterShiftEnter.includes("\n"), space: true, tab: true, shiftTab: true, escape: true,
     workloadDraft: true, aria: keyboardAria, maxEditors: Math.max(result.maxEditors, maxTrustedEditors) };
 
-  result.managedBulkContract = await evalPage(`(async () => {
+  result.reflectedBulkContract = await evalPage(`(async () => {
     const wait = async (fn, label) => { for (let i=0;i<250;i+=1) { const value=fn(); if (value) return value; await new Promise(r=>setTimeout(r,40)); } throw new Error(label); };
     const button = text => [...document.querySelectorAll('.kpi-activity-toolbar button')].find(item => item.textContent.trim()===text);
-    const zero = { managedDisabled: button('Mark managed').disabled, unmanagedDisabled: button('Mark unmanaged').disabled };
-    const candidates = [...document.querySelectorAll('.kpi-activities-table tbody tr')].filter(row => row.querySelector('.kpi-managed-status-icon.is-unmanaged')).slice(0,2);
-    if (candidates.length !== 2) throw new Error('two unmanaged fixture rows required');
+    const normalizeSelectAll=document.querySelector('thead input[aria-label="Select all KPI activities"]');
+    if (normalizeSelectAll.checked || normalizeSelectAll.indeterminate) normalizeSelectAll.click();
+    if (normalizeSelectAll.checked || normalizeSelectAll.indeterminate) normalizeSelectAll.click();
+    await wait(() => !normalizeSelectAll.checked && !normalizeSelectAll.indeterminate, 'bulk selection normalized');
+    const zero = { reflectedDisabled: button('Mark reflected').disabled, notReflectedDisabled: button('Mark not reflected').disabled };
+    const candidates = [...document.querySelectorAll('.kpi-activities-table tbody tr')].filter(row => row.querySelector('.kpi-reflected-status-badge.is-not-reflected')).slice(0,2);
+    if (candidates.length !== 2) throw new Error('two not-reflected fixture rows required');
     const candidateIds = candidates.map(row => row.dataset.kpiRowId);
     const candidateRows = () => candidateIds.map(id => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id="' + id + '"]'));
     candidates.forEach(row => row.querySelector('input[data-kpi-row-selector]').click());
-    await wait(() => !button('Mark managed').disabled && !button('Mark unmanaged').disabled, 'bulk toolbar enabled');
-    button('Mark managed').click();
-    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-managed')) && document.querySelectorAll('.kpi-grid-cell.is-unsaved-cell').length >= 2, 'bulk managed draft');
-    const managed = { selected: candidateIds.length, managed: candidateRows().filter(row => row?.querySelector('.kpi-managed-status-icon.is-managed')).length, save: Boolean(button('Save')) };
-    button('Mark unmanaged').click();
-    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-unmanaged')) && !button('Save'), 'bulk unmanaged revert');
+    await wait(() => !button('Mark reflected').disabled && !button('Mark not reflected').disabled, 'bulk toolbar enabled');
+    button('Mark reflected').click();
+    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')) && document.querySelectorAll('.kpi-grid-cell.is-unsaved-cell').length >= 2, 'bulk reflected draft');
+    const reflected = { selected: candidateIds.length, reflected: candidateRows().filter(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')).length, save: Boolean(button('Save')) };
+    button('Mark not reflected').click();
+    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-not-reflected')) && !button('Save'), 'bulk not-reflected revert');
     const selectAll=document.querySelector('thead input[aria-label="Select all KPI activities"]'); if (selectAll.checked || selectAll.indeterminate) selectAll.click();
     button('Add KPI Activity').click();
     const draft = await wait(() => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id^="draft-"]'), 'new draft row');
@@ -672,18 +676,18 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     document.querySelector('.kpi-activity-toolbar').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,composed:true}));
     await wait(() => !document.querySelector('[data-kpi-single-editor]'), 'new draft editor close');
     draft.querySelector('input[data-kpi-row-selector]').click();
-    await wait(() => !button('Mark managed').disabled, 'new draft toolbar enabled');
-    button('Mark managed').click();
-    await wait(() => draftRow()?.querySelector('.kpi-managed-status-icon.is-managed'), 'new draft managed');
-    const newManaged = draftRow().querySelector('.kpi-managed-status-icon').getAttribute('aria-label');
-    button('Mark unmanaged').click();
-    await wait(() => draftRow()?.querySelector('.kpi-managed-status-icon.is-unmanaged'), 'new draft unmanaged');
+    await wait(() => !button('Mark reflected').disabled, 'new draft toolbar enabled');
+    button('Mark reflected').click();
+    await wait(() => draftRow()?.querySelector('.kpi-reflected-status-badge.is-reflected'), 'new draft reflected');
+    const newReflected = draftRow().querySelector('.kpi-reflected-status-badge').getAttribute('aria-label');
+    button('Mark not reflected').click();
+    await wait(() => draftRow()?.querySelector('.kpi-reflected-status-badge.is-not-reflected'), 'new draft not reflected');
     button('Cancel').click();
     const dialog = await wait(() => [...document.querySelectorAll('oj-dialog')].find(item => item.isOpen?.() && item.textContent.includes('Discard changes')), 'new draft discard');
     const leaf=[...dialog.querySelectorAll('*')].find(element => element.childElementCount===0 && element.textContent.trim()==='Discard changes');
     (leaf.closest('oj-button')||leaf).dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));
     await wait(() => !document.querySelector('tr[data-kpi-row-id^="draft-"]'), 'new draft removed');
-    return { zero, managed, reverted: candidateRows().every(row => row?.querySelector('.kpi-managed-status-icon.is-unmanaged')), newManaged, newReverted: true };
+    return { zero, reflected, reverted: candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-not-reflected')), newReflected, newReverted: true };
   })()`);
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[1].click(); true`);
   await delay(80);
@@ -724,7 +728,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
   assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
   assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
-  assert.deepEqual(result.summaryContract, { quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, bDefaultHidden: true, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
+  assert.deepEqual(result.summaryContract, { aSummaryHidden: true, hSummaryHidden: true, quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
   assert.equal(result.guideContract.length, 7);
   for (const guide of result.guideContract) {
     assert.equal(guide.defaultHidden, true, `${guide.code} Guide defaults collapsed`);
@@ -742,6 +746,11 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     checked: { checked: true, indeterminate: false },
     unchecked: { checked: false, indeterminate: false }
   });
+  assert.deepEqual(result.reflectedBulkContract.zero, { reflectedDisabled: true, notReflectedDisabled: true });
+  assert.deepEqual(result.reflectedBulkContract.reflected, { selected: 2, reflected: 2, save: true });
+  assert.equal(result.reflectedBulkContract.reverted, true);
+  assert.equal(result.reflectedBulkContract.newReflected, "Reflected in internal system");
+  assert.equal(result.reflectedBulkContract.newReverted, true);
   assert.deepEqual(result.longContentContract, { rows: 40, wrapperVerticalOverflow: 0, documentScroll: true, footerAfterTable: true });
   assert.ok(result.shortFooterContract.documentOverflow <= 1, "three-row content must not create a document scrollbar");
   assert.ok(result.shortFooterContract.bottom <= 1, "short-content Footer must rest on the viewport bottom");
@@ -774,7 +783,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   assert.equal(result.keyboardContract.aria.editorMatchesCell, true);
   for (const draft of [result.draftBeforeSort, result.draftAfterSort, result.draftAfterViewport]) {
     assert.equal(draft.text, "A changed reflected draft value");
-    assert.equal(draft.background, "rgb(217, 67, 143)");
+    assert.equal(draft.background, "rgb(179, 54, 111)");
     assert.equal(draft.height, "3px");
   }
   assert.equal(result.results.length, 84);

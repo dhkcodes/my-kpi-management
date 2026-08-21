@@ -1,5 +1,50 @@
 import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
 
+export const ACCOUNT_WORKLOAD_EDITABLE_FIELDS = [
+  "planNumber", "account", "workloadName", "opptyNo", "startDate", "endDate",
+  "arrUsd", "arrKrw", "acrUsd", "acrKrw", "target", "winProbability", "latestUpdate", "notes"
+] as const satisfies readonly (keyof AccountWorkloadRow)[];
+
+const comparable = (value: unknown) => value ?? "";
+
+export const hasEditableAccountWorkloadChanges = (
+  savedRows: readonly AccountWorkloadRow[],
+  draftRows: readonly AccountWorkloadRow[]
+) => {
+  const savedById = new Map(savedRows.map((row) => [row.id, row]));
+  return draftRows.some((draft) => {
+    const saved = savedById.get(draft.id);
+    return Boolean(saved && ACCOUNT_WORKLOAD_EDITABLE_FIELDS.some((key) => comparable(saved[key]) !== comparable(draft[key])));
+  });
+};
+
+export const overlayEditableAccountWorkloadChanges = (
+  authoritativeRows: readonly AccountWorkloadRow[],
+  draftRows: readonly AccountWorkloadRow[]
+) => {
+  const draftsById = new Map(draftRows.map((row) => [row.id, row]));
+  return authoritativeRows.map((authoritative) => {
+    const draft = draftsById.get(authoritative.id);
+    if (!draft) return authoritative;
+    const next = { ...authoritative };
+    for (const key of ACCOUNT_WORKLOAD_EDITABLE_FIELDS) (next as any)[key] = draft[key];
+    return next;
+  });
+};
+
+export const classifyAccountDeleteTargets = (
+  savedRows: readonly AccountWorkloadRow[],
+  selectedRowIds: readonly string[],
+  draftRowId?: string | null
+) => {
+  const selected = new Set(selectedRowIds);
+  return {
+    draftIds: draftRowId && selected.has(draftRowId) ? [draftRowId] : [],
+    activeIds: savedRows.filter((row) => selected.has(row.id) && !row.isDeleted).map((row) => row.id),
+    permanentIds: savedRows.filter((row) => selected.has(row.id) && row.isDeleted).map((row) => row.id)
+  };
+};
+
 export type DeleteMode = "draft" | "permanent" | "mixed" | "none";
 
 export const resolveDeleteMode = (

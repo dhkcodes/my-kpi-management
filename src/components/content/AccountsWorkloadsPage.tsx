@@ -4,7 +4,15 @@ import { FiscalYear } from "../../data/kpiMockData";
 import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError } from "../../data/accountsWorkloadsApi";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
-import { applyDraftDelete, applyDraftRestore, hasSelectedDeletedRows, resolveDeleteMode, withMinimumPendingDuration } from "../../data/accountsWorkloadsSelection";
+import {
+  applyDraftDelete,
+  applyDraftRestore,
+  classifyAccountDeleteTargets,
+  hasEditableAccountWorkloadChanges,
+  hasSelectedDeletedRows,
+  overlayEditableAccountWorkloadChanges,
+  withMinimumPendingDuration
+} from "../../data/accountsWorkloadsSelection";
 import {
   AccountWorkloadMetadata,
   AccountWorkloadRow
@@ -39,6 +47,12 @@ type SortField = EditableField | "isImportant";
 type EditCell = Readonly<{
   id: string;
   field: EditableField;
+}>;
+
+type DeleteTargets = Readonly<{
+  draftIds: string[];
+  activeIds: string[];
+  permanentIds: string[];
 }>;
 
 type Props = Readonly<{
@@ -306,12 +320,10 @@ export function AccountsWorkloadsPage({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(query.direction ?? "asc");
   const [searchTerm, setSearchTerm] = useState(query.search ?? "");
   const [editCell, setEditCell] = useState<EditCell | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
   const [addingRow, setAddingRow] = useState<AccountWorkloadRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [permanentDeleteIds, setPermanentDeleteIds] = useState<string[]>([]);
-  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState(false);
+  const [deleteTargets, setDeleteTargets] = useState<DeleteTargets | null>(null);
   const initialExchangeRate = fxRate?.rateValue ?? metadata.exchangeRate;
   const [savedExchangeRate, setSavedExchangeRate] = useState(initialExchangeRate);
   const [exchangeRate, setExchangeRate] = useState(initialExchangeRate);
@@ -320,6 +332,9 @@ export function AccountsWorkloadsPage({
   const gridScrollRef = useRef<HTMLDivElement>(null);
   const savingDialogRef = useRef<ojDialog>(null);
   const deleteDialogRef = useRef<ojDialog>(null);
+  const addButtonRef = useRef<any>(null);
+  const deleteButtonRef = useRef<any>(null);
+  const deleteCancelButtonRef = useRef<any>(null);
   const [scrollState, setScrollState] = useState({ left: 0, max: 0, clientWidth: 0 });
 
   const updateScrollState = () => {
@@ -391,18 +406,21 @@ export function AccountsWorkloadsPage({
     }).map((row) => draftRows.find((draftRow) => draftRow.id === row.id) ?? row);
   }, [dataSource, draftRows, editCell, includeDeleted, rows, searchTerm, selectedRowIds, sortDirection, sortField]);
 
-  useEffect(() => {
-    if (!isDirty && !addingRow && !editCell) setDraftRows(rows);
-  }, [addingRow, editCell, isDirty, rows]);
+  const hasEditableRowChanges = hasEditableAccountWorkloadChanges(rows, draftRows);
+  const showEditActions = Boolean(addingRow || hasEditableRowChanges || exchangeRate !== savedExchangeRate);
 
   useEffect(() => {
-    if (!fxRate || isDirty) return;
+    if (!showEditActions && !editCell) setDraftRows(rows);
+  }, [editCell, rows, showEditActions]);
+
+  useEffect(() => {
+    if (!fxRate || showEditActions) return;
     setSavedExchangeRate(fxRate.rateValue);
     setExchangeRate(fxRate.rateValue);
     setDraftExchangeRate(`${fxRate.rateValue}`);
-  }, [fxRate, isDirty]);
+  }, [fxRate, showEditActions]);
 
-  const draftActive = Boolean(isDirty || addingRow || editCell);
+  const draftActive = Boolean(showEditActions || editCell);
   useEffect(() => {
     onDraftStateChange(draftActive);
     return () => onDraftStateChange(false);
@@ -414,9 +432,9 @@ export function AccountsWorkloadsPage({
   }, [saving]);
 
   useEffect(() => {
-    if (confirmPermanentDelete) deleteDialogRef.current?.open();
+    if (deleteTargets) deleteDialogRef.current?.open();
     else if (deleteDialogRef.current?.isOpen()) deleteDialogRef.current.close();
-  }, [confirmPermanentDelete]);
+  }, [deleteTargets]);
 
   useEffect(() => {
     updateScrollState();
@@ -424,21 +442,23 @@ export function AccountsWorkloadsPage({
     return () => window.removeEventListener("resize", updateScrollState);
   }, [visibleRows.length, addingRow]);
 
-  const selectedVisibleRowIds = visibleRows.map((row) => row.id).filter((id) => selectedRowIds.includes(id));
-  const allVisibleSelected = visibleRows.length > 0 && selectedVisibleRowIds.length === visibleRows.length;
-  const selectedCount = selectedVisibleRowIds.length;
-  const selectedHasDeletedRows = hasSelectedDeletedRows(rows, selectedVisibleRowIds);
-  const deleteMode = resolveDeleteMode(rows, selectedVisibleRowIds);
-  const showFooterActions = Boolean(editCell || isDirty || addingRow);
+  const selectedSavedRowIds = visibleRows.map((row) => row.id).filter((id) => selectedRowIds.includes(id));
+  const selectedActionIds = addingRow && selectedRowIds.includes(addingRow.id)
+    ? [addingRow.id, ...selectedSavedRowIds]
+    : selectedSavedRowIds;
+  const allVisibleSelected = visibleRows.length > 0 && selectedSavedRowIds.length === visibleRows.length;
+  const selectedCount = selectedActionIds.length;
+  const selectedHasDeletedRows = hasSelectedDeletedRows(rows, selectedSavedRowIds);
   const hasFiscalYearSeed = fiscalYear === metadata.fiscalYear;
 
   useEffect(() => {
     const visibleIds = new Set(visibleRows.map((row) => row.id));
+    if (addingRow) visibleIds.add(addingRow.id);
     setSelectedRowIds((current) => {
       const next = current.filter((id) => visibleIds.has(id));
       return next.length === current.length ? current : next;
     });
-  }, [visibleRows]);
+  }, [addingRow, visibleRows]);
 
   const commitActiveCell = () => {
     setEditCell(null);
@@ -476,7 +496,6 @@ export function AccountsWorkloadsPage({
         return { ...row, [field]: rawValue };
       })
     );
-    setIsDirty(true);
   };
 
   const updateAddRowCell = (field: EditableField, rawValue: string) => {
@@ -502,7 +521,7 @@ export function AccountsWorkloadsPage({
     setSaveError("");
     try {
       const authoritative = await withMinimumPendingDuration(() =>
-        onRowsChange(rowsToSave, permanentDeleteIds, draftFxRate)
+        onRowsChange(rowsToSave, [], draftFxRate)
       );
       setDraftRows(authoritative.items);
       if (authoritative.fxRate) {
@@ -514,9 +533,7 @@ export function AccountsWorkloadsPage({
         setDraftExchangeRate(`${exchangeRate}`);
       }
       setAddingRow(null);
-      setIsDirty(false);
       setEditCell(null);
-      setPermanentDeleteIds([]);
       setSelectedRowIds([]);
     } catch (error) {
       setSaveError(formatAccountsWorkloadsSaveError(error));
@@ -529,57 +546,98 @@ export function AccountsWorkloadsPage({
     setDraftRows(rows);
     setExchangeRate(savedExchangeRate);
     setDraftExchangeRate(`${savedExchangeRate}`);
-    setIsDirty(false);
     setEditCell(null);
     setAddingRow(null);
-    setPermanentDeleteIds([]);
+    setSelectedRowIds((current) => current.filter((id) => rows.some((row) => row.id === id)));
   };
 
   const addRow = () => {
     setAddingRow(createEmptyRow(fiscalYear));
   };
 
-  const highlightSelected = () => {
-    setDraftRows((current) =>
-      current.map((row) => selectedVisibleRowIds.includes(row.id) ? { ...row, isImportant: !row.isImportant } : row)
-    );
-    setIsDirty(true);
+  const runImmediateRowsAction = async (nextRows: AccountWorkloadRow[], permanentIds: string[] = []) => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const authoritative = await withMinimumPendingDuration(() => onRowsChange(nextRows, permanentIds));
+      setDraftRows(overlayEditableAccountWorkloadChanges(authoritative.items, draftRows));
+      return true;
+    } catch (error) {
+      setSaveError(formatAccountsWorkloadsSaveError(error));
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const stageDraftDelete = () => {
-    const activeIds = selectedVisibleRowIds.filter((id) => !rows.find((row) => row.id === id)?.isDeleted);
-    setDraftRows((current) => applyDraftDelete(current, activeIds, "current-user", new Date().toISOString()));
-    setIsDirty(true);
+  const highlightSelected = async () => {
+    const savedIds = new Set(selectedSavedRowIds);
+    const nextRows = rows.map((row) => savedIds.has(row.id) ? { ...row, isImportant: !row.isImportant } : row);
+    const success = savedIds.size === 0 || await runImmediateRowsAction(nextRows);
+    if (success && addingRow && selectedRowIds.includes(addingRow.id)) {
+      setAddingRow({ ...addingRow, isImportant: !addingRow.isImportant });
+    }
   };
 
-  const deleteSelected = () => {
-    if (deleteMode === "permanent" || deleteMode === "mixed") {
-      setPermanentDeleteIds(selectedVisibleRowIds.filter((id) => rows.find((row) => row.id === id)?.isDeleted));
-      setConfirmPermanentDelete(true);
+  const restoreDeleteLauncherFocus = () => {
+    window.requestAnimationFrame(() => {
+      const target = deleteButtonRef.current ?? addButtonRef.current;
+      target?.focus?.();
+    });
+  };
+
+  const focusDeleteCancel = () => window.setTimeout(() => {
+    const host = deleteCancelButtonRef.current as (HTMLElement & { shadowRoot?: ShadowRoot | null }) | null;
+    const target = host?.shadowRoot?.querySelector<HTMLButtonElement>("button")
+      || host?.querySelector<HTMLButtonElement>("button")
+      || host;
+    target?.focus();
+  }, 0);
+
+  const requestDelete = () => {
+    const targets = classifyAccountDeleteTargets(rows, selectedActionIds, addingRow?.id);
+    if (targets.draftIds.length + targets.activeIds.length + targets.permanentIds.length === 0) return;
+    setDeleteTargets(targets);
+  };
+
+  const cancelDelete = () => {
+    setDeleteTargets(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargets) return;
+    const { draftIds, activeIds, permanentIds } = deleteTargets;
+    if (activeIds.length === 0 && permanentIds.length === 0) {
+      if (draftIds.length > 0) setAddingRow(null);
+      setSelectedRowIds((current) => current.filter((id) => !draftIds.includes(id)));
+      setDeleteTargets(null);
       return;
     }
-    stageDraftDelete();
+    const nextRows = applyDraftDelete(rows, activeIds, "current-user", new Date().toISOString());
+    const success = await runImmediateRowsAction(nextRows, permanentIds);
+    if (!success) return;
+    if (draftIds.length > 0) setAddingRow(null);
+    const removedIds = new Set([...draftIds, ...activeIds, ...permanentIds]);
+    setSelectedRowIds((current) => current.filter((id) => !removedIds.has(id)));
+    setDeleteTargets(null);
   };
 
-  const permanentlyDeleteSelected = () => {
-    const ids = [...permanentDeleteIds];
-    const activeIds = selectedVisibleRowIds.filter((id) => !rows.find((row) => row.id === id)?.isDeleted);
-    const nextRows = applyDraftDelete(
-      draftRows.filter((row) => !ids.includes(row.id)),
-      activeIds,
-      "current-user",
-      new Date().toISOString()
-    );
-    setConfirmPermanentDelete(false);
-    setDraftRows(nextRows);
-    setIsDirty(true);
-    setSelectedRowIds([]);
+  const restoreSelected = async () => {
+    const restored = applyDraftRestore(rows, selectedSavedRowIds, rows);
+    const success = await runImmediateRowsAction(restored);
+    if (success) setSelectedRowIds([]);
   };
 
-  const restoreSelected = () => {
-    setDraftRows((current) => applyDraftRestore(current, selectedVisibleRowIds, rows));
-    setIsDirty(true);
-  };
+  const deleteDialogTitle = deleteTargets?.draftIds.length && !deleteTargets.activeIds.length && !deleteTargets.permanentIds.length
+    ? "Delete unsaved Draft?"
+    : deleteTargets?.permanentIds.length && !deleteTargets.activeIds.length && !deleteTargets.draftIds.length
+      ? "Permanently delete saved row?"
+      : "Delete selected rows?";
+  const deleteDialogMessage = deleteTargets?.draftIds.length && !deleteTargets.activeIds.length && !deleteTargets.permanentIds.length
+    ? "This unsaved Draft will be removed locally. No API request will be made."
+    : deleteTargets?.permanentIds.length
+      ? "Saved deleted rows will be permanently removed. This action cannot be undone."
+      : "Saved active rows will be moved to deleted records immediately.";
 
   const applyExchangeRate = () => {
     const parsed = numberFromInput(draftExchangeRate);
@@ -598,7 +656,6 @@ export function AccountsWorkloadsPage({
       arrKrw: current.arrUsd === null ? current.arrKrw : Math.round(current.arrUsd * parsed),
       acrKrw: current.acrUsd === null ? current.acrKrw : Math.round(current.acrUsd * parsed)
     } : current);
-    setIsDirty(true);
     setFxPopoverOpen(false);
   };
 
@@ -633,7 +690,7 @@ export function AccountsWorkloadsPage({
       isChanged ? "is-unsaved-cell" : ""
     ].filter(Boolean).join(" ");
     return (
-      <td class={cellClass || undefined} onDblClick={() => setEditCell({ id: row.id, field })}>
+      <td data-account-field={field} class={cellClass || undefined} onDblClick={() => setEditCell({ id: row.id, field })}>
         {isEditing ? (
           <EditableCell row={row} field={field} value={value} onChange={updateDraftCell} onCommit={commitActiveCell} />
         ) : field === "latestUpdate" ? (
@@ -770,13 +827,23 @@ export function AccountsWorkloadsPage({
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
-          <oj-button class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title="Add Account" onojAction={addRow}>Add Account</oj-button>
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing} onojAction={onRefresh}>Refresh</oj-button>
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={selectedCount === 0} onojAction={highlightSelected}>Highlight</oj-button>
-          {selectedHasDeletedRows && (
-            <oj-button class="accounts-workloads-jet-button" chroming="outlined" onojAction={restoreSelected}>Restore</oj-button>
+          <oj-button ref={addButtonRef} class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title="Add Account" disabled={saving} onojAction={addRow}>Add Account</oj-button>
+          {showEditActions && (
+            <>
+              <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={saving || Boolean(addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim()))} onClick={() => void saveGridChanges()}>Save</button>
+              <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>
+            </>
           )}
-          <oj-button class="accounts-workloads-jet-button" chroming="danger" disabled={selectedCount === 0} onojAction={deleteSelected}>Delete</oj-button>
+          {selectedCount > 0 && (
+            <>
+              <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={saving} onojAction={() => void highlightSelected()}>Highlight</oj-button>
+              {selectedHasDeletedRows && (
+                <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={saving} onojAction={() => void restoreSelected()}>Restore</oj-button>
+              )}
+              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={saving} onojAction={requestDelete}>Delete</oj-button>
+            </>
+          )}
+          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing || saving} onojAction={onRefresh}>Refresh</oj-button>
         </div>
       </div>
 
@@ -789,12 +856,22 @@ export function AccountsWorkloadsPage({
         </div>
       </oj-dialog>
 
-      <oj-dialog ref={deleteDialogRef} class="accounts-workloads-delete-dialog" initialVisibility="hide" modality="modal" cancelBehavior="escape" dragAffordance="none" resizeBehavior="none" dialogTitle="Permanently delete?" onojClose={() => setConfirmPermanentDelete(false)}>
+      <oj-dialog
+        ref={deleteDialogRef}
+        class="accounts-workloads-delete-dialog"
+        initialVisibility="hide"
+        modality="modal"
+        cancelBehavior="escape"
+        dragAffordance="none"
+        resizeBehavior="none"
+        dialogTitle={deleteDialogTitle}
+        onojOpen={focusDeleteCancel}
+        onojClose={() => { setDeleteTargets(null); restoreDeleteLauncherFocus(); }}>
         <div class="accounts-workloads-delete-content">
-          <p>{permanentDeleteIds.length} draft-deleted row(s) will be removed permanently. This action cannot be undone.</p>
+          <p>{deleteDialogMessage}</p>
           <div class="accounts-workloads-save-actions">
-            <oj-button chroming="danger" onojAction={permanentlyDeleteSelected}>Delete permanently</oj-button>
-            <oj-button chroming="outlined" onojAction={() => setConfirmPermanentDelete(false)}>Cancel</oj-button>
+            <oj-button chroming="danger" disabled={saving} onojAction={() => void confirmDelete()}>Delete</oj-button>
+            <oj-button ref={deleteCancelButtonRef} chroming="outlined" disabled={saving} onojAction={cancelDelete}>Cancel</oj-button>
           </div>
         </div>
       </oj-dialog>
@@ -833,7 +910,7 @@ export function AccountsWorkloadsPage({
           </thead>
           <tbody>
             {visibleRows.map((row, index) => (
-              <tr key={row.id} data-row-id={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
+              <tr key={row.id} data-row-id={row.id} data-account-row-id={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
                 <td class="is-sticky accounts-workloads-selection-col">
                   <input type="checkbox" checked={selectedRowIds.includes(row.id)} onChange={() => toggleSelection(row.id)} aria-label={`Select ${row.account} ${row.workloadName}`} />
                 </td>
@@ -861,8 +938,10 @@ export function AccountsWorkloadsPage({
               </tr>
             )}
             {addingRow && (
-              <tr class="is-adding-row">
-                <td class="is-sticky accounts-workloads-selection-col">New</td>
+              <tr data-account-row-id={addingRow.id} class="is-adding-row">
+                <td class="is-sticky accounts-workloads-selection-col">
+                  <input type="checkbox" checked={selectedRowIds.includes(addingRow.id)} onChange={() => toggleSelection(addingRow.id)} aria-label="Select unsaved Draft account" />
+                </td>
                 <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">—</td>
                 <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center"></td>
                 <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
@@ -886,23 +965,7 @@ export function AccountsWorkloadsPage({
       </div>
       </div>
 
-      {showFooterActions && (
-        <div class="accounts-workloads-footer-actions">
-          <div class="accounts-workloads-rule-note">
-            <strong>Unsaved changes are highlighted.</strong> Save commits the current edit session; Cancel restores the original rows and removes any new row.
-          </div>
-          <div class="accounts-workloads-save-actions">
-            <button
-              type="button"
-              class="accounts-workloads-button accounts-workloads-button--primary"
-              disabled={saving}
-              onClick={saveGridChanges}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>
-          </div>
-        </div>
-      )}
+
     </section>
   );
 }

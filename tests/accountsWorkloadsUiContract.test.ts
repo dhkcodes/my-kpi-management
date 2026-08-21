@@ -18,10 +18,20 @@ assert.match(header, /aria-label="My KPI & Account Planner"/, "header brand land
 assert.match(packageJson, /"description": "My KPI & Account Planner — Goals, Accounts and Next Actions"/, "package metadata uses the finalized KAP product name");
 assert.doesNotMatch(`${indexHtml}\n${app}\n${header}\n${packageJson}`, /KPI Management|Oracle KPI cockpit|KPI operating cockpit/, "legacy product names are removed from product metadata and the app shell");
 
-assert.match(page, /deleteMode === "permanent" \|\| deleteMode === "mixed"/, "deleted and mixed selections require confirmation");
-assert.match(page, /filter\(\(id\) => rows\.find\(\(row\) => row\.id === id\)\?\.isDeleted\)/, "permanent targets are isolated from selected deleted rows");
-assert.match(page, /applyDraftDelete\([\s\S]*activeIds/, "mixed confirmation stages active rows for draft deletion");
-assert.match(page, />Delete<\/oj-button>/, "destructive action label is always Delete");
+assert.match(page, /classifyAccountDeleteTargets/, "draft, saved active, and permanent targets are classified before one confirmation dialog");
+assert.match(page, /dialogTitle=\{deleteDialogTitle\}/, "the delete dialog title distinguishes draft and saved targets");
+assert.match(page, />Delete<\/oj-button>/, "confirmation uses the requested Delete label");
+assert.match(page, />Cancel<\/oj-button>/, "confirmation uses the requested Cancel label");
+assert.match(page, /const focusDeleteCancel = \(\) => window\.setTimeout/,
+  "the dialog defers initial focus until the JET focus cycle settles");
+assert.match(page, /shadowRoot\?\.querySelector<HTMLButtonElement>\("button"\)[\s\S]*target\?\.focus\(\)/,
+  "the least destructive dialog action receives native initial focus");
+assert.match(page, /onojOpen=\{focusDeleteCancel\}/,
+  "the least destructive dialog action receives initial focus");
+assert.match(page, /cancelBehavior="escape"/, "Escape closes the modal confirmation");
+assert.match(page, /restoreDeleteLauncherFocus/, "dialog close restores focus to the launcher or stable Add Account fallback");
+assert.match(page, /draftIds\.length > 0[\s\S]*setAddingRow\(null\)/,
+  "confirming an unsaved Draft delete removes it locally");
 assert.doesNotMatch(page, /\{deleteMode ===|Selected rows:/, "dynamic top-action delete labels and selected count are absent");
 assert.match(page, /hasSelectedDeletedRows[\s\S]*&& \([\s\S]*>Restore<\/oj-button>/, "Restore is conditionally rendered for deleted selections");
 assert.match(page, />Refresh<\/oj-button>/, "Refresh action is rendered");
@@ -68,9 +78,11 @@ assert.match(app, /fetchKpiGuides\(fiscalYear\)/, "opening the KPI Guide loads a
 assert.match(app, /updateKpiGuide\(draft\)/, "KPI Guide Save awaits the API adapter");
 assert.match(app, /fetchFxRate\(fiscalYear\)/, "FY changes load the authoritative FX rate");
 assert.doesNotMatch(page, /applyExchangeRate[\s\S]{0,500}(?:onSaveFxRate|updateFxRate|await)/, "FX Apply performs no API request");
-assert.match(page, /applyExchangeRate[\s\S]*setExchangeRate\(parsed\)[\s\S]*arrKrw:[\s\S]*parsed[\s\S]*setAddingRow[\s\S]*acrKrw:[\s\S]*parsed[\s\S]*setIsDirty\(true\)/, "FX Apply updates the draft rate and recalculates table and add-row KRW values");
+assert.match(page, /applyExchangeRate[\s\S]*setExchangeRate\(parsed\)[\s\S]*arrKrw:[\s\S]*parsed[\s\S]*setAddingRow[\s\S]*acrKrw:[\s\S]*parsed[\s\S]*setFxPopoverOpen\(false\)/, "FX Apply updates the draft rate and recalculates table and add-row KRW values");
 assert.match(page, /current\.map\(\(row\) => row\.isDeleted\s*\?\s*row\s*:/, "FX Apply leaves deleted rows unchanged so they are not emitted as stale active-row patches");
-assert.match(page, /onRowsChange\(rowsToSave, permanentDeleteIds, draftFxRate\)/, "main Save sends row operations and optional FX in one adapter call");
+assert.match(page, /onRowsChange\(rowsToSave, \[\], draftFxRate\)/, "main Save sends editable row operations and optional FX without carrying delete state");
+assert.match(page, /runImmediateRowsAction[\s\S]*onRowsChange\(nextRows, permanentIds\)/,
+  "Highlight, restore, soft delete, and permanent delete persist independently from editable Save/Cancel");
 assert.match(page, /const authoritative = await[\s\S]*setDraftRows\(authoritative\.items\)[\s\S]*authoritative\.fxRate/, "Save adopts authoritative rows and latest FX version");
 assert.doesNotMatch(page, /Some changes were saved|Some rows were deleted permanently|Completed deletions were reconciled|partial/i, "atomic save errors never imply partial persistence");
 assert.match(app, /saveAccountsWorkloadsBatch\(/, "App uses the atomic Accounts & Workloads batch adapter");
@@ -88,6 +100,21 @@ assert.match(page, /id="accountsWorkloadsFxError"[\s\S]*role="alert"/, "FX expos
 
 assert.match(page, /aria-label="Add Account"[^>]*title="Add Account"[^>]*>Add Account<\/oj-button>/, "Accounts-only create action uses Add Account for text, accessibility, and tooltip");
 assert.doesNotMatch(page, />Add Row<\/oj-button>/, "legacy Accounts Add Row label is absent");
+assert.match(page, /const showEditActions = Boolean\(addingRow \|\| hasEditableRowChanges \|\| exchangeRate !== savedExchangeRate\)/,
+  "Save/Cancel visibility is derived only from a new Draft, editable cell diff, or editable FX draft");
+assert.match(page, /\{showEditActions && \([\s\S]*>Save<[\s\S]*>Cancel</,
+  "Save/Cancel are conditionally rendered in the toolbar");
+assert.match(page, /\{selectedCount > 0 && \([\s\S]*>Highlight<[\s\S]*>Delete</,
+  "Highlight/Delete are absent from the DOM until checkbox selection exists");
+assert.doesNotMatch(page, /disabled=\{selectedCount === 0\}/, "hidden selection actions do not reserve disabled toolbar slots");
+const addAt = page.indexOf(">Add Account</oj-button>");
+const saveAt = page.indexOf(">Save</button>");
+const cancelAt = page.indexOf(">Cancel</button>", saveAt);
+const highlightAt = page.indexOf(">Highlight</oj-button>");
+const deleteAt = page.indexOf(">Delete</oj-button>", highlightAt);
+assert.ok(addAt < saveAt && saveAt < cancelAt && cancelAt < highlightAt && highlightAt < deleteAt,
+  "toolbar source order is Add Account, Save, Cancel, Highlight, Delete");
+assert.doesNotMatch(page, /accounts-workloads-footer-actions/, "Save/Cancel no longer appear in a separate footer action bar");
 
 assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
   "the common App shell owns short-content Footer placement for every route");
