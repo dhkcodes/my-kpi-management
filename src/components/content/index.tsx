@@ -31,6 +31,7 @@ type Props = Readonly<{
   accountsWorkloadsQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
   accountsWorkloadsDraftActive: boolean;
   weeklyActivitiesDraftActive: boolean;
+  kpiWriteActive: boolean;
   accountsWorkloadsDatasetAvailable: boolean;
   accountsWorkloadsLoading: boolean;
   accountsWorkloadsRefreshing: boolean;
@@ -58,6 +59,7 @@ type Props = Readonly<{
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
   onWeeklyActivitiesDraftStateChange: (active: boolean) => void;
   onKpiNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
+  onKpiWriteStateChange: (active: boolean) => void;
 }>;
 
 type GuideDetails = Readonly<{
@@ -286,6 +288,7 @@ export function Content({
   accountsWorkloadsQuery,
   accountsWorkloadsDraftActive,
   weeklyActivitiesDraftActive,
+  kpiWriteActive,
   accountsWorkloadsDatasetAvailable,
   accountsWorkloadsLoading,
   accountsWorkloadsRefreshing,
@@ -312,7 +315,8 @@ export function Content({
   onAccountsWorkloadsQueryChange,
   onAccountsWorkloadsDraftStateChange,
   onWeeklyActivitiesDraftStateChange,
-  onKpiNavigationGuardChange
+  onKpiNavigationGuardChange,
+  onKpiWriteStateChange
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const guideItems = dataset.guides;
@@ -412,12 +416,15 @@ export function Content({
                 aria-pressed={year === fiscalYear ? "true" : "false"}
                 disabled={(activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear)
                   || (activeRoute.module === "weeklyActivities" && weeklyActivitiesDraftActive && year !== fiscalYear)
+                  || (activeRoute.module === "kpiPage" && kpiWriteActive && year !== fiscalYear)
                   || (guideSaving && year !== fiscalYear)}
                 title={activeRoute.module === "accountsWorkloads" && accountsWorkloadsDraftActive && year !== fiscalYear
                   ? "Save or cancel table changes before changing fiscal year."
                   : activeRoute.module === "weeklyActivities" && weeklyActivitiesDraftActive && year !== fiscalYear
                     ? "Save or cancel Weekly Activity changes before changing fiscal year."
-                    : guideSaving && year !== fiscalYear
+                    : activeRoute.module === "kpiPage" && kpiWriteActive && year !== fiscalYear
+                      ? "Wait for the KPI activity save to finish before changing fiscal year."
+                      : guideSaving && year !== fiscalYear
                       ? "Wait for the KPI Guide save to finish before changing fiscal year."
                       : undefined}
                 onClick={() => onFiscalYearChange(year)}>
@@ -547,7 +554,8 @@ export function Content({
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
-          onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange} />
+          onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
+          onWriteStateChange={onKpiWriteStateChange} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page
           fiscalYear={fiscalYear}

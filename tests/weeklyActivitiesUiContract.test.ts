@@ -59,7 +59,7 @@ assert.match(page, /onDirtyStateChange\?\.\(editSessionDirty\)/, "the page repor
 assert.match(page, /isWeeklyActivityDraftDirty\(/, "date and both content drafts are compared with their baseline");
 assert.match(content, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\} onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} \/>/);
 assert.match(app, /confirmWeeklyActivitiesNavigation[\s\S]*weeklyActivitiesDraftActiveRef\.current[\s\S]*window\.confirm\(UNSAVED_WEEKLY_ACTIVITY_MESSAGE\)/, "navigation confirmation is centralized around the active weekly draft ref");
-assert.match(app, /handlePopState[\s\S]*confirmWeeklyActivitiesNavigation\(route, window\.location\.href\)/, "browser Back and Forward pass the full destination URL, including hash, to the dirty guard");
+assert.match(app, /handlePopState[\s\S]*const destinationHref = window\.location\.href[\s\S]*confirmWeeklyActivitiesNavigation\(route, destinationHref\)/, "browser Back and Forward pass the full destination URL, including hash, to the dirty guard");
 assert.match(app, /window\.history\.replaceState\(withHistoryIndex\(window\.history\.state, currentHistoryIndex\)/, "the current browser entry is indexed without replacing the stack");
 assert.match(app, /getRejectedPopstateDelta\(historyIndexRef\.current, event\.state\)[\s\S]*window\.history\.go\(restorationDelta\)/, "rejected Back and Forward restore the indexed current entry with a signed delta");
 assert.doesNotMatch(app, /restoreOnReject[\s\S]*history\.pushState/, "popstate rejection never duplicates or destroys entries with pushState");

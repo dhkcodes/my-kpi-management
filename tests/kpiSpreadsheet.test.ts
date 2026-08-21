@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   KPI_TABS,
   KPI_FIELD_CONTRACTS,
@@ -16,8 +17,28 @@ import {
   isKpiDraftInvalid,
   isKpiFieldChanged,
   isKpiRowChanged,
+  isKpiWriteContextCurrent,
   KpiSpreadsheetRow
 } from "../src/data/kpiSpreadsheet";
+
+assert.equal(isKpiWriteContextCurrent({ fiscalYear: "FY27", routeId: "kpiActivityA", generation: 3 }, "FY27", "kpiActivityA", 3), true);
+assert.equal(isKpiWriteContextCurrent({ fiscalYear: "FY27", routeId: "kpiActivityA", generation: 3 }, "FY26", "kpiActivityA", 3), false);
+assert.equal(isKpiWriteContextCurrent({ fiscalYear: "FY27", routeId: "kpiActivityA", generation: 3 }, "FY27", "kpiActivityB", 3), false);
+assert.equal(isKpiWriteContextCurrent({ fiscalYear: "FY27", routeId: "kpiActivityA", generation: 3 }, "FY27", "kpiActivityA", 4), false);
+
+const pageSource = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
+assert.match(pageSource, /const \[saving, setSaving\] = useState\(false\)/, "KPI writes must have a submission lock");
+assert.match(pageSource, /if \(saving \|\| saveDisabled\) return false;/, "repeated submissions must be ignored synchronously");
+assert.match(pageSource, /const saveSession = sessionVersion\.current[\s\S]*const saveSessionKey = sessionKeyRef\.current/, "writes must capture the active route and fiscal-year session");
+assert.match(pageSource, /sessionVersion\.current !== saveSession \|\| sessionKeyRef\.current !== saveSessionKey/, "stale save responses must be rejected");
+assert.match(pageSource, /sessionVersion\.current !== deleteSession \|\| sessionKeyRef\.current !== deleteSessionKey/, "stale delete responses must be rejected");
+assert.match(pageSource, /setRows\(\[\]\); setOverviewItems\(\[\]\); setApiMessage\("Loading KPI activities/, "stale fiscal-year rows must be hidden during reload");
+assert.match(pageSource, /disabled=\{saving/, "write controls must be disabled while a mutation is active");
+assert.match(pageSource, /onWriteStateChange\(true\)/, "the app shell must be told when a KPI write starts");
+assert.match(pageSource, /onWriteStateChange\(false\)/, "the app shell must be told when a KPI write settles");
+const appSource = readFileSync("src/components/app.tsx", "utf8");
+assert.match(appSource, /kpiWriteActiveRef\.current\) \{\s*return false;/, "route changes must be blocked while a KPI write is active");
+assert.match(appSource, /module === "kpiPage" && kpiWriteActiveRef\.current[\s\S]{0,100}return;/, "fiscal-year changes must be blocked while a KPI write is active");
 
 assert.deepEqual(KPI_TABS, ["Overview", "A", "B", "C1", "C2", "D1", "F", "H"]);
 assert.equal(KPI_TABS.includes("G" as never), false, "KPI G must never be present");

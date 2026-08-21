@@ -416,7 +416,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
   fiscalYear: FiscalYear;
   routeId: string;
   guideDataFiscalYear: FiscalYear | null;
@@ -425,6 +425,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   guideError: string;
   onNavigate: (routeId: string) => void;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
+  onWriteStateChange: (active: boolean) => void;
 }>) {
   const activeTab = getKpiTabForRoute(routeId);
   const tableScopeKey = `${fiscalYear}:${activeTab}`;
@@ -441,6 +442,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const editorAnchorRef = useRef<HTMLElement | null>(null);
   const pendingAutoEditRowIdRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const beginWrite = () => { setSaving(true); onWriteStateChange(true); };
+  const endWrite = () => { setSaving(false); onWriteStateChange(false); };
   const savingDialogDesiredRef = useRef(false);
   const savingDialogGenerationRef = useRef(0);
   const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
@@ -845,7 +848,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     const draftSnapshot = drafts;
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save" }));
     savingDialogDesiredRef.current = true;
-    setSaving(true);
+    beginWrite();
     let saved: KpiSpreadsheetRow[] = [];
     let failed = false;
     try {
@@ -856,7 +859,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     await minimumProgress(startedAt);
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
-      setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
+      endWrite(); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     if (!failed) {
       setRows((current) => {
@@ -869,11 +872,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
-      setSaving(false); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
+      endWrite(); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     setApiMessage(failed ? "KPI changes could not be saved. Drafts are unchanged; retry when ready." : `${saved.length} KPI activity row(s) saved atomically`);
     await settleSavingDialogClosed();
-    setSaving(false);
+    endWrite();
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failed }));
     return !failed;
   };
@@ -884,11 +887,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     const deleteSession = sessionVersion.current;
     const deleteSessionKey = sessionKeyRef.current;
     savingDialogDesiredRef.current = true;
-    setSaving(true);
+    beginWrite();
     const outcomes = await Promise.allSettled(rowsToDelete.map((row) => deleteKpiRow(row)));
     if (sessionVersion.current !== deleteSession || sessionKeyRef.current !== deleteSessionKey) {
       await settleSavingDialogClosed();
-      setSaving(false);
+      endWrite();
       setReloadVersion((current) => current + 1);
       return;
     }
@@ -899,7 +902,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);
     await settleSavingDialogClosed();
-    setSaving(false);
+    endWrite();
   };
 
   const requestProtectedNavigation = useCallback<KpiNavigationGuard>((label, action) => {

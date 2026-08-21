@@ -46,6 +46,14 @@ export type KpiSpreadsheetRow = {
   deliveryDate: string;
 };
 
+export type KpiWriteContext = Readonly<{ fiscalYear: FiscalYear; routeId: string; generation: number }>;
+export const isKpiWriteContextCurrent = (
+  context: KpiWriteContext,
+  fiscalYear: FiscalYear,
+  routeId: string,
+  generation: number
+) => context.fiscalYear === fiscalYear && context.routeId === routeId && context.generation === generation;
+
 export const createEmptyKpiRow = (kpiCode: SpreadsheetKpiCode, fiscalYear: FiscalYear): KpiSpreadsheetRow => ({
   id: `draft-${kpiCode.toLowerCase()}-${Date.now()}`,
   manageTimeReflected: false,

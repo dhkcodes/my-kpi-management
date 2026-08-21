@@ -17,7 +17,7 @@ assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
 assert.throws(() => decodeKpiRows({ items: [{ ...backend, kpiCode: "G" }] }), /Invalid KPI code/);
 assert.equal(
   getKpiActivitiesApiBase({ location: { protocol: "http:", hostname: "127.0.0.1", port: "8000" } }),
-  "http://127.0.0.1:18081/api/v1/kpi-activities"
+  "/api/v1/kpi-activities"
 );
 assert.equal(
   getKpiActivitiesApiBase({ location: { protocol: "https:", hostname: "127.0.0.1", port: "8000" } }),
@@ -67,6 +67,7 @@ async function run() {
   assert.equal(batch.length, 2);
   await deleteKpiRow(valid, fetchImpl);
   assert.equal(calls[0].url, "/api/v1/kpi-activities?fiscalYear=FY27");
+  assert.equal(new Headers(calls[0].init?.headers).has("Content-Type"), false, "GET must not add a JSON content type");
   assert.equal(calls[1].url, "/api/v1/kpi-activities/overview?fiscalYear=FY27");
   assert.match(calls[2].url, /workload-options\?fiscalYear=FY27&search=Account&offset=0&size=10$/);
   assert.equal(calls[3].init?.method, "PATCH");
@@ -79,6 +80,7 @@ async function run() {
   assert.equal(batchBody.items[1].id, undefined);
   assert.match(calls[6].url, /versionNo=2$/);
   assert.equal(calls[6].init?.method, "DELETE");
+  assert.equal(new Headers(calls[6].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
   console.log("kpiSpreadsheetApi tests passed");
 }
 

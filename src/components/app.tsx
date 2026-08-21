@@ -156,6 +156,8 @@ export const App = registerCustomElement(
     const [accountsWorkloadsDraftActive, setAccountsWorkloadsDraftActive] = useState(false);
     const [weeklyActivitiesDraftActive, setWeeklyActivitiesDraftActive] = useState(false);
     const weeklyActivitiesDraftActiveRef = useRef(false);
+    const [kpiWriteActive, setKpiWriteActive] = useState(false);
+    const kpiWriteActiveRef = useRef(false);
 
     const [accountsWorkloadsRefreshing, setAccountsWorkloadsRefreshing] = useState(false);
     const accountsWorkloadsRequestIdRef = useRef(0);
@@ -272,6 +274,9 @@ export const App = registerCustomElement(
     ) => {
       const previousRoute = activeRouteRef.current;
       const previousHref = activeLocationHrefRef.current;
+      if (hasNavigationDestinationChanged(previousRoute.id, route.id, previousHref, destinationHref) && kpiWriteActiveRef.current) {
+        return false;
+      }
       if (hasNavigationDestinationChanged(previousRoute.id, route.id, previousHref, destinationHref) && weeklyActivitiesDraftActiveRef.current && !window.confirm(UNSAVED_WEEKLY_ACTIVITY_MESSAGE)) {
         return false;
       }
@@ -297,6 +302,11 @@ export const App = registerCustomElement(
         }, window.location.href)) return;
         const destinationHref = anchor.href;
         const sameDocumentNavigation = isSameDocumentNavigation(window.location.href, destinationHref);
+        if (kpiWriteActiveRef.current && !sameDocumentNavigation) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         if (!weeklyActivitiesDraftActiveRef.current && !sameDocumentNavigation) return;
         if (weeklyActivitiesDraftActiveRef.current && !window.confirm(UNSAVED_WEEKLY_ACTIVITY_MESSAGE)) {
           event.preventDefault();
@@ -461,6 +471,7 @@ export const App = registerCustomElement(
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
+      if (activeRouteRef.current.module === "kpiPage" && kpiWriteActiveRef.current && nextFiscalYear !== fiscalYearRef.current) return;
       if (nextFiscalYear === fiscalYearRef.current) return;
       if (activeRouteRef.current.module === "weeklyActivities" && weeklyActivitiesDraftActiveRef.current) return;
       const changeFiscalYear = () => {
@@ -567,6 +578,7 @@ export const App = registerCustomElement(
             accountsWorkloadsQuery={accountsWorkloadsQuery}
             accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
             weeklyActivitiesDraftActive={weeklyActivitiesDraftActive}
+            kpiWriteActive={kpiWriteActive}
             accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
             accountsWorkloadsLoading={accountsWorkloadsLoading}
             accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
@@ -618,6 +630,10 @@ export const App = registerCustomElement(
               setWeeklyActivitiesDraftActive(active);
             }}
             onKpiNavigationGuardChange={handleKpiNavigationGuardChange}
+            onKpiWriteStateChange={(active) => {
+              kpiWriteActiveRef.current = active;
+              setKpiWriteActive(active);
+            }}
             onFiscalYearChange={handleFiscalYearChange}
             onNavigate={handleNavigate}
           />
