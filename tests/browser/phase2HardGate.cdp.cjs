@@ -72,16 +72,23 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
   await waitPage(`[...document.querySelectorAll('.accounts-workloads-actions oj-button')].some(button=>button.textContent.trim()==='Delete')`,`draft delete action`);
   assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),['Save','Cancel','Highlight','Delete']);
   await evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
-  const draftDialog=await waitPage(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const active=document.activeElement?.textContent?.trim()||'';return d?.isOpen?.()&&d.textContent.includes('unsaved Draft')&&active.includes('Cancel')?{title:d.dialogTitle||d.getProperty?.('dialogTitle'),text:d.textContent,active}:false;})()`,`draft delete dialog`);
-  assert.equal(draftDialog.title,'Delete unsaved Draft?'); assert.match(draftDialog.text,/removed locally[\s\S]*No API request/); assert.match(draftDialog.active||'',/Cancel/);
-  await evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Cancel');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
-  await waitPage(`!document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`draft cancel`); assert.equal(await evaluate(`Boolean(document.querySelector('tr.is-adding-row'))`),true);
-  await evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
-  await waitPage(`document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`draft dialog reopen`);
-  await evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
   await waitPage(`!document.querySelector('tr.is-adding-row')`,`draft deleted`);
+  assert.equal(await evaluate(`Boolean(document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.())`),false,'draft-only Delete must not open a dialog');
   assert.equal(requests.filter(r=>r.path.endsWith('/accounts-workloads/save')).length,draftDeleteRequestsBefore,'unsaved Draft Delete must not call API');
   assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),[]);
+
+  await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`document.querySelector('tr.is-adding-row')`,`mixed draft row`);
+  await evaluate(`document.querySelector('tr.is-adding-row input[aria-label="Select unsaved Draft account"]').click();document.querySelector('tr[data-account-row-id="41"] input[type="checkbox"]').click();true`);
+  await waitPage(`[...document.querySelectorAll('.accounts-workloads-actions oj-button')].some(button=>button.textContent.trim()==='Delete')`,`mixed delete action`);
+  await evaluate(`(()=>{const b=[...document.querySelectorAll('.accounts-workloads-actions oj-button')].find(button=>button.textContent.trim()==='Delete');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  const mixedDialog=await waitPage(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');return d?.isOpen?.()&&d.textContent.includes('already removed locally')?d.textContent:false;})()`,`mixed saved delete dialog`);
+  assert.match(mixedDialog,/will not be restored if you cancel/); assert.equal(await evaluate(`Boolean(document.querySelector('tr.is-adding-row'))`),false);
+  assert.equal(requests.filter(r=>r.path.endsWith('/accounts-workloads/save')).length,draftDeleteRequestsBefore,'mixed Draft removal before saved confirmation must not call API');
+  await evaluate(`(()=>{const d=document.querySelector('oj-dialog.accounts-workloads-delete-dialog');const b=[...d.querySelectorAll('oj-button')].find(button=>button.textContent.trim()==='Cancel');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`!document.querySelector('oj-dialog.accounts-workloads-delete-dialog')?.isOpen?.()`,`mixed cancel`);
+  assert.equal(await evaluate(`Boolean(document.querySelector('tr.is-adding-row'))`),false,'mixed cancel must not restore Draft');
+  await evaluate(`document.querySelector('tr[data-account-row-id="41"] input[type="checkbox"]').click();true`);
   const runAccountFailure=async(mode,expected)=>{
     saveMode=mode;
     await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
@@ -135,6 +142,14 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
   await waitPage(`![...document.querySelectorAll('.accounts-workloads-actions button')].some(button=>button.textContent.trim()==='Save')`,`dirty cancel`);
 
   await navigate("/accounts-workloads");
+  const accountEditorFocus=[];
+  for(const [field,selector] of [['account','input'],['notes','textarea'],['target','select'],['startDate','oj-input-date']]){
+    await evaluate(`(()=>{const cell=document.querySelector('tr[data-account-row-id="41"] [data-account-field="${field}"]');cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,composed:true,detail:2}));return true;})()`);
+    const focused=await waitPage(`(()=>{const editor=document.querySelector('tr[data-account-row-id="41"] [data-account-field="${field}"] ${selector}.accounts-workloads-edit-field');return editor&&(document.activeElement===editor||editor.contains(document.activeElement))?{field:${JSON.stringify(field)},tag:editor.tagName}:false;})()`,`${field} double-click focus`);
+    accountEditorFocus.push(focused);
+    await evaluate(`(()=>{const editor=document.querySelector('tr[data-account-row-id="41"] [data-account-field="${field}"] ${selector}.accounts-workloads-edit-field');editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,composed:true}));return true;})()`);
+    await waitPage(`!document.querySelector('tr[data-account-row-id="41"] [data-account-field="${field}"] .accounts-workloads-edit-field')`,`${field} editor close`);
+  }
   const accountStyles=await waitPage(`(()=>{try{const root=getComputedStyle(document.documentElement);const header=document.querySelector('.accounts-workloads-grid th');const cell=document.querySelector('.accounts-workloads-grid tbody td');const toolbarElement=document.querySelector('.accounts-workloads-toolbar');if(!header||!cell||!toolbarElement)return false;const h=getComputedStyle(header);const c=getComputedStyle(cell);const important=document.querySelector('.accounts-workloads-grid tbody tr.is-important');const toolbar=getComputedStyle(toolbarElement);return {tokens:['--kap-grid-header-bg','--kap-grid-cell-bg','--kap-grid-border','--kap-grid-hover-bg','--kap-grid-selected-bg','--kap-grid-draft-bg','--kap-grid-draft-line','--kap-grid-reflected-bg','--kap-grid-highlight-bg'].map(k=>[k,root.getPropertyValue(k).trim()]),header:{background:h.backgroundColor,border:h.borderBottomColor},cell:{background:c.backgroundColor,border:c.borderBottomColor},highlight:important?getComputedStyle(important).backgroundColor:null,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.accounts-workloads-grid thead input[type=checkbox]'))};}catch{return false;}})()`,`accounts styles ready`);
   await navigate("/activity-a");
   const kpiStyles=await evaluate(`(()=>{const h=getComputedStyle(document.querySelector('.kpi-activities-table th'));const c=getComputedStyle(document.querySelector('.kpi-activities-table tr:not(.kpi-manage-time-reflected-row) td'));const reflected=getComputedStyle(document.querySelector('.kpi-manage-time-reflected-row'));const toolbar=getComputedStyle(document.querySelector('.kpi-activity-toolbar'));const icon=document.querySelector('.kpi-reflected-status-badge');const title=getComputedStyle(document.querySelector('.kpi-grid-sort-button'));return {header:{background:h.backgroundColor,border:h.borderBottomColor,title:title.color},cell:{background:c.backgroundColor,border:c.borderBottomColor},reflected:reflected.backgroundColor,toolbarGap:toolbar.gap,checkboxHeader:Boolean(document.querySelector('.kpi-activities-table thead input[type=checkbox]')),icon:{aria:icon.getAttribute('aria-label'),title:icon.getAttribute('title'),role:icon.getAttribute('role')}};})()`);
@@ -149,6 +164,6 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
   for(const item of footerMatrix){assert.ok(item.short.bottom<=1&&item.short.left<=1&&item.short.right<=1&&item.short.x<=1&&item.short.y<=1&&item.short.overlay===0,`short footer ${item.width} ${item.path}`);assert.ok(item.long.after&&item.long.left<=1&&item.long.right<=1&&item.long.x<=1&&item.long.scroll&&item.long.overlay===0,`long footer ${item.width} ${item.path}`);assert.deepEqual(item.runtime.errors,[]);assert.deepEqual(item.runtime.rejections,[]);}
   assert.equal(footerMatrix.length,52/2); // 13 routes x 2 viewports
   assert.deepEqual(exceptions,[]);
-  const evidence={addContract,accountSaveRequests:saveBodies.map(b=>({fiscalYear:b.creates?.[0]?.fiscalYear,creates:b.creates?.length})),accountStyles,kpiStyles,footerMatrixCount:footerMatrix.length,exceptions,errors:[],rejections:[]};
+  const evidence={addContract,accountSaveRequests:saveBodies.map(b=>({fiscalYear:b.creates?.[0]?.fiscalYear,creates:b.creates?.length})),accountEditorFocus,accountStyles,kpiStyles,footerMatrixCount:footerMatrix.length,exceptions,errors:[],rejections:[]};
   console.log(JSON.stringify(evidence,null,2)); cdp.close();
 })().catch(error=>{console.error(error.stack||error);process.exit(1);});

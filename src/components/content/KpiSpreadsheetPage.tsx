@@ -25,6 +25,7 @@ import {
   createEmptyKpiRow,
   formatKpiWorkloadOption,
   getKpiToolbarActions,
+  getReflectedSelectionAction,
   getMonthsForQuarter,
   getQuarterStatus,
   getRowsForQuarter,
@@ -466,7 +467,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? activeRows : activeRows.filter((row) => row.kpiCode === activeTab), [activeRows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
-  const showSummary = activeTab !== "Overview" && activeTab !== "A" && activeTab !== "H";
+  const showSummary = activeTab !== "Overview" && activeTab !== "A" && activeTab !== "F" && activeTab !== "H";
   const activeDrafts = useMemo(() => drafts.filter((draft) =>
     draft.fiscalYear === fiscalYear && (activeTab === "Overview" || draft.kpiCode === activeTab)), [drafts, fiscalYear, activeTab]);
   const fiscalYearDrafts = useMemo(() => drafts.filter((draft) => draft.fiscalYear === fiscalYear), [drafts, fiscalYear]);
@@ -689,6 +690,19 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const setRowSelection = useCallback((rowId: string, selected: boolean) => setSelectedIds((current) => {
     const next = new Set(current); if (selected) next.add(rowId); else next.delete(rowId); return next;
   }), [setSelectedIds]);
+  const activateSelectorCell = (event: KeyboardEvent, action: () => void) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== "Enter" && ![" ", "Space", "Spacebar"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation(); action();
+  };
+  const toggleVisibleSelectionFromCell = (event: MouseEvent) => {
+    if (event.target instanceof HTMLInputElement) return;
+    setVisibleSelection(selectableVisibleIds.length > 0 && selectableVisibleIds.every((id) => selectedIds.has(id)) ? [] : selectableVisibleIds);
+  };
+  const toggleRowSelectionFromCell = (event: MouseEvent, rowId: string) => {
+    if (event.target instanceof HTMLInputElement) return;
+    setRowSelection(rowId, !selectedIds.has(rowId));
+  };
 
   const applyManaged = (managed: boolean) => {
     if (saving || selectedRows.length === 0) return;
@@ -744,6 +758,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const activeDefinition = KPI_OVERVIEW_ROWS.find((row) => row.code === activeTab);
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
+  const reflectedAction = getReflectedSelectionAction(selectedRows);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
   const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected
     && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
@@ -934,8 +949,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
-          <button type="button" class="kpi-reflected-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(true)}>Mark reflected</button>
-          <button type="button" class="kpi-reflected-action" disabled={saving || selectedRows.length === 0} onClick={() => applyManaged(false)}>Mark not reflected</button>
+          {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={saving}
+            title={reflectedAction.label} aria-label={reflectedAction.label}
+            onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
@@ -975,8 +991,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
             {fields.map((field) => <col key={field.key} style={{ width: `${columnLayout.widths[field.key] ?? 112}px` }} />)}
           </colgroup>
           <thead><tr>
-            <th class="kpi-grid-column-header kpi-selector-cell" scope="col">
-              <div class="kpi-select-all-header" onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
+            <th class="kpi-grid-column-header kpi-selector-cell" scope="col" tabIndex={0}
+              aria-label="Toggle all visible KPI activities" onClick={toggleVisibleSelectionFromCell}
+              onKeyDown={(event) => activateSelectorCell(event, () => setVisibleSelection(selectableVisibleIds.length > 0 && selectableVisibleIds.every((id) => selectedIds.has(id)) ? [] : selectableVisibleIds))}>
+              <div class="kpi-select-all-header" onMouseDown={stopGridInteraction} onDblClick={stopGridInteraction}>
                 <KpiSelectAll availableIds={selectableVisibleIds} selectedIds={selectedIds} onSelectionChange={setVisibleSelection} />
               </div>
             </th>
@@ -995,8 +1013,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
           </tr></thead>
           <tbody>{visibleRows.map((row) => <tr key={`${tableScopeKey}:${row.id}`} data-kpi-row-id={row.id}
             class={[row.manageTimeReflected ? "kpi-manage-time-reflected-row" : "", selectedIds.has(row.id) ? "is-selected" : ""].filter(Boolean).join(" ")}>
-            <td class="kpi-grid-cell kpi-selector-cell" data-kpi-grid-row={row.id}
-              onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction} onKeyDown={stopGridInteraction}>
+            <td class="kpi-grid-cell kpi-selector-cell" data-kpi-grid-row={row.id} tabIndex={0}
+              aria-label={`Toggle selection for KPI activity ${row.id}`}
+              onClick={(event) => toggleRowSelectionFromCell(event, row.id)} onDblClick={stopGridInteraction}
+              onKeyDown={(event) => activateSelectorCell(event, () => setRowSelection(row.id, !selectedIds.has(row.id)))}>
               <KpiRowSelector rowId={row.id} selected={selectedIds.has(row.id)} onSelectionChange={(selected) => setRowSelection(row.id, selected)} />
             </td>
             {fields.map((field) => renderNativeCell(row, field))}

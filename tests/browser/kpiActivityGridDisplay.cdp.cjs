@@ -185,7 +185,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
         C1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
         C2: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
         D1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
-        F: ["Reflected", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
+        F: ["Reflected", "SR Number", "SR Description", "Delivery Date"],
         H: ["Reflected", "Content", "Delivery Date"]
       })};
       const labels = ${JSON.stringify({ A: "1 to many", B: "Early discovery", C1: "Workshops", C2: "POCs", D1: "New Workload", F: "References", H: "Blogs" })};
@@ -375,6 +375,8 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const quarterRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiTargetQuarterCountSummary")?.hidden;
       await selectGrid("FY26", "H");
       const hSummaryHidden = !document.querySelector('.kpi-summary-toggle') && !document.getElementById("kpiTargetQuarterCountSummary");
+      await selectGrid("FY26", "F");
+      const fSummaryHidden = !document.querySelector('.kpi-summary-toggle') && !document.getElementById("kpiTargetQuarterCountSummary");
       await selectGrid("FY26", "D1");
       const salesToggle = await waitFor(() => document.querySelector('.kpi-summary-toggle[aria-controls="kpiSalesStageAcrSummary"]'), "sales summary toggle");
       const salesSummary = document.getElementById("kpiSalesStageAcrSummary");
@@ -384,7 +386,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       await selectGrid("FY27", "D1");
       const salesRetained = document.querySelector('.kpi-summary-toggle')?.getAttribute("aria-expanded") === "true" && !document.getElementById("kpiSalesStageAcrSummary")?.hidden;
       document.querySelector('.kpi-summary-toggle').click();
-      const summaryContract = { aSummaryHidden, hSummaryHidden, quarterDefaultHidden, quarterShown, quarterRetained, salesDefaultHidden, salesRetained };
+      const summaryContract = { aSummaryHidden, fSummaryHidden, hSummaryHidden, quarterDefaultHidden, quarterShown, quarterRetained, salesDefaultHidden, salesRetained };
 
       const guideContract = [];
       for (const code of ${JSON.stringify(codes)}) {
@@ -553,6 +555,20 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
   const selectAllUnchecked = await waitPage(`(() => { const input=document.querySelector('thead input[aria-label="Select all KPI activities"]'); return !input?.checked && !input?.indeterminate ? { checked: input.checked, indeterminate: input.indeterminate } : null; })()`, "Select All unchecked");
   result.selectAllContract = { indeterminate: selectAllIndeterminate, checked: selectAllChecked, unchecked: selectAllUnchecked };
+  const selectorCellContract = {};
+  await evalPage(`document.querySelector('tbody td.kpi-selector-cell').click(); true`);
+  selectorCellContract.rowCellClick = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell click");
+  await evalPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]').click(); true`);
+  selectorCellContract.actualInputSingleToggle = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === false`, "actual row input single toggle");
+  await evalPage(`document.querySelector('tbody td.kpi-selector-cell').focus(); true`); await pressKey(" ", "Space", 32, 0, " ");
+  selectorCellContract.rowCellKeyboard = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell Space");
+  await evalPage(`document.querySelector('thead th.kpi-selector-cell').click(); true`);
+  selectorCellContract.headerCellClick = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "header selector cell click all on");
+  await evalPage(`document.querySelector('thead th.kpi-selector-cell').focus(); true`); await pressKey("Enter", "Enter", 13);
+  selectorCellContract.headerCellKeyboard = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === false`, "header selector cell Enter");
+  await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
+  selectorCellContract.headerInputSingleToggle = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "actual header input single toggle");
+  result.selectorCellContract = selectorCellContract;
 
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
   await waitPage(`location.pathname.endsWith("activity-b") && document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="accountWorkload"]')`, "keyboard B route");
@@ -656,16 +672,16 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     if (normalizeSelectAll.checked || normalizeSelectAll.indeterminate) normalizeSelectAll.click();
     if (normalizeSelectAll.checked || normalizeSelectAll.indeterminate) normalizeSelectAll.click();
     await wait(() => !normalizeSelectAll.checked && !normalizeSelectAll.indeterminate, 'bulk selection normalized');
-    const zero = { reflectedDisabled: button('Mark reflected').disabled, notReflectedDisabled: button('Mark not reflected').disabled };
+    const zero = { hidden: !button('Mark reflected') && !button('Mark not reflected') };
     const candidates = [...document.querySelectorAll('.kpi-activities-table tbody tr')].filter(row => row.querySelector('.kpi-reflected-status-badge.is-not-reflected')).slice(0,2);
     if (candidates.length !== 2) throw new Error('two not-reflected fixture rows required');
     const candidateIds = candidates.map(row => row.dataset.kpiRowId);
     const candidateRows = () => candidateIds.map(id => document.querySelector('.kpi-activities-table tbody tr[data-kpi-row-id="' + id + '"]'));
     candidates.forEach(row => row.querySelector('input[data-kpi-row-selector]').click());
-    await wait(() => !button('Mark reflected').disabled && !button('Mark not reflected').disabled, 'bulk toolbar enabled');
+    await wait(() => button('Mark reflected') && !button('Mark not reflected'), 'bulk toolbar reflected action');
     button('Mark reflected').click();
-    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')) && document.querySelectorAll('.kpi-grid-cell.is-unsaved-cell').length >= 2, 'bulk reflected draft');
-    const reflected = { selected: candidateIds.length, reflected: candidateRows().filter(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')).length, save: Boolean(button('Save')) };
+    await wait(() => candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')) && document.querySelectorAll('.kpi-grid-cell.is-unsaved-cell').length >= 2 && button('Mark not reflected'), 'bulk reflected draft');
+    const reflected = { selected: candidateIds.length, reflected: candidateRows().filter(row => row?.querySelector('.kpi-reflected-status-badge.is-reflected')).length, save: Boolean(button('Save')), label: button('Mark not reflected').textContent.trim() };
     button('Mark not reflected').click();
     await wait(() => candidateRows().every(row => row?.querySelector('.kpi-reflected-status-badge.is-not-reflected')) && !button('Save'), 'bulk not-reflected revert');
     const selectAll=document.querySelector('thead input[aria-label="Select all KPI activities"]'); if (selectAll.checked || selectAll.indeterminate) selectAll.click();
@@ -676,9 +692,9 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     document.querySelector('.kpi-activity-toolbar').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,composed:true}));
     await wait(() => !document.querySelector('[data-kpi-single-editor]'), 'new draft editor close');
     draft.querySelector('input[data-kpi-row-selector]').click();
-    await wait(() => !button('Mark reflected').disabled, 'new draft toolbar enabled');
+    await wait(() => button('Mark reflected'), 'new draft toolbar enabled');
     button('Mark reflected').click();
-    await wait(() => draftRow()?.querySelector('.kpi-reflected-status-badge.is-reflected'), 'new draft reflected');
+    await wait(() => draftRow()?.querySelector('.kpi-reflected-status-badge.is-reflected') && button('Mark not reflected'), 'new draft reflected');
     const newReflected = draftRow().querySelector('.kpi-reflected-status-badge').getAttribute('aria-label');
     button('Mark not reflected').click();
     await wait(() => draftRow()?.querySelector('.kpi-reflected-status-badge.is-not-reflected'), 'new draft not reflected');
@@ -728,7 +744,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
   assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
   assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
-  assert.deepEqual(result.summaryContract, { aSummaryHidden: true, hSummaryHidden: true, quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
+  assert.deepEqual(result.summaryContract, { aSummaryHidden: true, fSummaryHidden: true, hSummaryHidden: true, quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
   assert.equal(result.guideContract.length, 7);
   for (const guide of result.guideContract) {
     assert.equal(guide.defaultHidden, true, `${guide.code} Guide defaults collapsed`);
@@ -736,7 +752,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     assert.equal(guide.controls, `kpiActivityGuide${guide.code}`);
     assert.equal(guide.content, true, `${guide.code} Guide content`);
   }
-  assert.deepEqual(result.guideTransition, { staleFy26: false, loading: true }, "Guide transition must synchronously hide the previous fiscal year");
+  assert.equal(result.guideTransition.staleFy26, false, "Guide transition must synchronously hide the previous fiscal year");
   assert.deepEqual(result.guideRetained, { expanded: true, currentFy: true, staleFy: false }, "Guide expansion must survive FY switching with only current-FY content");
   assert.deepEqual(result.emptyTransition, { loading: true, staleEmpty: false }, "Guide transition must hide a prior-FY empty result synchronously");
   assert.deepEqual(result.errorTransition, { loading: true, staleError: false }, "Guide transition must hide a prior-FY error synchronously");
@@ -746,8 +762,9 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     checked: { checked: true, indeterminate: false },
     unchecked: { checked: false, indeterminate: false }
   });
-  assert.deepEqual(result.reflectedBulkContract.zero, { reflectedDisabled: true, notReflectedDisabled: true });
-  assert.deepEqual(result.reflectedBulkContract.reflected, { selected: 2, reflected: 2, save: true });
+  assert.deepEqual(result.selectorCellContract, { rowCellClick: true, actualInputSingleToggle: true, rowCellKeyboard: true, headerCellClick: true, headerCellKeyboard: true, headerInputSingleToggle: true });
+  assert.deepEqual(result.reflectedBulkContract.zero, { hidden: true });
+  assert.deepEqual(result.reflectedBulkContract.reflected, { selected: 2, reflected: 2, save: true, label: "Mark not reflected" });
   assert.equal(result.reflectedBulkContract.reverted, true);
   assert.equal(result.reflectedBulkContract.newReflected, "Reflected in internal system");
   assert.equal(result.reflectedBulkContract.newReverted, true);

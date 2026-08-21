@@ -9,6 +9,7 @@ import {
   formatKpiWorkloadOption,
   getSelectedKpiRowIds,
   getKpiToolbarActions,
+  getReflectedSelectionAction,
   getQuarterStatus,
   getRowsForQuarter,
   isD1QuarterAchieved,
@@ -28,7 +29,7 @@ assert.deepEqual(getKpiToolbarActions(0, 2), ["delete"], "selection-only must ex
 for (const code of KPI_TABS.filter((tab) => tab !== "Overview")) {
   const fields = KPI_FIELD_CONTRACTS[code];
   assert.equal(fields[0]?.key, "manageTimeReflected", `${code} Manage Time must be first`);
-  if (code !== "A" && code !== "H") assert.equal(fields[fields.length - 2]?.key, code === "D1" ? "targetQuarter" : "quarter", `${code} Target Quarter must be before Delivery Date`);
+  if (!["A", "F", "H"].includes(code)) assert.equal(fields[fields.length - 2]?.key, code === "D1" ? "targetQuarter" : "quarter", `${code} Target Quarter must be before Delivery Date`);
   assert.equal(fields[fields.length - 1]?.key, "deliveryDate", `${code} Delivery Date must be final`);
   assert.equal(createEmptyKpiRow(code, "FY27").kpiCode, code);
 }
@@ -42,6 +43,7 @@ assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflec
 assert.equal(KPI_FIELD_CONTRACTS.A.some((item) => item.key === "quarter"), false, "A Target Quarter is UI-hidden");
 assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H SR Number is UI-hidden");
 assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "quarter" || item.key === "targetQuarter"), false, "H Target Quarter is UI-hidden");
+assert.equal(KPI_FIELD_CONTRACTS.F.some((item) => item.key === "quarter" || item.key === "targetQuarter"), false, "F Target Quarter is UI-hidden");
 assert.equal(KPI_FIELD_CONTRACTS.H.find((item) => item.key === "title")?.type, "textarea", "H Content must reuse the truncated long-text behavior");
 
 assert.equal(fiscalQuarterFromDeliveryDate("2026-06-01"), "Q1");
@@ -114,5 +116,10 @@ assert.deepEqual(bulkManaged.map((row) => [row.id, row.manageTimeReflected]), [[
   "existing and new rows are updated together while preserving draft order");
 assert.deepEqual(applyManagedToSelection([existingManaged], [{ ...existingManaged, manageTimeReflected: true }], [existingManaged.id], false), [],
   "reverting an existing row to its saved state removes the draft");
+assert.equal(getReflectedSelectionAction([]), null, "zero selection hides the reflected action");
+assert.deepEqual(getReflectedSelectionAction([{ ...existingManaged, manageTimeReflected: true }]), { managed: false, label: "Mark not reflected" });
+assert.deepEqual(getReflectedSelectionAction([{ ...existingManaged, manageTimeReflected: false }]), { managed: true, label: "Mark reflected" });
+assert.deepEqual(getReflectedSelectionAction([{ ...existingManaged, manageTimeReflected: true }, { ...newManaged, manageTimeReflected: false }]), { managed: true, label: "Mark reflected" },
+  "mixed selection converges to Reflected");
 
 console.log("kpiSpreadsheet tests passed");

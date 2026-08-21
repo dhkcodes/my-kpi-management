@@ -23,7 +23,7 @@ export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]
   C1: [...related, targetQuarter, delivery],
   C2: [...related, targetQuarter, delivery],
   D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
-  F: [...base, targetQuarter, delivery],
+  F: [...base, delivery],
   H: [manageTime, field("title", "Content", "textarea"), delivery]
 };
 
@@ -132,6 +132,12 @@ export const applyManagedToSelection = (
     if (isKpiRowChanged(saved, updated, KPI_FIELD_CONTRACTS[updated.kpiCode])) next.push(updated);
   }
   return next;
+};
+
+export const getReflectedSelectionAction = (selectedRows: readonly KpiSpreadsheetRow[]) => {
+  if (selectedRows.length === 0) return null;
+  const managed = !selectedRows.every((row) => row.manageTimeReflected);
+  return { managed, label: managed ? "Mark reflected" : "Mark not reflected" } as const;
 };
 
 type JetRowKeySet = Readonly<{

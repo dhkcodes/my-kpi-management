@@ -464,6 +464,23 @@ export function AccountsWorkloadsPage({
     setEditCell(null);
   };
 
+  useEffect(() => {
+    if (!editCell) return;
+    const frame = window.requestAnimationFrame(() => {
+      const cell = document.querySelector<HTMLElement>(
+        `[data-account-row-id="${CSS.escape(editCell.id)}"] [data-account-field="${CSS.escape(editCell.field)}"]`
+      );
+      const editor = cell?.querySelector<HTMLElement>(".accounts-workloads-edit-field");
+      if (!editor) return;
+      editor.focus();
+      if (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) {
+        const value = editor.value;
+        if (editor.type !== "number") editor.setSelectionRange(value.length, value.length);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editCell]);
+
   const submitSearch = () => {
     onQueryChange({ ...query, search: searchTerm, includeDeleted, sort: sortField, direction: sortDirection });
   };
@@ -597,6 +614,16 @@ export function AccountsWorkloadsPage({
   const requestDelete = () => {
     const targets = classifyAccountDeleteTargets(rows, selectedActionIds, addingRow?.id);
     if (targets.draftIds.length + targets.activeIds.length + targets.permanentIds.length === 0) return;
+    if (targets.draftIds.length > 0) {
+      setAddingRow(null);
+      setSelectedRowIds((current) => current.filter((id) => !targets.draftIds.includes(id)));
+    }
+    const remainingSavedTargets = targets.activeIds.length + targets.permanentIds.length;
+    if (remainingSavedTargets === 0) {
+      setDeleteTargets(null);
+      restoreDeleteLauncherFocus();
+      return;
+    }
     setDeleteTargets(targets);
   };
 
@@ -607,16 +634,9 @@ export function AccountsWorkloadsPage({
   const confirmDelete = async () => {
     if (!deleteTargets) return;
     const { draftIds, activeIds, permanentIds } = deleteTargets;
-    if (activeIds.length === 0 && permanentIds.length === 0) {
-      if (draftIds.length > 0) setAddingRow(null);
-      setSelectedRowIds((current) => current.filter((id) => !draftIds.includes(id)));
-      setDeleteTargets(null);
-      return;
-    }
     const nextRows = applyDraftDelete(rows, activeIds, "current-user", new Date().toISOString());
     const success = await runImmediateRowsAction(nextRows, permanentIds);
     if (!success) return;
-    if (draftIds.length > 0) setAddingRow(null);
     const removedIds = new Set([...draftIds, ...activeIds, ...permanentIds]);
     setSelectedRowIds((current) => current.filter((id) => !removedIds.has(id)));
     setDeleteTargets(null);
@@ -628,13 +648,11 @@ export function AccountsWorkloadsPage({
     if (success) setSelectedRowIds([]);
   };
 
-  const deleteDialogTitle = deleteTargets?.draftIds.length && !deleteTargets.activeIds.length && !deleteTargets.permanentIds.length
-    ? "Delete unsaved Draft?"
-    : deleteTargets?.permanentIds.length && !deleteTargets.activeIds.length && !deleteTargets.draftIds.length
+  const deleteDialogTitle = deleteTargets?.permanentIds.length && !deleteTargets.activeIds.length
       ? "Permanently delete saved row?"
       : "Delete selected rows?";
-  const deleteDialogMessage = deleteTargets?.draftIds.length && !deleteTargets.activeIds.length && !deleteTargets.permanentIds.length
-    ? "This unsaved Draft will be removed locally. No API request will be made."
+  const deleteDialogMessage = deleteTargets?.draftIds.length
+    ? "The selected unsaved Draft was already removed locally and will not be restored if you cancel. Confirm deletion of the remaining saved row(s)."
     : deleteTargets?.permanentIds.length
       ? "Saved deleted rows will be permanently removed. This action cannot be undone."
       : "Saved active rows will be moved to deleted records immediately.";
@@ -690,7 +708,8 @@ export function AccountsWorkloadsPage({
       isChanged ? "is-unsaved-cell" : ""
     ].filter(Boolean).join(" ");
     return (
-      <td data-account-field={field} class={cellClass || undefined} onDblClick={() => setEditCell({ id: row.id, field })}>
+      <td data-account-field={field} class={cellClass || undefined}
+        onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); setEditCell({ id: row.id, field }); }}>
         {isEditing ? (
           <EditableCell row={row} field={field} value={value} onChange={updateDraftCell} onCommit={commitActiveCell} />
         ) : field === "latestUpdate" ? (

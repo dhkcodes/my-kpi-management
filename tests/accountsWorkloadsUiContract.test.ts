@@ -30,8 +30,12 @@ assert.match(page, /onojOpen=\{focusDeleteCancel\}/,
   "the least destructive dialog action receives initial focus");
 assert.match(page, /cancelBehavior="escape"/, "Escape closes the modal confirmation");
 assert.match(page, /restoreDeleteLauncherFocus/, "dialog close restores focus to the launcher or stable Add Account fallback");
-assert.match(page, /draftIds\.length > 0[\s\S]*setAddingRow\(null\)/,
-  "confirming an unsaved Draft delete removes it locally");
+assert.match(page, /const requestDelete = \(\) => \{[\s\S]*targets\.draftIds\.length > 0[\s\S]*setAddingRow\(null\)[\s\S]*remainingSavedTargets/,
+  "Delete removes an unsaved Draft immediately before any saved-row confirmation");
+assert.match(page, /if \(remainingSavedTargets === 0\)[\s\S]*return;/,
+  "Draft-only delete returns without opening a dialog or calling the API");
+assert.match(page, /The selected unsaved Draft was already removed locally and will not be restored if you cancel/,
+  "mixed delete confirmation clearly states that Cancel does not restore the Draft");
 assert.match(app, /accountsWorkloadsDataSource !== "api"[\s\S]{0,300}applyPermanentDeletesLocally\(rows, permanentDeleteIds\)[\s\S]{0,300}items: localRows[\s\S]{0,200}total: localRows\.length[\s\S]{0,300}\[fiscalYear\]: localRows/,
   "the local/fallback adapter removes confirmed permanent targets from both its authoritative response and parent state");
 assert.doesNotMatch(page, /\{deleteMode ===|Selected rows:/, "dynamic top-action delete labels and selected count are absent");
@@ -117,6 +121,12 @@ const deleteAt = page.indexOf(">Delete</oj-button>", highlightAt);
 assert.ok(addAt < saveAt && saveAt < cancelAt && cancelAt < highlightAt && highlightAt < deleteAt,
   "toolbar source order is Add Account, Save, Cancel, Highlight, Delete");
 assert.doesNotMatch(page, /accounts-workloads-footer-actions/, "Save/Cancel no longer appear in a separate footer action bar");
+assert.match(page, /useEffect\(\(\) => \{[\s\S]*editCell[\s\S]*CSS\.escape\(editCell\.id\)[\s\S]*CSS\.escape\(editCell\.field\)[\s\S]*focus\(\)/,
+  "double-click editing focuses the real editor mounted in the selected cell");
+assert.match(page, /setSelectionRange\(value\.length, value\.length\)/,
+  "text editors place a visible caret at the latest value");
+assert.match(page, /onDblClick=\{\(event\) => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setEditCell\(\{ id: row\.id, field \}\); \}\}/,
+  "editable cells alone enter edit mode on double click");
 
 assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
   "the common App shell owns short-content Footer placement for every route");

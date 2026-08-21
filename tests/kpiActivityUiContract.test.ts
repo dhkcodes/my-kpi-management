@@ -23,7 +23,7 @@ assert.match(page, /<td key=\{field\.key\} class=\{classes\} data-kpi-grid-row=\
 assert.doesNotMatch(page, /onojBeforeEdit|onojBeforeEditEnd|_WIDGET_INSTANCE|_ojBridge|resizeColWidth/);
 assert.match(page, /inputRef\.current\.indeterminate = selectedCount > 0 && !allSelected/,
   "the native select-all control must reflect the page-owned selection model");
-assert.match(page, /<th class="kpi-grid-column-header kpi-selector-cell" scope="col">[\s\S]*?<div class="kpi-select-all-header"/,
+assert.match(page, /<th class="kpi-grid-column-header kpi-selector-cell" scope="col" tabIndex=\{0\}[\s\S]*?<div class="kpi-select-all-header"/,
   "Select All must share the data-column header surface and keep its checkbox in the centered wrapper");
 assert.match(page, /selected=\{selectedIds\.has\(row\.id\)\}/,
   "native row selectors must be controlled by scoped selection state");
@@ -152,8 +152,18 @@ assert.match(page, /kpi-quarter-status-label--in-progress/);
 assert.match(page, /kpi-quarter-status-label--not-started/);
 assert.doesNotMatch(page, />Edit</);
 assert.doesNotMatch(page, />Refresh</);
-assert.match(page, />Mark reflected</, "selection toolbar exposes bulk reflected action");
-assert.match(page, />Mark not reflected</, "selection toolbar exposes bulk not-reflected action");
+assert.match(page, /reflectedAction &&[\s\S]*aria-label=\{reflectedAction\.label\}[\s\S]*>\{reflectedAction\.label\}<\/button>/,
+  "selection toolbar exposes one context-aware reflected action");
+assert.doesNotMatch(page, /onClick=\{\(\) => applyManaged\(true\)\}[\s\S]{0,180}onClick=\{\(\) => applyManaged\(false\)\}/,
+  "separate reflected and not-reflected buttons are removed");
+assert.match(page, /class="kpi-grid-column-header kpi-selector-cell"[\s\S]{0,900}onClick=\{toggleVisibleSelectionFromCell\}/,
+  "the whole selector header cell toggles all visible rows");
+assert.match(page, /class="kpi-grid-cell kpi-selector-cell"[\s\S]{0,900}onClick=\{\(event\) => toggleRowSelectionFromCell\(event, row\.id\)\}/,
+  "the whole row selector cell toggles its row");
+assert.match(page, /event\.target instanceof HTMLInputElement/,
+  "native checkbox bubbling is ignored to prevent double toggles");
+assert.match(page, /event\.key !== "Enter" && !\[" ", "Space", "Spacebar"\]\.includes\(event\.key\)/,
+  "selector cell keyboard contract supports Enter and Space");
 assert.match(page, /aria-label=\{row\.manageTimeReflected \? "Reflected in internal system" : "Not reflected in internal system"\}/,
   "cells expose accessible final-reflection status");
 assert.match(page, /kpi-reflected-status-badge/, "cells use a composed Redwood-aligned status badge");
