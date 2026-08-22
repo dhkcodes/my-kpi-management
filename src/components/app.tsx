@@ -44,6 +44,9 @@ import {
 } from "./weeklyActivityNavigationGuard";
 import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
 import { applyPermanentDeletesLocally } from "../data/accountsWorkloadsSelection";
+import { listKpiSummary } from "../data/kpiSpreadsheetApi";
+import { buildLiveFiscalYearDataset } from "../data/kpiLiveDashboard";
+import { FiscalYearDataset } from "../data/kpiCalculations";
 import {
   fetchFxRate,
   fetchKpiGuides,
@@ -148,6 +151,9 @@ export const App = registerCustomElement(
     const [fxLoading, setFxLoading] = useState(false);
 
     const [fxError, setFxError] = useState("");
+    const [liveKpiDataset, setLiveKpiDataset] = useState<FiscalYearDataset | null>(null);
+    const [kpiDatasetLoading, setKpiDatasetLoading] = useState(false);
+    const [kpiDatasetError, setKpiDatasetError] = useState("");
     const [accountsWorkloadsAsOf] = useState(() => getBusinessAsOfDate());
     const [accountWorkloadMetadata, setAccountWorkloadMetadata] = useState<AccountWorkloadMetadata>(defaultAccountWorkloadMetadata);
     const [accountsWorkloadsDataSource, setAccountsWorkloadsDataSource] = useState<AccountsWorkloadsDataSource>("synthetic-fallback");
@@ -220,6 +226,19 @@ export const App = registerCustomElement(
         .finally(() => { if (active) setFxLoading(false); });
       return () => { active = false; };
     }, [fiscalYear]);
+
+    useEffect(() => {
+      if (activeRoute.module !== "home") return;
+      let active = true;
+      setLiveKpiDataset(null);
+      setKpiDatasetLoading(true);
+      setKpiDatasetError("");
+      void listKpiSummary(fiscalYear)
+        .then((summary) => { if (active) setLiveKpiDataset(buildLiveFiscalYearDataset(summary, fiscalYearData[fiscalYear])); })
+        .catch((error) => { if (active) setKpiDatasetError(error instanceof Error ? error.message : "KPI Overview API request failed."); })
+        .finally(() => { if (active) setKpiDatasetLoading(false); });
+      return () => { active = false; };
+    }, [activeRoute.module, fiscalYear]);
 
     useEffect(() => {
       let active = true;
@@ -585,6 +604,9 @@ export const App = registerCustomElement(
             onAccountsWorkloadsRefresh={() => void handleAccountsWorkloadsRefresh()}
             accountWorkloadMetadata={accountWorkloadMetadata}
             dataset={fiscalYearData[fiscalYear]}
+            kpiDataset={liveKpiDataset}
+            kpiDatasetLoading={kpiDatasetLoading}
+            kpiDatasetError={kpiDatasetError}
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}

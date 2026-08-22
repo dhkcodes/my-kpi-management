@@ -928,6 +928,27 @@ export function AccountsWorkloadsPage({
             </tr>
           </thead>
           <tbody>
+            {addingRow && (
+              <tr key={addingRow.id} data-account-row-id={addingRow.id} class="is-adding-row">
+                <td class="is-sticky accounts-workloads-selection-col"><input type="checkbox" checked={selectedRowIds.includes(addingRow.id)} onChange={() => toggleSelection(addingRow.id)} aria-label="Select unsaved Draft account" /></td>
+                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">—</td>
+                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center"></td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("account", "Account *")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("workloadName", "Workload *")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("opptyNo", "Oppty")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("startDate", "Start", "date")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("endDate", "End", "date")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("arrUsd", "USD", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("arrKrw", "KRW", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("acrUsd", "USD", "number")}</td>
+                <td class="accounts-workloads-cell--right">{renderAddInput("acrKrw", "KRW", "number")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("target", "FY27 Q1")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("winProbability", "%", "number")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
+                <td class="accounts-workloads-cell--left">{renderAddInput("notes", "Notes", "textarea")}</td>
+              </tr>
+            )}
             {visibleRows.map((row, index) => (
               <tr key={row.id} data-row-id={row.id} data-account-row-id={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
                 <td class="is-sticky accounts-workloads-selection-col">
@@ -956,29 +977,7 @@ export function AccountsWorkloadsPage({
                 <td colSpan={17}>No accounts or workloads match the current filters.</td>
               </tr>
             )}
-            {addingRow && (
-              <tr data-account-row-id={addingRow.id} class="is-adding-row">
-                <td class="is-sticky accounts-workloads-selection-col">
-                  <input type="checkbox" checked={selectedRowIds.includes(addingRow.id)} onChange={() => toggleSelection(addingRow.id)} aria-label="Select unsaved Draft account" />
-                </td>
-                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">—</td>
-                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center"></td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("account", "Account *")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("workloadName", "Workload *")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("opptyNo", "Oppty")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("startDate", "Start", "date")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("endDate", "End", "date")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("arrUsd", "USD", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("arrKrw", "KRW", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("acrUsd", "USD", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("acrKrw", "KRW", "number")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("target", "FY27 Q1")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("winProbability", "%", "number")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("notes", "Notes", "textarea")}</td>
-              </tr>
-            )}
+
           </tbody>
         </table>
       </div>

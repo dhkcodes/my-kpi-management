@@ -20,7 +20,6 @@ import {
   transitionKpiActivityEdit
 } from "../../data/kpiActivityGridModel";
 import {
-  buildKpiSummary,
   applyManagedToSelection,
   createEmptyKpiRow,
   formatKpiWorkloadOption,
@@ -29,7 +28,6 @@ import {
   getMonthsForQuarter,
   getQuarterStatus,
   getRowsForQuarter,
-  isD1QuarterAchieved,
   isKpiDraftInvalid,
   isKpiFieldChanged,
   isKpiRowChanged,
@@ -41,10 +39,12 @@ import {
 } from "../../data/kpiSpreadsheet";
 import {
   deleteKpiRow,
+  KpiActivitySummary,
   KpiOverviewItem,
   KpiWorkloadOption,
   listKpiOverview,
   listKpiRows,
+  listKpiSummary,
   listKpiWorkloadOptions,
   saveKpiRowsAtomic
 } from "../../data/kpiSpreadsheetApi";
@@ -53,13 +53,12 @@ import {
   getKpiTabForRoute,
   KPI_ACTIVITY_TABS,
   KPI_OVERVIEW_ROWS,
-  KPI_QUARTER_COUNT_TARGETS
+  KPI_PORTFOLIO_ROWS
 } from "../../data/kpiWorkspaceDefinition";
 
 const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
 const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
 const stageLabels: Record<WorkloadStage, string> = { identified: "Identified", validated: "Validated", onboarded: "Onboarded" };
-const stageTargets: Record<WorkloadStage, number> = { identified: 2000, validated: 1000, onboarded: 500 };
 const activities = ["Solution Design", "Solution Proposal", "Solution Deployment"];
 const collapsedKpiState = (): Record<SpreadsheetKpiCode, boolean> => ({
   A: false,
@@ -131,8 +130,8 @@ function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
   </nav>;
 }
 
-function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter, id, expanded }: Readonly<{
-  rows: KpiSpreadsheetRow[];
+function Summary({ summary, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter, id, expanded }: Readonly<{
+  summary: KpiActivitySummary | null;
   tab: SpreadsheetKpiCode;
   fiscalYear: FiscalYear;
   asOf: string;
@@ -141,28 +140,34 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   id: string;
   expanded: boolean;
 }>) {
-  const summary = buildKpiSummary(rows);
+  if (!summary) return <section id={id} class="kpi-sheet-summary" hidden={!expanded}><p role="status">Delivery summary is unavailable.</p></section>;
   const statusFor = (quarter: Quarter) => {
-    if (tab === "D1") return getQuarterStatus(fiscalYear, quarter, isD1QuarterAchieved(summary.d1[quarter]) ? 1 : 0, 1, asOf);
-    if (tab === "C1" || tab === "C2") {
-      const combined = summary.c1c2Combined[quarter];
-      return getQuarterStatus(fiscalYear, quarter, combined.actual, combined.target, asOf);
+    if (tab === "D1") {
+      const actual = summary.d1QuarterByStage[quarter];
+      const achieved = stages.some((stage) => actual[stage.toUpperCase() as keyof typeof actual].acrK >= summary.targets.d1AcrKPerQuarter[stage.toUpperCase() as keyof typeof summary.targets.d1AcrKPerQuarter]);
+      return getQuarterStatus(fiscalYear, quarter, achieved ? 1 : 0, 1, asOf);
     }
-    return getQuarterStatus(fiscalYear, quarter, summary.quarterly[tab][quarter], KPI_QUARTER_COUNT_TARGETS[tab as keyof typeof KPI_QUARTER_COUNT_TARGETS] ?? 1, asOf);
+    if (tab === "C1" || tab === "C2") {
+      const actual = summary.quarterCounts.C1[quarter] + summary.quarterCounts.C2[quarter];
+      return getQuarterStatus(fiscalYear, quarter, actual, summary.targets.c1C2CombinedPerQuarter, asOf);
+    }
+    const target = summary.targets.countPerQuarter[tab as keyof typeof summary.targets.countPerQuarter];
+    return getQuarterStatus(fiscalYear, quarter, summary.quarterCounts[tab][quarter], target, asOf);
   };
   const cardClass = (quarter: Quarter, base: string) => `${base}${selectedQuarter === quarter ? " is-selected" : ""}`;
   if (tab === "D1") {
     return <section id={id} class="kpi-sheet-summary" aria-labelledby="kpiD1Summary" hidden={!expanded}>
-      <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K</small></h3></div>
+      <div class="kpi-sheet-summary__heading"><h3 id="kpiD1Summary">Sales Stage ACR <small>USD K by Delivery Quarter</small></h3></div>
       <div class="kpi-d1-progress-grid" aria-label="Sales Stage ACR USD K by Delivery Date fiscal quarter">
         {quarters.map((quarter) => {
           const status = statusFor(quarter);
           return <button type="button" class={cardClass(quarter, "kpi-d1-progress-quarter")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
             <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
             {stages.map((stage) => {
-              const actual = summary.d1[quarter][stage];
-              const target = stageTargets[stage];
-              const percent = Math.min(100, Math.round((actual / target) * 100));
+              const apiStage = stage.toUpperCase() as keyof KpiActivitySummary["targets"]["d1AcrKPerQuarter"];
+              const actual = summary.d1QuarterByStage[quarter][apiStage].acrK;
+              const target = summary.targets.d1AcrKPerQuarter[apiStage];
+              const percent = target === 0 ? 100 : Math.min(100, Math.round((actual / target) * 100));
               return <span class="kpi-d1-progress-item">
                 <span class="kpi-d1-progress-label"><span>{stageLabels[stage]}</span><strong>{actual.toLocaleString()} / {target.toLocaleString()}K</strong></span>
                 <span class="kpi-d1-progress-track" role="progressbar" aria-label={`${quarter} ${stageLabels[stage]} ${actual} of ${target}K`} aria-valuemin={0} aria-valuemax={target} aria-valuenow={actual}>
@@ -177,13 +182,16 @@ function Summary({ rows, tab, fiscalYear, asOf, selectedQuarter, onSelectQuarter
   }
   const combined = tab === "C1" || tab === "C2";
   return <section id={id} class="kpi-sheet-summary" aria-labelledby="kpiQuarterSummary" hidden={!expanded}>
-    <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Target Quarter count</h3></div>
+    <div class="kpi-sheet-summary__heading"><h3 id="kpiQuarterSummary">Delivery Quarter Count</h3></div>
     <div class="kpi-quarter-summary">{quarters.map((quarter) => {
-      const actual = combined ? summary.c1c2Combined[quarter].actual : summary.quarterly[tab][quarter];
+      const c1 = summary.quarterCounts.C1[quarter];
+      const c2 = summary.quarterCounts.C2[quarter];
+      const actual = combined ? c1 + c2 : summary.quarterCounts[tab][quarter];
       const status = statusFor(quarter);
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
         <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
-        <b class={`kpi-quarter-count-label ${quarterStatusClass(status)}`}>{actual}</b>{combined && <small>C1 + C2 reflected</small>}
+        <b class={`kpi-quarter-count-label ${quarterStatusClass(status)}`}>{actual}</b>
+        {combined && <small>C1 + C2 combined · C1 {c1} + C2 {c2} · target {summary.targets.c1C2CombinedPerQuarter}</small>}
       </button>;
     })}</div>
   </section>;
@@ -431,6 +439,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const tableScopeKey = `${fiscalYear}:${activeTab}`;
   const [rows, setRows] = useState<KpiSpreadsheetRow[]>([]);
   const [overviewItems, setOverviewItems] = useState<KpiOverviewItem[]>([]);
+  const [activitySummary, setActivitySummary] = useState<KpiActivitySummary | null>(null);
   const [selectionByScope, setSelectionByScope] = useState<Record<string, Set<string>>>({});
 
   const [drafts, setDrafts] = useState<KpiSpreadsheetRow[]>([]);
@@ -470,19 +479,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? activeRows : activeRows.filter((row) => row.kpiCode === activeTab), [activeRows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
-  const showSummary = activeTab !== "Overview" && activeTab !== "A" && activeTab !== "F" && activeTab !== "H";
+  const showSummary = activeTab !== "Overview";
   const activeDrafts = useMemo(() => drafts.filter((draft) =>
     draft.fiscalYear === fiscalYear && (activeTab === "Overview" || draft.kpiCode === activeTab)), [drafts, fiscalYear, activeTab]);
-  const fiscalYearDrafts = useMemo(() => drafts.filter((draft) => draft.fiscalYear === fiscalYear), [drafts, fiscalYear]);
   const draftById = useMemo(() => new Map(activeDrafts.map((draft) => [draft.id, draft])), [activeDrafts]);
   const effectiveRows = useMemo(() => [
     ...activeDrafts.filter((draft) => draft.id.startsWith("draft-")),
     ...authoritativeRows.map((row) => draftById.get(row.id) ?? row)
   ], [authoritativeRows, draftById, activeDrafts]);
-  const summaryRows = useMemo(() => {
-    const byId = new Map(fiscalYearDrafts.map((draft) => [draft.id, draft]));
-    return [...fiscalYearDrafts.filter((draft) => draft.id.startsWith("draft-")), ...activeRows.map((row) => byId.get(row.id) ?? row)];
-  }, [fiscalYearDrafts, activeRows]);
   const selectedIds = selectionByScope[tableScopeKey] ?? new Set<string>();
   const setSelectedIds = useCallback((nextValue: Set<string> | ((current: Set<string>) => Set<string>)) => {
     setSelectionByScope((current) => {
@@ -658,10 +662,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
   useEffect(() => {
     let active = true;
-    setRows([]); setOverviewItems([]); setApiMessage("Loading KPI activities…");
-    void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear)]).then(([items, overview]) => {
+    setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
+    void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
-      setRows(items); setOverviewItems(overview.items); setAsOf(overview.asOf);
+      setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
       setApiMessage(`Live API connected · ${items.length} activities · as of ${overview.asOf}`);
     }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); });
     return () => { active = false; };
@@ -760,6 +764,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const editorField = editState.cell ? fields.find((field) => field.key === editState.cell?.field) : null;
   const activeDefinition = KPI_OVERVIEW_ROWS.find((row) => row.code === activeTab);
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
+  const activeTarget = activeTab === "Overview" ? "" : overviewByCode.get(activeTab)?.target ?? "Target unavailable";
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const reflectedAction = getReflectedSelectionAction(selectedRows);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
@@ -869,6 +874,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       });
       setDrafts([]);
       setSelectedIds(new Set());
+      setReloadVersion((current) => current + 1);
     }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
@@ -901,6 +907,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setDrafts((current) => current.filter((row) => !deletedIds.has(row.id)));
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);
+    setReloadVersion((current) => current + 1);
     await settleSavingDialogClosed();
     endWrite();
   };
@@ -928,7 +935,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
     <header class="kpi-spreadsheet-page__header"><div><span class="kpi-eyebrow">KPI Activities / {activeTab}</span>
       <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2>
-      <p>{activeTab === "Overview" ? "FY-scoped KPI activity workspace" : `${activeDefinition?.target} · ${activeDefinition?.summaryModel}`}</p>
+      <p>{activeTab === "Overview" ? "FY-scoped KPI activity workspace" : `${activeTarget} · ${activeDefinition?.summaryModel}`}</p>
       <p class="kpi-api-status" role="status">{apiMessage}</p></div>
       <div class="kpi-spreadsheet-page__fiscal-year" aria-label="Selected fiscal year"><span>Fiscal Year</span><strong>{fiscalYear}</strong></div>
     </header>
@@ -937,7 +944,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     {activeTab === "Overview" ? <Fragment>
       <div class="kpi-overview-metrics" aria-label={`${fiscalYear} KPI portfolio summary`}><article><span>KPI categories</span><strong>7</strong></article><article><span>Reflected activities</span><strong>{rows.filter((row) => row.manageTimeReflected).length}</strong></article><article><span>Count-based</span><strong>6</strong></article><article><span>Stage/ACR-based</span><strong>1</strong></article></div>
       <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3><span>Summary + tables share fiscalYear</span></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Summary model</th><th>Status</th></tr></thead><tbody>{KPI_OVERVIEW_ROWS.map((row) => { const overview = overviewByCode.get(row.code); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td><td>{row.summaryModel}</td><td><span class={`kpi-status-badge kpi-status-badge--${(overview?.status ?? "unknown").toLowerCase().replace(" ", "-")}`} title={overview?.explanation}>{overview?.status ?? "—"}</span></td></tr>; })}</tbody></table></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Summary model</th><th>Status</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code === "C1" ? "C1+C2" : row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td><td>{row.summaryModel}</td><td><span class={`kpi-status-badge kpi-status-badge--${(overview?.status ?? "unknown").toLowerCase().replace(" ", "-")}`} title={overview?.explanation}>{overview?.status ?? "—"}</span></td></tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
@@ -963,7 +970,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
         ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
-      {showSummary && <Summary id={summaryId} expanded={summaryExpanded} rows={summaryRows} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
+      {showSummary && <Summary id={summaryId} expanded={summaryExpanded} summary={activitySummary} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
       <section id={guideId} class="kpi-activity-guide" hidden={!guideExpanded} aria-labelledby={`${guideId}Title`}>
         <div class="kpi-activity-guide__heading">
           <div><span class="kpi-eyebrow">{activeTab} KPI Guide</span><h3 id={`${guideId}Title`}>{activeDefinition?.name}</h3></div>

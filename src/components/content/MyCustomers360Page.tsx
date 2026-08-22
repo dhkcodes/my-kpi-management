@@ -50,7 +50,7 @@ export function MyCustomers360Page({ fiscalYear, rows, dataAvailable }: Props) {
             <thead>
               <tr>
                 <th>Account</th>
-                <th class="is-numeric">Workloads</th>
+                <th class="is-numeric">Commitments</th>
                 <th class="is-numeric">ARR</th>
                 <th class="is-numeric">ACR</th>
                 <th class="is-numeric">Targeted</th>

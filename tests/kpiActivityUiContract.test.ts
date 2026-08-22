@@ -141,6 +141,28 @@ assert.match(page, /Discard and Continue/);
 assert.match(page, />Stay</);
 assert.match(page, /Delete selected KPI activities/);
 
+assert.match(page, /listKpiSummary/,
+  "KPI workspace loads the strict summary API alongside rows and overview");
+assert.match(page, /Promise\.all\(\[listKpiRows\(fiscalYear\), listKpiOverview\(fiscalYear\), listKpiSummary\(fiscalYear\)\]\)/,
+  "rows, overview, and summary share one FY-scoped refresh");
+assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)[\s\S]{0,500}KPI activity row\(s\) saved atomically/,
+  "successful Save refreshes authoritative rows, overview, and summary");
+assert.match(page, /KPI activity row\(s\) deleted[\s\S]{0,500}setReloadVersion\(\(current\) => current \+ 1\)/,
+  "Delete refreshes authoritative rows, overview, and summary");
+assert.doesNotMatch(page, /KPI_QUARTER_COUNT_TARGETS/, "B and other count targets come from summary API policy");
+assert.match(page, /<h3 id="kpiQuarterSummary">Delivery Quarter Count<\/h3>/,
+  "count statistics are named for Delivery Date quarters");
+assert.match(page, /const showSummary = activeTab !== "Overview"/,
+  "A, F, and H expose reflected Delivery Date quarter summaries");
+assert.match(page, /C1 \+ C2 combined[^\n]*C1[^\n]*C2/,
+  "combined detail summary explains C1 and C2 contributions");
+assert.match(app, /listKpiSummary\(fiscalYear\)/,
+  "Home loads KPI statistics from the live summary API");
+assert.match(app, /buildLiveFiscalYearDataset/,
+  "Home adapts the authoritative API summary instead of synthetic KPI actuals");
+assert.match(content, /kpiDatasetLoading[\s\S]*KPI Overview data/, "Home exposes KPI API loading state");
+assert.doesNotMatch(content, /showHome[\s\S]{0,7000}dataset\.overviewRows/,
+  "Home no longer renders synthetic KPI overview actuals");
 assert.match(page, /role="progressbar"/);
 assert.match(page, /Sales Stage ACR[\s\S]*USD K/);
 assert.match(page, /Solution Design/);

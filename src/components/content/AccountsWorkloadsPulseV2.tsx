@@ -57,12 +57,12 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
   const urgencyOrder: PulseUrgencyLevel[] = ["critical", "attention", "upcoming"];
   const metricCards = [
     { label: "Active Accounts", value: `${pulse.metrics.activeAccounts}`, detail: "distinct customers" },
-    { label: "Active Workloads", value: `${pulse.metrics.activeWorkloads}`, detail: `${deletedRows} deleted excluded` },
-    { label: "ARR", value: compactCurrency.format(pulse.metrics.arrUsd), detail: "active workloads" },
+    { label: "Active Commitments", value: `${pulse.metrics.activeWorkloads}`, detail: `${deletedRows} deleted excluded` },
+    { label: "ARR", value: compactCurrency.format(pulse.metrics.arrUsd), detail: "active commitments" },
     { label: "ACR", value: compactCurrency.format(pulse.metrics.acrUsd), detail: "annual contract value" },
     { label: "Important", value: `${pulse.metrics.importantWorkloads}`, detail: "flagged workloads" },
     {
-      label: "Target Coverage",
+      label: "Target input completeness",
       value: `${pulse.metrics.targetCoveragePercent}%`,
       detail: `${pulse.metrics.targetCoverageWorkloads} of ${pulse.metrics.activeWorkloads} workloads`
     }
@@ -169,8 +169,8 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
         </article>
 
         <article class="accounts-pulse-v2-card accounts-pulse-v2-card--accounts" aria-labelledby="workloadsByAccountTitle">
-          <h3 id="workloadsByAccountTitle">Workloads by Account</h3>
-          <div class="accounts-pulse-v2-account-head"><span>Account</span><span>Workloads</span></div>
+          <h3 id="workloadsByAccountTitle">Commitments by Account</h3>
+          <div class="accounts-pulse-v2-account-head"><span>Account</span><span>Commitments</span></div>
           <div class="accounts-pulse-v2-account-list">
             {pulse.workloadsByAccount.map((item, index) => (
               <div class="accounts-pulse-v2-account-row" key={item.account}>

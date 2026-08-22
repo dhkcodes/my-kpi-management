@@ -31,6 +31,24 @@ export type KpiOverviewResponse = Readonly<{
   items: KpiOverviewItem[];
 }>;
 
+export const KPI_SUMMARY_QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
+export const KPI_SUMMARY_CODES = ["A", "B", "C1", "C2", "D1", "F", "H"] as const;
+export const KPI_SUMMARY_STAGES = ["IDENTIFIED", "VALIDATED", "ONBOARDED"] as const;
+export type KpiSummaryQuarter = typeof KPI_SUMMARY_QUARTERS[number];
+export type KpiSummaryStage = typeof KPI_SUMMARY_STAGES[number];
+export type KpiActivitySummary = Readonly<{
+  fiscalYear: FiscalYear;
+  quarterCounts: Record<SpreadsheetKpiCode, Record<KpiSummaryQuarter, number>>;
+  c1C2Monthly: Record<KpiSummaryQuarter, Record<"C1" | "C2", Record<string, number>>>;
+  d1QuarterByStage: Record<KpiSummaryQuarter, Record<KpiSummaryStage, Readonly<{ count: number; acrK: number }>>>;
+  targets: Readonly<{
+    countPerQuarter: Record<"A" | "B" | "F" | "H", number>;
+    c1C2CombinedPerQuarter: number;
+    d1AcrKPerQuarter: Record<KpiSummaryStage, number>;
+    labels: Record<SpreadsheetKpiCode, string>;
+  }>;
+}>;
+
 export type KpiWorkloadOption = Readonly<{
   workloadId: number;
   accountName: string;
@@ -103,6 +121,102 @@ export function decodeKpiOverview(payload: unknown): KpiOverviewResponse {
   return { fiscalYear: payload.fiscalYear as FiscalYear, asOf: payload.asOf, items };
 }
 
+
+const isNonnegativeInteger = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
+const isNonnegativeFinite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
+const invalidSummary = (): never => { throw new Error("Invalid KPI summary response"); };
+
+export function decodeKpiSummary(payload: unknown): KpiActivitySummary {
+  if (!isObject(payload) || typeof payload.fiscalYear !== "string" || !/^FY\d{2}$/.test(payload.fiscalYear)
+    || !isObject(payload.quarterCounts) || !isObject(payload.c1C2Monthly)
+    || !isObject(payload.d1QuarterByStage) || !isObject(payload.targets)) invalidSummary();
+  const root = payload as Record<string, unknown>;
+  const rootQuarterCounts = root.quarterCounts as Record<string, unknown>;
+  const rootMonthly = root.c1C2Monthly as Record<string, unknown>;
+  const rootD1 = root.d1QuarterByStage as Record<string, unknown>;
+  const rootTargets = root.targets as Record<string, unknown>;
+
+  const quarterCounts = {} as KpiActivitySummary["quarterCounts"];
+  for (const code of KPI_SUMMARY_CODES) {
+    const source = rootQuarterCounts[code];
+    if (!isObject(source)) invalidSummary();
+    const sourceRecord = source as Record<string, unknown>;
+    quarterCounts[code] = {} as Record<KpiSummaryQuarter, number>;
+    for (const quarter of KPI_SUMMARY_QUARTERS) {
+      if (!isNonnegativeInteger(sourceRecord[quarter])) invalidSummary();
+      quarterCounts[code][quarter] = sourceRecord[quarter] as number;
+    }
+  }
+
+  const c1C2Monthly = {} as KpiActivitySummary["c1C2Monthly"];
+  for (const quarter of KPI_SUMMARY_QUARTERS) {
+    const byQuarter = rootMonthly[quarter];
+    if (!isObject(byQuarter)) invalidSummary();
+    const byQuarterRecord = byQuarter as Record<string, unknown>;
+    c1C2Monthly[quarter] = {} as Record<"C1" | "C2", Record<string, number>>;
+    for (const code of ["C1", "C2"] as const) {
+      const byMonth = byQuarterRecord[code];
+      if (!isObject(byMonth)) invalidSummary();
+      const byMonthRecord = byMonth as Record<string, unknown>;
+      const decoded: Record<string, number> = {};
+      for (const [month, value] of Object.entries(byMonthRecord)) {
+        if (!/^\d{4}-\d{2}$/.test(month) || !isNonnegativeInteger(value)) invalidSummary();
+        decoded[month] = value as number;
+      }
+      c1C2Monthly[quarter][code] = decoded;
+    }
+  }
+
+  const d1QuarterByStage = {} as KpiActivitySummary["d1QuarterByStage"];
+  for (const quarter of KPI_SUMMARY_QUARTERS) {
+    const byStage = rootD1[quarter];
+    if (!isObject(byStage)) invalidSummary();
+    const byStageRecord = byStage as Record<string, unknown>;
+    d1QuarterByStage[quarter] = {} as Record<KpiSummaryStage, { count: number; acrK: number }>;
+    for (const stage of KPI_SUMMARY_STAGES) {
+      const metric = byStageRecord[stage];
+      if (!isObject(metric)) invalidSummary();
+      const metricRecord = metric as Record<string, unknown>;
+      if (!isNonnegativeInteger(metricRecord.count) || !isNonnegativeFinite(metricRecord.acrK)) invalidSummary();
+      d1QuarterByStage[quarter][stage] = { count: metricRecord.count as number, acrK: metricRecord.acrK as number };
+    }
+  }
+
+  const countPerQuarter = rootTargets.countPerQuarter;
+  const d1AcrKPerQuarter = rootTargets.d1AcrKPerQuarter;
+  const labels = rootTargets.labels;
+  if (!isObject(countPerQuarter) || !isObject(d1AcrKPerQuarter) || !isObject(labels)
+    || !isNonnegativeInteger(rootTargets.c1C2CombinedPerQuarter)) invalidSummary();
+  const countRecord = countPerQuarter as Record<string, unknown>;
+  const stageTargetRecord = d1AcrKPerQuarter as Record<string, unknown>;
+  const labelRecord = labels as Record<string, unknown>;
+  const decodedCounts = {} as KpiActivitySummary["targets"]["countPerQuarter"];
+  for (const code of ["A", "B", "F", "H"] as const) {
+    if (!isNonnegativeInteger(countRecord[code])) invalidSummary();
+    decodedCounts[code] = countRecord[code] as number;
+  }
+  const decodedStages = {} as Record<KpiSummaryStage, number>;
+  for (const stage of KPI_SUMMARY_STAGES) {
+    if (!isNonnegativeFinite(stageTargetRecord[stage])) invalidSummary();
+    decodedStages[stage] = stageTargetRecord[stage] as number;
+  }
+  const decodedLabels = {} as Record<SpreadsheetKpiCode, string>;
+  for (const code of KPI_SUMMARY_CODES) {
+    if (typeof labelRecord[code] !== "string" || !(labelRecord[code] as string).trim()) invalidSummary();
+    decodedLabels[code] = labelRecord[code] as string;
+  }
+  return {
+    fiscalYear: root.fiscalYear as FiscalYear,
+    quarterCounts, c1C2Monthly, d1QuarterByStage,
+    targets: {
+      countPerQuarter: decodedCounts,
+      c1C2CombinedPerQuarter: rootTargets.c1C2CombinedPerQuarter as number,
+      d1AcrKPerQuarter: decodedStages,
+      labels: decodedLabels
+    }
+  };
+}
+
 async function request(fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<unknown> {
   const hasBody = init?.body !== undefined && init?.body !== null;
   const response = await fetchImpl(url, {
@@ -145,6 +259,10 @@ export async function listKpiRows(fiscalYear: FiscalYear, fetchImpl: FetchLike =
 
 export async function listKpiOverview(fiscalYear: FiscalYear, fetchImpl: FetchLike = fetch): Promise<KpiOverviewResponse> {
   return decodeKpiOverview(await request(fetchImpl, `${getKpiActivitiesApiBase()}/overview?fiscalYear=${encodeURIComponent(fiscalYear)}`));
+}
+
+export async function listKpiSummary(fiscalYear: FiscalYear, fetchImpl: FetchLike = fetch): Promise<KpiActivitySummary> {
+  return decodeKpiSummary(await request(fetchImpl, `${getKpiActivitiesApiBase()}/summary?fiscalYear=${encodeURIComponent(fiscalYear)}`));
 }
 
 export async function listKpiWorkloadOptions(

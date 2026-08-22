@@ -38,6 +38,9 @@ type Props = Readonly<{
   accountWorkloadMetadata: AccountWorkloadMetadata;
   onAccountsWorkloadsRefresh: () => void;
   dataset: FiscalYearDataset;
+  kpiDataset: FiscalYearDataset | null;
+  kpiDatasetLoading: boolean;
+  kpiDatasetError: string;
   fiscalYear: FiscalYear;
   fiscalYears: FiscalYear[];
   guideOpen: boolean;
@@ -268,7 +271,7 @@ function EditableDetails({ details, onChange }: Readonly<{
           <label>Business SR Type<input value={details.businessSrType} onInput={handleInput("businessSrType")} /></label>
         </>
       )}
-      <label>Target<input value={details.targetPerQuarter} onInput={handleInput("targetPerQuarter")} /></label>
+      <label>Target<input readOnly aria-readonly="true" value={details.targetPerQuarter} title="Authoritative KPI target managed by Backend policy" /></label>
       <label>Activity<input value={details.activity} onInput={handleInput("activity")} /></label>
       <label>Task Type<input value={details.taskType} onInput={handleInput("taskType")} /></label>
       <label>What are we measuring?<input value={details.measuring} onInput={handleInput("measuring")} /></label>
@@ -294,6 +297,9 @@ export function Content({
   accountsWorkloadsRefreshing,
   onAccountsWorkloadsRefresh,
   dataset,
+  kpiDataset,
+  kpiDatasetLoading,
+  kpiDatasetError,
   fiscalYear,
   fiscalYears,
   guideOpen,
@@ -465,7 +471,9 @@ export function Content({
             loading={accountsWorkloadsLoading}
             dataSource={accountsWorkloadsDataSource}
           />
-          <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
+          {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
+          : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
+          : kpiDataset && <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
             <div class="kpi-panel__header">
               <div>
                 <h2 id="kpiOverviewTitle">KPI Overview</h2>
@@ -486,7 +494,7 @@ export function Content({
                   </tr>
                 </thead>
                 <tbody>
-                  {dataset.overviewRows.map((row) => (
+                  {kpiDataset.overviewRows.map((row) => (
                     <tr id={`activity-${row.code.toLowerCase().replace("+", "-")}`}>
                       <td>
                         <div class="kpi-name-cell">
@@ -495,7 +503,7 @@ export function Content({
                         </div>
                       </td>
                       {row.quarters.map((quarter) => {
-                        const tooltip = overviewTooltip(dataset, row.code, quarter.quarter, quarter.displayActual, quarter.displayTarget);
+                        const tooltip = overviewTooltip(kpiDataset, row.code, quarter.quarter, quarter.displayActual, quarter.displayTarget);
                         return (
                           <td>
                             <span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}>
@@ -513,9 +521,9 @@ export function Content({
               </table>
             </div>
             <p class="kpi-helper-note">Workshops and POCs are consolidated in one overview row with the combined target of 6 qualified activities.</p>
-          </section>
+          </section>}
 
-          <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
+          {kpiDataset && <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
             <div class="kpi-panel__header">
               <div>
                 <h2 id="newWorkloadTitle">New Workload</h2>
@@ -523,7 +531,7 @@ export function Content({
               </div>
             </div>
             <div class="kpi-new-workload-grid">
-              {dataset.newWorkload.map((quarter) => (
+              {kpiDataset.newWorkload.map((quarter) => (
                 <article class="kpi-new-workload-card">
                   <div class="kpi-new-workload-card__header">
                     <strong>{quarter.quarter}</strong>
@@ -549,7 +557,7 @@ export function Content({
                 </article>
               ))}
             </div>
-          </section>
+          </section>}
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
