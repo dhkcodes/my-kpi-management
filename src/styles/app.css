@@ -41,6 +41,101 @@ body {
 
 *, *::before, *::after { box-sizing: border-box; }
 
+.kap-login {
+  align-items: center;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(199, 70, 52, 0.1), transparent 26rem),
+    linear-gradient(145deg, #f7f5f2 0%, #eeebe7 100%);
+  display: grid;
+  justify-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 2rem 1rem;
+}
+
+.kap-login__card {
+  background: var(--kpi-surface);
+  border: 1px solid rgba(49, 45, 42, 0.12);
+  border-radius: 0.75rem;
+  box-shadow: 0 22px 54px rgba(49, 45, 42, 0.13);
+  max-width: 100%;
+  padding: 2.5rem;
+  width: 28.5rem;
+}
+
+.kap-login__brand {
+  align-items: center;
+  display: flex;
+  min-height: 1.5rem;
+}
+
+.kap-login__eyebrow {
+  color: var(--kpi-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 2rem 0 0.75rem;
+}
+
+.kap-login h1 {
+  color: var(--kpi-ink);
+  font-size: clamp(2rem, 6vw, 2.65rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.kap-login__intro {
+  color: var(--kpi-muted);
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
+}
+
+.kap-login__form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.kap-login__field,
+.kap-login__submit {
+  width: 100%;
+}
+
+.kap-login__error {
+  align-items: flex-start;
+  background: #fff3f1;
+  border: 1px solid #e8aaa2;
+  border-radius: 0.4rem;
+  color: #8f2417;
+  display: flex;
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  line-height: 1.4;
+  padding: 0.7rem 0.8rem;
+}
+
+.kap-login__error-icon {
+  flex: 0 0 auto;
+  margin-top: 0.08rem;
+}
+
+.kap-login__notice {
+  border-top: 1px solid var(--kpi-border);
+  color: var(--kpi-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 1.75rem 0 0;
+  padding-top: 1rem;
+}
+
+@media (max-width: 480px) {
+  .kap-login { align-items: start; padding: 1rem; }
+  .kap-login__card { border-radius: 0.55rem; padding: 1.75rem 1.25rem; }
+  .kap-login__eyebrow { margin-top: 1.5rem; }
+}
+
 .kpi-fiscal-year-panel {
   align-items: center;
   background: var(--kpi-surface);
