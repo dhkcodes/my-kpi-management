@@ -53,6 +53,7 @@ type DeleteTargets = Readonly<{
   draftIds: string[];
   activeIds: string[];
   permanentIds: string[];
+  baseRows: AccountWorkloadRow[];
 }>;
 
 type Props = Readonly<{
@@ -578,10 +579,10 @@ export function AccountsWorkloadsPage({
     try {
       const authoritative = await withMinimumPendingDuration(() => onRowsChange(nextRows, permanentIds));
       setDraftRows(overlayEditableAccountWorkloadChanges(authoritative.items, draftRows));
-      return true;
+      return authoritative;
     } catch (error) {
       setSaveError(formatAccountsWorkloadsSaveError(error));
-      return false;
+      return null;
     } finally {
       setSaving(false);
     }
@@ -611,7 +612,7 @@ export function AccountsWorkloadsPage({
     target?.focus();
   }, 0);
 
-  const requestDelete = () => {
+  const requestDelete = async () => {
     const targets = classifyAccountDeleteTargets(rows, selectedActionIds, addingRow?.id);
     if (targets.draftIds.length + targets.activeIds.length + targets.permanentIds.length === 0) return;
     if (targets.draftIds.length > 0) {
@@ -624,7 +625,20 @@ export function AccountsWorkloadsPage({
       restoreDeleteLauncherFocus();
       return;
     }
-    setDeleteTargets(targets);
+    let baseRows = rows;
+    if (targets.activeIds.length > 0) {
+      const nextRows = applyDraftDelete(rows, targets.activeIds, "current-user", new Date().toISOString());
+      const authoritative = await runImmediateRowsAction(nextRows);
+      if (!authoritative) return;
+      baseRows = authoritative.items;
+      setSelectedRowIds((current) => current.filter((id) => !targets.activeIds.includes(id)));
+    }
+    if (targets.permanentIds.length === 0) {
+      setDeleteTargets(null);
+      restoreDeleteLauncherFocus();
+      return;
+    }
+    setDeleteTargets({ ...targets, draftIds: [], activeIds: [], baseRows });
   };
 
   const cancelDelete = () => {
@@ -633,8 +647,8 @@ export function AccountsWorkloadsPage({
 
   const confirmDelete = async () => {
     if (!deleteTargets) return;
-    const { draftIds, activeIds, permanentIds } = deleteTargets;
-    const nextRows = applyDraftDelete(rows, activeIds, "current-user", new Date().toISOString());
+    const { draftIds, activeIds, permanentIds, baseRows } = deleteTargets;
+    const nextRows = applyDraftDelete(baseRows, activeIds, "current-user", new Date().toISOString());
     const success = await runImmediateRowsAction(nextRows, permanentIds);
     if (!success) return;
     const removedIds = new Set([...draftIds, ...activeIds, ...permanentIds]);
@@ -648,14 +662,7 @@ export function AccountsWorkloadsPage({
     if (success) setSelectedRowIds([]);
   };
 
-  const deleteDialogTitle = deleteTargets?.permanentIds.length && !deleteTargets.activeIds.length
-      ? "Permanently delete saved row?"
-      : "Delete selected rows?";
-  const deleteDialogMessage = deleteTargets?.draftIds.length
-    ? "The selected unsaved Draft was already removed locally and will not be restored if you cancel. Confirm deletion of the remaining saved row(s)."
-    : deleteTargets?.permanentIds.length
-      ? "Saved deleted rows will be permanently removed. This action cannot be undone."
-      : "Saved active rows will be moved to deleted records immediately.";
+  const deleteDialogMessage = "Saved deleted rows will be permanently removed. This action cannot be undone.";
 
   const applyExchangeRate = () => {
     const parsed = numberFromInput(draftExchangeRate);
@@ -859,7 +866,7 @@ export function AccountsWorkloadsPage({
               {selectedHasDeletedRows && (
                 <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={saving} onojAction={() => void restoreSelected()}>Restore</oj-button>
               )}
-              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={saving} onojAction={requestDelete}>Delete</oj-button>
+              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={saving} onojAction={() => void requestDelete()}>Delete</oj-button>
             </>
           )}
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing || saving} onojAction={onRefresh}>Refresh</oj-button>
@@ -883,7 +890,7 @@ export function AccountsWorkloadsPage({
         cancelBehavior="escape"
         dragAffordance="none"
         resizeBehavior="none"
-        dialogTitle={deleteDialogTitle}
+        dialogTitle="Permanently delete saved row?"
         onojOpen={focusDeleteCancel}
         onojClose={() => { setDeleteTargets(null); restoreDeleteLauncherFocus(); }}>
         <div class="accounts-workloads-delete-content">
