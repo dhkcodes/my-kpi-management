@@ -44,6 +44,7 @@ export type KpiSpreadsheetRow = {
   acrK: number | null;
   targetQuarter: Quarter | "";
   deliveryDate: string;
+  deliveryDateRaw?: string;
 };
 
 export type KpiWriteContext = Readonly<{ fiscalYear: FiscalYear; routeId: string; generation: number }>;
@@ -69,7 +70,7 @@ export const createEmptyKpiRow = (kpiCode: SpreadsheetKpiCode, fiscalYear: Fisca
   stage: kpiCode === "D1" ? "identified" : "",
   acrK: kpiCode === "D1" ? 0 : null,
   targetQuarter: kpiCode === "D1" ? "Q1" : "",
-  deliveryDate: ""
+  deliveryDate: "", deliveryDateRaw: ""
 });
 
 const monthsByQuarter: Record<Quarter, readonly string[]> = {

@@ -13,7 +13,7 @@ const backend = {
 const valid: KpiSpreadsheetRow = {
   id: "41", versionNo: 2, manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "A", quarter: "Q1", month: "",
   accountWorkload: "", workloadId: null, mappingStatus: "NOT_REQUIRED", title: "Awareness session", srNumber: "SYN-2001",
-  stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-07-15"
+  stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-07-15", deliveryDateRaw: ""
 };
 assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
 assert.throws(() => decodeKpiRows({ items: [{ ...backend, kpiCode: "G" }] }), /Invalid KPI code/);
