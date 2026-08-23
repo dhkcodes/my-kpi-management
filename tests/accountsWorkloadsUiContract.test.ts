@@ -20,8 +20,8 @@ assert.match(header, /aria-label="My KPI & Account Planner"/, "header brand land
 assert.match(packageJson, /"description": "My KPI & Account Planner — Goals, Accounts and Next Actions"/, "package metadata uses the finalized KAP product name");
 assert.doesNotMatch(`${indexHtml}\n${app}\n${header}\n${packageJson}`, /KPI Management|Oracle KPI cockpit|KPI operating cockpit/, "legacy product names are removed from product metadata and the app shell");
 
-assert.match(page, /classifyAccountDeleteTargets/, "draft, saved active, and permanent targets are classified before one confirmation dialog");
-assert.match(page, /dialogTitle=\{deleteDialogTitle\}/, "the delete dialog title distinguishes draft and saved targets");
+assert.match(page, /classifyAccountDeleteTargets/, "draft, saved active, and permanent targets are classified before deletion");
+assert.match(page, /dialogTitle="Permanently delete saved row\?"/, "only permanent deletion retains confirmation");
 assert.match(page, />Delete<\/oj-button>/, "confirmation uses the requested Delete label");
 assert.match(page, />Cancel<\/oj-button>/, "confirmation uses the requested Cancel label");
 assert.match(page, /const focusDeleteCancel = \(\) => window\.setTimeout/,
@@ -32,12 +32,16 @@ assert.match(page, /onojOpen=\{focusDeleteCancel\}/,
   "the least destructive dialog action receives initial focus");
 assert.match(page, /cancelBehavior="escape"/, "Escape closes the modal confirmation");
 assert.match(page, /restoreDeleteLauncherFocus/, "dialog close restores focus to the launcher or stable Add Account fallback");
-assert.match(page, /const requestDelete = \(\) => \{[\s\S]*targets\.draftIds\.length > 0[\s\S]*setAddingRow\(null\)[\s\S]*remainingSavedTargets/,
-  "Delete removes an unsaved Draft immediately before any saved-row confirmation");
+assert.match(page, /const requestDelete = async \(\) => \{[\s\S]*targets\.draftIds\.length > 0[\s\S]*setAddingRow\(null\)[\s\S]*remainingSavedTargets/,
+  "Delete removes an unsaved Draft immediately before any saved-row action");
 assert.match(page, /if \(remainingSavedTargets === 0\)[\s\S]*return;/,
   "Draft-only delete returns without opening a dialog or calling the API");
-assert.match(page, /The selected unsaved Draft was already removed locally and will not be restored if you cancel/,
-  "mixed delete confirmation clearly states that Cancel does not restore the Draft");
+assert.match(page, /targets\.activeIds\.length > 0[\s\S]*applyDraftDelete[\s\S]*runImmediateRowsAction/,
+  "saved active rows move to Draft Delete immediately without confirmation");
+assert.match(page, /if \(targets\.permanentIds\.length === 0\)[\s\S]*return;/,
+  "Draft Delete completes without opening the permanent-delete dialog");
+assert.match(page, /setDeleteTargets\(\{ \.\.\.targets, draftIds: \[\], activeIds: \[\], baseRows \}\)/,
+  "only saved permanent targets reach confirmation");
 assert.match(app, /accountsWorkloadsDataSource !== "api"[\s\S]{0,300}applyPermanentDeletesLocally\(rows, permanentDeleteIds\)[\s\S]{0,300}items: localRows[\s\S]{0,200}total: localRows\.length[\s\S]{0,300}\[fiscalYear\]: localRows/,
   "the local/fallback adapter removes confirmed permanent targets from both its authoritative response and parent state");
 assert.doesNotMatch(page, /\{deleteMode ===|Selected rows:/, "dynamic top-action delete labels and selected count are absent");

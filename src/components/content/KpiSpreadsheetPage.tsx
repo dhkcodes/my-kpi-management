@@ -83,6 +83,29 @@ const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
   "Not Started": "kpi-quarter-status-label--not-started"
 })[status];
 
+const portfolioQuarterStatuses = (
+  summary: KpiActivitySummary | null,
+  code: SpreadsheetKpiCode,
+  fiscalYear: FiscalYear,
+  asOf: string
+) => quarters.map((quarter) => {
+  if (!summary) return null;
+  if (code === "D1") {
+    const actual = summary.d1QuarterByStage[quarter];
+    const achieved = stages.some((stage) => {
+      const apiStage = stage.toUpperCase() as keyof typeof actual;
+      return actual[apiStage].acrK >= summary.targets.d1AcrKPerQuarter[apiStage];
+    });
+    return getQuarterStatus(fiscalYear, quarter, achieved ? 1 : 0, 1, asOf);
+  }
+  if (code === "C1" || code === "C2") {
+    const actual = summary.quarterCounts.C1[quarter] + summary.quarterCounts.C2[quarter];
+    return getQuarterStatus(fiscalYear, quarter, actual, summary.targets.c1C2CombinedPerQuarter, asOf);
+  }
+  const target = summary.targets.countPerQuarter[code as keyof typeof summary.targets.countPerQuarter];
+  return getQuarterStatus(fiscalYear, quarter, summary.quarterCounts[code][quarter], target, asOf);
+});
+
 type EditorRect = Readonly<{ left: number; top: number; width: number; height: number }>;
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
 
@@ -943,8 +966,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
     {activeTab === "Overview" ? <Fragment>
       <div class="kpi-overview-metrics" aria-label={`${fiscalYear} KPI portfolio summary`}><article><span>KPI categories</span><strong>7</strong></article><article><span>Reflected activities</span><strong>{rows.filter((row) => row.manageTimeReflected).length}</strong></article><article><span>Count-based</span><strong>6</strong></article><article><span>Stage/ACR-based</span><strong>1</strong></article></div>
-      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3><span>Summary + tables share fiscalYear</span></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Summary model</th><th>Status</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code === "C1" ? "C1+C2" : row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td><td>{row.summaryModel}</td><td><span class={`kpi-status-badge kpi-status-badge--${(overview?.status ?? "unknown").toLowerCase().replace(" ", "-")}`} title={overview?.explanation}>{overview?.status ?? "—"}</span></td></tr>; })}</tbody></table></div>
+      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3><span>Quarter status from reflected Delivery Date activity</span></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(activitySummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code === "C1" ? "C1+C2" : row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => <td key={`${row.code}:${quarters[index]}`}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></td>)}</tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
