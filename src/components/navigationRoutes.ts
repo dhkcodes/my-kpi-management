@@ -43,3 +43,6 @@ export const getNavigationRouteFromPath = (pathname: string): NavigationRouteDef
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
   return getNavigationRoute(normalized || "home");
 };
+
+export const isKpiActivitiesRoute = (route: NavigationRouteDefinition): boolean =>
+  route.module === "kpiPage";

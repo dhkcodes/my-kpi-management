@@ -9,7 +9,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
-import { NavigationRouteDefinition } from "../navigationRoutes";
+import { isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
@@ -439,7 +439,7 @@ export function Content({
             ))}
           </div>
         </div>
-        {activeRoute.module !== "weeklyActivities" && activeRoute.module !== "kpiPage" && <button
+        {isKpiActivitiesRoute(activeRoute) && <button
           type="button"
           class="kpi-guide-entry-button"
           aria-label="Open KPI Guide"
@@ -600,7 +600,7 @@ export function Content({
         <EmptyRoutePage route={activeRoute} />
       )}
 
-      {guideOpen && (
+      {guideOpen && isKpiActivitiesRoute(activeRoute) && (
         <div class="kpi-guide-overlay" role="presentation">
           <section class="kpi-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="kpiGuideTitle">
             <div class="kpi-guide-dialog__header">

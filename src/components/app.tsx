@@ -18,6 +18,7 @@ import {
   getNavigationPath,
   getNavigationRoute,
   getNavigationRouteFromPath,
+  isKpiActivitiesRoute,
   NavigationRouteDefinition
 } from "./navigationRoutes";
 import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
@@ -192,6 +193,10 @@ function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProp
       const currentHistoryIndex = historyIndexRef.current;
       window.history.replaceState(withHistoryIndex(window.history.state, currentHistoryIndex), "", window.location.href);
     }, []);
+
+    useEffect(() => {
+      if (!isKpiActivitiesRoute(activeRoute)) setGuideOpen(false);
+    }, [activeRoute.id]);
 
     useEffect(() => {
       const handleBeforeUnload = (event: BeforeUnloadEvent) => {
