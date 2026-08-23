@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
+import { LoginPage } from "./LoginPage";
 import { Content } from "./content/index";
 import type { KpiNavigationGuard } from "./content/KpiSpreadsheetPage";
 import {
@@ -44,6 +45,9 @@ import {
 } from "./weeklyActivityNavigationGuard";
 import { getBusinessAsOfDate } from "../data/accountsWorkloadsPulseV2";
 import { applyPermanentDeletesLocally } from "../data/accountsWorkloadsSelection";
+import { listKpiSummary } from "../data/kpiSpreadsheetApi";
+import { buildLiveFiscalYearDataset } from "../data/kpiLiveDashboard";
+import { FiscalYearDataset } from "../data/kpiCalculations";
 import {
   fetchFxRate,
   fetchKpiGuides,
@@ -54,10 +58,21 @@ import {
 import "ojs/ojnavigationlist";
 import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
 import { KeySet, KeySetImpl } from "ojs/ojkeyset";
+import {
+  AuthSession,
+  clearAuthSession,
+  readAuthSession,
+  writeAuthSession
+} from "../auth/authSession";
 
 type Props = Readonly<{
   appName?: string;
-  userLogin?: string;
+}>;
+
+type AuthenticatedAppProps = Readonly<{
+  appName: string;
+  userLogin: string;
+  onLogout: () => void;
 }>;
 
 const defaultAccountWorkloadMetadata = getAccountWorkloadMetadata();
@@ -114,9 +129,7 @@ function renderNavigationItem(context: NavigationItemTemplateContext) {
   );
 }
 
-export const App = registerCustomElement(
-  "app-root",
-  ({ appName = "My KPI & Account Planner", userLogin = "donghu.kim@oracle.com" }: Props) => {
+function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProps) {
     const initialRoute = typeof window === "undefined"
       ? getNavigationRoute("home")
       : getNavigationRouteFromPath(window.location.pathname);
@@ -148,6 +161,9 @@ export const App = registerCustomElement(
     const [fxLoading, setFxLoading] = useState(false);
 
     const [fxError, setFxError] = useState("");
+    const [liveKpiDataset, setLiveKpiDataset] = useState<FiscalYearDataset | null>(null);
+    const [kpiDatasetLoading, setKpiDatasetLoading] = useState(false);
+    const [kpiDatasetError, setKpiDatasetError] = useState("");
     const [accountsWorkloadsAsOf] = useState(() => getBusinessAsOfDate());
     const [accountWorkloadMetadata, setAccountWorkloadMetadata] = useState<AccountWorkloadMetadata>(defaultAccountWorkloadMetadata);
     const [accountsWorkloadsDataSource, setAccountsWorkloadsDataSource] = useState<AccountsWorkloadsDataSource>("synthetic-fallback");
@@ -171,9 +187,6 @@ export const App = registerCustomElement(
       Object.fromEntries(fiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
     );
 
-    useEffect(() => {
-      Context.getPageContext().getBusyContext().applicationBootstrapComplete();
-    }, []);
 
     useEffect(() => {
       const currentHistoryIndex = historyIndexRef.current;
@@ -220,6 +233,19 @@ export const App = registerCustomElement(
         .finally(() => { if (active) setFxLoading(false); });
       return () => { active = false; };
     }, [fiscalYear]);
+
+    useEffect(() => {
+      if (activeRoute.module !== "home") return;
+      let active = true;
+      setLiveKpiDataset(null);
+      setKpiDatasetLoading(true);
+      setKpiDatasetError("");
+      void listKpiSummary(fiscalYear)
+        .then((summary) => { if (active) setLiveKpiDataset(buildLiveFiscalYearDataset(summary, fiscalYearData[fiscalYear])); })
+        .catch((error) => { if (active) setKpiDatasetError(error instanceof Error ? error.message : "KPI Overview API request failed."); })
+        .finally(() => { if (active) setKpiDatasetLoading(false); });
+      return () => { active = false; };
+    }, [activeRoute.module, fiscalYear]);
 
     useEffect(() => {
       let active = true;
@@ -551,6 +577,7 @@ export const App = registerCustomElement(
           userLogin={userLogin}
           navigationOpen={navigationOpen}
           onToggleNavigation={() => setNavigationOpen((value) => !value)}
+          onLogout={onLogout}
         />
         <div class={navigationOpen ? "kpi-mobile-scrim is-open" : "kpi-mobile-scrim"} onClick={closeNavigation}></div>
         <div class="kpi-shell__body">
@@ -585,6 +612,9 @@ export const App = registerCustomElement(
             onAccountsWorkloadsRefresh={() => void handleAccountsWorkloadsRefresh()}
             accountWorkloadMetadata={accountWorkloadMetadata}
             dataset={fiscalYearData[fiscalYear]}
+            kpiDataset={liveKpiDataset}
+            kpiDatasetLoading={kpiDatasetLoading}
+            kpiDatasetError={kpiDatasetError}
             fiscalYear={fiscalYear}
             fiscalYears={fiscalYears}
             guideOpen={guideOpen}
@@ -641,5 +671,48 @@ export const App = registerCustomElement(
         <Footer />
       </div>
     );
+}
+
+export const App = registerCustomElement(
+  "app-root",
+  ({ appName = "My KPI & Account Planner" }: Props) => {
+    const [session, setSession] = useState<AuthSession | null>(() =>
+      typeof window === "undefined" ? null : readAuthSession(window.sessionStorage)
+    );
+
+    useEffect(() => {
+      Context.getPageContext().getBusyContext().applicationBootstrapComplete();
+    }, []);
+
+    useEffect(() => {
+      if (session || typeof window === "undefined") return undefined;
+
+      const keepLoginAtHomePath = () => {
+        if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
+          window.history.replaceState(null, "", "/");
+        }
+      };
+
+      keepLoginAtHomePath();
+      window.addEventListener("popstate", keepLoginAtHomePath);
+      return () => window.removeEventListener("popstate", keepLoginAtHomePath);
+    }, [session]);
+
+    const handleAuthenticated = useCallback((authenticatedSession: AuthSession) => {
+      writeAuthSession(window.sessionStorage, authenticatedSession);
+      window.history.replaceState(null, "", "/");
+      setSession(authenticatedSession);
+    }, []);
+
+    const handleLogout = useCallback(() => {
+      clearAuthSession(window.sessionStorage);
+      window.history.replaceState(null, "", "/");
+      window.scrollTo({ top: 0, left: 0 });
+      setSession(null);
+    }, []);
+
+    return session
+      ? <AuthenticatedApp appName={appName} userLogin={session.userId} onLogout={handleLogout} />
+      : <LoginPage appName={appName} onAuthenticated={handleAuthenticated} />;
   }
 );

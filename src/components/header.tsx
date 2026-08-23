@@ -9,15 +9,18 @@ import { h } from "preact";
 import "ojs/ojbutton";
 import "ojs/ojtoolbar";
 import "ojs/ojmenu";
+import "ojs/ojavatar";
+import { getProfileInitials } from "../auth/authSession";
 
 type Props = Readonly<{
   appName: string;
   userLogin: string;
   navigationOpen: boolean;
   onToggleNavigation: () => void;
+  onLogout: () => void;
 }>;
 
-export function Header({ appName, userLogin, navigationOpen, onToggleNavigation }: Props) {
+export function Header({ appName, userLogin, navigationOpen, onToggleNavigation, onLogout }: Props) {
   return (
     <header role="banner" class="oj-web-applayout-header kpi-header">
       <div class="oj-flex-bar oj-sm-align-items-center kpi-header__bar">
@@ -42,14 +45,18 @@ export function Header({ appName, userLogin, navigationOpen, onToggleNavigation 
         </div>
         <div class="oj-flex-bar-end kpi-header__end">
           <oj-toolbar aria-label="User actions">
-            <oj-menu-button id="userMenu" display="all" chroming="borderless">
-              <span class="oj-ux-ico-user kpi-profile-icon" aria-hidden="true"></span>
+            <oj-menu-button id="userMenu" display="all" chroming="borderless" aria-label="User profile menu">
+              <oj-avatar slot="startIcon" initials={getProfileInitials(userLogin)} size="2xs" shape="circle"></oj-avatar>
               <span class="kpi-profile-email">{userLogin}</span>
               <span slot="endIcon" class="oj-component-icon oj-button-menu-dropdown-icon"></span>
-              <oj-menu id="menu1" slot="menu">
-                <oj-option id="pref" value="pref">Preferences</oj-option>
-                <oj-option id="help" value="help">Help</oj-option>
-                <oj-option id="about" value="about">About</oj-option>
+              <oj-menu
+                id="profileMenuItems"
+                slot="menu"
+                onojMenuAction={(event) => {
+                  if (event.detail.selectedValue === "logout") onLogout();
+                }}>
+                <oj-option id="signedInUser" value="identity" disabled={true}>{userLogin}</oj-option>
+                <oj-option id="logout" value="logout">Logout</oj-option>
               </oj-menu>
             </oj-menu-button>
           </oj-toolbar>

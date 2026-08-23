@@ -6,6 +6,8 @@ const root = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 const page = read("src/components/content/AccountsWorkloadsPage.tsx");
 const content = read("src/components/content/index.tsx");
+const pulse = read("src/components/content/AccountsWorkloadsPulseV2.tsx");
+const customers360 = read("src/components/content/MyCustomers360Page.tsx");
 const app = read("src/components/app.tsx");
 const styles = read("src/styles/app.css");
 const indexHtml = read("src/index.html");
@@ -105,6 +107,17 @@ assert.doesNotMatch(styles, /\.oj-dialog|\.oj-dialog-content|\.oj-dialog-body/, 
 assert.match(page, /id="accountsWorkloadsFxError"[\s\S]*role="alert"/, "FX exposes an error state");
 
 assert.match(page, /aria-label="Add Account"[^>]*title="Add Account"[^>]*>Add Account<\/oj-button>/, "Accounts-only create action uses Add Account for text, accessibility, and tooltip");
+const addDraftRowAt = page.indexOf("key={addingRow.id}");
+const savedRowsAt = page.indexOf("visibleRows.map((row, index)");
+assert.ok(addDraftRowAt >= 0 && addDraftRowAt < savedRowsAt,
+  "the stable-key Add Account draft row is rendered above saved rows");
+assert.match(pulse, /Target input completeness/, "Home names Target Coverage as input completeness");
+assert.match(content, /readOnly[\s\S]{0,160}value=\{details\.targetPerQuarter\}/,
+  "the authoritative KPI target is read-only in Guide edit mode");
+assert.match(pulse, /Active Commitments/, "Home distinguishes commitment rows from workloads");
+assert.match(pulse, /Commitments by Account/, "Home distribution is named for commitment rows");
+assert.match(customers360, /<th class="is-numeric">Commitments<\/th>/,
+  "Portfolio labels row counts as commitments");
 assert.doesNotMatch(page, />Add Row<\/oj-button>/, "legacy Accounts Add Row label is absent");
 assert.match(page, /const showEditActions = Boolean\(addingRow \|\| hasEditableRowChanges \|\| exchangeRate !== savedExchangeRate\)/,
   "Save/Cancel visibility is derived only from a new Draft, editable cell diff, or editable FX draft");
