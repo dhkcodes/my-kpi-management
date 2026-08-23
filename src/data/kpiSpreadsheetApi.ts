@@ -87,7 +87,7 @@ function decodeActivity(value: unknown): KpiSpreadsheetRow {
     title: asText(value.description), srNumber: asText(value.srNumber),
     stage: asText(value.salesStage).toLowerCase() as KpiSpreadsheetRow["stage"],
     acrK: asNullableNumber(value.acrK), targetQuarter: asText(value.targetQuarter) as KpiSpreadsheetRow["targetQuarter"],
-    deliveryDate: asText(value.deliveryDate)
+    deliveryDate: asText(value.deliveryDate), deliveryDateRaw: asText(value.deliveryDateRaw)
   };
 }
 
