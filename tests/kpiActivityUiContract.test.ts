@@ -112,8 +112,8 @@ assert.match(page, /class="kpi-guide-toggle"[\s\S]*aria-controls=\{guideId\}[\s\
 assert.match(page, /<span>KPI Guide<\/span>/);
 assert.match(page, /activeGuide\?\.targetPerQuarter[\s\S]*activeGuide\?\.activity[\s\S]*activeGuide\?\.measuring/,
   "active KPI Guide content must include target, activity, and measurement contracts");
-assert.match(content, /activeRoute\.module !== "kpiPage"[\s\S]*kpi-guide-entry-button/,
-  "KPI routes must use the contextual Guide control instead of the legacy global drawer entry");
+assert.match(content, /isKpiActivitiesRoute\(activeRoute\)[\s\S]*kpi-guide-entry-button/,
+  "Fiscal Year KPI Guide entry must be limited to KPI Activities routes");
 assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/);
 
 assert.match(page, /const tableScopeKey = `\$\{fiscalYear\}:\$\{activeTab\}`/);
