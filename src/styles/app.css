@@ -2039,6 +2039,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-status-badge--achieved { background: #e6f4ea; color: #176b3a; }
 .kpi-status-badge--in-progress { background: #fff0cc; color: #7b5100; }
 .kpi-status-badge--not-achieved { background: #fde7e3; color: #a63122; }
+.kpi-status-badge--not-started { background: #f5f5f5; color: #6f6f6f; }
 .kpi-month-summary .is-combined { color: var(--kpi-brand); font-weight: 700; }
 .kpi-inline-editor { background: #f7f4f1; border: 1px solid var(--kpi-border); border-left: 4px solid var(--kpi-brand); margin: 0 0 .9rem; padding: .85rem; }
 .kpi-inline-editor__fields { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }

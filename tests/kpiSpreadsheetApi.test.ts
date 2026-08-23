@@ -105,6 +105,8 @@ async function run() {
   await saveKpiRow(valid, fetchImpl);
   await saveKpiRow({ ...valid, id: "draft-a-1", versionNo: undefined }, fetchImpl);
   await saveKpiRow({ ...valid, id: "41", kpiCode: "C1", month: "", deliveryDate: "2026-05-06" }, fetchImpl);
+  await saveKpiRow({ ...valid, id: "42", kpiCode: "C1", month: "Jul", deliveryDate: "" }, fetchImpl);
+  await saveKpiRow({ ...valid, id: "43", kpiCode: "C2", month: "Jul", deliveryDate: "not-a-date" }, fetchImpl);
   const batch = await saveKpiRowsAtomic([valid, { ...valid, id: "draft-a-2", versionNo: undefined }], fetchImpl);
   assert.equal(batch.length, 2);
   await deleteKpiRow(valid, fetchImpl);
@@ -117,15 +119,19 @@ async function run() {
   assert.equal(calls[5].init?.method, "POST");
   const legacyC1Body = JSON.parse(String(calls[6].init?.body));
   assert.equal(legacyC1Body.activityMonth, "2026-05", "C1/C2 activityMonth follows Delivery Date even for legacy rows with no stored month");
-  assert.equal(calls[7].url, "/api/v1/kpi-activities/batch");
-  assert.equal(calls[7].init?.method, "POST");
-  const batchBody = JSON.parse(String(calls[7].init?.body));
+  const blankDateC1Body = JSON.parse(String(calls[7].init?.body));
+  assert.equal(blankDateC1Body.activityMonth, "2026-07", "unreflected C1/C2 drafts retain the API-required planning month until Delivery Date exists");
+  const invalidDateC2Body = JSON.parse(String(calls[8].init?.body));
+  assert.equal(invalidDateC2Body.activityMonth, null, "malformed nonblank Delivery Date cannot silently fall back to a legacy month");
+  assert.equal(calls[9].url, "/api/v1/kpi-activities/batch");
+  assert.equal(calls[9].init?.method, "POST");
+  const batchBody = JSON.parse(String(calls[9].init?.body));
   assert.equal(batchBody.items[0].id, 41);
   assert.equal(batchBody.items[0].versionNo, 2);
   assert.equal(batchBody.items[1].id, undefined);
-  assert.match(calls[8].url, /versionNo=2$/);
-  assert.equal(calls[8].init?.method, "DELETE");
-  assert.equal(new Headers(calls[8].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
+  assert.match(calls[10].url, /versionNo=2$/);
+  assert.equal(calls[10].init?.method, "DELETE");
+  assert.equal(new Headers(calls[10].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
   console.log("kpiSpreadsheetApi tests passed");
 }
 

@@ -148,6 +148,8 @@ assert.match(page, /<th>Q1<\/th><th>Q2<\/th><th>Q3<\/th><th>Q4<\/th>/,
   "KPI Performance exposes quarter-specific status columns");
 assert.match(page, /portfolioQuarterStatuses\(activitySummary, row\.code, fiscalYear, asOf\)/,
   "KPI Performance derives each status from the authoritative quarter summary");
+assert.match(styles, /\.kpi-status-badge--not-started\s*\{[^}]*background:\s*#f5f5f5[^}]*color:\s*#6f6f6f/,
+  "future-quarter Not Started badges use an explicit neutral treatment");
 assert.match(page, /Promise\.all\(\[listKpiRows\(fiscalYear\), listKpiOverview\(fiscalYear\), listKpiSummary\(fiscalYear\)\]\)/,
   "rows, overview, and summary share one FY-scoped refresh");
 assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)[\s\S]{0,500}KPI activity row\(s\) saved atomically/,
