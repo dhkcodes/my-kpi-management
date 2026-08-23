@@ -229,8 +229,12 @@ async function request(fetchImpl: FetchLike, url: string, init?: RequestInit): P
 }
 
 function activityMonth(row: KpiSpreadsheetRow): string | null {
-  if ((row.kpiCode === "C1" || row.kpiCode === "C2") && /^\d{4}-\d{2}-\d{2}$/.test(row.deliveryDate)) {
-    return row.deliveryDate.slice(0, 7);
+  if (row.kpiCode === "C1" || row.kpiCode === "C2") {
+    if (row.deliveryDate) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(row.deliveryDate) ? row.deliveryDate.slice(0, 7) : null;
+    }
+    // The API requires a planning month even for unreflected drafts. Once a
+    // Delivery Date exists, its month is authoritative and replaces this fallback.
   }
   if (!row.month || !(row.month in monthNumbers)) return null;
   const startYear = 2000 + Number(row.fiscalYear.slice(2)) - 1;
