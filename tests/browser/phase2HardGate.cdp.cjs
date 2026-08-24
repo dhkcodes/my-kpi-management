@@ -17,6 +17,8 @@ const accountRow={id:"41",commitmentId:41,versionNo:3,sourceRowNumber:10,planNum
 const deletedAccountRows=[42,43].map(id=>({...accountRow,id:String(id),commitmentId:id,sourceRowNumber:id-30,account:`Deleted Fixture ${id}`,workloadName:`Deleted Workload ${id}`,isImportant:false,isDeleted:true,deletedAt:"2026-08-20T00:00:00Z",deletedBy:"fixture"}));
 const fx={fxRateId:9,fiscalYear:"FY27",fromCurrency:"USD",toCurrency:"KRW",rateValue:1400,sourceReference:"Fixture",versionNo:5};
 const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflected:index===0,fiscalYear:"FY27",kpiCode:"A",quarter:["Q1","Q2","Q3"][index],activityMonth:`2026-0${index+1}`,rawWorkload:null,workloadId:null,mappingStatus:"NOT_REQUIRED",srNumber:`SR000765432${index}`,description:`Fixture KPI ${index}`,salesStage:null,acrK:null,targetQuarter:null,deliveryDate:`2026-0${index+1}-0${index+1}`}));
+const kpiCodes=["A","B","C1","C2","D1","F","H"];
+const kpiSummary={fiscalYear:"FY27",quarterCounts:Object.fromEntries(kpiCodes.map(code=>[code,{Q1:0,Q2:0,Q3:0,Q4:0}])),c1C2Monthly:Object.fromEntries(["Q1","Q2","Q3","Q4"].map(q=>[q,{C1:{},C2:{}}])),d1QuarterByStage:Object.fromEntries(["Q1","Q2","Q3","Q4"].map(q=>[q,{IDENTIFIED:{count:0,acrK:0},VALIDATED:{count:0,acrK:0},ONBOARDED:{count:0,acrK:0}}])),targets:{countPerQuarter:{A:1,B:1,F:1,H:1},c1C2CombinedPerQuarter:6,d1AcrKPerQuarter:{IDENTIFIED:2000,VALIDATED:1000,ONBOARDED:500},labels:Object.fromEntries(kpiCodes.map(code=>[code,`${code} fixture target`]))}};
 (async()=>{
   const targets=await getJson(`http://127.0.0.1:${cdpPort}/json/list`); const page=targets.find(t=>t.type==="page"&&!t.url.startsWith("devtools://")); if(!page)throw new Error("No CDP page");
   const cdp=new Cdp(page.webSocketDebuggerUrl); await cdp.open();
@@ -44,6 +46,7 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
     if(path.endsWith("/api/v1/fx-rates")) return fulfill(200,fx);
     if(path.endsWith("/api/v1/kpi-guides")) return fulfill(200,{items:[]});
     if(path.includes("/api/v1/kpi-activities")){
+      if(path.endsWith("/summary")) return fulfill(200,kpiSummary);
       if(path.endsWith("/overview")) return fulfill(200,{fiscalYear:"FY27",asOf:"2026-08-21",items:[{code:"A",rows:3,target:"Fixture",status:"In Progress",explanation:"Fixture"}]});
       if(path.endsWith("/workload-options")) return fulfill(200,{items:[],total:0,hasMore:false});
       if(request.method==="GET") return fulfill(200,{items:kpiRows});
@@ -52,18 +55,50 @@ const kpiRows=[0,1,2].map(index=>({id:270000+index,versionNo:1,manageTimeReflect
     return cdp.send("Fetch.continueRequest",{requestId});
   });
   await cdp.send("Page.enable"); await cdp.send("Runtime.enable"); await cdp.send("Network.enable"); await cdp.send("Network.setCacheDisabled",{cacheDisabled:true});
+  const runtimeConfigResult=await cdp.send("Runtime.evaluate",{expression:"globalThis.KAP_AUTH_CONFIG",returnByValue:true});
+  const runtimeConfig=runtimeConfigResult.result.value;
+  if(!runtimeConfig) throw new Error("Runtime auth config unavailable before test navigation");
   await cdp.send("Fetch.enable",{patterns:[{urlPattern:"*api/v1/*",requestStage:"Request"}]});
-  await cdp.send("Page.addScriptToEvaluateOnNewDocument",{source:`window.__phase2={errors:[],rejections:[]};addEventListener('error',e=>window.__phase2.errors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>window.__phase2.rejections.push(String(e.reason?.stack||e.reason)));`});
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument",{source:`Object.defineProperty(globalThis,'KAP_AUTH_CONFIG',{value:${JSON.stringify(runtimeConfig)},writable:false,configurable:false});window.__phase2={errors:[],rejections:[]};addEventListener('error',e=>window.__phase2.errors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>window.__phase2.rejections.push(String(e.reason?.stack||e.reason)));`});
   const evaluate=async expression=>{const out=await cdp.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(out.exceptionDetails)throw new Error(out.exceptionDetails.exception?.description||out.exceptionDetails.text);return out.result.value;};
   const waitPage=async(expression,label,timeout=18000)=>{const start=Date.now();while(Date.now()-start<timeout){const value=await evaluate(expression);if(value)return value;await delay(40);}throw new Error(`wait timeout: ${label}`);};
   const navigate=async(path)=>{await cdp.send("Page.navigate",{url:`${baseUrl}${path}${path.includes("?")?"&":"?"}gate=${Date.now()}`});await waitPage(`document.readyState==='complete'&&document.querySelector('.kpi-footer')&&document.querySelector('.kpi-content')`,path);await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);};
 
   await navigate("/accounts-workloads");
   await waitPage(`document.querySelector('#accountsWorkloadsTitle')`,`accounts loaded`);
+  const accountEscContract=await evaluate(`(async()=>{
+    const wait=async(fn,label)=>{for(let i=0;i<200;i+=1){const value=fn();if(value)return value;await new Promise(r=>setTimeout(r,30));}throw new Error(label);};
+    const cell=document.querySelector('tr[data-account-row-id="41"] [data-account-field="account"]');
+    const original=cell.textContent.trim();
+    cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,composed:true,detail:2,view:window}));
+    const input=await wait(()=>cell.querySelector('input.accounts-workloads-edit-field'),'account editor');
+    const nativeCaret=!(input.selectionStart===0&&input.selectionEnd===input.value.length);
+    input.value='Esc must discard this value';
+    input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:input.value}));
+    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',bubbles:true,composed:true}));
+    await wait(()=>!cell.querySelector('.accounts-workloads-edit-field'),'account editor close');
+    return {nativeCaret,restored:cell.textContent.trim()===original,normalMode:!cell.classList.contains('is-unsaved-cell')};
+  })()`);
+  assert.deepEqual(accountEscContract,{nativeCaret:true,restored:true,normalMode:true});
   const addContract=await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');const inner=b?.shadowRoot?.querySelector('button');return {text:b?.textContent.trim(),aria:b?.getAttribute('aria-label')||inner?.getAttribute('aria-label')||inner?.getAttribute('aria-labelledby')||inner?.textContent.trim()||b?.textContent.trim(),title:b?.getAttribute('title')};})()`);
   assert.deepEqual(addContract,{text:"Add Account",aria:"Add Account",title:"Add Account"});
   const accountToolbarLabels=()=>evaluate(`[...new Set([...document.querySelectorAll('.accounts-workloads-actions button, .accounts-workloads-actions oj-button')].map(button=>button.textContent.trim()).filter(Boolean))]`);
   assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel','Highlight','Delete'].includes(label)),[]);
+  await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
+  await waitPage(`document.querySelector('tr.is-adding-row')`,`Esc add row`);
+  const addEscContract=await evaluate(`(async()=>{
+    const input=document.querySelector('tr.is-adding-row input[placeholder="Account *"]');
+    input.value='Must be discarded';
+    input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:input.value}));
+    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:229,isComposing:true,bubbles:true,composed:true}));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const retainedDuringIme=Boolean(document.querySelector('tr.is-adding-row'));
+    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',bubbles:true,composed:true}));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    return {retainedDuringIme,cancelled:!document.querySelector('tr.is-adding-row')};
+  })()`);
+  assert.deepEqual(addEscContract,{retainedDuringIme:true,cancelled:true});
+  assert.deepEqual((await accountToolbarLabels()).filter(label=>['Save','Cancel'].includes(label)),[]);
   const draftDeleteRequestsBefore=requests.filter(r=>r.path.endsWith('/accounts-workloads/save')).length;
   await evaluate(`(()=>{const b=document.querySelector('oj-button.accounts-workloads-jet-button');b.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));return true;})()`);
   await waitPage(`document.querySelector('tr.is-adding-row')`,`draft delete row`);

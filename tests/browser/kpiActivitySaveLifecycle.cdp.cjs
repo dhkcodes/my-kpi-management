@@ -20,6 +20,16 @@ const getJson = (url) => new Promise((resolve, reject) => {
   }).on("error", reject);
 });
 const encodeBody = (value) => Buffer.from(JSON.stringify(value)).toString("base64");
+const summaryCodes = ["A", "B", "C1", "C2", "D1", "F", "H"];
+const summaryFixture = {
+  fiscalYear: "FY27",
+  quarterCounts: Object.fromEntries(summaryCodes.map(code => [code, { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }])),
+  c1C2Monthly: Object.fromEntries(["Q1", "Q2", "Q3", "Q4"].map(q => [q, { C1: {}, C2: {} }])),
+  d1QuarterByStage: Object.fromEntries(["Q1", "Q2", "Q3", "Q4"].map(q => [q, { IDENTIFIED: { count: 0, acrK: 0 }, VALIDATED: { count: 0, acrK: 0 }, ONBOARDED: { count: 0, acrK: 0 } }])),
+  targets: { countPerQuarter: { A: 1, B: 1, F: 1, H: 1 }, c1C2CombinedPerQuarter: 6,
+    d1AcrKPerQuarter: { IDENTIFIED: 2000, VALIDATED: 1000, ONBOARDED: 500 },
+    labels: Object.fromEntries(summaryCodes.map(code => [code, `${code} fixture target`])) }
+};
 
 class Cdp {
   constructor(url) {
@@ -90,6 +100,7 @@ class Cdp {
       body: payload == null ? undefined : encodeBody(payload)
     });
     const { url, method } = request;
+    if (url.includes("/api/v1/kpi-activities/summary")) return fulfill(200, summaryFixture);
     if (url.includes("/api/v1/kpi-activities/overview")) {
       return fulfill(200, { fiscalYear: "FY27", asOf: "2026-08-19", items: [{ code: "A", rows: 1, target: "Fixture", status: "In Progress", explanation: "Fixture" }] });
     }

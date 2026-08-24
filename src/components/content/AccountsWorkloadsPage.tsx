@@ -4,6 +4,7 @@ import { FiscalYear } from "../../data/kpiMockData";
 import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError } from "../../data/accountsWorkloadsApi";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
+import { getTargetPeriodOptions } from "../../data/targetPeriod";
 import {
   applyDraftDelete,
   applyDraftRestore,
@@ -103,9 +104,6 @@ const fieldAlignmentClass = (field: EditableField) =>
     : centerAlignedFields.has(field)
       ? "accounts-workloads-cell--center"
       : "accounts-workloads-cell--left";
-
-const targetOptions = (["FY26", "FY27", "FY28"] as FiscalYear[])
-  .flatMap((year) => [1, 2, 3, 4].map((quarter) => `${year} Q${quarter}`));
 
 const columnLabels: Record<EditableField | "rowNo" | "isImportant", string> = {
   rowNo: "No",
@@ -208,19 +206,31 @@ function EditableCell({
   row,
   field,
   value,
+  targetOptions,
   onChange,
-  onCommit
+  onCommit,
+  onCancel
 }: Readonly<{
   row: AccountWorkloadRow;
   field: EditableField;
   value: AccountWorkloadRow[EditableField];
+  targetOptions: readonly string[];
   onChange: (rowId: string, field: EditableField, value: string) => void;
   onCommit: () => void;
+  onCancel: () => void;
 }>) {
   const inputId = `${row.id}-${field}`;
-  const commitOnEnter = (event: KeyboardEvent) => {
+  const editorKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onCancel();
+      return;
+    }
     if (event.key === "Enter" && !(event.currentTarget instanceof HTMLTextAreaElement && event.shiftKey)) {
       event.preventDefault();
+      event.stopPropagation();
       onCommit();
     }
   };
@@ -231,7 +241,7 @@ function EditableCell({
         class="accounts-workloads-edit-field accounts-workloads-edit-field--textarea"
         value={`${value ?? ""}`}
         onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLTextAreaElement).value)}
-        onKeyDown={commitOnEnter}
+        onKeyDown={editorKeyDown}
         autofocus
       />
     );
@@ -252,7 +262,7 @@ function EditableCell({
           daysOutsideMonth: "visible"
         }}
         onvalueChanged={(event: CustomEvent) => onChange(row.id, field, `${event.detail.value ?? ""}`)}
-        onKeyDown={commitOnEnter}
+        onKeyDown={editorKeyDown}
         autofocus>
       </oj-input-date>
     );
@@ -266,7 +276,7 @@ function EditableCell({
         type="number"
         value={value === null ? "" : `${value}`}
         onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLInputElement).value)}
-        onKeyDown={commitOnEnter}
+        onKeyDown={editorKeyDown}
         autofocus
       />
     );
@@ -279,7 +289,7 @@ function EditableCell({
         class="accounts-workloads-edit-field"
         value={`${value ?? ""}`}
         onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLSelectElement).value)}
-        onKeyDown={commitOnEnter}
+        onKeyDown={editorKeyDown}
         autofocus>
         <option value="">—</option>
         {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -293,7 +303,7 @@ function EditableCell({
       class="accounts-workloads-edit-field"
       value={`${value ?? ""}`}
       onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLInputElement).value)}
-      onKeyDown={commitOnEnter}
+      onKeyDown={editorKeyDown}
       autofocus
     />
   );
@@ -313,7 +323,8 @@ export function AccountsWorkloadsPage({
   onRefresh,
   onDraftStateChange,
   onRowsChange
-}: Props) {
+} : Props) {
+  const targetOptions = getTargetPeriodOptions(fiscalYear);
   const [draftRows, setDraftRows] = useState<AccountWorkloadRow[]>(rows);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [includeDeleted, setIncludeDeleted] = useState(Boolean(query.includeDeleted));
@@ -336,6 +347,7 @@ export function AccountsWorkloadsPage({
   const addButtonRef = useRef<any>(null);
   const deleteButtonRef = useRef<any>(null);
   const deleteCancelButtonRef = useRef<any>(null);
+  const editEntrySnapshotRef = useRef<AccountWorkloadRow | null>(null);
   const [scrollState, setScrollState] = useState({ left: 0, max: 0, clientWidth: 0 });
 
   const updateScrollState = () => {
@@ -462,6 +474,16 @@ export function AccountsWorkloadsPage({
   }, [addingRow, visibleRows]);
 
   const commitActiveCell = () => {
+    editEntrySnapshotRef.current = null;
+    setEditCell(null);
+  };
+
+  const cancelCurrentCell = () => {
+    const snapshot = editEntrySnapshotRef.current;
+    if (snapshot) {
+      setDraftRows((current) => current.map((row) => row.id === snapshot.id ? snapshot : row));
+    }
+    editEntrySnapshotRef.current = null;
     setEditCell(null);
   };
 
@@ -476,8 +498,6 @@ export function AccountsWorkloadsPage({
         const editor = cell?.querySelector<HTMLElement>(".accounts-workloads-edit-field");
         if (!editor) return;
         editor.focus();
-        if (editor instanceof HTMLInputElement && editor.type !== "number") editor.select();
-        if (editor instanceof HTMLTextAreaElement) editor.select();
       });
     });
     return () => {
@@ -531,6 +551,13 @@ export function AccountsWorkloadsPage({
       }
       return { ...row, [field]: rawValue };
     });
+  };
+
+  const addRowEditorKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing || event.keyCode === 229 || event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setAddingRow(null);
   };
 
   const saveGridChanges = async () => {
@@ -720,9 +747,16 @@ export function AccountsWorkloadsPage({
     ].filter(Boolean).join(" ");
     return (
       <td data-account-field={field} class={cellClass || undefined}
-        onDblClick={(event) => { event.preventDefault(); event.stopPropagation(); setEditCell({ id: row.id, field }); }}>
+        onDblClick={(event) => {
+          if ((event.target as Element).closest(".accounts-workloads-edit-field")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          editEntrySnapshotRef.current = { ...row };
+          setEditCell({ id: row.id, field });
+        }}>
         {isEditing ? (
-          <EditableCell row={row} field={field} value={value} onChange={updateDraftCell} onCommit={commitActiveCell} />
+          <EditableCell row={row} field={field} value={value} targetOptions={targetOptions}
+            onChange={updateDraftCell} onCommit={commitActiveCell} onCancel={cancelCurrentCell} />
         ) : field === "latestUpdate" ? (
           <span class="accounts-workloads-update-trigger" tabIndex={0} aria-label={row.latestUpdate}>
             <span class="accounts-workloads-update-summary">{row.latestUpdate || "—"}</span>
@@ -739,6 +773,16 @@ export function AccountsWorkloadsPage({
 
   const renderAddInput = (field: EditableField, placeholder: string, type: "text" | "date" | "number" | "textarea" = "text") => {
     const value = addingRow?.[field];
+    if (field === "target") {
+      return (
+        <select class="accounts-workloads-edit-field" value={`${value ?? ""}`}
+          aria-label="Target" onKeyDown={addRowEditorKeyDown}
+          onChange={(event) => updateAddRowCell(field, (event.currentTarget as HTMLSelectElement).value)}>
+          <option value="">—</option>
+          {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      );
+    }
     if (type === "date") {
       return (
         <oj-input-date
@@ -752,6 +796,7 @@ export function AccountsWorkloadsPage({
             changeYear: "select",
             daysOutsideMonth: "visible"
           }}
+          onKeyDown={addRowEditorKeyDown}
           onvalueChanged={(event: CustomEvent) => updateAddRowCell(field, `${event.detail.value ?? ""}`)}>
         </oj-input-date>
       );
@@ -762,6 +807,7 @@ export function AccountsWorkloadsPage({
           class="accounts-workloads-edit-field accounts-workloads-edit-field--textarea"
           value={`${value ?? ""}`}
           placeholder={placeholder}
+          onKeyDown={addRowEditorKeyDown}
           onInput={(event) => updateAddRowCell(field, (event.currentTarget as HTMLTextAreaElement).value)}
         />
       );
@@ -772,6 +818,7 @@ export function AccountsWorkloadsPage({
         type={type}
         value={value === null ? "" : `${value ?? ""}`}
         placeholder={placeholder}
+        onKeyDown={addRowEditorKeyDown}
         onInput={(event) => updateAddRowCell(field, (event.currentTarget as HTMLInputElement).value)}
       />
     );
@@ -954,7 +1001,7 @@ export function AccountsWorkloadsPage({
                 <td class="accounts-workloads-cell--right">{renderAddInput("arrKrw", "KRW", "number")}</td>
                 <td class="accounts-workloads-cell--right">{renderAddInput("acrUsd", "USD", "number")}</td>
                 <td class="accounts-workloads-cell--right">{renderAddInput("acrKrw", "KRW", "number")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("target", "FY27 Q1")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("target", "Target")}</td>
                 <td class="accounts-workloads-cell--center">{renderAddInput("winProbability", "%", "number")}</td>
                 <td class="accounts-workloads-cell--left">{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
                 <td class="accounts-workloads-cell--left">{renderAddInput("notes", "Notes", "textarea")}</td>

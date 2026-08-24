@@ -86,7 +86,9 @@ function decodeActivity(value: unknown): KpiSpreadsheetRow {
     mappingStatus: asText(value.mappingStatus) as KpiSpreadsheetRow["mappingStatus"],
     title: asText(value.description), srNumber: asText(value.srNumber),
     stage: asText(value.salesStage).toLowerCase() as KpiSpreadsheetRow["stage"],
-    acrK: asNullableNumber(value.acrK), targetQuarter: asText(value.targetQuarter) as KpiSpreadsheetRow["targetQuarter"],
+    acrK: asNullableNumber(value.acrK),
+    targetFiscalYear: (asText(value.targetFiscalYear) || (kpiCode === "D1" ? asText(value.fiscalYear) : "")) as KpiSpreadsheetRow["targetFiscalYear"],
+    targetQuarter: asText(value.targetQuarter) as KpiSpreadsheetRow["targetQuarter"],
     deliveryDate: asText(value.deliveryDate), deliveryDateRaw: asText(value.deliveryDateRaw)
   };
 }
@@ -255,6 +257,7 @@ function payloadFor(row: KpiSpreadsheetRow) {
     mappingStatus: usesWorkload ? (verified ? "VERIFIED" : row.mappingStatus ?? "UNMATCHED") : "NOT_REQUIRED",
     salesStage: row.kpiCode === "D1" ? row.stage.toUpperCase() : null,
     acrK: row.kpiCode === "D1" ? row.acrK : null,
+    targetFiscalYear: row.kpiCode === "D1" ? row.targetFiscalYear : null,
     targetQuarter: row.kpiCode === "D1" ? row.targetQuarter : null,
     srNumber: row.srNumber || null, description: row.title || null
   };

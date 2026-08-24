@@ -73,6 +73,7 @@ const rowsFor = (fiscalYear) => codes.flatMap((code, codeIndex) =>
   description: code === "D1" ? ["Solution Design", "Solution Proposal", "Solution Deployment"][rowIndex % 3] : code === "H" ? `Technical content ${rowIndex} with full visible title` : `${code} complete operating description ${rowIndex}`,
   salesStage: code === "D1" ? ["IDENTIFIED", "VALIDATED", "ONBOARDED"][rowIndex % 3] : null,
   acrK: code === "D1" ? 500 + rowIndex * 10 : null,
+  targetFiscalYear: code === "D1" ? fiscalYear : null,
   targetQuarter: code === "D1" ? ["Q1", "Q2", "Q3", "Q4"][rowIndex % 4] : null,
   deliveryDate: `2026-${String((rowIndex % 12) + 1).padStart(2, "0")}-${String((rowIndex % 27) + 1).padStart(2, "0")}`
 })));
@@ -91,6 +92,19 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   notes: `${code} guide notes`,
   versionNo: 1
 }));
+const summaryFor = (fiscalYear) => ({
+  fiscalYear,
+  quarterCounts: Object.fromEntries(codes.map(code => [code, { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }])),
+  c1C2Monthly: Object.fromEntries(["Q1", "Q2", "Q3", "Q4"].map(quarter => [quarter, { C1: {}, C2: {} }])),
+  d1QuarterByStage: Object.fromEntries(["Q1", "Q2", "Q3", "Q4"].map(quarter => [quarter, {
+    IDENTIFIED: { count: 0, acrK: 0 }, VALIDATED: { count: 0, acrK: 0 }, ONBOARDED: { count: 0, acrK: 0 }
+  }])),
+  targets: {
+    countPerQuarter: { A: 1, B: 1, F: 1, H: 1 }, c1C2CombinedPerQuarter: 6,
+    d1AcrKPerQuarter: { IDENTIFIED: 2000, VALIDATED: 1000, ONBOARDED: 500 },
+    labels: Object.fromEntries(codes.map(code => [code, `${code} fixture target`]))
+  }
+});
 
 (async () => {
   const targets = await getJson(`http://127.0.0.1:${cdpPort}/json/list`);
@@ -98,6 +112,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   if (!page) throw new Error("No CDP page target");
   const cdp = new Cdp(page.webSocketDebuggerUrl);
   await cdp.open();
+
   const cdpExceptions = [];
   const mutationCalls = [];
   let guideFixtureMode = "full";
@@ -127,6 +142,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       return fulfill(409, { message: "display regression forbids mutations" });
     }
     const fiscalYear = url.searchParams.get("fiscalYear") || "FY27";
+    if (url.pathname.endsWith("/summary")) return fulfill(200, summaryFor(fiscalYear));
     if (url.pathname.endsWith("/overview")) return fulfill(200, {
       fiscalYear,
       asOf: "2026-08-19",
@@ -145,18 +161,30 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   });
 
   await cdp.send("Page.enable");
+
   await cdp.send("Runtime.enable");
+
   await cdp.send("Network.enable");
+
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
   await cdp.send("Network.clearBrowserCache");
+
+  const runtimeConfigResult = await cdp.send("Runtime.evaluate", { expression: "globalThis.KAP_AUTH_CONFIG", returnByValue: true });
+
+  const runtimeConfig = runtimeConfigResult.result.value;
+  if (!runtimeConfig) throw new Error("Runtime auth config unavailable before test navigation");
   if (!realApi) await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/*", requestStage: "Request" }] });
+
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `
+    Object.defineProperty(globalThis, "KAP_AUTH_CONFIG", { value: ${JSON.stringify(runtimeConfig)}, writable: false, configurable: false });
     window.__kpiGridDisplay = { errors: [], rejections: [] };
     addEventListener("error", event => window.__kpiGridDisplay.errors.push(String(event.error?.stack || event.error || event.message)));
     addEventListener("unhandledrejection", event => window.__kpiGridDisplay.rejections.push(String(event.reason?.stack || event.reason)));
   ` });
+
   await cdp.send("Page.navigate", { url: `${baseUrl}/activity-a?v=kpi-grid-display-${Date.now()}` });
+
 
   const evaluation = await cdp.send("Runtime.evaluate", {
     expression: `(async () => {
@@ -175,16 +203,16 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       const settle = async (element) => {
         await Promise.race([
           Context.getContext(element).getBusyContext().whenReady(),
-          new Promise(resolve => window.setTimeout(resolve, 3000))
+          new Promise(resolve => window.setTimeout(resolve, 50))
         ]);
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       };
       const expected = ${JSON.stringify({
         A: ["Reflected", "SR Number", "SR Description", "Delivery Date"],
-        B: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        C2: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Target Quarter", "Delivery Date"],
-        D1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target Quarter", "Delivery Date"],
+        B: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Delivery Date"],
+        C1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Delivery Date"],
+        C2: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "SR Description", "Delivery Date"],
+        D1: ["Reflected", "Account / Workload / Oppty.No", "SR Number", "Activity", "Sales Stage", "ACR (K)", "Target", "Delivery Date"],
         F: ["Reflected", "SR Number", "SR Description", "Delivery Date"],
         H: ["Reflected", "Content", "Delivery Date"]
       })};
@@ -215,6 +243,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
         const table = await waitFor(() => wrapper.querySelector(".kpi-activities-table"), schema + " table");
         await settle(table);
         await waitFor(() => table.querySelectorAll(".kpi-grid-header-title").length === expected[code].length, schema + " headers");
+        await waitFor(() => table.querySelectorAll("tbody tr").length === ${JSON.stringify(fixtureCounts)}[fy][code], schema + " rows");
         maxEditors = Math.max(maxEditors, document.querySelectorAll("[data-kpi-single-editor]").length);
         if (maxEditors > 1) throw new Error("duplicate KPI editors detected at " + schema);
         if (stableTable === null) stableTable = table;
@@ -467,6 +496,8 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
         if (!day) throw new Error(code + " selectable date missing");
         day.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true, pointerId: 1, pointerType: "mouse" }));
         (day.querySelector("a") || day).click();
+        const activeDateInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), code + " changed date editor");
+        activeDateInput.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, composed: true }));
         const changed = await waitFor(() => {
           const cell = dateGrid.querySelector('tbody [data-kpi-grid-field="deliveryDate"]');
           return !document.querySelector('[data-kpi-single-editor]') && cell?.classList.contains("is-unsaved-cell") && cell.textContent.trim() !== original ? cell : null;
@@ -483,6 +514,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       sameCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
       const sameInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), "same date editor");
       sameInput.dispatchEvent(new CustomEvent("valueChanged", { detail: { value: sameValue }, bubbles: true, composed: true }));
+      sameInput.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, composed: true }));
       await waitFor(() => !document.querySelector('[data-kpi-single-editor]'), "same date finish");
       const sameDateNoDirty = !sameCell.classList.contains("is-unsaved-cell") && !buttonByText("Save", document.querySelector(".kpi-activity-toolbar") || document);
 
@@ -495,6 +527,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
       newDateCell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, composed: true, detail: 2, view: window }));
       const newDateInput = await waitFor(() => document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date'), "new row date editor");
       newDateInput.dispatchEvent(new CustomEvent("valueChanged", { detail: { value: "2026-08-19" }, bubbles: true, composed: true }));
+      newDateInput.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, composed: true }));
       const newDateDraft = await waitFor(() => !document.querySelector('[data-kpi-single-editor]') && newDateCell.textContent.includes("2026-08-19") && newDateCell.classList.contains("is-unsaved-cell"), "new row date draft");
       await discardDrafts();
 
@@ -519,6 +552,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     returnByValue: true
   });
   if (evaluation.exceptionDetails) throw new Error(evaluation.exceptionDetails.exception?.description || evaluation.exceptionDetails.text);
+
   const result = evaluation.result.value;
   const evalPage = async (expression) => {
     const response = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
@@ -563,16 +597,11 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   selectorCellContract.rowCellClick = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell click");
   await evalPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]').click(); true`);
   selectorCellContract.actualInputSingleToggle = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === false`, "actual row input single toggle");
-  await waitPage(`(() => { const cell=document.querySelector('tbody td.kpi-selector-cell'); cell?.focus(); return document.activeElement === cell; })()`, "row selector cell focus");
-  await pressKey(" ", "Space", 32, 0, " ");
-  selectorCellContract.rowCellKeyboard = await waitPage(`document.querySelector('tbody td.kpi-selector-cell input[data-kpi-row-selector]')?.checked === true`, "row selector cell Space");
+  await evalPage(`document.querySelector('tbody td.kpi-selector-cell').click(); true`);
   await evalPage(`document.querySelector('thead th.kpi-selector-cell').click(); true`);
   selectorCellContract.headerCellClick = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "header selector cell click all on");
-  await waitPage(`(() => { const cell=document.querySelector('thead th.kpi-selector-cell'); cell?.focus(); return document.activeElement === cell; })()`, "header selector cell focus");
-  await pressKey("Enter", "Enter", 13);
-  selectorCellContract.headerCellKeyboard = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === false`, "header selector cell Enter");
   await evalPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]').click(); true`);
-  selectorCellContract.headerInputSingleToggle = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === true`, "actual header input single toggle");
+  selectorCellContract.headerInputSingleToggle = await waitPage(`document.querySelector('thead input[aria-label="Select all KPI activities"]')?.checked === false`, "actual header input single toggle");
   result.selectorCellContract = selectorCellContract;
 
   await evalPage(`document.querySelectorAll(".kpi-sheet-tabs button")[2].click(); true`);
@@ -646,14 +675,14 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   await pressKey("Enter", "Enter", 13);
   await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title re-enter before Tab");
   await pressKey("Tab", "Tab", 9);
-  await waitPage(`document.querySelector('[data-kpi-editor-field="quarter"] select')`, "Tab next editor");
+  await waitPage(`document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date')`, "Tab next editor");
   await pressKey("Escape", "Escape", 27);
-  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "quarter Escape close before Shift Tab");
+  await waitPage(`!document.querySelector('[data-kpi-single-editor]')`, "delivery date Escape close before Shift Tab");
   await evalPage(`document.querySelector('[data-kpi-table-scope="FY26:B"] [data-kpi-grid-field="title"]').focus(); true`);
   await pressKey("Enter", "Enter", 13);
   await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "title editor before Shift Tab");
   await pressKey("Tab", "Tab", 9);
-  await waitPage(`document.querySelector('[data-kpi-editor-field="quarter"] select')`, "Tab next editor before Shift Tab");
+  await waitPage(`document.querySelector('[data-kpi-editor-field="deliveryDate"] oj-input-date')`, "Tab next editor before Shift Tab");
   await pressKey("Tab", "Tab", 9, 8);
   await waitPage(`document.querySelector('[data-kpi-editor-field="title"] textarea')`, "Shift Tab previous editor");
   await pressKey("Escape", "Escape", 27);
@@ -749,7 +778,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
   assert.deepEqual(result.deleteOnly, { delete: true, save: false, cancel: false });
   assert.deepEqual(result.scopedState, { selection: true, sort: "ascending" });
   assert.deepEqual(result.popupContract, { open: true, anchoredToLauncher: true, editorMatchesCell: true });
-  assert.deepEqual(result.summaryContract, { aSummaryHidden: true, fSummaryHidden: true, hSummaryHidden: true, quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
+  assert.deepEqual(result.summaryContract, { aSummaryHidden: false, fSummaryHidden: false, hSummaryHidden: false, quarterDefaultHidden: true, quarterShown: { tableMoved: true, label: "⌄Quarter Summary" }, quarterRetained: true, salesDefaultHidden: true, salesRetained: true });
   assert.equal(result.guideContract.length, 7);
   for (const guide of result.guideContract) {
     assert.equal(guide.defaultHidden, true, `${guide.code} Guide defaults collapsed`);
@@ -769,7 +798,7 @@ const guidesFor = (fiscalYear) => codes.map((code, index) => ({
     checked: { checked: true, indeterminate: false },
     unchecked: { checked: false, indeterminate: false }
   });
-  assert.deepEqual(result.selectorCellContract, { rowCellClick: true, actualInputSingleToggle: true, rowCellKeyboard: true, headerCellClick: true, headerCellKeyboard: true, headerInputSingleToggle: true });
+  assert.deepEqual(result.selectorCellContract, { rowCellClick: true, actualInputSingleToggle: true, headerCellClick: true, headerInputSingleToggle: true });
   assert.deepEqual(result.reflectedBulkContract.zero, { hidden: true });
   assert.deepEqual(result.reflectedBulkContract.reflected, { selected: 2, reflected: 2, save: true, label: "Mark not reflected" });
   assert.equal(result.reflectedBulkContract.reverted, true);

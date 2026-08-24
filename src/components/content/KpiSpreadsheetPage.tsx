@@ -49,6 +49,7 @@ import {
   saveKpiRowsAtomic
 } from "../../data/kpiSpreadsheetApi";
 import { KpiGuideRecord } from "../../data/kpiConfigurationApi";
+import { getTargetPeriodOptions, joinTargetPeriod, splitTargetPeriod } from "../../data/targetPeriod";
 import {
   buildKpiActivitiesOverview,
   filterKpiOverviewRows,
@@ -75,6 +76,7 @@ const collapsedKpiState = (): Record<SpreadsheetKpiCode, boolean> => ({
   H: false
 });
 const stopGridInteraction = (event: Event) => event.stopPropagation();
+const isImeCommand = (event: KeyboardEvent | globalThis.KeyboardEvent) => event.isComposing || event.keyCode === 229;
 const waitForFrame = () => new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 const minimumProgress = (startedAt: number, minimumMs = 450) => new Promise<void>((resolve) => {
   const remaining = Math.max(0, minimumMs - (performance.now() - startedAt));
@@ -141,7 +143,8 @@ function KpiRowSelector({ rowId, selected, onSelectionChange }: Readonly<{
 
 const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "manageTimeReflected"
   ? (row.manageTimeReflected ? "Reflected in internal system" : "Not reflected in internal system")
-  : key === "stage" && row.stage ? stageLabels[row.stage] : row[key] === null ? "—" : String(row[key] || "—");
+  : key === "targetQuarter" ? (joinTargetPeriod(row.targetFiscalYear, row.targetQuarter) || "—")
+    : key === "stage" && row.stage ? stageLabels[row.stage] : row[key] === null ? "—" : String(row[key] || "—");
 
 function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
   routeId: string;
@@ -249,7 +252,9 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   const [offset, setOffset] = useState(0);
   const [activeWorkloadIndex, setActiveWorkloadIndex] = useState(0);
   const requestGenerationRef = useRef(0);
-  const value = row[field.key] === null ? "" : String(row[field.key]);
+  const value = field.type === "targetPeriod"
+    ? joinTargetPeriod(row.targetFiscalYear, row.targetQuarter)
+    : row[field.key] === null ? "" : String(row[field.key]);
   const isTextarea = field.type === "textarea";
   const maxWidth = Math.max(160, window.innerWidth - rect.left - 16);
   const overlayWidth = Math.min(isTextarea ? Math.max(rect.width, 360) : rect.width, maxWidth);
@@ -328,9 +333,11 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
 
   useEffect(() => {
     const retainEditorFocusUntilKeyUp = (event: globalThis.KeyboardEvent) => {
+      if (isImeCommand(event)) return;
       if (event.key === "Tab" || event.key === "Escape") event.preventDefault();
     };
     const finishKeyboardAfterFocusMove = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || isImeCommand(event)) return;
       if (event.key === "Escape") {
         event.preventDefault(); closePopup(); onCancelCell(); return;
       }
@@ -366,6 +373,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   };
 
   const blockContractKey = (event: KeyboardEvent) => {
+    if (isImeCommand(event)) return;
     if (event.target instanceof HTMLTextAreaElement && event.key === "Enter" && event.shiftKey) return;
     const workloadArrow = field.type === "workload" && (event.key === "ArrowDown" || event.key === "ArrowUp");
     if (["Escape", "Tab", "Enter"].includes(event.key) || workloadArrow) {
@@ -374,6 +382,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   };
 
   const keyContract = (event: KeyboardEvent) => {
+    if (isImeCommand(event)) return;
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closePopup(); onCancelCell(); return; }
     if (event.key === "Tab") { event.preventDefault(); event.stopPropagation(); closePopup(); onMove(event.shiftKey ? -1 : 1); return; }
     if (field.type === "workload" && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
@@ -432,14 +441,14 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
       value={value} onvalueChanged={(event: CustomEvent) => {
         const nextValue = `${event.detail.value ?? ""}`;
         onInput(field.key, nextValue);
-        onFinish(nextValue !== state.originalValue);
       }} onKeyDown={blockContractKey} onKeyUp={keyContract}></oj-input-date>;
   } else {
-    const choices = field.type === "quarter" ? quarters
+    const choices = field.type === "targetPeriod" ? getTargetPeriodOptions(fiscalYear)
+      : field.type === "quarter" ? quarters
       : field.type === "month" ? getMonthsForQuarter(row.kpiCode === "D1" ? (row.targetQuarter || "Q1") : row.quarter)
         : field.type === "stage" ? stages : field.type === "activity" ? activities : null;
     editor = choices ? <select ref={editorRef as any} class="kpi-cell-editor-control" value={value} aria-label={field.label}
-      onChange={(event) => { onInput(field.key, (event.currentTarget as HTMLSelectElement).value); onFinish(); }} onKeyDown={blockContractKey} onKeyUp={keyContract}>
+      onChange={(event) => onInput(field.key, (event.currentTarget as HTMLSelectElement).value)} onKeyDown={blockContractKey} onKeyUp={keyContract}>
       {choices.map((choice) => <option value={choice}>{field.type === "stage" ? stageLabels[choice as WorkloadStage] : choice}</option>)}
     </select> : <input ref={editorRef as any} class="kpi-cell-editor-control" type={field.type === "number" ? "number" : "text"}
       min={field.type === "number" ? "0" : undefined} value={value} aria-label={field.label}
@@ -452,15 +461,14 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onFiscalYearChange, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
   fiscalYear: FiscalYear;
-  fiscalYears: readonly FiscalYear[];
   routeId: string;
   guideDataFiscalYear: FiscalYear | null;
   guideRecords: KpiGuideRecord[];
   guideLoading: boolean;
   guideError: string;
-  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
+
   onNavigate: (routeId: string) => void;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   onWriteStateChange: (active: boolean) => void;
@@ -556,10 +564,16 @@ export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideData
       : [...current, updated];
   }, [fields, rows]);
 
-  const applyDraftValue = (source: KpiSpreadsheetRow, key: KpiFieldKey, value: string): KpiSpreadsheetRow => ({
-    ...source,
-    [key]: key === "acrK" ? (value === "" ? null : Number(value)) : key === "manageTimeReflected" ? value === "true" : value
-  } as KpiSpreadsheetRow);
+  const applyDraftValue = (source: KpiSpreadsheetRow, key: KpiFieldKey, value: string): KpiSpreadsheetRow => {
+    if (key === "targetQuarter") {
+      const targetPeriod = splitTargetPeriod(value);
+      return targetPeriod ? { ...source, targetFiscalYear: targetPeriod.fiscalYear, targetQuarter: targetPeriod.quarter } : source;
+    }
+    return {
+      ...source,
+      [key]: key === "acrK" ? (value === "" ? null : Number(value)) : key === "manageTimeReflected" ? value === "true" : value
+    } as KpiSpreadsheetRow;
+  };
 
   const finishEditing = useCallback((currentCellDirty = false) => {
     setEditState((current) => transitionKpiActivityEdit(current, { type: "finish", hasDrafts: currentCellDirty || drafts.length > 0 }));
@@ -606,7 +620,9 @@ export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideData
     setEditState((current) => transitionKpiActivityEdit(current, {
       type: "begin",
       cell: { rowId: row.id, field: field.key },
-      value: latest[field.key] === null ? "" : String(latest[field.key])
+      value: field.type === "targetPeriod"
+        ? joinTargetPeriod(latest.targetFiscalYear, latest.targetQuarter)
+        : latest[field.key] === null ? "" : String(latest[field.key])
     }));
   }, [draftById, saving]);
 
@@ -839,11 +855,6 @@ export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideData
     setDrafts([draft]);
   };
 
-  const updateNewActivityFiscalYear = (value: string) => {
-    const nextFiscalYear = value as FiscalYear;
-    if (!fiscalYears.includes(nextFiscalYear)) return;
-    onFiscalYearChange(nextFiscalYear);
-  };
 
   const cancelDrafts = useCallback(() => {
     pendingAutoEditRowIdRef.current = null;
@@ -985,7 +996,7 @@ export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideData
       <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2>
       <p>{activeTab === "Overview" ? "FY-scoped KPI activity workspace" : `${activeTarget} · ${activeDefinition?.summaryModel}`}</p>
       <p class="kpi-api-status" role="status">{apiMessage}</p></div>
-      <div class="kpi-spreadsheet-page__fiscal-year" aria-label="Selected fiscal year"><span>Fiscal Year</span><strong>{fiscalYear}</strong></div>
+
     </header>
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
 
@@ -1039,13 +1050,6 @@ export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideData
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
         <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
-          <label class="kpi-new-activity-fiscal-year">
-            <span>Fiscal Year</span>
-            <select aria-label="Fiscal Year for new KPI Activity" value={fiscalYear}
-              disabled={saving || drafts.length > 0 || editState.cell !== null} onChange={(event) => updateNewActivityFiscalYear((event.currentTarget as HTMLSelectElement).value)}>
-              {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </label>
           {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>

@@ -13,6 +13,7 @@ const styles = read("src/styles/app.css");
 const indexHtml = read("src/index.html");
 const header = read("src/components/header.tsx");
 const packageJson = read("package.json");
+const targetPeriod = read("src/data/targetPeriod.ts");
 
 assert.match(indexHtml, /<title>My KPI &amp; Account Planner<\/title>/, "browser title uses the finalized KAP product name");
 assert.match(app, /appName = "My KPI & Account Planner"/, "app header defaults to the finalized KAP product name");
@@ -138,20 +139,36 @@ const deleteAt = page.indexOf(">Delete</oj-button>", highlightAt);
 assert.ok(addAt < saveAt && saveAt < cancelAt && cancelAt < highlightAt && highlightAt < deleteAt,
   "toolbar source order is Add Account, Save, Cancel, Highlight, Delete");
 assert.doesNotMatch(page, /accounts-workloads-footer-actions/, "Save/Cancel no longer appear in a separate footer action bar");
-assert.match(page, /useEffect\(\(\) => \{[\s\S]*editCell[\s\S]*CSS\.escape\(editCell\.id\)[\s\S]*CSS\.escape\(editCell\.field\)[\s\S]*focus\(\)/,
+assert.match(page, /useEffect\(\(\) => \{[\s\S]*editCell[\s\S]*CSS\.escape\(editCell\.id\)[\s\S]*CSS\.escape\(editCell\.field\)[\s\S]*editor\.focus\(\)/,
   "double-click editing focuses the real editor mounted in the selected cell");
-assert.match(page, /editor instanceof HTMLInputElement[\s\S]*editor\.type !== "number"[\s\S]*editor\.select\(\)/,
-  "double-click text inputs select their complete value after focus");
-assert.match(page, /editor instanceof HTMLTextAreaElement[\s\S]*editor\.select\(\)/,
-  "the shared multiline text editor also selects its complete value");
-assert.doesNotMatch(page, /setSelectionRange\(value\.length, value\.length\)/,
-  "text editors no longer collapse selection to a trailing caret");
-assert.match(page, /onDblClick=\{\(event\) => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setEditCell\(\{ id: row\.id, field \}\); \}\}/,
-  "editable cells alone enter edit mode on double click");
+assert.doesNotMatch(page, /editor\.select\(\)|setSelectionRange\(/,
+  "saved-row editors keep native caret and double-click selection behavior after focus");
+assert.match(page, /const editEntrySnapshotRef = useRef<AccountWorkloadRow \| null>\(null\)/,
+  "saved-row editing captures one row snapshot at edit entry");
+assert.match(page, /const cancelCurrentCell[\s\S]*editEntrySnapshotRef\.current[\s\S]*setDraftRows[\s\S]*snapshot[\s\S]*setEditCell\(null\)/,
+  "Escape restores only the active row snapshot and exits cell editing");
+assert.match(page, /const editorKeyDown[\s\S]*event\.isComposing \|\| event\.keyCode === 229[\s\S]*event\.key === "Escape"[\s\S]*onCancel\(\)[\s\S]*event\.key === "Enter"/,
+  "all saved-row editors ignore IME command keys and share Escape/Enter behavior");
+assert.equal((page.match(/onKeyDown=\{editorKeyDown\}/g) ?? []).length, 5,
+  "text, textarea, number, oj-input-date, and select saved-row editors share the keyboard contract");
+assert.match(page, /onDblClick=\{\(event\) => \{[\s\S]*closest\("\.accounts-workloads-edit-field"\)[\s\S]*return;[\s\S]*editEntrySnapshotRef\.current = \{ \.\.\.row \}[\s\S]*setEditCell\(\{ id: row\.id, field \}\)/,
+  "cell double-click starts one snapshot session without blocking native editor double-click selection");
+assert.match(page, /const addRowEditorKeyDown[\s\S]*event\.isComposing \|\| event\.keyCode === 229[\s\S]*event\.key !== "Escape"[\s\S]*setAddingRow\(null\)/,
+  "Add Account Escape ignores IME composition, cancels the entire new row, and returns to the normal grid");
+assert.doesNotMatch(page, /addRowSnapshotRef|cancelAddRowCell|beginAddRowCell/,
+  "Add Account no longer keeps a per-cell snapshot because Escape cancels the whole new row");
 assert.match(page, /workloadName: "Workload"/,
   "the Workload column uses the requested display-only label");
 assert.doesNotMatch(page, /Workload Name \(Enduser\)/,
   "the legacy Workload display label is absent without renaming the workloadName field");
+assert.match(targetPeriod, /export const getTargetPeriodOptions/,
+  "Accounts and KPI Activities share one target-period option generator");
+assert.match(page, /const targetOptions = getTargetPeriodOptions\(fiscalYear\)/,
+  "Accounts Target options follow the selected fiscal year");
+assert.match(page, /if \(field === "target"\)[\s\S]*<select[\s\S]*targetOptions\.map/,
+  "Add Account Target uses the same constrained SelectBox options as saved-row editing");
+assert.doesNotMatch(page, /renderAddInput\("target", "FY27 Q1"\)/,
+  "Add Account Target is not rendered as the legacy free-text input");
 
 assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
   "the common App shell owns short-content Footer placement for every route");
