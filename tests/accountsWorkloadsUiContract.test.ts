@@ -140,10 +140,18 @@ assert.ok(addAt < saveAt && saveAt < cancelAt && cancelAt < highlightAt && highl
 assert.doesNotMatch(page, /accounts-workloads-footer-actions/, "Save/Cancel no longer appear in a separate footer action bar");
 assert.match(page, /useEffect\(\(\) => \{[\s\S]*editCell[\s\S]*CSS\.escape\(editCell\.id\)[\s\S]*CSS\.escape\(editCell\.field\)[\s\S]*focus\(\)/,
   "double-click editing focuses the real editor mounted in the selected cell");
-assert.match(page, /setSelectionRange\(value\.length, value\.length\)/,
-  "text editors place a visible caret at the latest value");
+assert.match(page, /editor instanceof HTMLInputElement[\s\S]*editor\.type !== "number"[\s\S]*editor\.select\(\)/,
+  "double-click text inputs select their complete value after focus");
+assert.match(page, /editor instanceof HTMLTextAreaElement[\s\S]*editor\.select\(\)/,
+  "the shared multiline text editor also selects its complete value");
+assert.doesNotMatch(page, /setSelectionRange\(value\.length, value\.length\)/,
+  "text editors no longer collapse selection to a trailing caret");
 assert.match(page, /onDblClick=\{\(event\) => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setEditCell\(\{ id: row\.id, field \}\); \}\}/,
   "editable cells alone enter edit mode on double click");
+assert.match(page, /workloadName: "Workload"/,
+  "the Workload column uses the requested display-only label");
+assert.doesNotMatch(page, /Workload Name \(Enduser\)/,
+  "the legacy Workload display label is absent without renaming the workloadName field");
 
 assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
   "the common App shell owns short-content Footer placement for every route");

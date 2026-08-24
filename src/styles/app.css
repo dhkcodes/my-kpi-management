@@ -2099,10 +2099,14 @@ h4.weekly-activity-section-label--next-week,
 .kpi-dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
 .kpi-selector-cell { min-width: 3rem !important; text-align: center; width: 3rem; }
 .kpi-select-all-header { align-items: center; display: flex; justify-content: center; min-height: 2.5rem; width: 100%; }
-.kpi-reflected-status-badge { align-items: center; border: 1px solid; border-radius: 999px; display: inline-flex; font-size: .7rem; font-weight: 750; gap: .3rem; justify-content: center; margin: 0 auto; min-height: 1.55rem; padding: .16rem .48rem; width: max-content; }
+.kpi-grid-cell > .kpi-reflected-status-badge { align-items: center; border: 1px solid; border-radius: 999px; display: inline-flex; font-size: .7rem; font-weight: 750; gap: .3rem; justify-content: center; margin: 0 auto; min-height: 1.55rem; padding: .16rem .48rem; width: max-content; }
 .kpi-reflected-status-badge.is-reflected { background: #dcefe9; border-color: #8bbcaf; color: #205b4f; }
 .kpi-reflected-status-badge.is-not-reflected { background: #f8fafc; border-color: #9aa9b8; color: #526273; }
-.kpi-reflected-status-badge > [class*="oj-ux-ico-"] { font-size: .82rem; }
+.kpi-reflected-status-badge > [class*="oj-ux-ico-"] { align-items: center; display: inline-flex; flex: 0 0 auto; font-size: .82rem; line-height: 1; }
+.kpi-reflected-status-badge > span:last-child { align-items: center; display: inline-flex; line-height: 1; }
+.kpi-new-activity-fiscal-year { align-items: center; display: inline-flex; gap: .4rem; }
+.kpi-new-activity-fiscal-year > span { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; }
+.kpi-new-activity-fiscal-year select { background: var(--kap-grid-cell-bg); border: 1px solid var(--kap-grid-border); border-radius: .2rem; color: var(--kpi-ink); font: inherit; min-height: 2.25rem; padding: .3rem 1.8rem .3rem .55rem; }
 .kpi-activity-toolbar__right button.kpi-reflected-action { background: var(--kap-grid-cell-bg); border-color: var(--kap-grid-border); color: var(--kpi-ink); }
 .kpi-summary-toggle, .kpi-guide-toggle { align-items: center; display: inline-flex; gap: .35rem; }
 .kpi-toggle-chevron { display: inline-block; font-size: 1.15rem; font-weight: 800; line-height: 1; width: .8rem; }

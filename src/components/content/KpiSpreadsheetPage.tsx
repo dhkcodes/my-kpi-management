@@ -452,13 +452,15 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, fiscalYears, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onFiscalYearChange, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
   fiscalYear: FiscalYear;
+  fiscalYears: readonly FiscalYear[];
   routeId: string;
   guideDataFiscalYear: FiscalYear | null;
   guideRecords: KpiGuideRecord[];
   guideLoading: boolean;
   guideError: string;
+  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   onNavigate: (routeId: string) => void;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   onWriteStateChange: (active: boolean) => void;
@@ -837,6 +839,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setDrafts([draft]);
   };
 
+  const updateNewActivityFiscalYear = (value: string) => {
+    const nextFiscalYear = value as FiscalYear;
+    if (!fiscalYears.includes(nextFiscalYear)) return;
+    onFiscalYearChange(nextFiscalYear);
+  };
+
   const cancelDrafts = useCallback(() => {
     pendingAutoEditRowIdRef.current = null;
     setEditState((current) => transitionKpiActivityEdit(current, { type: "cancel" }));
@@ -1031,6 +1039,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
         <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
+          <label class="kpi-new-activity-fiscal-year">
+            <span>Fiscal Year</span>
+            <select aria-label="Fiscal Year for new KPI Activity" value={fiscalYear}
+              disabled={saving || drafts.length > 0 || editState.cell !== null} onChange={(event) => updateNewActivityFiscalYear((event.currentTarget as HTMLSelectElement).value)}>
+              {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
           {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>
