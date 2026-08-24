@@ -50,7 +50,10 @@ assert.deepEqual(getKpiToolbarActions(0, 2), ["delete"], "selection-only must ex
 for (const code of KPI_TABS.filter((tab) => tab !== "Overview")) {
   const fields = KPI_FIELD_CONTRACTS[code];
   assert.equal(fields[0]?.key, "manageTimeReflected", `${code} Manage Time must be first`);
-  if (!["A", "F", "H"].includes(code)) assert.equal(fields[fields.length - 2]?.key, code === "D1" ? "targetQuarter" : "quarter", `${code} Target Quarter must be before Delivery Date`);
+  if (code === "D1") {
+    assert.equal(fields[fields.length - 2]?.key, "targetQuarter", "D1 Target must be before Delivery Date");
+    assert.equal(fields[fields.length - 2]?.label, "Target", "D1 must expose one combined Target SelectBox");
+  }
   assert.equal(fields[fields.length - 1]?.key, "deliveryDate", `${code} Delivery Date must be final`);
   assert.equal(createEmptyKpiRow(code, "FY27").kpiCode, code);
 }
@@ -60,6 +63,9 @@ assert.equal(d1Keys.includes("quarter"), false, "D1 must expose one Target Quart
 assert.ok(d1Keys.indexOf("stage") < d1Keys.indexOf("acrK"));
 assert.equal(KPI_FIELD_CONTRACTS.C1.some((item) => item.key === "month"), false, "C1 Month column must be removed");
 assert.equal(KPI_FIELD_CONTRACTS.C2.some((item) => item.key === "month"), false, "C2 Month column must be removed");
+for (const code of ["B", "C1", "C2"] as const) {
+  assert.equal(KPI_FIELD_CONTRACTS[code].some((item) => item.key === "quarter" || item.key === "targetQuarter"), false, `${code} Target Quarter is UI-hidden`);
+}
 assert.equal(KPI_FIELD_CONTRACTS.A.find((item) => item.key === "manageTimeReflected")?.label, "Reflected", "the status column describes final internal-system reflection");
 assert.equal(KPI_FIELD_CONTRACTS.A.some((item) => item.key === "quarter"), false, "A Target Quarter is UI-hidden");
 assert.equal(KPI_FIELD_CONTRACTS.H.some((item) => item.key === "srNumber"), false, "H SR Number is UI-hidden");
@@ -79,9 +85,9 @@ const rows: KpiSpreadsheetRow[] = [
   { id: "c1-jun", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "C1", quarter: "Q4", month: "Aug", accountWorkload: "Synthetic Account / Analytics", title: "Workshop", srNumber: "SYN-1001", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-12" },
   { id: "c2-aug", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "C2", quarter: "Q3", month: "Aug", accountWorkload: "Synthetic Account / Database", title: "POC", srNumber: "SYN-1002", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-08-18" },
   { id: "c2-pending", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "C2", quarter: "Q1", month: "Jun", accountWorkload: "Synthetic Account / Pending", title: "Pending POC", srNumber: "SYN-PENDING", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-20" },
-  { id: "d1-i", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1003", stage: "identified", acrK: 600, targetQuarter: "Q3", deliveryDate: "2026-10-20" },
-  { id: "d1-v", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Proposal", srNumber: "SYN-1004", stage: "validated", acrK: 350, targetQuarter: "Q3", deliveryDate: "2026-11-21" },
-  { id: "d1-pending", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q2", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1005", stage: "identified", acrK: 5000, targetQuarter: "Q2", deliveryDate: "2026-10-22" }
+  { id: "d1-i", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1003", stage: "identified", acrK: 600, targetFiscalYear: "FY27", targetQuarter: "Q3", deliveryDate: "2026-10-20" },
+  { id: "d1-v", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q4", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Proposal", srNumber: "SYN-1004", stage: "validated", acrK: 350, targetFiscalYear: "FY27", targetQuarter: "Q3", deliveryDate: "2026-11-21" },
+  { id: "d1-pending", manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "D1", quarter: "Q2", month: "", accountWorkload: "Synthetic Account / AI", title: "Solution Design", srNumber: "SYN-1005", stage: "identified", acrK: 5000, targetFiscalYear: "FY27", targetQuarter: "Q2", deliveryDate: "2026-10-22" }
 ];
 const summary = buildKpiSummary(rows);
 assert.deepEqual(summary.monthly.C1.Q1, { Jun: 1, Jul: 0, Aug: 0, total: 1 });

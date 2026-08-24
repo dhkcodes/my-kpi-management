@@ -1,0 +1,35 @@
+const assert = require("node:assert/strict");
+const http = require("node:http");
+const WebSocket = require("ws");
+const port = Number(process.env.CDP_PORT || 9237);
+const base = process.env.KPI_BASE || "http://127.0.0.1:8136";
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const getJson = url => new Promise((resolve,reject)=>http.get(url,res=>{let body="";res.on("data",c=>body+=c);res.on("end",()=>{try{resolve(JSON.parse(body));}catch(e){reject(e);}});}).on("error",reject));
+const encode = value => Buffer.from(JSON.stringify(value)).toString("base64");
+class Cdp { constructor(url){this.id=0;this.pending=new Map();this.handlers=new Map();this.ws=new WebSocket(url);} async open(){await new Promise((r,j)=>{this.ws.once("open",r);this.ws.once("error",j);});this.ws.on("message",raw=>{const m=JSON.parse(raw);if(m.id){const p=this.pending.get(m.id);if(!p)return;this.pending.delete(m.id);return m.error?p.reject(new Error(m.error.message)):p.resolve(m.result);}for(const h of this.handlers.get(m.method)||[])h(m.params);});} send(method,params={}){const id=++this.id;return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});this.ws.send(JSON.stringify({id,method,params}));});} on(method,h){if(!this.handlers.has(method))this.handlers.set(method,[]);this.handlers.get(method).push(h);} }
+(async()=>{
+  const page=(await getJson(`http://127.0.0.1:${port}/json/list`)).find(t=>t.type==="page");
+  if(!page) throw new Error("No CDP page");
+  const cdp=new Cdp(page.webSocketDebuggerUrl); await cdp.open();
+  const row={id:"41",commitmentId:41,versionNo:3,sourceRowNumber:10,planNumber:"UCM 1",account:"Fixture Account",workloadName:"Fixture Workload",opptyNo:"D100",startDate:"2026-08-01",endDate:"2027-08-01",arrUsd:100,arrKrw:140000,acrUsd:80,acrKrw:112000,target:"FY27 Q2",winProbability:50,latestUpdate:"Fixture update",notes:"Fixture note",isImportant:true,isDeleted:false,deletedAt:null,deletedBy:null};
+  const fx={fxRateId:9,fiscalYear:"FY27",fromCurrency:"USD",toCurrency:"KRW",rateValue:1400,sourceReference:"Fixture",versionNo:5};
+  const errors=[];
+  cdp.on("Runtime.exceptionThrown",p=>errors.push(p.exceptionDetails.exception?.description||p.exceptionDetails.text));
+  cdp.on("Fetch.requestPaused",async({requestId,request})=>{const path=new URL(request.url).pathname;const fulfill=payload=>cdp.send("Fetch.fulfillRequest",{requestId,responseCode:200,responseHeaders:[{name:"Content-Type",value:"application/json"}],body:encode(payload)});if(path.endsWith("/api/v1/accounts-workloads"))return fulfill({items:[row],total:1});if(path.endsWith("/api/v1/fx-rates"))return fulfill(fx);return cdp.send("Fetch.continueRequest",{requestId});});
+  await cdp.send("Page.enable");await cdp.send("Runtime.enable");await cdp.send("Network.enable");
+  const configResult=await cdp.send("Runtime.evaluate",{expression:"globalThis.KAP_AUTH_CONFIG",returnByValue:true});
+  const config=configResult.result.value;if(!config)throw new Error("Runtime auth config unavailable");
+  await cdp.send("Fetch.enable",{patterns:[{urlPattern:"*api/v1/*",requestStage:"Request"}]});
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument",{source:`Object.defineProperty(globalThis,'KAP_AUTH_CONFIG',{value:${JSON.stringify(config)},writable:false,configurable:false});`});
+  const evaluate=async expression=>{const result=await cdp.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
+  const wait=async(expression,label,timeout=18000)=>{const start=Date.now();while(Date.now()-start<timeout){const value=await evaluate(expression);if(value)return value;await delay(40);}throw new Error(`wait timeout: ${label}`);};
+  await cdp.send("Page.navigate",{url:`${base}/accounts-workloads?accounts-esc=${Date.now()}`});
+  await wait(`document.readyState==='complete'&&document.querySelector('tr[data-account-row-id="41"]')`,"accounts row");
+  const saved=await evaluate(`(async()=>{const wait=async fn=>{for(let i=0;i<200;i++){const v=fn();if(v)return v;await new Promise(r=>setTimeout(r,30));}throw new Error('editor timeout');};const cell=document.querySelector('tr[data-account-row-id="41"] [data-account-field="account"]');const original=cell.textContent.trim();cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,composed:true,detail:2}));const input=await wait(()=>cell.querySelector('input.accounts-workloads-edit-field'));const nativeSelection=!(input.selectionStart===0&&input.selectionEnd===input.value.length);input.value='discard';input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'discard'}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',bubbles:true,composed:true}));await wait(()=>!cell.querySelector('.accounts-workloads-edit-field'));return {nativeSelection,restored:cell.textContent.trim()===original,displayMode:!cell.querySelector('.accounts-workloads-edit-field')};})()`);
+  assert.deepEqual(saved,{nativeSelection:true,restored:true,displayMode:true});
+  const added=await evaluate(`(async()=>{const wait=async fn=>{for(let i=0;i<200;i++){const v=fn();if(v)return v;await new Promise(r=>setTimeout(r,30));}throw new Error('add timeout');};const add=document.querySelector('oj-button.accounts-workloads-jet-button');add.dispatchEvent(new CustomEvent('ojAction',{bubbles:true,composed:true}));const input=await wait(()=>document.querySelector('tr.is-adding-row input[placeholder="Account *"]'));input.value='discard add';input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'discard add'}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:229,isComposing:true,bubbles:true,composed:true}));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const retainedDuringIme=Boolean(document.querySelector('tr.is-adding-row'));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',bubbles:true,composed:true}));await wait(()=>!document.querySelector('tr.is-adding-row'));return {retainedDuringIme,cancelled:true,gridMode:!document.querySelector('tr.is-adding-row')};})()`);
+  assert.deepEqual(added,{retainedDuringIme:true,cancelled:true,gridMode:true});
+  assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({savedRowEsc:saved,addAccountEsc:added,runtimeErrors:errors.length}));
+  cdp.ws.close();
+})().catch(error=>{console.error(error.stack||error);process.exit(1);});

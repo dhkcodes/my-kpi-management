@@ -126,6 +126,12 @@ assert.match(page, /const blockContractKey[\s\S]*event\.target instanceof HTMLTe
   "Shift+Enter must bypass keydown blocking so multiline textarea editors retain the native newline action");
 assert.match(page, /const keyContract[\s\S]*event\.key === "Enter"[\s\S]*HTMLTextAreaElement[\s\S]*event\.shiftKey[\s\S]*closePopup\(\); onFinish\(\)/,
   "plain Enter must finish textarea editing while Shift+Enter remains inside the editor");
+assert.match(page, /const isImeCommand = \(event: KeyboardEvent \| globalThis\.KeyboardEvent\) => event\.isComposing \|\| event\.keyCode === 229/,
+  "KPI editor commands share one IME composition guard");
+assert.match(page, /const blockContractKey[\s\S]*if \(isImeCommand\(event\)\) return;/,
+  "IME Enter and Escape are never blocked as editor commands");
+assert.match(page, /const keyContract[\s\S]*if \(isImeCommand\(event\)\) return;/,
+  "IME Enter and Escape never commit or cancel on keyup");
 assert.match(page, /state\.generation[\s\S]*setActiveWorkloadIndex\(0\)/,
   "each edit generation must reset the workload active option");
 assert.match(page, /setActiveWorkloadIndex\(\(current\) => Math\.min\(current, page\.items\.length\)\)/,
@@ -136,6 +142,8 @@ assert.match(page, /role="option" aria-selected=\{activeWorkloadIndex === 0\}[\s
   "workload options must expose the active option through aria-selected");
 assert.match(page, /window\.addEventListener\("keyup", finishKeyboardAfterFocusMove\)[\s\S]*onMove\(event\.shiftKey \? -1 : 1\)/,
   "Escape and Tab must complete even when popup or native focus movement changes the keyup target");
+assert.match(page, /finishKeyboardAfterFocusMove[\s\S]*if \(event\.defaultPrevented \|\| isImeCommand\(event\)\) return;/,
+  "the window fallback ignores handled editor events and IME keys so Escape callbacks cannot duplicate");
 assert.match(page, /window\.addEventListener\("keydown", retainEditorFocusUntilKeyUp, true\)/,
   "Tab and Escape default focus movement must be blocked at capture time");
 assert.match(page, /getBoundingClientRect\(\)[\s\S]*width <= 0[\s\S]*popup\.open/,
@@ -161,8 +169,14 @@ assert.match(page, /requestProtectedNavigation[\s\S]*finishEditing\(\)[\s\S]*if 
   "navigation must finish the single editor and preserve dirty-data protection without a JET settlement queue");
 assert.match(page, /target\.closest\("\.oj-datepicker-popup"\)/,
   "the reparented public JET datepicker popup must remain inside the active edit interaction boundary");
-assert.match(page, /onvalueChanged=\{\(event: CustomEvent\) => \{[\s\S]*onInput\(field\.key,[\s\S]*onFinish\(\)/,
-  "Delivery Date valueChanged must apply the latest value before closing the one-cell editor");
+assert.match(page, /onvalueChanged=\{\(event: CustomEvent\) => \{[\s\S]*onInput\(field\.key, nextValue\);[\s\S]*\}\} onKeyDown=\{blockContractKey\}/,
+  "Delivery Date valueChanged keeps the editor open so Escape can restore the entry snapshot");
+assert.doesNotMatch(page, /onvalueChanged=\{\(event: CustomEvent\) => \{[\s\S]{0,220}onFinish\(/,
+  "Delivery Date selection cannot exit before an Escape opportunity");
+assert.match(page, /editor = choices \? <select[\s\S]*onChange=\{\(event\) => onInput\(field\.key, \(event\.currentTarget as HTMLSelectElement\)\.value\)\}/,
+  "quarter, target-period, stage, and activity selects keep editing after a changed selection");
+assert.match(page, /const cancelCurrentCell[\s\S]*editRowSnapshotRef\.current[\s\S]*reconcileDraft\(current, snapshot\)[\s\S]*finishEditing\(\)/,
+  "Escape restores the full edit-entry row snapshot before returning to display mode");
 assert.match(page, /collapsedKpiState[\s\S]*A:\s*false[\s\S]*B:\s*false[\s\S]*C1:\s*false[\s\S]*C2:\s*false[\s\S]*D1:\s*false[\s\S]*F:\s*false[\s\S]*H:\s*false/,
   "every KPI tab summary must default collapsed and retain independent page-local visibility state");
 assert.match(page, /summaryExpandedByTab[\s\S]*useState<Record<SpreadsheetKpiCode, boolean>>\(collapsedKpiState\)/,

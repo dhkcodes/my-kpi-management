@@ -220,14 +220,22 @@ assert.match(styles, /\.kpi-grid-cell\s*>\s*\.kpi-reflected-status-badge\s*\{[^}
   "the badge selector overrides the generic KPI cell child block layout");
 assert.doesNotMatch(page, /<select[^>]*kpi-cell-editor-control[^>]*>[\s\S]{0,600}<option[^>]*>Pending<\/option>[\s\S]{0,300}<option[^>]*>Reflected<\/option>/,
   "Managed cells must not expose the old select editor");
-assert.match(content, /<KpiSpreadsheetPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}/,
-  "KPI Add Activity reuses the app-supported Fiscal Year list");
-assert.match(page, /class="kpi-new-activity-fiscal-year"[\s\S]*<select[^>]*aria-label="Fiscal Year for new KPI Activity"[\s\S]*fiscalYears\.map/,
-  "a new KPI Activity exposes Fiscal Year as a constrained selection control");
-assert.match(page, /updateNewActivityFiscalYear[\s\S]*fiscalYears\.includes\(nextFiscalYear\)[\s\S]*onFiscalYearChange\(nextFiscalYear\)/,
-  "new Activity Fiscal Year changes reuse the supported list and the shared FY change path");
-assert.doesNotMatch(page, /aria-label="Fiscal Year for new KPI Activity"[^>]*type="text"/,
-  "new Activity Fiscal Year is never a free-text input");
+assert.doesNotMatch(page, /Fiscal Year for new KPI Activity|kpi-new-activity-fiscal-year|updateNewActivityFiscalYear/,
+  "Add KPI Activity has no duplicate Fiscal Year control");
+assert.doesNotMatch(page, /kpi-spreadsheet-page__fiscal-year|aria-label="Selected fiscal year"/,
+  "KPI Activities detail headers omit the redundant read-only Fiscal Year panel");
+assert.doesNotMatch(contract, /B:\s*\[\.\.\.related, targetQuarter/,
+  "B does not expose Target Quarter");
+assert.doesNotMatch(contract, /C1:\s*\[\.\.\.related, targetQuarter/,
+  "C1 does not expose Target Quarter");
+assert.doesNotMatch(contract, /C2:\s*\[\.\.\.related, targetQuarter/,
+  "C2 does not expose Target Quarter");
+assert.match(contract, /field\("targetQuarter", "Target", "targetPeriod"\)/,
+  "D1 exposes a fiscal-year-qualified target-period field");
+assert.match(page, /field\.type === "targetPeriod"\s*\?\s*getTargetPeriodOptions\(fiscalYear\)/,
+  "D1 reuses the shared FY-window option generator");
+assert.match(api, /targetFiscalYear:\s*row\.kpiCode === "D1"/,
+  "D1 save payload preserves the selected target fiscal year separately from its quarter");
 
 assert.match(styles, /--kap-grid-header-bg:\s*#eef2f5/);
 assert.match(styles, /--kap-grid-header-ink:\s*#334155/);

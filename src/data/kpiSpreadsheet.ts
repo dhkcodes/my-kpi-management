@@ -1,10 +1,11 @@
 import { FiscalYear, Quarter, WorkloadStage } from "./kpiExcelParser";
+import { TargetFiscalYear } from "./targetPeriod";
 
 export const KPI_TABS = ["Overview", "A", "B", "C1", "C2", "D1", "F", "H"] as const;
 export type KpiWorkspaceTab = typeof KPI_TABS[number];
 export type SpreadsheetKpiCode = Exclude<KpiWorkspaceTab, "Overview">;
 export type KpiFieldKey = "manageTimeReflected" | "quarter" | "month" | "accountWorkload" | "title" | "srNumber" | "stage" | "acrK" | "targetQuarter" | "deliveryDate";
-export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "textarea" | "date" | "number" | "quarter" | "month" | "stage" | "activity" | "workload" | "manageTime" }>;
+export type KpiField = Readonly<{ key: KpiFieldKey; label: string; type?: "text" | "textarea" | "date" | "number" | "quarter" | "targetPeriod" | "month" | "stage" | "activity" | "workload" | "manageTime" }>;
 export type KpiToolbarAction = "save" | "cancel" | "delete";
 
 export const getKpiToolbarActions = (draftCount: number, selectedCount: number): readonly KpiToolbarAction[] =>
@@ -12,17 +13,17 @@ export const getKpiToolbarActions = (draftCount: number, selectedCount: number):
 
 const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text"): KpiField => ({ key, label, type });
 const manageTime = field("manageTimeReflected", "Reflected", "manageTime");
-const targetQuarter = field("quarter", "Target Quarter", "quarter");
+
 const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const delivery = field("deliveryDate", "Delivery Date", "date");
 
 export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]> = {
   A: [...base, delivery],
-  B: [...related, targetQuarter, delivery],
-  C1: [...related, targetQuarter, delivery],
-  C2: [...related, targetQuarter, delivery],
-  D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target Quarter", "quarter"), delivery],
+  B: [...related, delivery],
+  C1: [...related, delivery],
+  C2: [...related, delivery],
+  D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target", "targetPeriod"), delivery],
   F: [...base, delivery],
   H: [manageTime, field("title", "Content", "textarea"), delivery]
 };
@@ -42,6 +43,7 @@ export type KpiSpreadsheetRow = {
   srNumber: string;
   stage: WorkloadStage | "";
   acrK: number | null;
+  targetFiscalYear?: TargetFiscalYear | "";
   targetQuarter: Quarter | "";
   deliveryDate: string;
   deliveryDateRaw?: string;
@@ -69,6 +71,7 @@ export const createEmptyKpiRow = (kpiCode: SpreadsheetKpiCode, fiscalYear: Fisca
   srNumber: "",
   stage: kpiCode === "D1" ? "identified" : "",
   acrK: kpiCode === "D1" ? 0 : null,
+  targetFiscalYear: kpiCode === "D1" ? fiscalYear : "",
   targetQuarter: kpiCode === "D1" ? "Q1" : "",
   deliveryDate: "", deliveryDateRaw: ""
 });
@@ -101,7 +104,9 @@ export const isKpiFieldChanged = (
   saved: KpiSpreadsheetRow,
   draft: KpiSpreadsheetRow,
   key: KpiFieldKey
-) => (saved[key] ?? "") !== (draft[key] ?? "");
+) => key === "targetQuarter"
+  ? (saved.targetFiscalYear ?? "") !== (draft.targetFiscalYear ?? "") || (saved.targetQuarter ?? "") !== (draft.targetQuarter ?? "")
+  : (saved[key] ?? "") !== (draft[key] ?? "");
 
 export const isKpiRowChanged = (
   saved: KpiSpreadsheetRow,
@@ -167,7 +172,7 @@ export const isKpiDraftInvalid = (draft: KpiSpreadsheetRow, saved?: KpiSpreadshe
   if (["B", "C1", "C2", "D1"].includes(draft.kpiCode)
     && draft.workloadId == null && saved?.workloadId != null) return true;
   if (draft.kpiCode === "D1") {
-    const missingDimension = !draft.stage || draft.acrK === null || !draft.targetQuarter;
+    const missingDimension = !draft.stage || draft.acrK === null || !draft.targetFiscalYear || !draft.targetQuarter;
     const savedHadDimension = Boolean(saved?.stage) || saved?.acrK !== null || Boolean(saved?.targetQuarter);
     if (missingDimension && savedHadDimension) return true;
   }

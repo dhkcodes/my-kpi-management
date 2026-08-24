@@ -13,7 +13,7 @@ const backend = {
 const valid: KpiSpreadsheetRow = {
   id: "41", versionNo: 2, manageTimeReflected: false, fiscalYear: "FY27", kpiCode: "A", quarter: "Q1", month: "",
   accountWorkload: "", workloadId: null, mappingStatus: "NOT_REQUIRED", title: "Awareness session", srNumber: "SYN-2001",
-  stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-07-15", deliveryDateRaw: ""
+  stage: "", acrK: null, targetFiscalYear: "", targetQuarter: "", deliveryDate: "2026-07-15", deliveryDateRaw: ""
 };
 assert.deepEqual(decodeKpiRows({ items: [backend] }), [valid]);
 assert.throws(() => decodeKpiRows({ items: [{ ...backend, kpiCode: "G" }] }), /Invalid KPI code/);
@@ -79,6 +79,12 @@ assert.throws(() => decodeKpiSummary({ ...summaryPayload, d1QuarterByStage: { ..
 const calls: Array<{ url: string; init?: RequestInit }> = [];
 const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push({ url: String(input), init });
+  const requestBody = init?.body ? JSON.parse(String(init.body)) : null;
+  const d1Response = requestBody?.kpiCode === "D1"
+    ? { ...backend, id: 44, kpiCode: "D1", rawWorkload: "D1 workload", mappingStatus: "UNMATCHED",
+      salesStage: "IDENTIFIED", acrK: 2000, targetFiscalYear: requestBody.targetFiscalYear,
+      targetQuarter: requestBody.targetQuarter }
+    : backend;
   const responseBody = String(input).endsWith("/batch")
     ? { items: [backend, { ...backend, id: 42 }] }
     : String(input).includes("/summary")
@@ -88,7 +94,7 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     : String(input).includes("workload-options")
       ? { items: [{ workloadId: 17, accountName: "Account A", workloadName: "Workload A", opptyNo: "D100" }], total: 1, hasMore: false }
       : null;
-  return new Response(JSON.stringify(init?.method === "DELETE" ? undefined : responseBody ?? (init?.method ? backend : { items: [backend] })), {
+  return new Response(JSON.stringify(init?.method === "DELETE" ? undefined : responseBody ?? (init?.method ? d1Response : { items: [backend] })), {
     status: init?.method === "DELETE" ? 204 : init?.method === "POST" ? 201 : 200,
     headers: { "Content-Type": "application/json" }
   });
@@ -107,6 +113,10 @@ async function run() {
   await saveKpiRow({ ...valid, id: "41", kpiCode: "C1", month: "", deliveryDate: "2026-05-06" }, fetchImpl);
   await saveKpiRow({ ...valid, id: "42", kpiCode: "C1", month: "Jul", deliveryDate: "" }, fetchImpl);
   await saveKpiRow({ ...valid, id: "43", kpiCode: "C2", month: "Jul", deliveryDate: "not-a-date" }, fetchImpl);
+  const savedD1 = await saveKpiRow({ ...valid, id: "44", kpiCode: "D1", stage: "identified", acrK: 2000,
+    accountWorkload: "D1 workload", mappingStatus: "UNMATCHED", targetFiscalYear: "FY28", targetQuarter: "Q1" }, fetchImpl);
+  assert.equal(savedD1.targetFiscalYear, "FY28", "D1 target fiscal year survives the API response decode");
+  assert.equal(savedD1.targetQuarter, "Q1", "D1 target quarter survives the API response decode");
   const batch = await saveKpiRowsAtomic([valid, { ...valid, id: "draft-a-2", versionNo: undefined }], fetchImpl);
   assert.equal(batch.length, 2);
   await deleteKpiRow(valid, fetchImpl);
@@ -119,19 +129,24 @@ async function run() {
   assert.equal(calls[5].init?.method, "POST");
   const legacyC1Body = JSON.parse(String(calls[6].init?.body));
   assert.equal(legacyC1Body.activityMonth, "2026-05", "C1/C2 activityMonth follows Delivery Date even for legacy rows with no stored month");
+  assert.equal(legacyC1Body.targetFiscalYear, null, "B/C1/C2 payloads do not introduce a target fiscal year");
+  assert.equal(legacyC1Body.targetQuarter, null, "B/C1/C2 remain compatible after the Target Quarter UI is removed");
   const blankDateC1Body = JSON.parse(String(calls[7].init?.body));
   assert.equal(blankDateC1Body.activityMonth, "2026-07", "unreflected C1/C2 drafts retain the API-required planning month until Delivery Date exists");
   const invalidDateC2Body = JSON.parse(String(calls[8].init?.body));
   assert.equal(invalidDateC2Body.activityMonth, null, "malformed nonblank Delivery Date cannot silently fall back to a legacy month");
-  assert.equal(calls[9].url, "/api/v1/kpi-activities/batch");
-  assert.equal(calls[9].init?.method, "POST");
-  const batchBody = JSON.parse(String(calls[9].init?.body));
+  const d1Body = JSON.parse(String(calls[9].init?.body));
+  assert.equal(d1Body.targetFiscalYear, "FY28", "D1 persists its target fiscal year independently from the selected activity FY");
+  assert.equal(d1Body.targetQuarter, "Q1", "D1 preserves the selected target quarter");
+  assert.equal(calls[10].url, "/api/v1/kpi-activities/batch");
+  assert.equal(calls[10].init?.method, "POST");
+  const batchBody = JSON.parse(String(calls[10].init?.body));
   assert.equal(batchBody.items[0].id, 41);
   assert.equal(batchBody.items[0].versionNo, 2);
   assert.equal(batchBody.items[1].id, undefined);
-  assert.match(calls[10].url, /versionNo=2$/);
-  assert.equal(calls[10].init?.method, "DELETE");
-  assert.equal(new Headers(calls[10].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
+  assert.match(calls[11].url, /versionNo=2$/);
+  assert.equal(calls[11].init?.method, "DELETE");
+  assert.equal(new Headers(calls[11].init?.headers).has("Content-Type"), false, "DELETE must not add a JSON content type");
   console.log("kpiSpreadsheetApi tests passed");
 }
 

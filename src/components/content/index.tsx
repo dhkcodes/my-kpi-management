@@ -560,9 +560,9 @@ export function Content({
           </section>}
         </>
       ) : activeRoute.module === "kpiPage" ? (
-        <KpiSpreadsheetPage fiscalYear={fiscalYear} fiscalYears={fiscalYears} routeId={activeRoute.id}
+        <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
-          onFiscalYearChange={onFiscalYearChange} onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
+          onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
           onWriteStateChange={onKpiWriteStateChange} />
       ) : activeRoute.module === "myCustomers360" ? (
         <MyCustomers360Page

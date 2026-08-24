@@ -99,6 +99,7 @@ export const nextKpiSort = (current: KpiSortState | null, field: KpiFieldKey): K
 });
 
 const sortableValue = (row: KpiSpreadsheetRow, field: KpiFieldKey): string | number => {
+  if (field === "targetQuarter") return `${row.targetFiscalYear ?? ""} ${row.targetQuarter}`.trim().toLocaleLowerCase();
   const value = row[field];
   if (typeof value === "boolean") return value ? 1 : 0;
   if (typeof value === "number") return value;
@@ -137,7 +138,7 @@ const fixedWidthFor = (field: KpiField): number | null => {
   if (field.type === "manageTime") return 140;
   if (field.key === "srNumber") return 144;
   if (field.type === "date") return 140;
-  if (field.type === "quarter") return 156;
+  if (field.type === "quarter" || field.type === "targetPeriod") return 156;
   if (field.type === "activity") return 164;
   if (field.type === "stage") return 132;
   if (field.key === "acrK") return 104;
