@@ -112,7 +112,7 @@ const columnLabels: Record<EditableField | "rowNo" | "isImportant", string> = {
   isImportant: "!",
   planNumber: "Plan Number",
   account: "Account",
-  workloadName: "Workload Name (Enduser)",
+  workloadName: "Workload",
   opptyNo: "Oppty No",
   startDate: "Start Date",
   endDate: "End Date",
@@ -466,20 +466,24 @@ export function AccountsWorkloadsPage({
   };
 
   useEffect(() => {
-    if (!editCell) return;
-    const frame = window.requestAnimationFrame(() => {
-      const cell = document.querySelector<HTMLElement>(
-        `[data-account-row-id="${CSS.escape(editCell.id)}"] [data-account-field="${CSS.escape(editCell.field)}"]`
-      );
-      const editor = cell?.querySelector<HTMLElement>(".accounts-workloads-edit-field");
-      if (!editor) return;
-      editor.focus();
-      if (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) {
-        const value = editor.value;
-        if (editor.type !== "number") editor.setSelectionRange(value.length, value.length);
-      }
+    if (!editCell) return undefined;
+    let selectionFrame: number | undefined;
+    const mountFrame = window.requestAnimationFrame(() => {
+      selectionFrame = window.requestAnimationFrame(() => {
+        const cell = document.querySelector<HTMLElement>(
+          `[data-account-row-id="${CSS.escape(editCell.id)}"] [data-account-field="${CSS.escape(editCell.field)}"]`
+        );
+        const editor = cell?.querySelector<HTMLElement>(".accounts-workloads-edit-field");
+        if (!editor) return;
+        editor.focus();
+        if (editor instanceof HTMLInputElement && editor.type !== "number") editor.select();
+        if (editor instanceof HTMLTextAreaElement) editor.select();
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(mountFrame);
+      if (selectionFrame !== undefined) window.cancelAnimationFrame(selectionFrame);
+    };
   }, [editCell]);
 
   const submitSearch = () => {

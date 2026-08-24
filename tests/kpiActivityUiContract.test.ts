@@ -212,8 +212,22 @@ assert.match(page, /aria-label=\{row\.manageTimeReflected \? "Reflected in inter
   "cells expose accessible final-reflection status");
 assert.match(page, /kpi-reflected-status-badge/, "cells use a composed Redwood-aligned status badge");
 assert.doesNotMatch(page, /kpi-managed-status-icon|>✓<|>○</, "legacy text glyph status icons are removed");
-assert.doesNotMatch(page, /<select[^>]*kpi-cell-editor-control[^>]*>[\s\S]*Pending[\s\S]*Reflected[\s\S]*<\/select>/,
+assert.match(styles, /\.kpi-reflected-status-badge\s*>\s*\[class\*="oj-ux-ico-"\]\s*\{[^}]*align-items:\s*center[^}]*display:\s*inline-flex[^}]*line-height:\s*1/,
+  "Reflected and Pending icons align vertically beside their text");
+assert.match(styles, /\.kpi-reflected-status-badge\s*>\s*span:last-child\s*\{[^}]*align-items:\s*center[^}]*display:\s*inline-flex[^}]*line-height:\s*1/,
+  "status text shares the icon's centered inline layout without changing badge height");
+assert.match(styles, /\.kpi-grid-cell\s*>\s*\.kpi-reflected-status-badge\s*\{[^}]*display:\s*inline-flex/,
+  "the badge selector overrides the generic KPI cell child block layout");
+assert.doesNotMatch(page, /<select[^>]*kpi-cell-editor-control[^>]*>[\s\S]{0,600}<option[^>]*>Pending<\/option>[\s\S]{0,300}<option[^>]*>Reflected<\/option>/,
   "Managed cells must not expose the old select editor");
+assert.match(content, /<KpiSpreadsheetPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}/,
+  "KPI Add Activity reuses the app-supported Fiscal Year list");
+assert.match(page, /class="kpi-new-activity-fiscal-year"[\s\S]*<select[^>]*aria-label="Fiscal Year for new KPI Activity"[\s\S]*fiscalYears\.map/,
+  "a new KPI Activity exposes Fiscal Year as a constrained selection control");
+assert.match(page, /updateNewActivityFiscalYear[\s\S]*fiscalYears\.includes\(nextFiscalYear\)[\s\S]*onFiscalYearChange\(nextFiscalYear\)/,
+  "new Activity Fiscal Year changes reuse the supported list and the shared FY change path");
+assert.doesNotMatch(page, /aria-label="Fiscal Year for new KPI Activity"[^>]*type="text"/,
+  "new Activity Fiscal Year is never a free-text input");
 
 assert.match(styles, /--kap-grid-header-bg:\s*#eef2f5/);
 assert.match(styles, /--kap-grid-header-ink:\s*#334155/);
