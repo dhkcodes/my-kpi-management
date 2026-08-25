@@ -106,7 +106,7 @@ const guideDetailsByCode: Partial<Record<GuideSection["code"], GuideDetails>> = 
   C1: {
     srType: "Account Level SR",
     businessSrType: "Account Development",
-    targetPerQuarter: "C1 + C2 combined target >= 6 activities",
+    targetPerQuarter: "6 activities / Quarter",
     activity: "Customer Workshop or Cloud Day",
     taskType: "Delivery",
     measuring: "# of Workshops",
@@ -116,7 +116,7 @@ const guideDetailsByCode: Partial<Record<GuideSection["code"], GuideDetails>> = 
   C2: {
     srType: "Account Level SR",
     businessSrType: "Account Development",
-    targetPerQuarter: "C1 + C2 combined target >= 6 activities",
+    targetPerQuarter: "6 activities / Quarter",
     activity: "Proof of Concept",
     taskType: "Delivery",
     measuring: "# of POCs",
