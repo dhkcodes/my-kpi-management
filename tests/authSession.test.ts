@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
-import { AuthSession, getProfileInitials } from "../src/auth/authSession";
+import { AuthSession, getProfileInitials, parseAuthProfile } from "../src/auth/authSession";
 
 const session: AuthSession = {
-  version: 1,
-  userId: "owner@example.com",
-  authenticatedAt: "2026-08-25T00:00:00.000Z"
+  userKey: "user-1",
+  displayName: "KPI Owner",
+  loginId: "owner@example.com",
+  access: "Admin",
+  status: "ACTIVE"
 };
-assert.equal(session.userId, "owner@example.com");
-assert.equal(getProfileInitials("owner@example.com"), "OW");
-assert.equal(getProfileInitials("kpi owner"), "KO");
+assert.equal(session.loginId, "owner@example.com");
+assert.equal(getProfileInitials(session.displayName), "KO");
 assert.equal(getProfileInitials("x"), "X");
+assert.deepEqual(parseAuthProfile(session), session);
+assert.throws(() => parseAuthProfile({ ...session, status: "PENDING" }), /Invalid authentication response/);
 
 console.log("auth session tests passed");

@@ -4,7 +4,9 @@ export type NavigationRouteModule =
   | "myCustomers360"
   | "accountsWorkloads"
   | "weeklyActivities"
-  | "consumption";
+  | "consumption"
+  | "profile"
+  | "users";
 
 export type NavigationRouteDefinition = Readonly<{
   id: string;
@@ -25,7 +27,9 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
-  { id: "consumption", module: "consumption", pageTitle: "Consumption" }
+  { id: "consumption", module: "consumption", pageTitle: "Consumption" },
+  { id: "profile", module: "profile", pageTitle: "Profile" },
+  { id: "users", module: "users", pageTitle: "Users" }
 ];
 
 const navigationRoutesById = navigationRouteDefinitions.reduce((routes, route) => {

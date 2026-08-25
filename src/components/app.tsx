@@ -61,6 +61,7 @@ import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
 import { KeySet, KeySetImpl } from "ojs/ojkeyset";
 import type { AuthSession } from "../auth/authSession";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
+import { subscribeAuthRequired } from "../auth/apiFetch";
 
 type Props = Readonly<{
   appName?: string;
@@ -68,7 +69,7 @@ type Props = Readonly<{
 
 type AuthenticatedAppProps = Readonly<{
   appName: string;
-  userLogin: string;
+  profile: AuthSession;
   onLogout: () => void;
 }>;
 
@@ -126,10 +127,13 @@ function renderNavigationItem(context: NavigationItemTemplateContext) {
   );
 }
 
-function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProps) {
-    const initialRoute = typeof window === "undefined"
+function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps) {
+    const requestedInitialRoute = typeof window === "undefined"
       ? getNavigationRoute("home")
       : getNavigationRouteFromPath(window.location.pathname);
+    const initialRoute = requestedInitialRoute.module === "users" && profile.access !== "Admin"
+      ? getNavigationRoute("home")
+      : requestedInitialRoute;
     const [isDesktopNavigation, setIsDesktopNavigation] = useState(() =>
       typeof window === "undefined" ? true : window.matchMedia("(min-width: 1025px)").matches
     );
@@ -575,9 +579,10 @@ function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProp
       <div id="appContainer" class="oj-web-applayout-page kpi-shell">
         <Header
           appName={appName}
-          userLogin={userLogin}
+          profile={profile}
           navigationOpen={navigationOpen}
           onToggleNavigation={() => setNavigationOpen((value) => !value)}
+          onNavigate={handleNavigate}
           onLogout={onLogout}
         />
         <div class={navigationOpen ? "kpi-mobile-scrim is-open" : "kpi-mobile-scrim"} onClick={closeNavigation}></div>
@@ -599,6 +604,7 @@ function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProp
           </aside>
           <Content
             activeRoute={activeRoute}
+            profile={profile}
             accountsWorkloadsRows={accountsWorkloadsRows[fiscalYear]}
             accountsWorkloadsAsOf={accountsWorkloadsAsOf}
             accountsWorkloadsDataSource={accountsWorkloadsDataSource}
@@ -715,6 +721,13 @@ export const App = registerCustomElement(
       return () => window.removeEventListener("popstate", keepLoginAtHomePath);
     }, [authChecking, session]);
 
+    useEffect(() => subscribeAuthRequired(() => {
+      window.history.replaceState(null, "", "/");
+      window.scrollTo({ top: 0, left: 0 });
+      setSession(null);
+      setAuthChecking(false);
+    }), []);
+
     const handleAuthenticated = useCallback((authenticatedSession: AuthSession) => {
       window.history.replaceState(null, "", "/");
       setSession(authenticatedSession);
@@ -734,7 +747,7 @@ export const App = registerCustomElement(
       return <main class="kap-login" aria-label="Checking sign-in session" />;
     }
     return session
-      ? <AuthenticatedApp appName={appName} userLogin={session.userId} onLogout={handleLogout} />
+      ? <AuthenticatedApp appName={appName} profile={session} onLogout={handleLogout} />
       : <LoginPage appName={appName} onAuthenticated={handleAuthenticated} />;
   }
 );

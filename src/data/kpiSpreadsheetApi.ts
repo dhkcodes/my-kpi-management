@@ -1,5 +1,6 @@
 import { FiscalYear } from "./kpiExcelParser";
 import { KpiSpreadsheetRow, SpreadsheetKpiCode } from "./kpiSpreadsheet";
+import { apiFetch } from "../auth/apiFetch";
 
 const API_BASE = "/api/v1/kpi-activities";
 type KpiActivitiesRuntime = Readonly<{
@@ -221,11 +222,11 @@ export function decodeKpiSummary(payload: unknown): KpiActivitySummary {
 
 async function request(fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<unknown> {
   const hasBody = init?.body !== undefined && init?.body !== null;
-  const response = await fetchImpl(url, {
+  const response = await apiFetch(url, {
     ...init,
     signal: init?.signal ?? AbortSignal.timeout(15000),
     headers: hasBody ? { "Content-Type": "application/json", ...(init?.headers ?? {}) } : init?.headers
-  });
+  }, fetchImpl);
   if (!response.ok) throw new Error(`KPI API request failed (${response.status})`);
   return response.status === 204 ? undefined : response.json();
 }

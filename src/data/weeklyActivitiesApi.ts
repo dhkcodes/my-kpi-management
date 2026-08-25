@@ -1,4 +1,5 @@
 import { assertValidUtf8Content, hasValidUtf8Content } from "./utf8TextPolicy";
+import { apiFetch } from "../auth/apiFetch";
 
 export const WEEKLY_ACTIVITIES_API_BASE = "/api/v1";
 export const WEEKLY_ACTIVITY_MUTATION_TIMEOUT_MS = 15_000;
@@ -75,11 +76,11 @@ const requestResponse = async (
   const timeoutController = timeoutMs === undefined ? null : new AbortController();
   const timeoutHandle = timeoutController === null ? null : globalThis.setTimeout(() => timeoutController.abort(), timeoutMs);
   try {
-    response = await fetchImpl(url, {
+    response = await apiFetch(url, {
       ...init,
       signal: timeoutController?.signal ?? init?.signal,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
-    });
+    }, fetchImpl);
   } catch {
     if (timeoutController?.signal.aborted) {
       throw new WeeklyActivitiesApiError(

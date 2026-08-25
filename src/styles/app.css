@@ -1644,6 +1644,46 @@ body {
   .accounts-workloads-fx-popover { left: 0; right: auto; width: min(100%, 18rem); }
 }
 
+/* Minimal account and user administration — Redwood-first app-owned layout. */
+.kap-login__modes { display: grid; gap: .25rem; grid-template-columns: repeat(3, 1fr); margin-bottom: 1rem; }
+.kap-login__modes button { background: transparent; border: 0; border-bottom: 2px solid var(--kpi-border); color: var(--kpi-muted); cursor: pointer; font: inherit; font-size: .78rem; font-weight: 800; padding: .55rem .25rem; }
+.kap-login__modes button.is-active { border-bottom-color: var(--kpi-brand); color: var(--kpi-brand); }
+.kap-account-page { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); box-shadow: var(--kpi-shadow); padding: clamp(1rem, 2vw, 1.5rem); }
+.kap-account-page h2 { margin: .25rem 0; }
+.kap-profile-fields { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1.25rem 0; }
+.kap-profile-fields div { background: var(--kpi-soft); border: 1px solid var(--kpi-border); padding: .85rem; }
+.kap-profile-fields dt { color: var(--kpi-muted); font-size: .75rem; font-weight: 800; margin-bottom: .35rem; }
+.kap-profile-fields dd { font-weight: 800; margin: 0; overflow-wrap: anywhere; }
+.kap-password-form { border-top: 1px solid var(--kpi-border); display: grid; gap: .75rem; max-width: 32rem; padding-top: 1rem; }
+.kap-password-form h3 { margin: 0; }
+.kap-form-message { background: color-mix(in srgb, var(--kpi-green) 10%, var(--kpi-surface)); border-left: .25rem solid var(--kpi-green); padding: .7rem; }
+.kap-form-message--error { background: #fff2f0; border-left-color: var(--kpi-danger); color: var(--kpi-danger); }
+.kap-users-header { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
+.kap-users-header p { color: var(--kpi-muted); margin: .35rem 0 0; }
+.kap-users-table-wrap { border: 1px solid var(--kpi-border); margin-top: 1rem; overflow-x: auto; }
+.kap-users-table { border-collapse: collapse; min-width: 52rem; width: 100%; }
+.kap-users-table th, .kap-users-table td { border-bottom: 1px solid var(--kpi-border); padding: .7rem; text-align: left; }
+.kap-users-table th { background: var(--kpi-soft); color: var(--kpi-muted); font-size: .75rem; text-transform: uppercase; }
+.kap-status { border-radius: 999px; display: inline-flex; font-size: .72rem; font-weight: 850; padding: .25rem .55rem; }
+.kap-status--active { background: #e6f4ea; color: #176b3a; }
+.kap-status--invited { background: #eaf2fb; color: #245879; }
+.kap-status--locked { background: #fff0cc; color: #7b5100; }
+.kap-status--disabled { background: #eeebe8; color: #5f5853; }
+.kap-user-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.kap-user-actions button { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 750; padding: .35rem .5rem; }
+.kap-user-actions button:disabled { cursor: not-allowed; opacity: .5; }
+.kap-empty-state { align-items: center; color: var(--kpi-muted); display: flex; flex-direction: column; justify-content: center; min-height: 14rem; padding: 2rem; text-align: center; }
+.kap-empty-state h2, .kap-empty-state h3 { color: var(--kpi-ink); margin: .6rem 0 .25rem; }
+.kap-dialog-backdrop { align-items: center; background: rgba(22,21,19,.45); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 80; }
+.kap-action-dialog { background: var(--kpi-surface); border: 1px solid var(--kpi-border); box-shadow: 0 28px 70px rgba(22,21,19,.3); max-height: 90vh; overflow: auto; padding: 1.25rem; width: min(30rem, 100%); }
+.kap-action-dialog form { display: grid; gap: .8rem; }
+.kap-action-dialog h3 { margin: 0; }
+.kap-action-dialog label { color: var(--kpi-muted); display: grid; font-size: .75rem; font-weight: 800; gap: .3rem; }
+.kap-action-dialog input, .kap-action-dialog select { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); font: inherit; min-height: 2.5rem; padding: .5rem; }
+.kap-action-dialog footer { display: flex; gap: .5rem; justify-content: flex-end; }
+.kap-dialog-note { color: var(--kpi-muted); font-size: .78rem; margin: 0; }
+@media (max-width: 640px) { .kap-profile-fields { grid-template-columns: 1fr; } .kap-users-header { align-items: stretch; flex-direction: column; } }
+
 /* Weekly Activities — Redwood-first app-owned layout. */
 .weekly-activities-page {
   background: var(--kpi-surface);

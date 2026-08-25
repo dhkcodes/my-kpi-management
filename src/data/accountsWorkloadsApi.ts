@@ -1,6 +1,7 @@
 import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
 import { FiscalYear } from "./kpiMockData";
 import { FxRateRecord } from "./kpiConfigurationApi";
+import { apiFetch } from "../auth/apiFetch";
 
 export const ACCOUNTS_WORKLOADS_API_BASE = "/api/v1";
 
@@ -94,10 +95,10 @@ export class AccountsWorkloadsPersistenceError extends Error {
 const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<T> => {
   let response: Response;
   try {
-    response = await fetchImpl(url, {
+    response = await apiFetch(url, {
       ...init,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
-    });
+    }, fetchImpl);
   } catch (cause) {
     throw new AccountsWorkloadsNetworkError(cause);
   }

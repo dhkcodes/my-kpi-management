@@ -3,6 +3,7 @@ import {
   ConsumptionSignal,
   seedForecastMonths
 } from "./consumptionData";
+import { apiFetch } from "../auth/apiFetch";
 
 const apiBase = () => {
   const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: unknown; location?: { hostname?: string; port?: string } };
@@ -134,7 +135,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
 
 const request = async (path: string, init?: RequestInit): Promise<{ response: Response; payload: unknown }> => {
   let response: Response;
-  try { response = await fetch(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
+  try { response = await apiFetch(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
   let payload: unknown = null;
   try { payload = await response.json(); } catch { /* sanitized below */ }
   if (!response.ok) {

@@ -20,11 +20,15 @@ import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionPage } from "./ConsumptionPage";
+import { ProfilePage } from "./ProfilePage";
+import { UsersPage } from "./UsersPage";
+import type { AuthSession } from "../../auth/authSession";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
 type Props = Readonly<{
   activeRoute: NavigationRouteDefinition;
+  profile: AuthSession;
   accountsWorkloadsRows: AccountWorkloadRow[];
   accountsWorkloadsAsOf: string;
   accountsWorkloadsDataSource: AccountsWorkloadsDataSource;
@@ -284,6 +288,7 @@ function EditableDetails({ details, onChange }: Readonly<{
 
 export function Content({
   activeRoute,
+  profile,
   accountWorkloadMetadata,
   accountsWorkloadsRows,
   accountsWorkloadsAsOf,
@@ -412,7 +417,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      {activeRoute.module !== "consumption" && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      {!['consumption', 'profile', 'users'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -451,18 +456,22 @@ export function Content({
         </button>}
       </section>}
 
-      {activeRoute.module !== "weeklyActivities" && accountsWorkloadsLoadError && (
+      {!['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
           <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
         </div>
       )}
-      {activeRoute.module !== "weeklyActivities" && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+      {!['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
       )}
 
-      {showHome ? (
+      {activeRoute.module === "profile" ? (
+        <ProfilePage profile={profile} />
+      ) : activeRoute.module === "users" ? (
+        profile.access === "Admin" ? <UsersPage /> : <section class="kap-empty-state" role="alert"><h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
+      ) : showHome ? (
         <>
           <AccountsWorkloadsPulseV2
             fiscalYear={fiscalYear}

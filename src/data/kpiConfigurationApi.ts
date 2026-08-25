@@ -1,4 +1,5 @@
 import { FiscalYear } from "./kpiMockData";
+import { apiFetch } from "../auth/apiFetch";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type RuntimeConfig = Readonly<{
@@ -24,10 +25,10 @@ export class KpiConfigurationApiError extends Error {
 }
 
 const requestJson = async (fetchImpl: FetchLike, url: string, init?: RequestInit): Promise<unknown> => {
-  const response = await fetchImpl(url, {
+  const response = await apiFetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
-  });
+  }, fetchImpl);
   if (!response.ok) {
     let payload: { code?: string; message?: string } = {};
     try { payload = await response.json(); } catch { /* use sanitized fallback */ }

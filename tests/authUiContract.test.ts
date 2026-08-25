@@ -16,10 +16,10 @@ assert.doesNotMatch(app, /logoutUser\(\)\.finally/, "failed logout cannot appear
 assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back remains guarded after logout");
 assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="kapLoginSubmit"/, "the Redwood sign-in form exposes stable controls");
 assert.match(login, /role="alert"/, "credential failures are announced");
-assert.match(login, /authenticateUser\(userId, password\)/, "the sign-in form delegates credentials to the Backend auth API");
+assert.match(login, /authenticateUser\(loginId, password\)/, "the sign-in form delegates credentials to the Backend auth API");
 assert.match(login, /isSubmitting[\s\S]*disabled=\{isSubmitting\}/, "duplicate login submissions are locked while authentication is pending");
 assert.doesNotMatch(login, /KAP_AUTH_CONFIG|authenticateConfiguredUser/, "the UI does not read a browser-visible credential config");
-assert.match(header, /selectedValue === "logout"[\s\S]*onLogout\(\)/, "the profile menu invokes logout");
-assert.match(header, /\{userLogin\}/, "the Header profile is based on the authenticated login ID");
+assert.match(header, /value === "logout"[\s\S]*onLogout\(\)/, "the profile menu invokes logout");
+assert.match(header, /profile\.loginId/, "the Header identity comes from the authenticated profile");
 
 console.log("authUiContract tests passed");
