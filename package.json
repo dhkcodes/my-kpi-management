@@ -27,7 +27,7 @@
     "test:phase2-hard-gate": "node tests/browser/phase2HardGate.cdp.cjs",
     "test:kpi-regression": "npm run test:pulse-v2 && npm run test:kpi-save-lifecycle && npm run test:kpi-grid-display",
     "test:weekly-activities": "rm -rf .test-dist && tsc tests/*.test.ts --outDir .test-dist --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --strict --skipLibCheck && node .test-dist/tests/weeklyActivitiesApi.test.js && node .test-dist/tests/weeklyActivityEditorSession.test.js && node .test-dist/tests/weeklyActivitiesUiContract.test.js && node .test-dist/tests/navigationWeeklyActivitiesFixes.test.js && rm -rf .test-dist",
-    "test:consumption": "rm -rf .test-dist-consumption && tsc tests/consumption*.test.ts --outDir .test-dist-consumption --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --strict --skipLibCheck && node .test-dist-consumption/tests/consumptionData.test.js && node .test-dist-consumption/tests/consumptionMockData.test.js && node .test-dist-consumption/tests/consumptionUiContract.test.js && rm -rf .test-dist-consumption"
+    "test:consumption": "rm -rf .test-dist-consumption && tsc tests/consumption*.test.ts --outDir .test-dist-consumption --module commonjs --moduleResolution node --target ES2020 --esModuleInterop --strict --skipLibCheck && node .test-dist-consumption/tests/consumptionData.test.js && node .test-dist-consumption/tests/consumptionMockData.test.js && node .test-dist-consumption/tests/consumptionApi.test.js && node .test-dist-consumption/tests/consumptionUiContract.test.js && rm -rf .test-dist-consumption"
   },
   "engines": {
     "node": ">=16.0.0"

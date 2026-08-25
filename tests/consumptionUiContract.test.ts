@@ -22,8 +22,8 @@ assert.match(page, /savedPlans\.find\(\(plan\) => plan\.id === series\.id\)/, "d
 assert.match(page, /onDblClick[\s\S]*beginForecastEdit/, "double-click enters Forecast editing");
 assert.match(page, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the current cell into the page draft");
 assert.match(page, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the current edit-entry value");
-assert.match(page, /hasDraftChanges[\s\S]*>Save<[\s\S]*>Cancel</, "Save and Cancel appear only for draft changes");
-assert.match(page, /setSavedPlans\(clonePlans\(draftPlans\)\)/, "Save adopts the draft as the local saved snapshot");
+assert.match(page, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel appear only for draft changes");
+assert.match(page, /await saveConsumptionForecasts\(apiEtag, updates\)[\s\S]*adoptWorkspace/, "Save adopts the authoritative backend snapshot");
 assert.match(page, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the whole saved snapshot");
 assert.match(page, /onNavigationGuardChange/, "Consumption Draft reuses the KAP navigation guard contract");
 assert.match(page, /window\.confirm\(/, "Leaving with a Draft requires an explicit decision");
@@ -35,5 +35,20 @@ const accountColumnRule = styles.match(/\.consumption-account-column\s*\{([^}]*)
 assert.match(accountColumnRule, /position:\s*sticky/, "Account column uses sticky positioning");
 assert.match(accountColumnRule, /left:\s*0/, "Account column stays fixed at the left edge");
 assert.doesNotMatch(page, /Sold To/, "Sold To never appears in the UI model");
+assert.match(page, /fetchConsumptionWorkspace/, "Consumption loads the authoritative backend workspace");
+assert.match(page, /previewConsumptionImport/, "CSV import calls server-side preview validation");
+assert.match(page, /applyConsumptionImport/, "CSV import uses atomic server-side apply");
+assert.match(page, /saveConsumptionForecasts/, "Forecast Save uses the atomic backend API");
+assert.match(page, /ConsumptionConflictError/, "HTTP 409 is handled as a typed conflict");
+assert.match(page, /Saved baseline[\s\S]*My draft[\s\S]*Current server/, "409 UX compares saved, draft and current server values");
+assert.match(page, /useState<ConsumptionPlan\[\]>\(\[\]\)/, "production starts without rendering synthetic Consumption data");
+assert.match(page, /dataMode === "fallback"[\s\S]*Saved in local fallback[\s\S]*dataMode !== "backend"/, "local-only fallback is explicit and production fails closed before Save");
+assert.match(page, /canUseConsumptionFallback\(error\)[\s\S]*setSavedPlans\(fallbackPlans\)/, "synthetic plans are adopted only after a localhost fallback decision");
+assert.match(page, /setApiEtag\(""\)[\s\S]*setDataMode\("fallback"\)/, "local import fallback clears the prior server ETag");
+assert.match(page, /if \(isSaving\) return;[\s\S]*setIsSaving\(true\)[\s\S]*finally[\s\S]*setIsSaving\(false\)/, "Forecast Save submissions are serialized by an in-flight guard");
+assert.match(page, /disabled=\{dataMode === "loading" \|\| isSaving\}/, "Import stays disabled during initial authoritative load and save");
+assert.match(page, /if \(!file \|\| dataMode === "loading" \|\| isSaving\) return;/, "Import handler rejects loading and save races");
+assert.match(page, /if \(isSaving \|\| \(dataMode !== "backend" && dataMode !== "fallback"\)\) return;/, "Forecast editing locks while save is in flight");
+assert.match(page, /aria-label=\{`\$\{series\.endUser\} \$\{month\} forecast`\}[\s\S]*disabled=\{isSaving\}/, "an already open forecast editor is disabled while saving");
 
 console.log("consumptionUiContract tests passed");

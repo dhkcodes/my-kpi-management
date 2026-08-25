@@ -4,6 +4,7 @@ import { FiscalYear } from "../../data/kpiMockData";
 import {
   ConsumptionPlan,
   ConsumptionQuarterSummary,
+  ConsumptionSignal,
   aggregateConsumptionAccounts,
   buildQuarterSummary,
   detectConsumptionSignals,
@@ -15,6 +16,15 @@ import {
   sortConsumptionMonths
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
+import {
+  ConsumptionApiWorkspace,
+  ConsumptionConflictError,
+  applyConsumptionImport,
+  canUseConsumptionFallback,
+  fetchConsumptionWorkspace,
+  previewConsumptionImport,
+  saveConsumptionForecasts
+} from "../../data/consumptionApi";
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -24,7 +34,8 @@ const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
     ...plan,
     actuals: { ...plan.actuals },
-    forecasts: { ...plan.forecasts }
+    forecasts: { ...plan.forecasts },
+    versions: plan.versions ? { ...plan.versions } : undefined
   }));
 
 const createSeedPlans = (csv: string) => {
@@ -46,6 +57,7 @@ const formatPercent = (value: number | null) => value === null ? "New baseline" 
 const shortMonth = (month: string) => month.split("-")[1];
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
+type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
 type ConsumptionChartPoint = Readonly<{
   id: string;
   seriesId: string;
@@ -69,20 +81,56 @@ type Props = Readonly<{
 }>;
 
 export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) {
-  const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>(() => clonePlans(initialSeed.plans));
-  const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>(() => clonePlans(initialSeed.plans));
+  const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
+  const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
   const [selectedSignalId, setSelectedSignalId] = useState("");
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(() => new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
-  const [importStatus, setImportStatus] = useState(
-    `Synthetic fallback · ${initialSeed.importedPlans} plans · ${initialSeed.controls} control total excluded`
-  );
+  const [importStatus, setImportStatus] = useState("Loading authoritative Consumption workspace…");
   const [importError, setImportError] = useState("");
+  const [apiEtag, setApiEtag] = useState("");
+  const [dataMode, setDataMode] = useState<"loading" | "backend" | "fallback" | "error">("loading");
+  const [isSaving, setIsSaving] = useState(false);
+  const [serverSignals, setServerSignals] = useState<ConsumptionSignal[] | null>(null);
+  const [conflictRows, setConflictRows] = useState<ConflictRow[]>([]);
+  const [conflictWorkspace, setConflictWorkspace] = useState<ConsumptionApiWorkspace | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
 
+  const adoptWorkspace = (workspace: ConsumptionApiWorkspace, status: string) => {
+    setSavedPlans(clonePlans(workspace.plans));
+    setDraftPlans(clonePlans(workspace.plans));
+    setServerSignals(workspace.signals);
+    setApiEtag(workspace.etag);
+    setDataMode("backend");
+    setConflictRows([]);
+    setConflictWorkspace(null);
+    setImportStatus(status);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void fetchConsumptionWorkspace().then((workspace) => {
+      if (active) adoptWorkspace(workspace, `Backend connected · ${workspace.plans.length} plans · ${workspace.controlTotalCount} control totals`);
+    }).catch((error) => {
+      if (!active) return;
+      if (canUseConsumptionFallback(error)) {
+        const fallbackPlans = clonePlans(initialSeed.plans);
+        setSavedPlans(fallbackPlans);
+        setDraftPlans(clonePlans(fallbackPlans));
+        setServerSignals(null);
+        setDataMode("fallback");
+        setImportStatus(`Synthetic fallback · ${initialSeed.importedPlans} plans · Backend unavailable in local preview`);
+      } else {
+        setDataMode("error");
+        setImportError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
+      }
+    });
+    return () => { active = false; };
+  }, []);
+
   const accounts = useMemo(() => aggregateConsumptionAccounts(draftPlans), [draftPlans]);
-  const signals = useMemo(() => detectConsumptionSignals(draftPlans), [draftPlans]);
+  const signals = useMemo(() => serverSignals ?? detectConsumptionSignals(draftPlans), [draftPlans, serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? signals[0] ?? null;
   const selectedPlan = selectedSignal
     ? draftPlans.find((plan) => plan.customer === selectedSignal.customer && plan.planId === selectedSignal.planId) ?? null
@@ -156,6 +204,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const beginForecastEdit = (plan: ConsumptionPlan, month: string) => {
+    if (isSaving || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = plan.forecasts[month] ?? 0;
     setEditCell({ planKey: plan.id, month });
   };
@@ -188,11 +237,57 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     }
   };
 
-  const saveForecasts = () => {
-    setSavedPlans(clonePlans(draftPlans));
+  const saveForecasts = async () => {
+    if (isSaving) return;
     setEditCell(null);
     editEntryValueRef.current = null;
-    setImportStatus((current) => `${current.split(" · Saved")[0]} · Saved locally`);
+    setIsSaving(true);
+    setImportError("");
+    setConflictRows([]);
+    const updates = draftPlans.flatMap((draft) => {
+      const saved = savedPlans.find((plan) => plan.id === draft.id);
+      if (!saved || draft.serverPlanId === undefined) return [];
+      return Object.keys(draft.forecasts).flatMap((month) => saved.forecasts[month] === draft.forecasts[month] ? [] : [{
+        planId: draft.serverPlanId as number,
+        periodKey: month,
+        amount: draft.forecasts[month],
+        versionNo: saved.versions?.[month] ?? 0
+      }]);
+    });
+    try {
+      if (dataMode === "fallback") {
+        setSavedPlans(clonePlans(draftPlans));
+        setImportStatus((current) => `${current.split(" · Saved")[0]} · Saved in local fallback`);
+      } else if (dataMode !== "backend" || !apiEtag) {
+        throw new Error("Authoritative Consumption workspace is not ready; Forecast was not saved.");
+      } else {
+        const workspace = await saveConsumptionForecasts(apiEtag, updates);
+        adoptWorkspace(workspace, `Backend connected · Forecast saved atomically · ${workspace.plans.length} plans`);
+      }
+      setEditCell(null);
+      editEntryValueRef.current = null;
+    } catch (error) {
+      if (error instanceof ConsumptionConflictError) {
+        const rows: ConflictRow[] = [];
+        draftPlans.forEach((draft) => {
+          const saved = savedPlans.find((plan) => plan.id === draft.id);
+          const current = error.current.plans.find((plan) => plan.serverPlanId === draft.serverPlanId);
+          Object.keys(draft.forecasts).forEach((month) => {
+            if (saved?.forecasts[month] === draft.forecasts[month]) return;
+            rows.push({ plan: `${draft.endUser} · ${draft.planId}`, month,
+              saved: saved?.forecasts[month] ?? null, draft: draft.forecasts[month] ?? null,
+              current: current?.forecasts[month] ?? current?.actuals[month] ?? null });
+          });
+        });
+        setConflictRows(rows);
+        setConflictWorkspace(error.current);
+        setImportError("Forecast Save conflicted with a newer server version. Compare values below.");
+      } else {
+        setImportError(error instanceof Error ? error.message : "Consumption Forecast could not be saved.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const cancelAllForecasts = () => {
@@ -205,19 +300,37 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (!file) return;
+    if (!file || dataMode === "loading" || isSaving) return;
     setImportError("");
     try {
-      const parsed = parseConsumptionCsv(await file.text());
+      const csv = await file.text();
+      const parsed = parseConsumptionCsv(csv);
       const latestActualMonth = getLatestActualMonth(parsed.plans);
       if (!latestActualMonth) throw new Error("The imported CSV has no populated fiscal Actual values.");
-      const imported = seedForecastMonths(parsed.plans, getNextQuarterMonths(latestActualMonth));
-      setSavedPlans(clonePlans(imported));
-      setDraftPlans(clonePlans(imported));
+      try {
+        const preview = await previewConsumptionImport(csv);
+        const accepted = window.confirm(`Preview passed: ${preview.planCount} plans and ${preview.controlTotalCount} control totals. Apply this CSV atomically?`);
+        if (!accepted) {
+          setImportStatus(`${file.name} · Preview passed · Apply cancelled`);
+          return;
+        }
+        const workspace = await applyConsumptionImport(csv);
+        adoptWorkspace(workspace, `${file.name} · Applied batch ${workspace.lastBatchId ?? ""} · ${workspace.plans.length} plans · through ${latestActualMonth}`);
+      } catch (error) {
+        if (!canUseConsumptionFallback(error)) throw error;
+        const imported = seedForecastMonths(parsed.plans, getNextQuarterMonths(latestActualMonth));
+        setSavedPlans(clonePlans(imported));
+        setDraftPlans(clonePlans(imported));
+        setServerSignals(null);
+        setApiEtag("");
+        setDataMode("fallback");
+        setConflictRows([]);
+        setConflictWorkspace(null);
+        setImportStatus(`${file.name} · Local fallback · ${imported.length} plans · through ${latestActualMonth}`);
+      }
       setSelectedSignalId("");
       setExpandedAccounts(new Set());
       setEditCell(null);
-      setImportStatus(`${file.name} · ${imported.length} plans · ${parsed.controlTotals.length} control total excluded · through ${latestActualMonth}`);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption CSV could not be imported.");
     }
@@ -254,6 +367,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                     min="0"
                     value={`${value ?? 0}`}
                     aria-label={`${series.endUser} ${month} forecast`}
+                    disabled={isSaving}
                     onInput={(event) => updateForecast(series.id, month, Math.max(0, Number((event.currentTarget as HTMLInputElement).value) || 0))}
                     onKeyDown={editorKeyDown}
                     autofocus
@@ -286,8 +400,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <p>Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast.</p>
         </div>
         <div class="consumption-import-actions">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" onChange={(event) => void handleCsvFile(event)} />
-          <oj-button chroming="outlined" onojAction={() => fileInputRef.current?.click()}>
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving} onChange={(event) => void handleCsvFile(event)} />
+          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Import CSV
           </oj-button>
@@ -296,6 +410,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
       <div class="consumption-import-status" role="status">{importStatus}</div>
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
+      {conflictRows.length > 0 && (
+        <section class="kpi-panel consumption-conflict-panel" aria-labelledby="consumptionConflictTitle">
+          <div class="consumption-section-heading"><div><span class="kpi-section-label">HTTP 409 comparison</span><h2 id="consumptionConflictTitle">Forecast version conflict</h2></div></div>
+          <table><thead><tr><th>Plan / Month</th><th>Saved baseline</th><th>My draft</th><th>Current server</th></tr></thead>
+            <tbody>{conflictRows.map((row) => <tr key={`${row.plan}-${row.month}`}><th>{row.plan} · {row.month}</th><td>{row.saved === null ? "—" : currency.format(row.saved)}</td><td>{row.draft === null ? "—" : currency.format(row.draft)}</td><td>{row.current === null ? "—" : currency.format(row.current)}</td></tr>)}</tbody>
+          </table>
+          <oj-button chroming="outlined" onojAction={() => conflictWorkspace && adoptWorkspace(conflictWorkspace, "Adopted current server values after conflict")}>Use current server</oj-button>
+        </section>
+      )}
 
       <div class="consumption-pulse-layout">
         <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
@@ -359,8 +482,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
               <span>Draft changes</span>
-              <oj-button chroming="callToAction" onojAction={saveForecasts}>Save</oj-button>
-              <oj-button chroming="outlined" onojAction={cancelAllForecasts}>Cancel</oj-button>
+              <oj-button chroming="callToAction" disabled={isSaving} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
+              <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
             </div>
           )}
         </div>

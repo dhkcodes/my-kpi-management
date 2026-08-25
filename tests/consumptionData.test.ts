@@ -89,6 +89,9 @@ assert.equal(fy27q1.status, "ACTUAL");
 
 const forecasted = seedForecastMonths(parsed.plans, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
 assert.equal(forecasted[0].forecasts["FY27-SEP"], 350, "next-quarter seed uses the latest actual as an editable draft baseline");
+const preserved = seedForecastMonths([{ ...parsed.plans[0], forecasts: { "FY27-SEP": 999 } }], ["FY27-SEP", "FY27-OCT"]);
+assert.equal(preserved[0].forecasts["FY27-SEP"], 999, "authoritative persisted forecasts must not be overwritten by seed defaults");
+assert.equal(preserved[0].forecasts["FY27-OCT"], 350, "missing forecast months still receive a seed default");
 const forecastAccount = aggregateConsumptionAccounts(forecasted)[0];
 const fy27q2 = buildQuarterSummary(forecastAccount, "FY27-Q2", fy27q1);
 assert.equal(fy27q2.total, 2400);

@@ -11,6 +11,8 @@ export type ConsumptionPlan = Readonly<{
   planType: string;
   actuals: Record<string, number>;
   forecasts: Record<string, number>;
+  serverPlanId?: number;
+  versions?: Record<string, number>;
 }>;
 
 export type ConsumptionAccount = Readonly<{
@@ -273,7 +275,10 @@ export const seedForecastMonths = (plans: readonly ConsumptionPlan[], forecastMo
       actuals: { ...plan.actuals },
       forecasts: {
         ...plan.forecasts,
-        ...Object.fromEntries(forecastMonths.map((month) => [month, latestActual]))
+        ...Object.fromEntries(forecastMonths
+          .filter((month) => !Object.prototype.hasOwnProperty.call(plan.forecasts, month)
+            && !Object.prototype.hasOwnProperty.call(plan.actuals, month))
+          .map((month) => [month, latestActual]))
       }
     };
   });
