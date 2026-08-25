@@ -3,10 +3,8 @@ import { useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojinputtext";
 import type { InputPasswordElement, InputTextElement } from "ojs/ojinputtext";
-import {
-  AuthSession,
-  authenticateConfiguredUser
-} from "../auth/authSession";
+import { authenticateUser } from "../auth/authApi";
+import type { AuthSession } from "../auth/authSession";
 
 type LoginPageProps = Readonly<{
   appName: string;
@@ -15,30 +13,33 @@ type LoginPageProps = Readonly<{
 
 export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const userIdRef = useRef<InputTextElement<string> | null>(null);
   const passwordRef = useRef<InputPasswordElement<string> | null>(null);
 
-  const handleSubmit = (event?: Event) => {
+  const handleSubmit = async (event?: Event) => {
     event?.preventDefault();
+    if (isSubmitting) return;
     setError("");
     const userId = String(userIdRef.current?.rawValue ?? userIdRef.current?.value ?? "");
     const password = String(passwordRef.current?.rawValue ?? passwordRef.current?.value ?? "");
 
-    if (!userId || !password) {
+    if (!userId.trim() || !password) {
       setError("Enter both your user ID and password.");
       return;
     }
 
-    const session = authenticateConfiguredUser(userId, password);
-    if (!session) {
-      setError("The user ID or password is incorrect.");
-      passwordRef.current?.setProperty("value", "");
+    setIsSubmitting(true);
+    try {
+      const session = await authenticateUser(userId, password);
+      onAuthenticated(session);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sign in is temporarily unavailable.");
       window.requestAnimationFrame(() => passwordRef.current?.focus());
-      return;
+    } finally {
+      passwordRef.current?.setProperty("value", "");
+      setIsSubmitting(false);
     }
-
-    passwordRef.current?.setProperty("value", "");
-    onAuthenticated(session);
   };
 
   return (
@@ -54,7 +55,7 @@ export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
         <form
           id="kapLoginForm"
           class="kap-login__form"
-          onSubmit={handleSubmit}
+          onSubmit={(event) => void handleSubmit(event)}
           noValidate>
           <oj-input-text
             id="kapLoginUserId"
@@ -64,6 +65,7 @@ export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
             labelEdge="inside"
             labelHint="User ID"
             required={true}
+            disabled={isSubmitting}
             userAssistanceDensity="compact"
             virtualKeyboard="email"
             onrawValueChanged={() => {
@@ -79,6 +81,7 @@ export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
             labelEdge="inside"
             labelHint="Password"
             required={true}
+            disabled={isSubmitting}
             userAssistanceDensity="compact"
             onrawValueChanged={() => {
               if (error) setError("");
@@ -95,13 +98,14 @@ export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
           <oj-button
             id="kapLoginSubmit"
             class="kap-login__submit"
-            chroming="callToAction">
-            Sign in
+            chroming="callToAction"
+            disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Sign in"}
           </oj-button>
         </form>
 
         <p class="kap-login__notice">
-          This single-user sign-in is a local workspace gate. It does not secure Backend APIs or data.
+          Authentication is verified by the workspace service. Backend API authorization remains Tailnet-scoped.
         </p>
       </section>
     </main>

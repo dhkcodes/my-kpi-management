@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   AUTH_SESSION_STORAGE_KEY,
-  authenticateConfiguredUser,
+  AuthSession,
   clearAuthSession,
   getProfileInitials,
   readAuthSession,
@@ -15,18 +15,12 @@ class MemoryStorage {
   removeItem(key: string) { this.values.delete(key); }
 }
 
-const testCredentials = {
-  userId: "test-user@example.invalid",
-  password: "test-password"
-};
-globalThis.KAP_AUTH_CONFIG = testCredentials;
-
 const storage = new MemoryStorage();
-assert.equal(authenticateConfiguredUser(testCredentials.userId, "wrong"), null, "wrong credentials are rejected");
-
-const session = authenticateConfiguredUser(testCredentials.userId, testCredentials.password);
-assert.ok(session, "configured credentials create a session");
-assert.equal(session.userId, testCredentials.userId);
+const session: AuthSession = {
+  version: 1,
+  userId: "test-user@example.invalid",
+  authenticatedAt: new Date().toISOString()
+};
 
 writeAuthSession(storage, session);
 assert.deepEqual(readAuthSession(storage), session, "the same-tab session round-trips through storage");
@@ -37,9 +31,13 @@ clearAuthSession(storage);
 assert.equal(readAuthSession(storage), null, "logout removes the local session");
 
 storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({ version: 1, userId: "someone.else@example.invalid" }));
-assert.equal(readAuthSession(storage), null, "a tampered profile is not accepted");
+assert.equal(readAuthSession(storage), null, "an incomplete profile is not accepted");
 
-globalThis.KAP_AUTH_CONFIG = undefined;
-assert.equal(authenticateConfiguredUser(testCredentials.userId, testCredentials.password), null, "missing runtime config fails closed");
+storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+  version: 1,
+  userId: "test-user@example.invalid",
+  authenticatedAt: ""
+}));
+assert.equal(readAuthSession(storage), null, "an invalid timestamp is rejected");
 
 console.log("authSession tests passed");
