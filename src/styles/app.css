@@ -2159,3 +2159,74 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 760px) {
   .kpi-d1-progress-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Consumption — Redwood-first Signal-integrated Pulse. */
+.consumption-page { display: grid; gap: 1rem; min-width: 0; }
+.consumption-page__header { align-items: flex-start; display: flex; gap: 1.25rem; justify-content: space-between; }
+.consumption-page__header h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; margin: .2rem 0; }
+.consumption-page__header p, .consumption-section-heading p { color: var(--kpi-muted); line-height: 1.45; margin: .25rem 0 0; }
+.consumption-import-actions { align-items: center; display: flex; flex: 0 0 auto; }
+.consumption-file-input { display: none; }
+.consumption-import-status, .consumption-import-error { border-left: .25rem solid #2f6f9f; font-size: .82rem; padding: .65rem .8rem; }
+.consumption-import-status { background: #eef5fa; color: #245777; }
+.consumption-import-error { background: #fff1ef; border-left-color: var(--kpi-danger); color: #8f2417; }
+.consumption-pulse-layout { display: grid; gap: 1rem; grid-template-columns: minmax(25rem, .9fr) minmax(30rem, 1.1fr); min-width: 0; }
+.consumption-signal-panel, .consumption-trend-panel, .consumption-table-panel { margin: 0; min-width: 0; }
+.consumption-section-heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .85rem; }
+.consumption-section-heading h2 { margin: .15rem 0 0; }
+.consumption-count-badge { align-items: center; background: #f0eeeb; border-radius: 999px; display: inline-flex; font-size: .78rem; font-weight: 800; justify-content: center; min-height: 1.8rem; min-width: 1.8rem; padding: .2rem .5rem; }
+.consumption-signal-inbox { border: 1px solid var(--kpi-border); max-height: 23rem; overflow: auto; }
+.consumption-signal { align-items: center; background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; display: grid; font: inherit; gap: .55rem; grid-template-columns: auto minmax(9rem, 1fr) auto auto auto; padding: .65rem; text-align: left; width: 100%; }
+.consumption-signal:last-child { border-bottom: 0; }
+.consumption-signal:hover, .consumption-signal:focus-visible { background: #f7f5f2; }
+.consumption-signal.is-selected { background: #fff5f2; box-shadow: inset .22rem 0 0 var(--kpi-brand); }
+.consumption-signal-main, .consumption-signal-change { display: grid; gap: .15rem; min-width: 0; }
+.consumption-signal-main strong, .consumption-signal-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumption-signal-main span, .consumption-signal-change span, .consumption-signal-month { color: var(--kpi-muted); font-size: .72rem; }
+.consumption-signal-type { font-size: .72rem; font-weight: 800; white-space: nowrap; }
+.consumption-signal-change { justify-items: end; }
+.consumption-signal-grade { border-radius: 999px; font-size: .64rem; font-weight: 850; letter-spacing: .025em; padding: .24rem .42rem; white-space: nowrap; }
+.consumption-signal-grade.is-critical { background: #fde7e3; color: #a63122; }
+.consumption-signal-grade.is-high { background: #fff0cc; color: #7b5100; }
+.consumption-signal-grade.is-watch { background: #e9f2f8; color: #245777; }
+.consumption-empty-state { color: var(--kpi-muted); margin: 0; padding: 1.5rem; text-align: center; }
+.consumption-trend-panel oj-chart { display: block; height: 17rem; width: 100%; }
+.consumption-signal-reason { align-items: flex-start; background: #f8f6f4; border-left: .22rem solid var(--kpi-brand); display: flex; gap: .7rem; margin-top: .5rem; padding: .7rem; }
+.consumption-signal-reason p { color: var(--kpi-muted); line-height: 1.4; margin: .2rem 0 0; }
+.consumption-table-heading { align-items: center; }
+.consumption-draft-actions { align-items: center; display: flex; flex: 0 0 auto; gap: .5rem; }
+.consumption-draft-actions > span { color: var(--kap-grid-draft-ink); font-size: .76rem; font-weight: 800; }
+.consumption-table-scroll { border: 1px solid var(--kpi-border); max-width: 100%; overflow-x: auto; position: relative; width: 100%; }
+.consumption-table { border-collapse: separate; border-spacing: 0; min-width: 100%; table-layout: fixed; width: max-content; }
+.consumption-table th, .consumption-table td { background: var(--kap-grid-cell-bg); border-bottom: 1px solid var(--kap-grid-border); border-right: 1px solid var(--kap-grid-border); height: 3.25rem; min-width: 7.25rem; padding: .55rem; }
+.consumption-table thead th { background: var(--kap-grid-header-bg); color: var(--kap-grid-header-ink); font-size: .74rem; font-weight: 850; text-align: center; }
+.consumption-table thead tr:first-child th { border-bottom-color: #d7dde2; }
+.consumption-table tbody tr:hover > td, .consumption-table tbody tr:hover > th { background: var(--kap-grid-hover-bg); }
+.consumption-table tbody tr.is-context > td, .consumption-table tbody tr.is-context > th { background: #fff7f3; }
+.consumption-account-column { left: 0; min-width: 19rem !important; position: sticky; text-align: left !important; width: 19rem; z-index: 3; }
+.consumption-table thead .consumption-account-column { z-index: 6; }
+.consumption-account-row .consumption-account-column { background: #f7f5f2; }
+.consumption-account-toggle { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: grid; font: inherit; gap: .2rem .45rem; grid-template-columns: auto minmax(0, 1fr); padding: 0; text-align: left; width: 100%; }
+.consumption-account-toggle > span { grid-row: 1 / 3; }
+.consumption-account-toggle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumption-account-toggle small, .consumption-account-column > small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; }
+.consumption-plan-row .consumption-account-column { padding-left: 2rem; }
+.consumption-end-user { display: block; font-size: .82rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumption-value-cell { font-variant-numeric: tabular-nums; text-align: right; }
+.consumption-value-cell small { color: var(--kpi-muted); display: block; font-size: .62rem; margin-top: .15rem; text-transform: uppercase; }
+.consumption-quarter-total { background: #f5f7f8 !important; font-weight: 800; }
+.consumption-preq-gap { background: #faf8f5 !important; font-weight: 750; }
+.consumption-forecast-cell { background: #f4f8fb !important; cursor: cell; }
+.consumption-forecast-cell.is-draft { background: var(--kap-grid-draft-bg) !important; box-shadow: inset 0 -3px 0 var(--kap-grid-draft-line); color: var(--kap-grid-draft-ink); }
+.consumption-forecast-editor { background: #fff; border: 2px solid #2f6f9f; font: inherit; font-variant-numeric: tabular-nums; height: 2.25rem; min-width: 6rem; padding: .35rem; text-align: right; width: 100%; }
+
+@media (max-width: 1120px) {
+  .consumption-pulse-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .consumption-page__header, .consumption-table-heading { align-items: stretch; flex-direction: column; }
+  .consumption-import-actions { align-self: flex-start; }
+  .consumption-signal { grid-template-columns: auto minmax(8rem, 1fr) auto; }
+  .consumption-signal-change, .consumption-signal-month { grid-column: 2 / -1; justify-items: start; }
+  .consumption-account-column { min-width: 14rem !important; width: 14rem; }
+}

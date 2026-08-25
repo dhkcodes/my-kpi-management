@@ -1,0 +1,39 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const page = readFileSync("src/components/content/ConsumptionPage.tsx", "utf8");
+const content = readFileSync("src/components/content/index.tsx", "utf8");
+const styles = readFileSync("src/styles/app.css", "utf8");
+
+assert.match(content, /activeRoute\.module === "consumption"[\s\S]*<ConsumptionPage/, "Consumption route renders the implemented page");
+assert.match(page, /import "ojs\/ojchart"/, "Consumption trend uses Oracle JET Chart");
+assert.match(page, /<oj-chart[\s\S]*type="line"/, "linked trend is a JET line chart");
+assert.match(page, /allMonths\.flatMap[\s\S]*value === null \? \[\]/, "missing Plan months are omitted from the trend instead of rendered as zero");
+assert.match(page, /id="consumptionSignalInbox"/, "Change Signal Inbox is rendered");
+assert.match(page, /setSelectedSignalId/, "signal selection drives linked context");
+assert.match(page, /changeAmount[\s\S]*changePercent[\s\S]*grade[\s\S]*month[\s\S]*reason/, "signals expose MoM amount, percent, grade, month and reason");
+assert.match(page, /accept="\.csv,text\/csv"/, "runtime CSV import accepts CSV files");
+assert.match(page, /parseConsumptionCsv/, "CSV import uses the normalized parser");
+assert.match(page, /seedForecastMonths/, "the next quarter receives editable forecast cells");
+assert.match(page, /data-forecast-cell/, "forecast cells expose a browser-verifiable edit contract");
+assert.match(page, /type EditCell = Readonly<\{ planKey:/, "the active editor is keyed by stable account-scoped Plan identity");
+assert.match(page, /plan\.id === planKey/, "Forecast updates change only the selected stable Plan row");
+assert.match(page, /savedPlans\.find\(\(plan\) => plan\.id === series\.id\)/, "dirty comparison uses the same stable Plan identity");
+assert.match(page, /onDblClick[\s\S]*beginForecastEdit/, "double-click enters Forecast editing");
+assert.match(page, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the current cell into the page draft");
+assert.match(page, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the current edit-entry value");
+assert.match(page, /hasDraftChanges[\s\S]*>Save<[\s\S]*>Cancel</, "Save and Cancel appear only for draft changes");
+assert.match(page, /setSavedPlans\(clonePlans\(draftPlans\)\)/, "Save adopts the draft as the local saved snapshot");
+assert.match(page, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the whole saved snapshot");
+assert.match(page, /onNavigationGuardChange/, "Consumption Draft reuses the KAP navigation guard contract");
+assert.match(page, /window\.confirm\(/, "Leaving with a Draft requires an explicit decision");
+assert.match(page, /data-readonly="account"/, "Account aggregate rows are read-only");
+assert.match(page, /data-readonly=\{actual \? "actual"/, "Actual cells are read-only");
+assert.match(page, /Quarter Total[\s\S]*PreQ Gap/, "each quarter column group ends with Total and PreQ Gap");
+assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*overflow-x:\s*auto/, "the month and quarter area owns horizontal scrolling");
+const accountColumnRule = styles.match(/\.consumption-account-column\s*\{([^}]*)\}/)?.[1] ?? "";
+assert.match(accountColumnRule, /position:\s*sticky/, "Account column uses sticky positioning");
+assert.match(accountColumnRule, /left:\s*0/, "Account column stays fixed at the left edge");
+assert.doesNotMatch(page, /Sold To/, "Sold To never appears in the UI model");
+
+console.log("consumptionUiContract tests passed");

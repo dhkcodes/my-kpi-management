@@ -19,6 +19,7 @@ import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSou
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
+import { ConsumptionPage } from "./ConsumptionPage";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -596,6 +597,12 @@ export function Content({
         )
       ) : activeRoute.module === "weeklyActivities" ? (
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
+      ) : activeRoute.module === "consumption" ? (
+        <ConsumptionPage
+          key={fiscalYear}
+          fiscalYear={fiscalYear}
+          onNavigationGuardChange={onKpiNavigationGuardChange}
+        />
       ) : (
         <EmptyRoutePage route={activeRoute} />
       )}
