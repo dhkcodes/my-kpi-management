@@ -28,6 +28,7 @@ assert.equal("soldTo" in parsed.plans[0], false, "Sold To must be discarded at t
 assert.equal(parsed.plans[0].actuals["FY27-AUG"], 350);
 assert.equal(getFiscalQuarter("FY26-MAY"), "FY26-Q4");
 assert.equal(getFiscalQuarter("FY27-JUN"), "FY27-Q1");
+assert.deepEqual(getNextQuarterMonths("FY27-JUL"), ["FY27-AUG", "FY27-SEP", "FY27-OCT"], "Forecast starts in the month immediately after the last populated Actual");
 assert.deepEqual(getNextQuarterMonths("FY27-AUG"), ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
 assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY28-AUG"]);
 

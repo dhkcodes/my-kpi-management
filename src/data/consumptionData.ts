@@ -219,13 +219,17 @@ export const getFiscalQuarter = (monthKey: string): string => {
 };
 
 export const getNextQuarterMonths = (latestActualMonth: string): string[] => {
-  const currentQuarter = getFiscalQuarter(latestActualMonth);
-  const match = /^FY(\d{2})-Q([1-4])$/.exec(currentQuarter);
-  if (!match) throw new Error(`Invalid fiscal quarter: ${currentQuarter}`);
-  const currentQuarterNumber = Number(match[2]);
-  const nextQuarterNumber = currentQuarterNumber === 4 ? 1 : currentQuarterNumber + 1;
-  const nextFiscalYear = currentQuarterNumber === 4 ? Number(match[1]) + 1 : Number(match[1]);
-  return quarterMonths[`Q${nextQuarterNumber}`].map((month) => `FY${String(nextFiscalYear).padStart(2, "0")}-${month}`);
+  const match = /^FY(\d{2})-([A-Z]{3})$/.exec(latestActualMonth);
+  if (!match) throw new Error(`Invalid fiscal month: ${latestActualMonth}`);
+  const monthIndex = oracleFiscalMonths.findIndex((month) => month === match[2]);
+  if (monthIndex < 0) throw new Error(`Unsupported fiscal month: ${latestActualMonth}`);
+  const fiscalYear = Number(match[1]);
+  return [1, 2, 3].map((offset) => {
+    const absoluteIndex = monthIndex + offset;
+    const nextMonth = oracleFiscalMonths[absoluteIndex % oracleFiscalMonths.length];
+    const nextFiscalYear = fiscalYear + Math.floor(absoluteIndex / oracleFiscalMonths.length);
+    return `FY${String(nextFiscalYear).padStart(2, "0")}-${nextMonth}`;
+  });
 };
 
 export const getQuarterMonths = (quarter: string): string[] => {
