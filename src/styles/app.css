@@ -1684,6 +1684,13 @@ body {
 .kap-dialog-note { color: var(--kpi-muted); font-size: .78rem; margin: 0; }
 @media (max-width: 640px) { .kap-profile-fields { grid-template-columns: 1fr; } .kap-users-header { align-items: stretch; flex-direction: column; } }
 
+.accounts-workloads-clone-content { display: grid; gap: 1rem; min-width: min(36rem, 80vw); }
+.accounts-workloads-clone-groups { display: grid; gap: .75rem; max-height: 50vh; overflow-y: auto; }
+.accounts-workloads-clone-groups fieldset { border: 1px solid var(--kpi-border); display: grid; gap: .5rem; padding: .75rem; }
+.accounts-workloads-clone-groups label { align-items: center; display: flex; gap: .5rem; }
+.accounts-workloads-clone-groups label.is-skipped { color: var(--kpi-muted); }
+.accounts-workloads-clone-status { font-size: .72rem; margin-left: auto; order: 3; }
+
 /* Weekly Activities — Redwood-first app-owned layout. */
 .weekly-activities-page {
   background: var(--kpi-surface);

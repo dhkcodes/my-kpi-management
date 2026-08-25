@@ -184,4 +184,25 @@ assert.match(page, /formatAccountsWorkloadsSaveError\(error\)/,
 assert.doesNotMatch(page, /check the API connection and try again/,
   "validation and DB failures must not be mislabeled as generic connectivity errors");
 
+assert.match(page, />Clone Previous FY<\/oj-button>/, "Redwood action opens previous-FY clone preview");
+assert.match(page, /dialogTitle="Clone Previous FY"/, "clone uses a mounted JET dialog");
+assert.match(page, /clonePreview\.accounts\.map/, "preview is grouped by Account");
+assert.match(page, /toggleCloneAccount/, "account-level checkbox selects eligible workloads");
+assert.match(page, /toggleCloneWorkload/, "individual workload checkboxes are supported");
+assert.match(page, /item\.status === "SKIP_TARGET_EXISTS"[\s\S]*disabled/, "target-exists workloads are labeled and disabled");
+assert.match(page, /disabled=\{cloneSelection\.length === 0 \|\| cloneExecuting \|\| cloneLoading \|\| draftActive \|\| saving \|\| accountsWorkloadsRefreshing/, "execute is disabled without eligible selection or during any conflicting async/draft state");
+assert.match(page, /cloneAccountsWorkloadsPreviousFiscalYear[\s\S]*setSelectedRowIds\(\[\]\)[\s\S]*setDraftRows\(authoritative\.items\)[\s\S]*onRefresh\(\)/, "success clears selection/drafts and refreshes authoritative current FY rows");
+assert.match(page, /const cloneGenerationRef = useRef\(0\)/, "clone async work has an explicit generation guard");
+assert.match(page, /cloneGenerationRef\.current \+= 1[\s\S]*setClonePreview\(null\)[\s\S]*setCloneSelection\(\[\]\)/, "opening or cancelling invalidates stale work and clears prior candidates");
+assert.match(page, /generation !== cloneGenerationRef\.current[\s\S]*fiscalYear !== cloneContextFiscalYearRef\.current/, "stale preview and clone responses are rejected after context changes");
+assert.match(page, /authoritative\.preview\.targetFiscalYear !== fiscalYear[\s\S]*clonePreview\.targetFiscalYear !== fiscalYear/, "clone success rejects reconciliation outside the exact current target FY context");
+assert.match(page, /disabled=\{draftActive \|\| saving \|\| accountsWorkloadsRefreshing \|\| cloneLoading \|\| cloneExecuting \|\| dataSource !== "api"\}/, "clone launch locks for drafts, save, table load, preview, and submit");
+assert.match(page, /const cloneSubmitInFlightRef = useRef\(false\)/, "clone submit has an immediate ref lock");
+assert.match(page, /if \(cloneSubmitInFlightRef\.current \|\| cloneExecuting \|\| !clonePreview \|\| cloneSelection\.length === 0\) return;[\s\S]*cloneSubmitInFlightRef\.current = true;[\s\S]*cloneAccountsWorkloadsPreviousFiscalYear[\s\S]*finally \{[\s\S]*cloneSubmitInFlightRef\.current = false;/, "clone submit is synchronously single-flight even before state rerenders");
+assert.match(page, /catch \(error\)[\s\S]{0,180}setCloneError[\s\S]{0,120}finally/, "clone failure preserves selection for retry");
+assert.match(page, /const cancelClone[\s\S]*cloneGenerationRef\.current \+= 1[\s\S]*setCloneSelection\(\[\]\)[\s\S]*setClonePreview\(null\)/, "clone cancel clears selection and candidates");
+assert.match(page, /useEffect\(\(\) => \(\) => \{ cloneGenerationRef\.current \+= 1; \}, \[\]\)/, "unmount invalidates pending clone work");
+assert.doesNotMatch(page, /\{cloneOpen &&\s*<oj-dialog/, "clone dialog stays mounted and is controlled by its ref");
+assert.doesNotMatch(page, /ownerUserKey|owner\s*:/, "clone UI exposes no unsafe owner input");
+
 console.log("accountsWorkloadsUiContract tests passed");

@@ -181,6 +181,108 @@ const parseAccountWorkloadRow = (value: unknown): AccountWorkloadRow | null => {
   };
 };
 
+export type CloneWorkloadStatus = "ELIGIBLE" | "SKIP_TARGET_EXISTS";
+export type AccountsWorkloadsClonePreview = Readonly<{
+  sourceFiscalYear: FiscalYear;
+  targetFiscalYear: FiscalYear;
+  currentFiscalYear: FiscalYear;
+  enabled: boolean;
+  accounts: ReadonlyArray<Readonly<{
+    account: string;
+    workloads: ReadonlyArray<Readonly<{
+      sourceCommitmentId: number;
+      sourceVersionNo: number;
+      workloadName: string;
+      status: CloneWorkloadStatus;
+    }>>;
+  }>>;
+  eligibleSelectionIds: number[];
+}>;
+
+export type AccountsWorkloadsCloneResponse = AccountsWorkloadsListResponse & Readonly<{
+  clonedCount: number;
+  skippedCount: number;
+  preview: AccountsWorkloadsClonePreview;
+}>;
+
+const isFiscalYear = (value: unknown): value is FiscalYear =>
+  typeof value === "string" && /^FY\d{2}$/.test(value);
+
+const parseClonePreview = (payload: unknown): AccountsWorkloadsClonePreview => {
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Accounts & Workloads clone preview response");
+  const value = payload as Record<string, unknown>;
+  if (!isFiscalYear(value.sourceFiscalYear) || !isFiscalYear(value.targetFiscalYear)
+      || !isFiscalYear(value.currentFiscalYear) || typeof value.enabled !== "boolean"
+      || !Array.isArray(value.accounts) || !Array.isArray(value.eligibleSelectionIds)
+      || value.eligibleSelectionIds.some((id) => !isPositiveInteger(id))) {
+    throw new Error("Malformed Accounts & Workloads clone preview response");
+  }
+  const accounts = value.accounts.map((candidate) => {
+    if (typeof candidate !== "object" || candidate === null) throw new Error("Malformed Accounts & Workloads clone preview response");
+    const account = candidate as Record<string, unknown>;
+    if (typeof account.account !== "string" || !Array.isArray(account.workloads)) throw new Error("Malformed Accounts & Workloads clone preview response");
+    const workloads = account.workloads.map((candidateItem) => {
+      if (typeof candidateItem !== "object" || candidateItem === null) throw new Error("Malformed Accounts & Workloads clone preview response");
+      const item = candidateItem as Record<string, unknown>;
+      if (!isPositiveInteger(item.sourceCommitmentId) || !isPositiveInteger(item.sourceVersionNo)
+          || typeof item.workloadName !== "string"
+          || (item.status !== "ELIGIBLE" && item.status !== "SKIP_TARGET_EXISTS")) {
+        throw new Error("Malformed Accounts & Workloads clone preview response");
+      }
+      return item as { sourceCommitmentId: number; sourceVersionNo: number;
+        workloadName: string; status: CloneWorkloadStatus };
+    });
+    return { account: account.account, workloads };
+  });
+  return {
+    sourceFiscalYear: value.sourceFiscalYear,
+    targetFiscalYear: value.targetFiscalYear,
+    currentFiscalYear: value.currentFiscalYear,
+    enabled: value.enabled,
+    accounts,
+    eligibleSelectionIds: [...value.eligibleSelectionIds] as number[]
+  };
+};
+
+export const fetchAccountsWorkloadsClonePreview = async (
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsClonePreview> => parseClonePreview(await requestJson<unknown>(
+  fetchImpl, `${accountsWorkloadsApiBase()}/accounts-workloads/clone-preview`
+));
+
+export type CloneSourceSelection = Readonly<{
+  sourceCommitmentId: number;
+  sourceVersionNo: number;
+}>;
+
+export const cloneAccountsWorkloadsPreviousFiscalYear = async (
+  sourceFiscalYear: FiscalYear,
+  targetFiscalYear: FiscalYear,
+  sources: CloneSourceSelection[],
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsCloneResponse> => {
+  const payload = await requestJson<unknown>(fetchImpl, `${accountsWorkloadsApiBase()}/accounts-workloads/clone`, {
+    method: "POST",
+    body: JSON.stringify({ sourceFiscalYear, targetFiscalYear, sources })
+  });
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Accounts & Workloads clone response");
+  const value = payload as Record<string, unknown>;
+  const parsedItems = Array.isArray(value.items) ? value.items.map(parseAccountWorkloadRow) : [];
+  if (!Number.isInteger(value.clonedCount) || (value.clonedCount as number) < 0
+      || !Number.isInteger(value.skippedCount) || (value.skippedCount as number) < 0
+      || !Array.isArray(value.items) || parsedItems.some((item) => item === null)
+      || !Number.isInteger(value.total) || (value.total as number) < 0) {
+    throw new Error("Malformed Accounts & Workloads clone response");
+  }
+  return {
+    clonedCount: value.clonedCount as number,
+    skippedCount: value.skippedCount as number,
+    preview: parseClonePreview(value.preview),
+    items: parsedItems as AccountWorkloadRow[],
+    total: value.total as number
+  };
+};
+
 export const fetchAccountsWorkloads = async (
   query: AccountsWorkloadsListQuery,
   fetchImpl: FetchLike = fetch

@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
-import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsClonePreview, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError, cloneAccountsWorkloadsPreviousFiscalYear, fetchAccountsWorkloadsClonePreview } from "../../data/accountsWorkloadsApi";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { getTargetPeriodOptions } from "../../data/targetPeriod";
@@ -336,6 +336,12 @@ export function AccountsWorkloadsPage({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [deleteTargets, setDeleteTargets] = useState<DeleteTargets | null>(null);
+  const [clonePreview, setClonePreview] = useState<AccountsWorkloadsClonePreview | null>(null);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneSelection, setCloneSelection] = useState<number[]>([]);
+  const [cloneLoading, setCloneLoading] = useState(false);
+  const [cloneExecuting, setCloneExecuting] = useState(false);
+  const [cloneError, setCloneError] = useState("");
   const initialExchangeRate = fxRate?.rateValue ?? metadata.exchangeRate;
   const [savedExchangeRate, setSavedExchangeRate] = useState(initialExchangeRate);
   const [exchangeRate, setExchangeRate] = useState(initialExchangeRate);
@@ -344,11 +350,17 @@ export function AccountsWorkloadsPage({
   const gridScrollRef = useRef<HTMLDivElement>(null);
   const savingDialogRef = useRef<ojDialog>(null);
   const deleteDialogRef = useRef<ojDialog>(null);
+  const cloneDialogRef = useRef<ojDialog>(null);
+  const cloneGenerationRef = useRef(0);
+  const cloneSubmitInFlightRef = useRef(false);
+  const cloneContextFiscalYearRef = useRef(fiscalYear);
   const addButtonRef = useRef<any>(null);
   const deleteButtonRef = useRef<any>(null);
   const deleteCancelButtonRef = useRef<any>(null);
   const editEntrySnapshotRef = useRef<AccountWorkloadRow | null>(null);
   const [scrollState, setScrollState] = useState({ left: 0, max: 0, clientWidth: 0 });
+
+  useEffect(() => () => { cloneGenerationRef.current += 1; }, []);
 
   const updateScrollState = () => {
     const grid = gridScrollRef.current;
@@ -448,6 +460,23 @@ export function AccountsWorkloadsPage({
     if (deleteTargets) deleteDialogRef.current?.open();
     else if (deleteDialogRef.current?.isOpen()) deleteDialogRef.current.close();
   }, [deleteTargets]);
+
+  useEffect(() => {
+    if (cloneContextFiscalYearRef.current === fiscalYear) return;
+    cloneContextFiscalYearRef.current = fiscalYear;
+    cloneGenerationRef.current += 1;
+    setCloneOpen(false);
+    setClonePreview(null);
+    setCloneSelection([]);
+    setCloneError("");
+    setCloneLoading(false);
+    setCloneExecuting(false);
+  }, [fiscalYear]);
+
+  useEffect(() => {
+    if (cloneOpen) cloneDialogRef.current?.open();
+    else if (cloneDialogRef.current?.isOpen()) cloneDialogRef.current.close();
+  }, [cloneOpen]);
 
   useEffect(() => {
     updateScrollState();
@@ -734,6 +763,98 @@ export function AccountsWorkloadsPage({
     });
   };
 
+  const cancelClone = () => {
+    cloneGenerationRef.current += 1;
+    setCloneOpen(false);
+    setCloneSelection([]);
+    setClonePreview(null);
+    setCloneError("");
+    setCloneLoading(false);
+  };
+
+  const openClonePreviousFiscalYear = async () => {
+    if (draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api") return;
+    const generation = ++cloneGenerationRef.current;
+    cloneContextFiscalYearRef.current = fiscalYear;
+    setClonePreview(null);
+    setCloneSelection([]);
+    setCloneOpen(true);
+    setCloneLoading(true);
+    setCloneError("");
+    try {
+      const preview = await fetchAccountsWorkloadsClonePreview();
+      if (generation !== cloneGenerationRef.current
+          || fiscalYear !== cloneContextFiscalYearRef.current
+          || preview.targetFiscalYear !== fiscalYear
+          || preview.currentFiscalYear !== fiscalYear) return;
+      setClonePreview(preview);
+      setCloneSelection([...preview.eligibleSelectionIds]);
+    } catch (error) {
+      if (generation === cloneGenerationRef.current) {
+        setCloneError(error instanceof Error ? error.message : "Clone preview could not be loaded.");
+      }
+    } finally {
+      if (generation === cloneGenerationRef.current) setCloneLoading(false);
+    }
+  };
+
+  const toggleCloneWorkload = (sourceCommitmentId: number) => {
+    setCloneSelection((current) => current.includes(sourceCommitmentId)
+      ? current.filter((id) => id !== sourceCommitmentId)
+      : [...current, sourceCommitmentId]);
+  };
+
+  const toggleCloneAccount = (account: AccountsWorkloadsClonePreview["accounts"][number]) => {
+    const eligibleIds = account.workloads
+      .filter((item) => item.status === "ELIGIBLE")
+      .map((item) => item.sourceCommitmentId);
+    const allSelected = eligibleIds.length > 0 && eligibleIds.every((id) => cloneSelection.includes(id));
+    setCloneSelection((current) => allSelected
+      ? current.filter((id) => !eligibleIds.includes(id))
+      : Array.from(new Set([...current, ...eligibleIds])));
+  };
+
+  const executeClonePreviousFiscalYear = async () => {
+    if (cloneSubmitInFlightRef.current || cloneExecuting || !clonePreview || cloneSelection.length === 0) return;
+    const targetFiscalYear = clonePreview.targetFiscalYear;
+    if (targetFiscalYear !== fiscalYear || targetFiscalYear !== cloneContextFiscalYearRef.current) return;
+    const sourceById = new Map(clonePreview.accounts.flatMap((account) => account.workloads)
+      .filter((item) => item.status === "ELIGIBLE")
+      .map((item) => [item.sourceCommitmentId, item]));
+    const sources = cloneSelection.map((sourceCommitmentId) => sourceById.get(sourceCommitmentId))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .map((item) => ({ sourceCommitmentId: item.sourceCommitmentId, sourceVersionNo: item.sourceVersionNo }));
+    if (sources.length !== cloneSelection.length) return;
+    cloneSubmitInFlightRef.current = true;
+    const generation = ++cloneGenerationRef.current;
+    setCloneExecuting(true);
+    setCloneError("");
+    try {
+      const authoritative = await cloneAccountsWorkloadsPreviousFiscalYear(
+        clonePreview.sourceFiscalYear, targetFiscalYear, sources);
+      if (generation !== cloneGenerationRef.current
+          || fiscalYear !== cloneContextFiscalYearRef.current
+          || authoritative.preview.targetFiscalYear !== fiscalYear
+          || authoritative.preview.currentFiscalYear !== fiscalYear
+          || clonePreview.targetFiscalYear !== fiscalYear) return;
+      setSelectedRowIds([]);
+      setDraftRows(authoritative.items);
+      setAddingRow(null);
+      setEditCell(null);
+      setCloneSelection([]);
+      setClonePreview(authoritative.preview);
+      setCloneOpen(false);
+      onRefresh();
+    } catch (error) {
+      if (generation === cloneGenerationRef.current) {
+        setCloneError(error instanceof Error ? error.message : "Clone could not be completed.");
+      }
+    } finally {
+      cloneSubmitInFlightRef.current = false;
+      if (generation === cloneGenerationRef.current) setCloneExecuting(false);
+    }
+  };
+
   const renderEditableCell = (row: AccountWorkloadRow, field: EditableField, displayValue: string) => {
     const isEditing = editCell?.id === row.id && editCell.field === field;
     const isChanged = isFieldChanged(rows, row, field);
@@ -904,6 +1025,7 @@ export function AccountsWorkloadsPage({
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
+          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api"} onojAction={() => void openClonePreviousFiscalYear()}>Clone Previous FY</oj-button>
           <oj-button ref={addButtonRef} class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title="Add Account" disabled={saving} onojAction={addRow}>Add Account</oj-button>
           {showEditActions && (
             <>
@@ -950,6 +1072,58 @@ export function AccountsWorkloadsPage({
             <oj-button chroming="danger" disabled={saving} onojAction={() => void confirmDelete()}>Delete</oj-button>
             <oj-button ref={deleteCancelButtonRef} chroming="outlined" disabled={saving} onojAction={cancelDelete}>Cancel</oj-button>
           </div>
+        </div>
+      </oj-dialog>
+
+      <oj-dialog
+        ref={cloneDialogRef}
+        class="accounts-workloads-clone-dialog"
+        initialVisibility="hide"
+        modality="modal"
+        cancelBehavior={cloneExecuting ? "none" : "escape"}
+        dragAffordance="none"
+        resizeBehavior="none"
+        dialogTitle="Clone Previous FY"
+        onojClose={cancelClone}>
+        <div class="accounts-workloads-clone-content">
+          {cloneLoading && <p role="status">Loading clone preview…</p>}
+          {cloneError && <p role="alert">{cloneError}</p>}
+          {clonePreview && (
+            <>
+              <p>Copy planning data from {clonePreview.sourceFiscalYear} to {clonePreview.targetFiscalYear}. Existing target workloads are skipped.</p>
+              <div class="accounts-workloads-clone-groups">
+                {clonePreview.accounts.map((account) => {
+                  const eligibleIds = account.workloads.filter((item) => item.status === "ELIGIBLE").map((item) => item.sourceCommitmentId);
+                  const accountSelected = eligibleIds.length > 0 && eligibleIds.every((id) => cloneSelection.includes(id));
+                  return (
+                    <fieldset key={account.account}>
+                      <legend>
+                        <label>
+                          <input type="checkbox" checked={accountSelected} disabled={eligibleIds.length === 0 || cloneExecuting}
+                            onChange={() => toggleCloneAccount(account)} />
+                          {account.account}
+                        </label>
+                      </legend>
+                      {account.workloads.map((item) => (
+                        <label key={item.sourceCommitmentId} class={item.status === "SKIP_TARGET_EXISTS" ? "is-skipped" : undefined}>
+                          {item.status === "SKIP_TARGET_EXISTS" && <span class="accounts-workloads-clone-status">Skip — target exists</span>}
+                          <input type="checkbox" checked={cloneSelection.includes(item.sourceCommitmentId)}
+                            disabled={item.status === "SKIP_TARGET_EXISTS" || cloneExecuting}
+                            onChange={() => toggleCloneWorkload(item.sourceCommitmentId)} />
+                          <span>{item.workloadName}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  );
+                })}
+              </div>
+              <div class="accounts-workloads-save-actions">
+                <oj-button chroming="callToAction" disabled={cloneSelection.length === 0 || cloneExecuting || cloneLoading || draftActive || saving || accountsWorkloadsRefreshing || clonePreview.targetFiscalYear !== fiscalYear}
+                  onojAction={() => void executeClonePreviousFiscalYear()}>Clone selected</oj-button>
+                <oj-button chroming="outlined" disabled={cloneExecuting} onojAction={cancelClone}>Cancel</oj-button>
+              </div>
+            </>
+          )}
         </div>
       </oj-dialog>
 

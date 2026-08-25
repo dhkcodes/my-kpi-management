@@ -12,7 +12,9 @@ import {
   restoreAccountWorkload,
   saveAccountsWorkloadsBatch,
   AccountsWorkloadsPersistenceError,
-  canUseDevelopmentDataFallback
+  canUseDevelopmentDataFallback,
+  fetchAccountsWorkloadsClonePreview,
+  cloneAccountsWorkloadsPreviousFiscalYear
 } from "../src/data/accountsWorkloadsApi";
 import { AccountWorkloadRow } from "../src/data/accountsWorkloadsMockData";
 
@@ -413,6 +415,45 @@ async function run() {
     canUseDevelopmentDataFallback(new TypeError("fetch failed"), { location: { hostname: "app.example" } }),
     false,
     "deployed environments must never silently fall back"
+  );
+
+  const previewPayload = {
+    sourceFiscalYear: "FY26", targetFiscalYear: "FY27", currentFiscalYear: "FY27", enabled: true,
+    eligibleSelectionIds: [11],
+    accounts: [{ account: "Account A", workloads: [
+      { sourceCommitmentId: 11, sourceVersionNo: 3, workloadName: "Workload 1", status: "ELIGIBLE" },
+      { sourceCommitmentId: 12, sourceVersionNo: 4, workloadName: "Workload 2", status: "SKIP_TARGET_EXISTS" }
+    ] }]
+  };
+  const cloneCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const cloneFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    cloneCalls.push({ url: String(input), init });
+    if (init?.method === "POST") return response({ clonedCount: 1, skippedCount: 0, preview: previewPayload, items: [saved], total: 1 });
+    return response(previewPayload);
+  };
+  const preview = await fetchAccountsWorkloadsClonePreview(cloneFetch);
+  assert.equal(preview.accounts[0].workloads[1].status, "SKIP_TARGET_EXISTS");
+  assert.ok(cloneCalls[0].url.endsWith("/api/v1/accounts-workloads/clone-preview"));
+  const cloned = await cloneAccountsWorkloadsPreviousFiscalYear("FY26", "FY27", [
+    { sourceCommitmentId: 11, sourceVersionNo: 3 }
+  ], cloneFetch);
+  assert.equal(cloned.clonedCount, 1);
+  assert.deepEqual(JSON.parse(String(cloneCalls[1].init?.body)), {
+    sourceFiscalYear: "FY26", targetFiscalYear: "FY27",
+    sources: [{ sourceCommitmentId: 11, sourceVersionNo: 3 }]
+  });
+  assert.equal("owner" in JSON.parse(String(cloneCalls[1].init?.body)), false, "clone request never accepts owner input");
+  await assert.rejects(
+    () => fetchAccountsWorkloadsClonePreview(async () => response({ ...previewPayload, eligibleSelectionIds: [0] })),
+    /malformed/i
+  );
+  await assert.rejects(
+    () => fetchAccountsWorkloadsClonePreview(async () => response({
+      ...previewPayload,
+      accounts: [{ account: "Account A", workloads: [{ sourceCommitmentId: 11, workloadName: "stale", status: "ELIGIBLE" }] }]
+    })),
+    /malformed/i,
+    "preview candidates without source version must be rejected"
   );
 
   delete (globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string }).__KPI_API_BASE_URL__;
