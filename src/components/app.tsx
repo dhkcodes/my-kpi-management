@@ -721,11 +721,13 @@ export const App = registerCustomElement(
     }, []);
 
     const handleLogout = useCallback(() => {
-      void logoutUser().finally(() => {
-        window.history.replaceState(null, "", "/");
-        window.scrollTo({ top: 0, left: 0 });
-        setSession(null);
-      });
+      void logoutUser()
+        .then(() => {
+          window.history.replaceState(null, "", "/");
+          window.scrollTo({ top: 0, left: 0 });
+          setSession(null);
+        })
+        .catch(() => undefined);
     }, []);
 
     if (authChecking) {
