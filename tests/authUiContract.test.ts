@@ -8,10 +8,10 @@ const app = read("src/components/app.tsx");
 const login = read("src/components/LoginPage.tsx");
 const header = read("src/components/header.tsx");
 
-assert.match(app, /readAuthSession\(window\.sessionStorage\)/, "same-tab refresh restores the local session");
-assert.match(app, /session\s*\?\s*<AuthenticatedApp[\s\S]*:\s*<LoginPage/, "the data-loading App shell is not mounted before login");
-assert.match(app, /writeAuthSession[\s\S]*history\.replaceState\(null, "", "\/"\)[\s\S]*setSession/, "successful login replaces the URL and opens Home");
-assert.match(app, /clearAuthSession[\s\S]*history\.replaceState\(null, "", "\/"\)[\s\S]*setSession\(null\)/, "logout clears the session, replaces history, and unmounts draft state");
+assert.match(app, /getAuthenticatedSession/, "startup verifies the HttpOnly server session");
+assert.match(app, /authChecking/, "the data-loading App shell is not mounted before server session verification");
+assert.doesNotMatch(app, /sessionStorage|readAuthSession|writeAuthSession/, "client storage cannot establish authentication");
+assert.match(app, /logoutUser[\s\S]*setSession\(null\)/, "logout invalidates the server session and unmounts draft state");
 assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back remains guarded after logout");
 assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="kapLoginSubmit"/, "the Redwood sign-in form exposes stable controls");
 assert.match(login, /role="alert"/, "credential failures are announced");

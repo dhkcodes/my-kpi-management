@@ -59,12 +59,8 @@ import {
 import "ojs/ojnavigationlist";
 import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
 import { KeySet, KeySetImpl } from "ojs/ojkeyset";
-import {
-  AuthSession,
-  clearAuthSession,
-  readAuthSession,
-  writeAuthSession
-} from "../auth/authSession";
+import type { AuthSession } from "../auth/authSession";
+import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
 
 type Props = Readonly<{
   appName?: string;
@@ -681,16 +677,32 @@ function AuthenticatedApp({ appName, userLogin, onLogout }: AuthenticatedAppProp
 export const App = registerCustomElement(
   "app-root",
   ({ appName = "My KPI & Account Planner" }: Props) => {
-    const [session, setSession] = useState<AuthSession | null>(() =>
-      typeof window === "undefined" ? null : readAuthSession(window.sessionStorage)
-    );
+    const [session, setSession] = useState<AuthSession | null>(null);
+    const [authChecking, setAuthChecking] = useState(true);
 
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     }, []);
 
     useEffect(() => {
-      if (session || typeof window === "undefined") return undefined;
+      let active = true;
+      void getAuthenticatedSession()
+        .then((verifiedSession) => {
+          if (active) setSession(verifiedSession);
+        })
+        .catch(() => {
+          if (active) setSession(null);
+        })
+        .finally(() => {
+          if (active) setAuthChecking(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, []);
+
+    useEffect(() => {
+      if (authChecking || session || typeof window === "undefined") return undefined;
 
       const keepLoginAtHomePath = () => {
         if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
@@ -701,21 +713,24 @@ export const App = registerCustomElement(
       keepLoginAtHomePath();
       window.addEventListener("popstate", keepLoginAtHomePath);
       return () => window.removeEventListener("popstate", keepLoginAtHomePath);
-    }, [session]);
+    }, [authChecking, session]);
 
     const handleAuthenticated = useCallback((authenticatedSession: AuthSession) => {
-      writeAuthSession(window.sessionStorage, authenticatedSession);
       window.history.replaceState(null, "", "/");
       setSession(authenticatedSession);
     }, []);
 
     const handleLogout = useCallback(() => {
-      clearAuthSession(window.sessionStorage);
-      window.history.replaceState(null, "", "/");
-      window.scrollTo({ top: 0, left: 0 });
-      setSession(null);
+      void logoutUser().finally(() => {
+        window.history.replaceState(null, "", "/");
+        window.scrollTo({ top: 0, left: 0 });
+        setSession(null);
+      });
     }, []);
 
+    if (authChecking) {
+      return <main class="kap-login" aria-label="Checking sign-in session" />;
+    }
     return session
       ? <AuthenticatedApp appName={appName} userLogin={session.userId} onLogout={handleLogout} />
       : <LoginPage appName={appName} onAuthenticated={handleAuthenticated} />;
