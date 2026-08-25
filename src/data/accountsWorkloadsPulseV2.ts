@@ -6,6 +6,7 @@ export type PulseUrgencyLevel = "critical" | "attention" | "upcoming";
 export type PulseUrgencyCount = Readonly<{
   accounts: number;
   workloads: number;
+  items: ReadonlyArray<Readonly<{ id: string; account: string; workloadName: string }>>;
 }>;
 
 export type AccountsWorkloadsPulseV2 = Readonly<{
@@ -111,9 +112,9 @@ const urgencyForDays = (days: number | null): PulseUrgencyLevel | null => {
 };
 
 const emptyUrgency = (): Record<PulseUrgencyLevel, PulseUrgencyCount> => ({
-  critical: { accounts: 0, workloads: 0 },
-  attention: { accounts: 0, workloads: 0 },
-  upcoming: { accounts: 0, workloads: 0 }
+  critical: { accounts: 0, workloads: 0, items: [] },
+  attention: { accounts: 0, workloads: 0, items: [] },
+  upcoming: { accounts: 0, workloads: 0, items: [] }
 });
 
 const summarizeUrgency = (
@@ -124,7 +125,8 @@ const summarizeUrgency = (
     const matching = classified.filter((item) => item.urgency === level).map((item) => item.row);
     result[level] = {
       accounts: new Set(matching.map((row) => row.account)).size,
-      workloads: matching.length
+      workloads: matching.length,
+      items: matching.map((row) => ({ id: row.id, account: row.account, workloadName: row.workloadName }))
     };
   });
   return result;

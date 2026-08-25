@@ -557,12 +557,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
     const handleAccountsWorkloadsQueryChange = async (nextQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => {
       const requestId = ++accountsWorkloadsRequestIdRef.current;
+      setAccountsWorkloadsQuery(nextQuery);
       setAccountsWorkloadsRefreshing(true);
       setAccountsWorkloadsLoadError("");
       try {
         const refreshed = await fetchAccountsWorkloads({ fiscalYear, ...nextQuery });
         if (requestId !== accountsWorkloadsRequestIdRef.current) return;
-        setAccountsWorkloadsQuery(nextQuery);
         setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
         setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
         setAccountsWorkloadsDataSource("api");

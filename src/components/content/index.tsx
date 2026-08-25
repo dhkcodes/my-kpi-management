@@ -198,11 +198,6 @@ const metricToneClass = (rate: number) => `kpi-new-workload-metric__bar-fill kpi
 
 const metricClass = (stage: WorkloadStage, rate: number) => `kpi-new-workload-metric kpi-new-workload-metric--${stage} kpi-new-workload-metric--${workloadRateTone(rate)}`;
 
-const workloadStatusToneClassName = (metrics: FiscalYearDataset["newWorkload"][number]["metrics"]) => {
-  const bestRate = Math.max(...metrics.map((metric) => metric.rate));
-  return `kpi-status-badge kpi-status-badge--rate-${workloadRateTone(bestRate)}`;
-};
-
 const guideListSelectionClass = (code: string, selectedCode: string) =>
   code === selectedCode ? "kpi-guide-list-item is-selected" : "kpi-guide-list-item";
 
@@ -414,6 +409,10 @@ export function Content({
     setGuideEditMode(false);
     setSelectedGuideCode(code);
   };
+  const openAccountWorkloads = (account: string) => {
+    onAccountsWorkloadsQueryChange({ ...accountsWorkloadsQuery, search: account, includeDeleted: false });
+    onNavigate("accounts-workloads");
+  };
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
@@ -480,6 +479,7 @@ export function Content({
             dataAvailable={accountsWorkloadsDatasetAvailable}
             loading={accountsWorkloadsLoading}
             dataSource={accountsWorkloadsDataSource}
+            onOpenAccount={openAccountWorkloads}
           />
           {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
@@ -487,7 +487,7 @@ export function Content({
             <div class="kpi-panel__header">
               <div>
                 <h2 id="kpiOverviewTitle">KPI Overview</h2>
-                <p class="kpi-panel__description">KPI Overview summarizes quarterly achievement status across each KPI so progress and gaps are visible at a glance.</p>
+
               </div>
 
             </div>
@@ -530,14 +530,14 @@ export function Content({
                 </tbody>
               </table>
             </div>
-            <p class="kpi-helper-note">Workshops and POCs are consolidated in one overview row with the combined target of 6 qualified activities.</p>
+
           </section>}
 
           {kpiDataset && <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
             <div class="kpi-panel__header">
               <div>
                 <h2 id="newWorkloadTitle">New Workload</h2>
-                <p class="kpi-panel__description">New Workload tracks how identified opportunities progress into validated pipeline and onboarded revenue against quarterly targets.</p>
+
               </div>
             </div>
             <div class="kpi-new-workload-grid">
@@ -545,7 +545,7 @@ export function Content({
                 <article class="kpi-new-workload-card">
                   <div class="kpi-new-workload-card__header">
                     <strong>{quarter.quarter}</strong>
-                    <span class={workloadStatusToneClassName(quarter.metrics)}>
+                    <span class={statusToneClassName(quarter.status)}>
                       <span>{quarter.status}</span>
                     </span>
                   </div>
@@ -579,6 +579,7 @@ export function Content({
           fiscalYear={fiscalYear}
           rows={accountsWorkloadsRows}
           dataAvailable={accountsWorkloadsDatasetAvailable}
+          onOpenAccount={openAccountWorkloads}
         />
       ) : activeRoute.module === "accountsWorkloads" ? (
         accountsWorkloadsLoading ? (
@@ -622,7 +623,7 @@ export function Content({
             <div class="kpi-guide-dialog__header">
               <div>
                 <h2 id="kpiGuideTitle">KPI Guide</h2>
-                <p class="kpi-panel__description">Use KPI Guide to understand each KPI target, required evidence, and how each activity is measured before updating details.</p>
+
               </div>
               <div class="kpi-guide-dialog__actions">
                 {guideEditMode ? (

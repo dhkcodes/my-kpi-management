@@ -951,11 +951,7 @@ export function AccountsWorkloadsPage({
         <div>
           <span class="kpi-eyebrow">My Customers 360</span>
           <h2 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h2>
-          <p class="kpi-panel__description">
-            {hasFiscalYearSeed
-              ? `Manage ${fiscalYear} accounts and workloads from ${metadata.sourceSheet}. Loaded rows: ${metadata.parsedRowCount}.`
-              : `Manage ${fiscalYear} accounts and workloads. No dataset is loaded for this fiscal year.`}
-          </p>
+
         </div>
         <div class="accounts-workloads-fx">
           <button type="button" class="accounts-workloads-fx__button" onClick={() => setFxPopoverOpen((value) => !value)} aria-expanded={fxPopoverOpen ? "true" : "false"}>
@@ -1047,6 +1043,9 @@ export function AccountsWorkloadsPage({
       </div>
 
       {saveError && <div class="accounts-workloads-save-error" role="alert">{saveError}</div>}
+      <div class="accounts-workloads-table-meta" role="status">
+        {hasFiscalYearSeed ? `${metadata.parsedRowCount} workloads` : `No workloads available for ${fiscalYear}`}
+      </div>
 
       <oj-dialog ref={savingDialogRef} class="accounts-workloads-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
         <div class="accounts-workloads-saving-content" role="status" aria-live="polite">
@@ -1129,7 +1128,7 @@ export function AccountsWorkloadsPage({
 
       <div class="accounts-workloads-grid-shell">
         {accountsWorkloadsRefreshing && <div class="accounts-workloads-table-refresh" role="status" aria-live="polite">Refreshing table…</div>}
-        <div class="accounts-workloads-scroll-hint" role="note">Use fixed arrows, Shift + mouse wheel, or ← / → while the grid is focused.</div>
+
         <div class="accounts-workloads-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" class="accounts-workloads-scroll-control" aria-label="Move table left" title="Move left" disabled={scrollState.left <= 0} onClick={() => moveHorizontally(-1)}>‹</button>
           <button type="button" class="accounts-workloads-scroll-control" aria-label="Move table right" title="Move right" disabled={scrollState.left >= scrollState.max} onClick={() => moveHorizontally(1)}>›</button>

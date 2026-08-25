@@ -2,7 +2,7 @@ export const KPI_ACTIVITY_TABS = [
   { tab: "Overview", routeId: "kpis-overview", label: "Overview" },
   { tab: "A", routeId: "activity-a", label: "1 to many" },
   { tab: "B", routeId: "activity-b", label: "Early discovery" },
-  { tab: "C1", routeId: "activity-c1", label: "Workshops" },
+  { tab: "C1", routeId: "activity-c1", label: "Show and discover workshops" },
   { tab: "C2", routeId: "activity-c2", label: "POCs" },
   { tab: "D1", routeId: "activity-d1", label: "New Workload" },
   { tab: "F", routeId: "activity-f", label: "References" },
@@ -20,7 +20,7 @@ export type KpiOverviewRow = Readonly<{
 export const KPI_OVERVIEW_ROWS: readonly KpiOverviewRow[] = [
   { code: "A", name: "1 to many market awareness", summaryModel: "Delivery Quarter count" },
   { code: "B", name: "Early discovery with customer", summaryModel: "Delivery Quarter count" },
-  { code: "C1", name: "C1 + C2 combined · Workshops / POCs", summaryModel: "Combined Delivery Quarter count" },
+  { code: "C1", name: "Show and discover workshops", summaryModel: "Combined Delivery Quarter count" },
   { code: "C2", name: "POCs in customer tenancy", summaryModel: "Combined Delivery Quarter count" },
   { code: "D1", name: "New workload", summaryModel: "Delivery Quarter × Sales Stage ACR matrix" },
   { code: "F", name: "Customer references", summaryModel: "Delivery Quarter count" },

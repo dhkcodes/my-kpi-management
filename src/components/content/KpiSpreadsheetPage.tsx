@@ -82,6 +82,12 @@ const minimumProgress = (startedAt: number, minimumMs = 450) => new Promise<void
   const remaining = Math.max(0, minimumMs - (performance.now() - startedAt));
   window.setTimeout(resolve, remaining);
 });
+const formatActivityMetaDate = (value: string) => {
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "UTC"
+  }).format(date);
+};
 
 const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
   Achieved: "kpi-quarter-status-label--achieved",
@@ -222,7 +228,7 @@ function Summary({ summary, tab, fiscalYear, asOf, selectedQuarter, onSelectQuar
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
         <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
         <b class={`kpi-quarter-count-label ${quarterStatusClass(status)}`}>{actual}</b>
-        {combined && <small>C1 + C2 combined · C1 {c1} + C2 {c2} · target {summary.targets.c1C2CombinedPerQuarter}</small>}
+
       </button>;
     })}</div>
   </section>;
@@ -724,7 +730,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
-      setApiMessage(`Live API connected · ${items.length} activities · as of ${overview.asOf}`);
+      setApiMessage(`${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
     }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); });
     return () => { active = false; };
   }, [fiscalYear, reloadVersion]);
@@ -822,7 +828,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const editorField = editState.cell ? fields.find((field) => field.key === editState.cell?.field) : null;
   const activeDefinition = KPI_OVERVIEW_ROWS.find((row) => row.code === activeTab);
   const overviewByCode = useMemo(() => new Map(overviewItems.map((item) => [item.code, item])), [overviewItems]);
-  const activeTarget = activeTab === "Overview" ? "" : overviewByCode.get(activeTab)?.target ?? "Target unavailable";
   const toolbarActions = getKpiToolbarActions(drafts.length, selectedRows.length);
   const reflectedAction = getReflectedSelectionAction(selectedRows);
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
@@ -994,7 +999,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
     <header class="kpi-spreadsheet-page__header"><div><span class="kpi-eyebrow">KPI Activities / {activeTab}</span>
       <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2>
-      <p>{activeTab === "Overview" ? "FY-scoped KPI activity workspace" : `${activeTarget} · ${activeDefinition?.summaryModel}`}</p>
       <p class="kpi-api-status" role="status">{apiMessage}</p></div>
 
     </header>
@@ -1044,8 +1048,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
         </table></div>
         {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
       </section>}
-      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3><span>Quarter status from reflected Delivery Date activity</span></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(displaySummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code === "C1" ? "C1+C2" : row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => <td key={`${row.code}:${quarters[index]}`}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></td>)}</tr>; })}</tbody></table></div>
+      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(displaySummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => <td key={`${row.code}:${quarters[index]}`}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></td>)}</tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>

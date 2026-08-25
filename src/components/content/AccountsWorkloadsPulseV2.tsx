@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useMemo } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
@@ -29,14 +29,7 @@ const urgencyDays: Record<PulseUrgencyLevel, string> = {
 };
 
 const barColors = ["#c74634", "#d77b20", "#417590", "#756f69"];
-const accountCount = (value: number) => `${value} ${value === 1 ? "acct" : "accts"}`;
 const workloadCount = (value: number) => `${value} ${value === 1 ? "workload" : "workloads"}`;
-const displayAsOf = (asOf: string) => new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC"
-}).format(new Date(`${asOf}T00:00:00Z`));
 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
@@ -45,13 +38,15 @@ type Props = Readonly<{
   dataAvailable: boolean;
   loading: boolean;
   dataSource: AccountsWorkloadsDataSource;
+  onOpenAccount: (account: string) => void;
 }>;
 
-export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable, loading, dataSource }: Props) {
+export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable, loading, dataSource, onOpenAccount }: Props) {
   const pulse = useMemo(
     () => calculateAccountsWorkloadsPulseV2(rows, fiscalYear, asOf),
     [rows, fiscalYear, asOf]
   );
+  const [expandedUrgency, setExpandedUrgency] = useState("");
   const maxAccountWorkloads = Math.max(1, ...pulse.workloadsByAccount.map((item) => item.workloads));
   const deletedRows = rows.filter((row) => row.isDeleted).length;
   const urgencyOrder: PulseUrgencyLevel[] = ["critical", "attention", "upcoming"];
@@ -68,19 +63,39 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
     }
   ];
 
+  const renderUrgency = (kind: "new" | "renewal", level: PulseUrgencyLevel) => {
+    const count = kind === "new" ? pulse.newCommit[level] : pulse.renewalExpand[level];
+    const key = `${kind}:${level}`;
+    return (
+      <div class="accounts-pulse-v2-urgency-group" key={level}>
+        <div class="accounts-pulse-v2-urgency-row">
+          <span class={`accounts-pulse-v2-pill accounts-pulse-v2-pill--${level}`}>{urgencyLabels[level]}</span>
+          <span class="accounts-pulse-v2-days">{urgencyDays[level]}</span>
+          <button type="button" class="accounts-pulse-v2-workload-count" aria-expanded={expandedUrgency === key}
+            disabled={count.workloads === 0} onClick={() => setExpandedUrgency((current) => current === key ? "" : key)}>
+            {workloadCount(count.workloads)}
+          </button>
+        </div>
+        {expandedUrgency === key && (
+          <ul class="accounts-pulse-v2-workload-list">
+            {count.items.map((item) => (
+              <li key={item.id}>
+                <button type="button" onClick={() => onOpenAccount(item.account)}>
+                  <strong>{item.workloadName}</strong><span>{item.account}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source="loading">
-        <div class="accounts-pulse-v2__header">
-          <div>
-            <span class="kpi-eyebrow">My Customers 360</span>
-            <h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2>
-            <p>{fiscalYear} portfolio pulse</p>
-          </div>
-        </div>
-        <div class="accounts-pulse-v2__unavailable" role="status">
-          <strong>Loading Accounts &amp; Workloads data…</strong>
-        </div>
+        <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
+        <div class="accounts-pulse-v2__unavailable" role="status"><strong>Loading Accounts &amp; Workloads data…</strong></div>
       </section>
     );
   }
@@ -88,14 +103,7 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
   if (!dataAvailable) {
     return (
       <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source={dataSource}>
-        <div class="accounts-pulse-v2__header">
-          <div>
-            <span class="kpi-eyebrow">My Customers 360</span>
-            <h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2>
-            <p>{fiscalYear} portfolio pulse · proactive renewal and commit management</p>
-          </div>
-          <span class="accounts-pulse-v2__concept">Concept 01 · Executive Pulse V2</span>
-        </div>
+        <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
         <div class="accounts-pulse-v2__unavailable" role="status">
           <strong>Accounts &amp; Workloads data is not available for {fiscalYear}</strong>
           <span>Select FY27 to view the currently loaded dataset.</span>
@@ -106,98 +114,35 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
 
   return (
     <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source={dataSource}>
-      <div class="accounts-pulse-v2__header">
-        <div>
-          <span class="kpi-eyebrow">My Customers 360</span>
-          <h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2>
-          <p>{fiscalYear} portfolio pulse · proactive renewal and commit management</p>
-        </div>
-        <span class="accounts-pulse-v2__concept">Concept 01 · Executive Pulse V2</span>
-      </div>
-
+      <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
       <div class="accounts-pulse-v2__metrics" aria-label="Accounts and workloads metrics">
-        {metricCards.map((metric) => (
-          <article class="accounts-pulse-v2-metric" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </article>
-        ))}
+        {metricCards.map((metric) => <article class="accounts-pulse-v2-metric" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></article>)}
       </div>
-
       <div class="accounts-pulse-v2__grid">
         <article class="accounts-pulse-v2-card accounts-pulse-v2-card--new" aria-labelledby="newCommitTitle">
-          <div class="accounts-pulse-v2-card__title-row">
-            <h3 id="newCommitTitle">New Commit</h3>
-            <span>Missing Dates</span>
-          </div>
-          <div class="accounts-pulse-v2-urgency-list">
-            {urgencyOrder.map((level) => {
-              const count = pulse.newCommit[level];
-              return (
-                <div class="accounts-pulse-v2-urgency-row" key={level}>
-                  <span class={`accounts-pulse-v2-pill accounts-pulse-v2-pill--${level}`}>{urgencyLabels[level]}</span>
-                  <span>{urgencyDays[level]}</span>
-                  <strong aria-label={`${accountCount(count.accounts)} and ${workloadCount(count.workloads)}`}>
-                    {count.accounts} acct · {count.workloads} wl
-                  </strong>
-                </div>
-              );
-            })}
-          </div>
+          <div class="accounts-pulse-v2-card__title-row"><h3 id="newCommitTitle">New Commit</h3><span>Start or End Date Needed</span></div>
+          <div class="accounts-pulse-v2-urgency-list">{urgencyOrder.map((level) => renderUrgency("new", level))}</div>
         </article>
-
         <article class="accounts-pulse-v2-card accounts-pulse-v2-card--renewal" aria-labelledby="renewalCommitTitle">
-          <div class="accounts-pulse-v2-card__title-row">
-            <h3 id="renewalCommitTitle">Renewal / Expand Commit</h3>
-            <span>End Date</span>
-          </div>
-          <div class="accounts-pulse-v2-urgency-list">
-            {urgencyOrder.map((level) => {
-              const count = pulse.renewalExpand[level];
-              return (
-                <div class="accounts-pulse-v2-urgency-row" key={level}>
-                  <span class={`accounts-pulse-v2-pill accounts-pulse-v2-pill--${level}`}>{urgencyLabels[level]}</span>
-                  <span>{urgencyDays[level]}</span>
-                  <strong aria-label={`${accountCount(count.accounts)} and ${workloadCount(count.workloads)}`}>
-                    {count.accounts} acct · {count.workloads} wl
-                  </strong>
-                </div>
-              );
-            })}
-          </div>
+          <div class="accounts-pulse-v2-card__title-row"><h3 id="renewalCommitTitle">Renewal / Expand Commit</h3><span>Commit End Date</span></div>
+          <div class="accounts-pulse-v2-urgency-list">{urgencyOrder.map((level) => renderUrgency("renewal", level))}</div>
         </article>
-
         <article class="accounts-pulse-v2-card accounts-pulse-v2-card--accounts" aria-labelledby="workloadsByAccountTitle">
           <h3 id="workloadsByAccountTitle">Commitments by Account</h3>
           <div class="accounts-pulse-v2-account-head"><span>Account</span><span>Commitments</span></div>
           <div class="accounts-pulse-v2-account-list">
             {pulse.workloadsByAccount.map((item, index) => (
-              <div class="accounts-pulse-v2-account-row" key={item.account}>
+              <button type="button" class="accounts-pulse-v2-account-row" key={item.account}
+                disabled={item.account.startsWith("Other ")} onClick={() => onOpenAccount(item.account)}>
                 <div><strong>{item.account}</strong><span>{item.workloads}</span></div>
-                <oj-c-meter-bar
-                  class="accounts-pulse-v2-account-meter"
-                  value={item.workloads}
-                  min={0}
-                  max={maxAccountWorkloads}
-                  color={barColors[index] ?? barColors[barColors.length - 1]}
-                  readonly={true}
-                  size="sm"
-                  tabIndex={-1}
-                  aria-hidden="true">
-                </oj-c-meter-bar>
-              </div>
+                <oj-c-meter-bar class="accounts-pulse-v2-account-meter" value={item.workloads} min={0} max={maxAccountWorkloads}
+                  color={barColors[index] ?? barColors[barColors.length - 1]} readonly={true} size="sm" tabIndex={-1} aria-hidden="true"></oj-c-meter-bar>
+              </button>
             ))}
           </div>
-          <div class="accounts-pulse-v2-concentration">
-            {pulse.topAccountConcentrationPercent}% concentrated in one account
-          </div>
+          <div class="accounts-pulse-v2-concentration">{pulse.topAccountConcentrationPercent}% concentrated in one account</div>
         </article>
       </div>
-
-      <p class="accounts-pulse-v2__note">
-        Urgency uses calendar days as of {displayAsOf(asOf)} · overdue active rows remain Critical until resolved or soft-deleted
-      </p>
     </section>
   );
 }

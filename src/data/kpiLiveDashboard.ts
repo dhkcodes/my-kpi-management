@@ -6,7 +6,7 @@ import { WorkloadStage } from "./kpiExcelParser";
 const names: Record<SpreadsheetKpiCode, string> = {
   A: "Market Awareness",
   B: "Early Discovery with Customers",
-  C1: "Workshops",
+  C1: "Show and discover workshops",
   C2: "POCs",
   D1: "New Workload",
   F: "Customer References",
@@ -57,7 +57,7 @@ export function buildLiveFiscalYearDataset(summary: KpiActivitySummary, base: Fi
     quarter
   ));
   const combined: KpiOverviewRow = {
-    code: "C1+C2", codeBadge: "C1 + C2", name: "Workshops / POCs", unit: "count", quarters: c1c2Quarters,
+    code: "C1+C2", codeBadge: "C1", name: "Show and discover workshops", unit: "count", quarters: c1c2Quarters,
     fyActualDisplay: `${c1c2Quarters.reduce((sum, item) => sum + item.actual, 0)}`,
     fyTargetDisplay: `${summary.targets.c1C2CombinedPerQuarter * quarters.length}`
   };

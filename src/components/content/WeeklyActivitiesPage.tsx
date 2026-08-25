@@ -446,7 +446,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyA
         <div>
           <span class="kpi-eyebrow">Activity planning</span>
           <h2 id="weeklyActivitiesTitle">Weekly Activities</h2>
-          <p>Review completed work and plan next-week actions in one weekly row.</p>
+
         </div>
         <oj-button ref={(element: EventTarget | null) => { addTriggerRef.current = element as HTMLElement | null; }} id="weeklyActivityAddButton" chroming="callToAction" disabled={Boolean(editSession) || controlsBusy} onojAction={startAdd}>
           <span slot="startIcon" class="oj-ux-ico-plus" aria-hidden="true"></span>

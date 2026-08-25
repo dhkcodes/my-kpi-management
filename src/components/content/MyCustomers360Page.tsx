@@ -16,9 +16,10 @@ type Props = Readonly<{
   fiscalYear: FiscalYear;
   rows: AccountWorkloadRow[];
   dataAvailable: boolean;
+  onOpenAccount: (account: string) => void;
 }>;
 
-export function MyCustomers360Page({ fiscalYear, rows, dataAvailable }: Props) {
+export function MyCustomers360Page({ fiscalYear, rows, dataAvailable, onOpenAccount }: Props) {
   const accounts = useMemo(() => summarizeAccountsWorkloadsByAccount(rows), [rows]);
 
   return (
@@ -27,9 +28,7 @@ export function MyCustomers360Page({ fiscalYear, rows, dataAvailable }: Props) {
         <div>
           <span class="kpi-eyebrow">My Customers 360</span>
           <h2 id="myCustomers360Title">Account Portfolio</h2>
-          <p class="kpi-panel__description">
-            {fiscalYear} account totals use the same saved Accounts &amp; Workloads rows as Home and the detail grid.
-          </p>
+
         </div>
         {dataAvailable && (
           <div class="my-customers-360-page__total" aria-label={`${accounts.length} active accounts`}>
@@ -60,7 +59,7 @@ export function MyCustomers360Page({ fiscalYear, rows, dataAvailable }: Props) {
             <tbody>
               {accounts.map((account) => (
                 <tr key={account.account}>
-                  <th scope="row">{account.account}</th>
+                  <th scope="row"><button type="button" class="my-customers-360-account-link" onClick={() => onOpenAccount(account.account)}>{account.account}</button></th>
                   <td class="is-numeric">{account.workloads}</td>
                   <td class="is-numeric">{compactCurrency.format(account.arrUsd)}</td>
                   <td class="is-numeric">{compactCurrency.format(account.acrUsd)}</td>

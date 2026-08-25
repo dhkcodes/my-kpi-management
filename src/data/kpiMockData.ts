@@ -15,7 +15,7 @@ export type NavigationItem = {
 };
 
 const names: Record<SpreadsheetKpiCode, string> = {
-  A: "Market Awareness", B: "Early Discovery with Customers", C1: "Workshops", C2: "POCs",
+  A: "Market Awareness", B: "Early Discovery with Customers", C1: "Show and discover workshops", C2: "POCs",
   D1: "New Workload", F: "Customer References", H: "Technical Blogs / Articles"
 };
 

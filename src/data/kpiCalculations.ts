@@ -68,7 +68,7 @@ export const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
 export const kpiDefinitions: KpiDefinition[] = [
   { code: "A", name: "Market Awareness", unit: "count", quarterlyTargetCount: 1 },
   { code: "B", name: "Early Discovery with Customers", unit: "count", quarterlyTargetCount: 12 },
-  { code: "C1", name: "Workshops", unit: "count", quarterlyTargetCount: 6, combinedTargetGroup: "workshops-pocs" },
+  { code: "C1", name: "Show and discover workshops", unit: "count", quarterlyTargetCount: 6, combinedTargetGroup: "workshops-pocs" },
   { code: "C2", name: "POCs", unit: "count", quarterlyTargetCount: 6, combinedTargetGroup: "workshops-pocs" },
   { code: "D1", name: "New Workload", unit: "amount" },
   { code: "F", name: "Customer References", unit: "count", quarterlyTargetCount: 1 },
@@ -189,8 +189,8 @@ export function calculateFiscalYearDataset(workbook: ParsedWorkbook): FiscalYear
 
     return {
       code: definition.code === "C1" ? "C1+C2" as const : definition.code,
-      codeBadge: definition.code === "C1" ? "C1 + C2" : definition.code,
-      name: definition.code === "C1" ? "Workshops / POCs" : definition.name,
+      codeBadge: definition.code,
+      name: definition.code === "C1" ? "Show and discover workshops" : definition.name,
       unit: definition.unit,
       quarters: quarterRows,
       fyActualDisplay: definition.unit === "amount" ? formatAmountK(fyActual) : `${fyActual}`,
