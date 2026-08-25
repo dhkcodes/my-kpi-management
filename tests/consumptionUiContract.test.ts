@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/ConsumptionPage.tsx", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
+
+assert.match(navigation, /export const navItems[\s\S]*id: "home"[\s\S]*id: "kpis"[\s\S]*id: "consumption"[\s\S]*id: "my-customers"/, "root navigation order is Home, KPI Activities, Consumption, My Customers");
+const customerChildren = navigation.match(/export const customerNavItems[\s\S]*?\];/)?.[0] ?? "";
+assert.doesNotMatch(customerChildren, /id: "consumption"/, "Consumption is no longer nested under My Customers");
+assert.match(content, /activeRoute\.module !== "consumption"[\s\S]*kpi-fiscal-year-panel/, "the global Fiscal Year selector is hidden on Consumption");
 
 assert.match(content, /activeRoute\.module === "consumption"[\s\S]*<ConsumptionPage/, "Consumption route renders the implemented page");
 assert.match(page, /import "ojs\/ojchart"/, "Consumption trend uses Oracle JET Chart");
@@ -50,5 +56,16 @@ assert.match(page, /disabled=\{dataMode === "loading" \|\| isSaving\}/, "Import 
 assert.match(page, /if \(!file \|\| dataMode === "loading" \|\| isSaving\) return;/, "Import handler rejects loading and save races");
 assert.match(page, /if \(isSaving \|\| \(dataMode !== "backend" && dataMode !== "fallback"\)\) return;/, "Forecast editing locks while save is in flight");
 assert.match(page, /aria-label=\{`\$\{series\.endUser\} \$\{month\} forecast`\}[\s\S]*disabled=\{isSaving\}/, "an already open forecast editor is disabled while saving");
+assert.match(page, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "From/To Quarter controls validate reversed ranges before Apply");
+assert.match(page, /fetchConsumptionWorkspace\(\{ fromQuarter, toQuarter \}\)/, "Apply reloads the API with the selected quarter range");
+assert.match(page, /workspace\.fromQuarter[\s\S]*workspace\.toQuarter[\s\S]*workspace\.editablePeriodIds[\s\S]*workspace\.displayQuarterOrder/, "backend range metadata is adopted as authoritative UI state");
+assert.match(page, /useState\("__all__"\)/, "trend defaults to All accounts");
+assert.match(page, /All accounts · Total/, "the default trend is the total across all accounts");
+assert.match(page, /id="consumptionAccountSearch"[\s\S]*accounts\.map/, "the searchable account selector includes every returned account");
+assert.match(page, /selectSignal[\s\S]*setSelectedAccount/, "signal selection links the account into trend context");
+assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
+assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
+assert.match(page, /displayQuarterOrder\.flatMap/, "table columns follow the backend display quarter order");
+assert.match(styles, /\.consumption-forecast-cell[^}]*box-shadow:/, "editable Forecast cells are visually explicit");
 
 console.log("consumptionUiContract tests passed");

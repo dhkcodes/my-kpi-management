@@ -1,8 +1,6 @@
 import {
   ConsumptionPlan,
   ConsumptionSignal,
-  getLatestActualMonth,
-  getNextQuarterMonths,
   seedForecastMonths
 } from "./consumptionData";
 
@@ -17,9 +15,32 @@ type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; foreca
 type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; facts: RawFact[] }>;
 type RawSignal = Readonly<{ signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string; type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"]; changeAmount: number; changePercent: number | null; reason: string }>;
 type RawControlTotal = Readonly<{ account: string; periodKey: string }>;
-type RawWorkspace = Readonly<{ etag: string; lastBatchId: number | null; plans: RawPlan[]; controlTotals: RawControlTotal[]; signals: RawSignal[] }>;
+type RawWorkspace = Readonly<{
+  etag: string;
+  lastBatchId: number | null;
+  plans: RawPlan[];
+  controlTotals: RawControlTotal[];
+  signals: RawSignal[];
+  currentFiscalMonth: string;
+  fromQuarter: string;
+  toQuarter: string;
+  editablePeriodIds: string[];
+  displayQuarterOrder: string[];
+}>;
 
-export type ConsumptionApiWorkspace = Readonly<{ etag: string; plans: ConsumptionPlan[]; signals: ConsumptionSignal[]; controlTotalCount: number; lastBatchId: number | null }>;
+export type ConsumptionApiWorkspace = Readonly<{
+  etag: string;
+  plans: ConsumptionPlan[];
+  signals: ConsumptionSignal[];
+  controlTotalCount: number;
+  lastBatchId: number | null;
+  currentFiscalMonth: string;
+  fromQuarter: string;
+  toQuarter: string;
+  editablePeriodIds: string[];
+  displayQuarterOrder: string[];
+}>;
+export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionForecastUpdate = Readonly<{ planId: number; periodKey: string; amount: number; versionNo: number }>;
 export type ConsumptionImportPreview = Readonly<{ planCount: number; controlTotalCount: number; sourceRowCount: number; sourceSha256: string }>;
 
@@ -42,19 +63,26 @@ export const canUseConsumptionFallback = (error: unknown) => {
 const signalTypes = new Set<ConsumptionSignal["type"]>(["SPIKE", "DROP", "TREND UP", "TREND DOWN", "NEW", "STOPPED"]);
 const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "WATCH"]);
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
+const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const isNullableFiniteNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
 const isNonNegativeInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 const isPositiveInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) > 0;
 const isPeriodKey = (value: unknown): value is string => typeof value === "string" && fiscalPeriodPattern.test(value);
+const isQuarterKey = (value: unknown): value is string => typeof value === "string" && fiscalQuarterPattern.test(value);
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {
   if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption workspace response");
   const raw = value as RawWorkspace;
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.signals) || !Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption workspace response");
   const etag = headerEtag ?? raw.etag;
-  if (!isNonEmptyString(etag) || !(raw.lastBatchId === null || isPositiveInteger(raw.lastBatchId))) throw new Error("Malformed Consumption workspace metadata");
+  if (!isNonEmptyString(etag) || !(raw.lastBatchId === null || isPositiveInteger(raw.lastBatchId))
+    || !isPeriodKey(raw.currentFiscalMonth) || !isQuarterKey(raw.fromQuarter) || !isQuarterKey(raw.toQuarter)
+    || !Array.isArray(raw.editablePeriodIds) || raw.editablePeriodIds.some((period) => !isPeriodKey(period))
+    || !Array.isArray(raw.displayQuarterOrder) || raw.displayQuarterOrder.some((quarter) => !isQuarterKey(quarter))
+    || new Set(raw.editablePeriodIds).size !== raw.editablePeriodIds.length
+    || new Set(raw.displayQuarterOrder).size !== raw.displayQuarterOrder.length) throw new Error("Malformed Consumption workspace metadata");
   if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey))) throw new Error("Malformed Consumption control total response");
   const basePlans: ConsumptionPlan[] = raw.plans.map((plan) => {
     if (!isPositiveInteger(plan?.planId) || !isNonEmptyString(plan?.stableKey) || !isNonEmptyString(plan?.account)
@@ -74,11 +102,10 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
       dataCenter: plan.dataCenter, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
   });
-  const latest = getLatestActualMonth(basePlans);
-  const plans = latest ? seedForecastMonths(basePlans, getNextQuarterMonths(latest)).map((plan) => ({
+  const plans = seedForecastMonths(basePlans, raw.editablePeriodIds).map((plan) => ({
     ...plan,
     versions: Object.fromEntries(Object.keys(plan.forecasts).map((month) => [month, plan.versions?.[month] ?? 0]).concat(Object.entries(plan.versions ?? {})))
-  })) : basePlans;
+  }));
   const byServerId = new Map(plans.map((plan) => [plan.serverPlanId, plan]));
   const signals: ConsumptionSignal[] = raw.signals.map((signal) => {
     if (!isPositiveInteger(signal?.signalId) || !isPositiveInteger(signal?.planId) || !isNonEmptyString(signal?.account)
@@ -91,7 +118,18 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
       changePercent: signal.changePercent, reason: signal.reason, topContributingPlan: byServerId.get(signal.planId)?.planId ?? signal.planCode
     };
   });
-  return { etag, plans, signals, controlTotalCount: new Set(raw.controlTotals.map((control) => control.account)).size, lastBatchId: raw.lastBatchId };
+  return {
+    etag,
+    plans,
+    signals,
+    controlTotalCount: new Set(raw.controlTotals.map((control) => control.account)).size,
+    lastBatchId: raw.lastBatchId,
+    currentFiscalMonth: raw.currentFiscalMonth,
+    fromQuarter: raw.fromQuarter,
+    toQuarter: raw.toQuarter,
+    editablePeriodIds: [...raw.editablePeriodIds],
+    displayQuarterOrder: [...raw.displayQuarterOrder]
+  };
 };
 
 const request = async (path: string, init?: RequestInit): Promise<{ response: Response; payload: unknown }> => {
@@ -110,8 +148,9 @@ const request = async (path: string, init?: RequestInit): Promise<{ response: Re
   return { response, payload };
 };
 
-export const fetchConsumptionWorkspace = async (): Promise<ConsumptionApiWorkspace> => {
-  const { response, payload } = await request("/consumption/workspace");
+export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRange): Promise<ConsumptionApiWorkspace> => {
+  const query = range ? `?${new URLSearchParams({ fromQuarter: range.fromQuarter, toQuarter: range.toQuarter })}` : "";
+  const { response, payload } = await request(`/consumption/workspace${query}`);
   return parseWorkspace(payload, response.headers.get("ETag"));
 };
 export const previewConsumptionImport = async (csv: string): Promise<ConsumptionImportPreview> => {

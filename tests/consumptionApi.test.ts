@@ -11,8 +11,11 @@ const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: strin
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
 const payload = {
   etag: '"body-etag"', lastBatchId: 7,
+  currentFiscalMonth: "FY27-AUG", fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1",
+  editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
+  displayQuarterOrder: ["FY27-Q1", "FY27-Q2", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"],
   plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC",
-    facts: [{ periodKey: "FY27-SEP", actualAmount: 100, forecastAmount: null, versionNo: 1 },
+    facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1 },
       { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 999, versionNo: 3 }] }],
   controlTotals: [
     { account: "A", periodKey: "FY27-AUG" }, { account: "A", periodKey: "FY27-SEP" },
@@ -20,16 +23,22 @@ const payload = {
   ], signals: []
 };
 runtime.fetch = async (input) => {
-  assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace");
+  assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace?fromQuarter=FY26-Q1&toQuarter=FY27-Q1");
   return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json", ETag: '"header-etag"' } });
 };
 
 void (async () => {
-  const workspace = await fetchConsumptionWorkspace();
+  const workspace = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1" });
   assert.equal(workspace.etag, '"header-etag"');
+  assert.equal(workspace.currentFiscalMonth, "FY27-AUG");
+  assert.equal(workspace.fromQuarter, "FY26-Q1");
+  assert.equal(workspace.toQuarter, "FY27-Q1");
+  assert.deepEqual(workspace.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
+  assert.deepEqual(workspace.displayQuarterOrder, ["FY27-Q1", "FY27-Q2", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"]);
   assert.equal(workspace.controlTotalCount, 2, "monthly control entries must be reported as two source Multiple controls");
   assert.equal(workspace.plans[0].forecasts["FY27-OCT"], 999, "persisted server forecast must remain authoritative");
-  assert.equal(workspace.plans[0].forecasts["FY27-NOV"], 100, "only a missing forecast month receives the seed default");
+  assert.equal(workspace.plans[0].forecasts["FY27-NOV"], 100, "only a missing editable forecast month receives the seed default");
+  assert.equal("FY27-SEP" in workspace.plans[0].forecasts, true);
   assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 3);
 
   let putInit: RequestInit | undefined;

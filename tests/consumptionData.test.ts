@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import {
   ConsumptionPlan,
   aggregateConsumptionAccounts,
+  buildDisplayQuarterSummaries,
   buildQuarterSummary,
   detectConsumptionSignals,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths,
+  isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   seedForecastMonths
 } from "../src/data/consumptionData";
@@ -97,6 +99,22 @@ const fy27q2 = buildQuarterSummary(forecastAccount, "FY27-Q2", fy27q1);
 assert.equal(fy27q2.total, 2400);
 assert.equal(fy27q2.status, "FORECAST");
 assert.equal(fy27q2.preQGap, 300);
+
+assert.equal(isConsumptionQuarterRangeValid("FY26-Q4", "FY27-Q1"), true);
+assert.equal(isConsumptionQuarterRangeValid("FY27-Q2", "FY27-Q1"), false, "a reversed From/To range is invalid");
+const displaySeries: ConsumptionPlan = {
+  id: "display", customer: "Display Account", endUser: "Display End User", planId: "DISPLAY", dataCenter: "1", planType: "OCI",
+  actuals: {
+    "FY26-MAR": 5, "FY26-APR": 5, "FY26-MAY": 5,
+    "FY27-JUN": 10, "FY27-JUL": 10, "FY27-AUG": 10
+  },
+  forecasts: { "FY27-SEP": 20, "FY27-OCT": 20, "FY27-NOV": 20 }
+};
+const displaySummaries = buildDisplayQuarterSummaries(displaySeries, ["FY27-Q1", "FY27-Q2", "FY26-Q4", "FY27-Q1"]);
+assert.deepEqual(displaySummaries.map((summary) => summary.quarter), ["FY27-Q1", "FY27-Q2", "FY26-Q4"], "backend display order is preserved without duplicate quarters");
+assert.equal(displaySummaries[0].preQGap, 15, "a displayed history quarter compares with its chronological predecessor");
+assert.equal(displaySummaries[1].preQGap, 30, "a displayed forecast quarter compares with its chronological predecessor");
+assert.equal(displaySummaries[2].preQGap, null, "the first chronological quarter has no predecessor in the returned range");
 
 const signalPlan = (
   id: string,

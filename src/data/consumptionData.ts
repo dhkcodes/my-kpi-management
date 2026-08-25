@@ -240,6 +240,16 @@ export const getQuarterMonths = (quarter: string): string[] => {
   return quarterMonths[match[2]].map((month) => `${match[1]}-${month}`);
 };
 
+const fiscalQuarterOrder = (quarter: string): number => {
+  const match = /^FY(\d{2})-Q([1-4])$/.exec(quarter);
+  return match ? Number(match[1]) * 4 + Number(match[2]) - 1 : Number.MAX_SAFE_INTEGER;
+};
+
+export const isConsumptionQuarterRangeValid = (fromQuarter: string, toQuarter: string): boolean =>
+  fiscalQuarterOrder(fromQuarter) !== Number.MAX_SAFE_INTEGER
+  && fiscalQuarterOrder(toQuarter) !== Number.MAX_SAFE_INTEGER
+  && fiscalQuarterOrder(fromQuarter) <= fiscalQuarterOrder(toQuarter);
+
 const effectiveValue = (series: ConsumptionSeries, month: string): { value: number | null; status: "ACTUAL" | "FORECAST" | "MISSING" } => {
   if (Object.prototype.hasOwnProperty.call(series.actuals, month)) return { value: series.actuals[month], status: "ACTUAL" };
   if (Object.prototype.hasOwnProperty.call(series.forecasts, month)) return { value: series.forecasts[month], status: "FORECAST" };
@@ -264,6 +274,22 @@ export const buildQuarterSummary = (
   const total = available.length === 0 ? null : available.reduce((sum, item) => sum + (item.value ?? 0), 0);
   const preQGap = total !== null && previous?.total !== null && previous?.total !== undefined ? total - previous.total : null;
   return { quarter, months, total, status, preQGap };
+};
+
+export const buildDisplayQuarterSummaries = (
+  series: ConsumptionSeries,
+  displayQuarterOrder: readonly string[]
+): ConsumptionQuarterSummary[] => {
+  const displayed = [...new Set(displayQuarterOrder)];
+  const chronological = [...displayed].sort((left, right) => fiscalQuarterOrder(left) - fiscalQuarterOrder(right));
+  let previous: ConsumptionQuarterSummary | null = null;
+  const summaries = new Map<string, ConsumptionQuarterSummary>();
+  chronological.forEach((quarter) => {
+    const summary = buildQuarterSummary(series, quarter, previous);
+    summaries.set(quarter, summary);
+    previous = summary;
+  });
+  return displayed.map((quarter) => summaries.get(quarter) as ConsumptionQuarterSummary);
 };
 
 export const seedForecastMonths = (plans: readonly ConsumptionPlan[], forecastMonths: readonly string[]): ConsumptionPlan[] =>

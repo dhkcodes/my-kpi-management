@@ -65,11 +65,11 @@ export const kpiNavItems: NavigationItem[] = [
 export const customerNavItems: NavigationItem[] = [
   { id: "customers-overview", label: "Portfolio Overview", icon: "oj-ux-ico-contact-group" },
   { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" },
-  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" },
-  { id: "consumption", label: "Consumption", icon: "oj-ux-ico-chart-line" }
+  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" }
 ];
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", icon: "oj-ux-ico-home" },
-  { id: "my-customers", label: "My Customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
-  { id: "kpis", label: "KPI Activities", icon: "oj-ux-ico-book", children: kpiNavItems }
+  { id: "kpis", label: "KPI Activities", icon: "oj-ux-ico-book", children: kpiNavItems },
+  { id: "consumption", label: "Consumption", icon: "oj-ux-ico-chart-line" },
+  { id: "my-customers", label: "My Customers", icon: "oj-ux-ico-contact-group", children: customerNavItems }
 ];

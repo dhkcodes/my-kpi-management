@@ -412,7 +412,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      {activeRoute.module !== "consumption" && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -449,7 +449,7 @@ export function Content({
           <span class="oj-ux-ico-book" aria-hidden="true"></span>
           <span class="kpi-guide-entry-button__label">KPI Guide</span>
         </button>}
-      </section>
+      </section>}
 
       {activeRoute.module !== "weeklyActivities" && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
