@@ -173,7 +173,7 @@ const recordToGuideDetails = (record: KpiGuideRecord): GuideDetails => ({
   srType: record.srType,
   businessSrType: record.businessSrType,
   combinedSrType: record.combinedSrType ?? undefined,
-  targetPerQuarter: record.targetPerQuarter,
+  targetPerQuarter: record.kpiCode === "C1" || record.kpiCode === "C2" ? "6 activities / Quarter" : record.targetPerQuarter,
   activity: record.activity,
   taskType: record.taskType,
   measuring: record.measuring,
@@ -388,6 +388,7 @@ export function Content({
       const authoritative = await onSaveGuide({
         ...record,
         ...details,
+        targetPerQuarter: record.targetPerQuarter,
         combinedSrType: details.combinedSrType ?? null
       });
       const saved = recordToGuideDetails(authoritative);
