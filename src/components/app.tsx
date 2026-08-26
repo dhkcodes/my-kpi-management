@@ -575,6 +575,13 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       }
     };
 
+    const handleOpenAccountWorkloads = (account: string) => {
+      const nextQuery = { ...accountsWorkloadsQuery, search: account, includeDeleted: false };
+      setAccountsWorkloadsQuery(nextQuery);
+      handleNavigate("accounts-workloads");
+      void handleAccountsWorkloadsQueryChange(nextQuery);
+    };
+
 
     return (
       <div id="appContainer" class="oj-web-applayout-page kpi-shell">
@@ -674,6 +681,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             }}
             onFiscalYearChange={handleFiscalYearChange}
             onNavigate={handleNavigate}
+            onOpenAccountWorkloads={handleOpenAccountWorkloads}
           />
         </div>
         <Footer />

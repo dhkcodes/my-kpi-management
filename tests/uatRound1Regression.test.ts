@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const content = read("src/components/content/index.tsx");
+const app = read("src/components/app.tsx");
 const pulse = read("src/components/content/AccountsWorkloadsPulseV2.tsx");
 const accounts = read("src/components/content/AccountsWorkloadsPage.tsx");
 const portfolio = read("src/components/content/MyCustomers360Page.tsx");
@@ -38,8 +39,10 @@ assert.match(pulse, /aria-expanded=\{expandedUrgency === key\}/);
 assert.match(pulse, /items\.map/);
 assert.match(content, /statusToneClassName\(quarter\.status\)/,
   "New Workload uses semantic KPI status, not best-rate warning tone");
-assert.match(content, /onNavigate\("accounts-workloads"\)[\s\S]*onAccountsWorkloadsQueryChange\(\{ \.\.\.accountsWorkloadsQuery, search: account, includeDeleted: false \}\)/,
-  "Account navigation invalidates old requests before starting the automatic filter request");
+assert.match(content, /onOpenAccountWorkloads\(account\)/,
+  "Account links use the dedicated automatic filter handoff");
+assert.match(app, /handleOpenAccountWorkloads[\s\S]*search: account, includeDeleted: false[\s\S]*setAccountsWorkloadsQuery\(nextQuery\)/,
+  "the parent commits the Account filter before the detail page mounts");
 assert.match(accounts, /accounts-workloads-table-meta/);
 assert.doesNotMatch(accounts, /Loaded rows:/);
 assert.match(kpi, /Data through/);

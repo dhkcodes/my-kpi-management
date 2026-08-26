@@ -59,6 +59,7 @@ type Props = Readonly<{
   fxError: string;
   onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   onNavigate: (routeId: string) => void;
+  onOpenAccountWorkloads: (account: string) => void;
   onCloseGuide: () => void;
   onOpenGuide: () => void;
   onSaveGuide: (draft: KpiGuideRecord) => Promise<KpiGuideRecord>;
@@ -314,6 +315,7 @@ export function Content({
   fxError,
   onFiscalYearChange,
   onNavigate,
+  onOpenAccountWorkloads,
   onCloseGuide,
   onOpenGuide,
   onSaveGuide,
@@ -411,8 +413,7 @@ export function Content({
     setSelectedGuideCode(code);
   };
   const openAccountWorkloads = (account: string) => {
-    onNavigate("accounts-workloads");
-    onAccountsWorkloadsQueryChange({ ...accountsWorkloadsQuery, search: account, includeDeleted: false });
+    onOpenAccountWorkloads(account);
   };
 
   return (
