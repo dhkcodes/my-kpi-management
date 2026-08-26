@@ -23,7 +23,7 @@ assert.doesNotMatch(page, /role="listitem"/, "signal controls preserve native bu
 assert.match(page, /candidate\.serverPlanId === signal\.serverPlanId/, "signal selection preserves exact server Plan ID identity");
 assert.match(page, /consumptionSignalDirection[\s\S]*signal\.type === "RISING"[\s\S]*Rising[\s\S]*Falling/, "signals visibly expose strict rising or falling direction");
 assert.match(page, /consumption-signal-type[^\n]*is-\$\{signal\.type\.toLowerCase\(\)\}[\s\S]*\{signal\.type\}/, "RISING and FALLING are the primary signal badges");
-assert.doesNotMatch(page, /Month-over-Month|Latest actual month vs immediately previous month|SPIKE|DROP|Prioritized detection|Change Signal Inbox|New baseline/, "legacy MoM and broad-anomaly language is removed");
+assert.doesNotMatch(page, /Month-over-Month|month-over-month|\bMoM\b|Latest actual month vs immediately previous month|SPIKE|DROP|Prioritized detection|Change Signal Inbox|New baseline/, "legacy MoM and broad-anomaly language is removed");
 assert.match(page, /accept="\.csv,text\/csv"/, "runtime CSV import accepts CSV files");
 assert.match(page, /parseConsumptionCsv/, "CSV import uses the normalized parser");
 assert.match(page, /seedForecastMonths/, "the next quarter receives editable forecast cells");

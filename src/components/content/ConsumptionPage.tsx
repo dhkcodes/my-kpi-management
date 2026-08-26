@@ -658,7 +658,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <article class="kpi-panel"><span>Range Total</span><strong>{currency.format(rangeTotal)}</strong><small>{fromQuarter} → {toQuarter}</small></article>
         <article class="kpi-panel"><span>Latest Quarter</span><strong>{latestSummary?.total === null || !latestSummary ? "N/A" : currency.format(latestSummary.total)}</strong><small>{latestSummary?.quarter ?? "—"} · {latestSummary?.status ?? "—"}</small></article>
         <article class="kpi-panel"><span>PreQ Change</span><strong>{signedCurrency(latestSummary?.preQGap ?? null)}</strong><small>Chronological predecessor</small></article>
-        <article class="kpi-panel"><span>MoM Changes</span><strong>{signals.length}</strong><small>Latest Plan comparison</small></article>
+        <article class="kpi-panel"><span>Trend Alerts</span><strong>{signals.length}</strong><small>Strict completed-month direction</small></article>
         <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
       </section>
 
@@ -690,7 +690,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </button>
               );
             })}
-            {signals.length === 0 && <p class="consumption-empty-state">No Plans met both month-over-month change thresholds.</p>}
+            {signals.length === 0 && <p class="consumption-empty-state">No Plans met the strict 3-month trend thresholds.</p>}
           </div>
         </section>
 
