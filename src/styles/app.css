@@ -2341,8 +2341,8 @@ h4.weekly-activity-section-label--next-week,
 .consumption-signal-main strong, .consumption-signal-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-signal-main span, .consumption-signal-change span, .consumption-signal-month { color: var(--kpi-muted); font-size: .72rem; }
 .consumption-signal-type { border-radius: 999px; font-size: .67rem; font-weight: 850; letter-spacing: .025em; padding: .24rem .42rem; white-space: nowrap; }
-.consumption-signal-type.is-spike { background: var(--oj-palette-success-20, #e8f3e7); color: var(--oj-palette-success-120, #285b28); }
-.consumption-signal-type.is-drop { background: #fde7e3; color: #a63122; }
+.consumption-signal-type.is-rising { background: var(--oj-palette-success-20, #e8f3e7); color: var(--oj-palette-success-120, #285b28); }
+.consumption-signal-type.is-falling { background: #fde7e3; color: #a63122; }
 .consumption-signal-severity { color: var(--kpi-muted); font-size: .68rem; font-weight: 750; white-space: nowrap; }
 .consumption-signal-direction { align-items: center; display: inline-flex; font-size: .7rem; font-weight: 850; gap: .2rem; white-space: nowrap; }
 .consumption-signal-direction.is-rise { color: var(--oj-palette-success-100, #356b31); }

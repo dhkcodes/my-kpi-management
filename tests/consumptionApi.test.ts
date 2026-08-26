@@ -45,6 +45,18 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
+    signals: [{ signalId: 11, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUL",
+      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: 40, reason: "strict three-month rise" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"trend"' } });
+  const trendWorkspace = await fetchConsumptionWorkspace();
+  assert.deepEqual(
+    [trendWorkspace.signals[0].type, trendWorkspace.signals[0].serverPlanId, trendWorkspace.signals[0].planId],
+    ["RISING", 11, "P1"],
+    "approved trend signals retain their exact numeric server Plan identity"
+  );
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
     fromQuarter: "FY26-Q4", toQuarter: "FY26-Q4", displayQuarterOrder: ["FY27-Q2", "FY26-Q4"],
     plans: [{ ...payload.plans[0], facts: [
       { periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1 },
@@ -104,22 +116,29 @@ void (async () => {
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
     signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "SPIKE", grade: "UNTRUSTED", changeAmount: 1, changePercent: 1, reason: "bad" }]
+      type: "RISING", grade: "UNTRUSTED", changeAmount: 1, changePercent: 1, reason: "bad" }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-signal"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
     signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: null, reason: "bad" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-mom-signal"' } });
+      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: null, reason: "bad" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-trend-signal"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
     signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: -50, reason: "bad" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-mom-sign"' } });
+      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: -50, reason: "bad" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-trend-sign"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
+    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUL",
+      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: 50, reason: "legacy MoM" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"legacy-mom-signal"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...payload, lastBatchId: "7" }),

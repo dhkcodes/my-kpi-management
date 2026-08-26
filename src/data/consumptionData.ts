@@ -1,5 +1,5 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
-export type ConsumptionSignalType = "SPIKE" | "DROP";
+export type ConsumptionSignalType = "RISING" | "FALLING";
 export type ConsumptionSignalGrade = "CRITICAL" | "HIGH" | "WATCH";
 
 export type ConsumptionPlan = Readonly<{
@@ -321,34 +321,39 @@ export const seedForecastMonths = (plans: readonly ConsumptionPlan[], forecastMo
 const signalGrade = (amount: number, percent: number | null): ConsumptionSignalGrade => {
   const absolutePercent = Math.abs(percent ?? 0);
   if (Math.abs(amount) >= 1000 || absolutePercent >= 100) return "CRITICAL";
-  if (Math.abs(amount) >= 300 || absolutePercent >= 40) return "HIGH";
+  if (Math.abs(amount) >= 300 || absolutePercent >= 30) return "HIGH";
   return "WATCH";
 };
 
 const reasonFor = (type: ConsumptionSignalType, amount: number, percent: number | null) => {
-  const direction = amount >= 0 ? "increased" : "decreased";
-  return `Plan consumption ${direction} by ${Math.abs(amount).toLocaleString("en-US")} (${Math.abs(percent ?? 0).toFixed(1)}%) versus the previous month.`;
+  const direction = type === "RISING" ? "rose" : "fell";
+  return `Plan consumption ${direction} consistently over three completed months by ${Math.abs(amount).toLocaleString("en-US")} (${Math.abs(percent ?? 0).toFixed(1)}%).`;
 };
 
-const detectPlanSignal = (plan: ConsumptionPlan, previousMonth: string, currentMonth: string): ConsumptionSignal | null => {
-  if (!Object.prototype.hasOwnProperty.call(plan.actuals, previousMonth)
-    || !Object.prototype.hasOwnProperty.call(plan.actuals, currentMonth)) return null;
-  const current = plan.actuals[currentMonth];
-  const previous = plan.actuals[previousMonth];
-  if (previous === 0) return null;
-  const amount = current - previous;
-  const percent = (amount / previous) * 100;
-  if (Math.abs(amount) < 300 || Math.abs(percent) < 40) return null;
-  const type: ConsumptionSignalType = amount > 0 ? "SPIKE" : "DROP";
+const detectPlanSignal = (plan: ConsumptionPlan, firstMonth: string, middleMonth: string, lastMonth: string): ConsumptionSignal | null => {
+  if (!Object.prototype.hasOwnProperty.call(plan.actuals, firstMonth)
+    || !Object.prototype.hasOwnProperty.call(plan.actuals, middleMonth)
+    || !Object.prototype.hasOwnProperty.call(plan.actuals, lastMonth)) return null;
+  const first = plan.actuals[firstMonth];
+  const middle = plan.actuals[middleMonth];
+  const last = plan.actuals[lastMonth];
+  if (first === 0) return null;
+  const rising = first < middle && middle < last;
+  const falling = first > middle && middle > last;
+  if (!rising && !falling) return null;
+  const amount = last - first;
+  const percent = (amount / Math.abs(first)) * 100;
+  if (Math.abs(amount) < 300 || Math.abs(percent) < 30) return null;
+  const type: ConsumptionSignalType = rising ? "RISING" : "FALLING";
   return {
-    id: `${plan.id}::${currentMonth}::${type}`,
+    id: `${plan.id}::${lastMonth}::${type}`,
     serverPlanId: plan.serverPlanId,
     customer: plan.customer,
     endUser: plan.endUser,
     planId: plan.planId,
     type,
     grade: signalGrade(amount, percent),
-    month: currentMonth,
+    month: lastMonth,
     changeAmount: amount,
     changePercent: percent,
     reason: reasonFor(type, amount, percent),
@@ -357,13 +362,19 @@ const detectPlanSignal = (plan: ConsumptionPlan, previousMonth: string, currentM
 };
 
 const gradeOrder: Record<ConsumptionSignalGrade, number> = { CRITICAL: 0, HIGH: 1, WATCH: 2 };
-export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[]): ConsumptionSignal[] => {
-  const currentMonth = getLatestActualMonth(plans);
-  if (!currentMonth) return [];
-  const previousMonth = sortConsumptionMonths([...new Set(plans.flatMap((plan) => Object.keys(plan.actuals)))])
-    .find((month) => fiscalMonthOrder(month) === fiscalMonthOrder(currentMonth) - 1);
-  if (!previousMonth) return [];
-  return plans.map((plan) => detectPlanSignal(plan, previousMonth, currentMonth))
+const completedFiscalMonth = (asOf: Date, monthsBack: number) => {
+  const businessCalendar = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit"
+  }).formatToParts(asOf).map((part) => [part.type, part.value]));
+  const month = new Date(Date.UTC(Number(businessCalendar.year), Number(businessCalendar.month) - 1 - monthsBack, 1));
+  const fiscalYear = month.getUTCMonth() >= 5 ? month.getUTCFullYear() + 1 : month.getUTCFullYear();
+  const monthName = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][month.getUTCMonth()];
+  return `FY${String(fiscalYear % 100).padStart(2, "0")}-${monthName}`;
+};
+
+export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[], asOf = new Date()): ConsumptionSignal[] => {
+  const [firstMonth, middleMonth, lastMonth] = [3, 2, 1].map((monthsBack) => completedFiscalMonth(asOf, monthsBack));
+  return plans.map((plan) => detectPlanSignal(plan, firstMonth, middleMonth, lastMonth))
     .filter((signal): signal is ConsumptionSignal => signal !== null)
     .sort((left, right) => gradeOrder[left.grade] - gradeOrder[right.grade] || Math.abs(right.changeAmount) - Math.abs(left.changeAmount));
 };

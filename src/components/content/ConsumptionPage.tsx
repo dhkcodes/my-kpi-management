@@ -63,9 +63,9 @@ const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 const shortMonth = (month: string) => month.split("-")[1];
-const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.type === "SPIKE"
-  ? { label: "Increased", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
-  : { label: "Decreased", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
+const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.type === "RISING"
+  ? { label: "Rising", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
+  : { label: "Falling", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
@@ -666,9 +666,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
           <div class="consumption-section-heading">
             <div>
-              <span class="kpi-section-label">Latest Plan comparison</span>
-              <h2 id="consumptionSignalTitle">Month-over-Month Plan Changes</h2>
-              <p>Latest actual month vs immediately previous month · ≥ $300 and ≥ 40%</p>
+              <span class="kpi-section-label">Completed-month trend</span>
+              <h2 id="consumptionSignalTitle">3-Month Plan Trend Alerts</h2>
+              <p>Strict 3-month direction · ≥ $300 and ≥ 30%</p>
             </div>
             <span class="consumption-count-badge">{signals.length}</span>
           </div>
