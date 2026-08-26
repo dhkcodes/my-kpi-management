@@ -41,6 +41,15 @@ void (async () => {
   assert.equal("FY27-SEP" in workspace.plans[0].forecasts, true);
   assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 3);
 
+  runtime.fetch = async () => new Response(JSON.stringify({
+    etag: '"legacy-etag"', lastBatchId: null, plans: payload.plans,
+    controlTotals: payload.controlTotals, signals: []
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"legacy-etag"' } });
+  const compatible = await fetchConsumptionWorkspace();
+  assert.equal(compatible.currentFiscalMonth, "FY27-AUG", "legacy workspaces derive the latest Actual fiscal month");
+  assert.deepEqual(compatible.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
+  assert.deepEqual(compatible.displayQuarterOrder.slice(0, 2), ["FY27-Q1", "FY27-Q2"]);
+
   let putInit: RequestInit | undefined;
   runtime.fetch = async (_input, init) => {
     putInit = init;

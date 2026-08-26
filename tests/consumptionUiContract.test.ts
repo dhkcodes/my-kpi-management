@@ -6,7 +6,7 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
-assert.match(navigation, /export const navItems[\s\S]*id: "home"[\s\S]*id: "kpis"[\s\S]*id: "consumption"[\s\S]*id: "my-customers"/, "root navigation order is Home, KPI Activities, Consumption, My Customers");
+assert.match(navigation, /export const navItems[\s\S]*id: "home"[\s\S]*id: "my-customers"[\s\S]*id: "kpis"[\s\S]*id: "consumption"/, "root navigation order is Home, My Customers, KPI Activities, Consumption");
 const customerChildren = navigation.match(/export const customerNavItems[\s\S]*?\];/)?.[0] ?? "";
 assert.doesNotMatch(customerChildren, /id: "consumption"/, "Consumption is no longer nested under My Customers");
 assert.match(content, /\['consumption', 'profile', 'users'\]\.includes\(activeRoute\.module\)[\s\S]*kpi-fiscal-year-panel/, "the global Fiscal Year selector is hidden on Consumption and identity pages");
@@ -44,6 +44,10 @@ assert.doesNotMatch(page, /Sold To/, "Sold To never appears in the UI model");
 assert.match(page, /fetchConsumptionWorkspace/, "Consumption loads the authoritative backend workspace");
 assert.match(page, /previewConsumptionImport/, "CSV import calls server-side preview validation");
 assert.match(page, /applyConsumptionImport/, "CSV import uses atomic server-side apply");
+assert.doesNotMatch(page, /window\.confirm\(`Preview passed:/, "CSV import does not use a browser confirm dialog");
+assert.match(page, /<oj-dialog[\s\S]*Consumption CSV import/, "CSV import confirmation uses an Oracle JET dialog");
+assert.match(page, /<oj-progress-circle[\s\S]*Importing Consumption CSV/, "CSV import exposes an in-progress state");
+assert.match(page, /Successful rows[\s\S]*Failed rows[\s\S]*Loaded plans/, "CSV import completion reports success, failure and loaded counts");
 assert.match(page, /saveConsumptionForecasts/, "Forecast Save uses the atomic backend API");
 assert.match(page, /ConsumptionConflictError/, "HTTP 409 is handled as a typed conflict");
 assert.match(page, /Saved baseline[\s\S]*My draft[\s\S]*Current server/, "409 UX compares saved, draft and current server values");
@@ -52,8 +56,8 @@ assert.match(page, /dataMode === "fallback"[\s\S]*Saved in local fallback[\s\S]*
 assert.match(page, /canUseConsumptionFallback\(error\)[\s\S]*setSavedPlans\(fallbackPlans\)/, "synthetic plans are adopted only after a localhost fallback decision");
 assert.match(page, /setApiEtag\(""\)[\s\S]*setDataMode\("fallback"\)/, "local import fallback clears the prior server ETag");
 assert.match(page, /if \(isSaving\) return;[\s\S]*setIsSaving\(true\)[\s\S]*finally[\s\S]*setIsSaving\(false\)/, "Forecast Save submissions are serialized by an in-flight guard");
-assert.match(page, /disabled=\{dataMode === "loading" \|\| isSaving\}/, "Import stays disabled during initial authoritative load and save");
-assert.match(page, /if \(!file \|\| dataMode === "loading" \|\| isSaving\) return;/, "Import handler rejects loading and save races");
+assert.match(page, /disabled=\{dataMode === "loading" \|\| isSaving \|\| importPhase === "previewing"/, "Import stays disabled during load, save and in-flight import");
+assert.match(page, /if \(!file \|\| dataMode === "loading" \|\| isSaving \|\| importPhase === "previewing"/, "Import handler rejects loading, save and duplicate import races");
 assert.match(page, /if \(isSaving \|\| \(dataMode !== "backend" && dataMode !== "fallback"\)\) return;/, "Forecast editing locks while save is in flight");
 assert.match(page, /aria-label=\{`\$\{series\.endUser\} \$\{month\} forecast`\}[\s\S]*disabled=\{isSaving\}/, "an already open forecast editor is disabled while saving");
 assert.match(page, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "From/To Quarter controls validate reversed ranges before Apply");
@@ -66,6 +70,8 @@ assert.match(page, /selectSignal[\s\S]*setSelectedAccount/, "signal selection li
 assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
 assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
 assert.match(page, /displayQuarterOrder\.flatMap/, "table columns follow the backend display quarter order");
+assert.match(page, /const expandable = account\.plans\.length > 1/, "only Multiple End Users are expandable");
+assert.match(page, /expandable \? \([\s\S]*consumption-account-toggle[\s\S]*\) : \(/, "single-plan End Users render without an expand control");
 assert.match(styles, /\.consumption-forecast-cell[^}]*box-shadow:/, "editable Forecast cells are visually explicit");
 
 console.log("consumptionUiContract tests passed");

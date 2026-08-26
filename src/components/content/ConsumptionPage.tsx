@@ -29,6 +29,9 @@ import {
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
 import "ojs/ojbutton";
 import "ojs/ojchart";
+import "ojs/ojdialog";
+import "ojs/ojprogress-circle";
+import { ojDialog } from "ojs/ojdialog";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
 const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
@@ -63,6 +66,17 @@ const shortMonth = (month: string) => month.split("-")[1];
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
+type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "error";
+type PendingImport = Readonly<{
+  csv: string;
+  fileName: string;
+  latestActualMonth: string;
+  parsed: ReturnType<typeof parseConsumptionCsv>;
+  useFallback: boolean;
+  planCount: number;
+  controlTotalCount: number;
+  sourceRowCount: number;
+}>;
 type ConsumptionChartPoint = Readonly<{
   id: string;
   seriesId: string;
@@ -107,7 +121,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
   const [currentFiscalMonth, setCurrentFiscalMonth] = useState("");
   const [rangeLoading, setRangeLoading] = useState(false);
+  const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [importResult, setImportResult] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace, status: string) => {
@@ -337,12 +355,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     editEntryValueRef.current = null;
   };
 
+  useEffect(() => {
+    if (importPhase !== "idle") importDialogRef.current?.open();
+  }, [importPhase]);
+
   const handleCsvFile = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (!file || dataMode === "loading" || isSaving) return;
+    if (!file || dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     setImportError("");
+    setImportResult("");
+    setPendingImport(null);
+    setImportPhase("previewing");
     try {
       const csv = await file.text();
       const parsed = parseConsumptionCsv(csv);
@@ -350,18 +375,39 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       if (!latestActualMonth) throw new Error("The imported CSV has no populated fiscal Actual values.");
       try {
         const preview = await previewConsumptionImport(csv);
-        const accepted = window.confirm(`Preview passed: ${preview.planCount} plans and ${preview.controlTotalCount} control totals. Apply this CSV atomically?`);
-        if (!accepted) {
-          setImportStatus(`${file.name} · Preview passed · Apply cancelled`);
-          return;
-        }
-        const workspace = await applyConsumptionImport(csv);
-        adoptWorkspace(workspace, `${file.name} · Applied batch ${workspace.lastBatchId ?? ""} · ${workspace.plans.length} plans · through ${latestActualMonth}`);
+        setPendingImport({ csv, fileName: file.name, latestActualMonth, parsed, useFallback: false,
+          planCount: preview.planCount, controlTotalCount: preview.controlTotalCount, sourceRowCount: preview.sourceRowCount });
       } catch (error) {
         if (!canUseConsumptionFallback(error)) throw error;
-        const importedEditablePeriods = getNextQuarterMonths(latestActualMonth);
-        const imported = seedForecastMonths(parsed.plans, importedEditablePeriods);
-        const importedHistoryQuarters = [...new Set(parsed.monthKeys.map(getFiscalQuarter))].reverse();
+        setPendingImport({ csv, fileName: file.name, latestActualMonth, parsed, useFallback: true,
+          planCount: parsed.plans.length, controlTotalCount: parsed.controlTotals.length,
+          sourceRowCount: parsed.plans.length + parsed.controlTotals.length });
+      }
+      setImportPhase("preview");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Consumption CSV could not be previewed.";
+      setImportError(message);
+      setImportResult(message);
+      setImportPhase("error");
+    }
+  };
+
+  const applyPendingImport = async () => {
+    if (!pendingImport || importPhase !== "preview") return;
+    setImportPhase("applying");
+    setImportError("");
+    try {
+      let loadedPlans = pendingImport.planCount;
+      let loadedControls = pendingImport.controlTotalCount;
+      if (!pendingImport.useFallback) {
+        const result = await applyConsumptionImport(pendingImport.csv);
+        loadedPlans = result.planCount;
+        loadedControls = result.controlTotalCount;
+        adoptWorkspace(result.workspace, `${pendingImport.fileName} · Applied batch ${result.workspace.lastBatchId ?? ""} · ${result.planCount} plans · through ${pendingImport.latestActualMonth}`);
+      } else {
+        const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
+        const imported = seedForecastMonths(pendingImport.parsed.plans, importedEditablePeriods);
+        const importedHistoryQuarters = [...new Set(pendingImport.parsed.monthKeys.map(getFiscalQuarter))].reverse();
         const importedForecastQuarters = [...new Set(importedEditablePeriods.map(getFiscalQuarter))];
         setSavedPlans(clonePlans(imported));
         setDraftPlans(clonePlans(imported));
@@ -370,20 +416,27 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setToQuarter(importedForecastQuarters[importedForecastQuarters.length - 1] ?? importedHistoryQuarters[0] ?? "");
         setEditablePeriodIds(new Set(importedEditablePeriods));
         setDisplayQuarterOrder([...importedForecastQuarters, ...importedHistoryQuarters.filter((quarter) => !importedForecastQuarters.includes(quarter))]);
-        setCurrentFiscalMonth(latestActualMonth);
+        setCurrentFiscalMonth(pendingImport.latestActualMonth);
         setApiEtag("");
         setDataMode("fallback");
         setConflictRows([]);
         setConflictWorkspace(null);
-        setImportStatus(`${file.name} · Local fallback · ${imported.length} plans · through ${latestActualMonth}`);
+        setImportStatus(`${pendingImport.fileName} · Local fallback · ${imported.length} plans · through ${pendingImport.latestActualMonth}`);
       }
       setSelectedSignalId("");
       setExpandedAccounts(new Set());
       setEditCell(null);
+      setImportResult(`Successful rows: ${loadedPlans + loadedControls} · Failed rows: 0 · Loaded plans: ${loadedPlans} · Control totals: ${loadedControls}`);
+      setImportPhase("complete");
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Consumption CSV could not be imported.");
+      const message = error instanceof Error ? error.message : "Consumption CSV could not be imported.";
+      setImportError(message);
+      setImportResult(`Successful rows: 0 · Failed rows: 1 · Loaded plans: 0 · ${message}`);
+      setImportPhase("error");
     }
   };
+
+  const closeImportDialog = () => importDialogRef.current?.close();
 
   const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], readOnly: boolean) =>
     buildDisplayQuarterSummaries(series, displayQuarterOrder).flatMap((summary) => {
@@ -446,8 +499,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <p>Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast.</p>
         </div>
         <div class="consumption-import-actions">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving} onChange={(event) => void handleCsvFile(event)} />
-          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving} onojAction={() => fileInputRef.current?.click()}>
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
+          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Import CSV
           </oj-button>
@@ -474,6 +527,44 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
       <div class="consumption-import-status" role="status">{importStatus}</div>
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
+      <oj-dialog
+        id="consumptionImportDialog"
+        ref={importDialogRef}
+        dialogTitle="Consumption CSV import"
+        cancelBehavior={importPhase === "previewing" || importPhase === "applying" ? "none" : "icon"}
+        onojClose={() => {
+          if (importPhase === "previewing" || importPhase === "applying") return;
+          setImportPhase("idle");
+          setPendingImport(null);
+          setImportResult("");
+        }}>
+        <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
+          {(importPhase === "previewing" || importPhase === "applying") && (
+            <div class="consumption-import-progress" role="status">
+              <oj-progress-circle value={-1} size="md"></oj-progress-circle>
+              <div><strong>{importPhase === "previewing" ? "Validating CSV…" : "Importing Consumption CSV…"}</strong><p>Keep this dialog open while the atomic import completes.</p></div>
+            </div>
+          )}
+          {importPhase === "preview" && pendingImport && (
+            <div class="consumption-import-preview">
+              <p><strong>{pendingImport.fileName}</strong> passed validation.</p>
+              <dl><div><dt>Source rows</dt><dd>{pendingImport.sourceRowCount}</dd></div><div><dt>Plans</dt><dd>{pendingImport.planCount}</dd></div><div><dt>Control totals</dt><dd>{pendingImport.controlTotalCount}</dd></div></dl>
+              <p>{pendingImport.useFallback ? "Local preview mode will replace the current synthetic workspace." : "Apply will replace the authoritative Consumption workspace atomically."}</p>
+            </div>
+          )}
+          {(importPhase === "complete" || importPhase === "error") && (
+            <div class={importPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={importPhase === "error" ? "alert" : "status"}>
+              <span class={importPhase === "complete" ? "oj-ux-ico-check-circle" : "oj-ux-ico-error"} aria-hidden="true"></span>
+              <strong>{importPhase === "complete" ? "Import completed" : "Import failed"}</strong>
+              <p>{importResult}</p>
+            </div>
+          )}
+        </div>
+        <div slot="footer">
+          {importPhase === "preview" && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction" onojAction={() => void applyPendingImport()}>Import</oj-button></>}
+          {(importPhase === "complete" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
+        </div>
+      </oj-dialog>
       {conflictRows.length > 0 && (
         <section class="kpi-panel consumption-conflict-panel" aria-labelledby="consumptionConflictTitle">
           <div class="consumption-section-heading"><div><span class="kpi-section-label">HTTP 409 comparison</span><h2 id="consumptionConflictTitle">Forecast version conflict</h2></div></div>
@@ -584,20 +675,29 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </thead>
             <tbody>
               {accounts.map((account) => {
-                const expanded = expandedAccounts.has(account.customer);
+                const expandable = account.plans.length > 1;
+                const expanded = expandable && expandedAccounts.has(account.customer);
+                const singlePlan = account.plans[0];
                 return (
                   <>
                     <tr key={account.id} class={selectedSignal?.customer === account.customer ? "consumption-account-row is-context" : "consumption-account-row"} data-readonly="account">
                       <th class="consumption-account-column" scope="row">
-                        <button type="button" class="consumption-account-toggle" aria-expanded={expanded} onClick={() => toggleAccount(account.customer)}>
-                          <span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
-                          <strong>{account.customer}</strong>
-                          <small>{account.plans.length} Plan{account.plans.length === 1 ? "" : "s"}</small>
-                        </button>
+                        {expandable ? (
+                          <button type="button" class="consumption-account-toggle" aria-expanded={expanded} onClick={() => toggleAccount(account.customer)}>
+                            <span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
+                            <strong>{account.customer}</strong>
+                            <small>Multiple · {account.plans.length} Plans</small>
+                          </button>
+                        ) : (
+                          <span class="consumption-account-single">
+                            <strong>{account.customer}</strong>
+                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId}</small>
+                          </span>
+                        )}
                       </th>
                       {renderQuarterCells(account, true)}
                     </tr>
-                    {expanded && account.plans.map((plan) => (
+                    {expandable && expanded && account.plans.map((plan) => (
                       <tr key={plan.id} class={selectedSignal?.planId === plan.planId ? "consumption-plan-row is-context" : "consumption-plan-row"}>
                         <th class="consumption-account-column" scope="row">
                           <span class="consumption-end-user">{plan.endUser}</span>

@@ -13,16 +13,16 @@ assert.deepEqual(
   [
     { id: "home", label: "Home", childIds: undefined },
     {
+      id: "my-customers",
+      label: "My Customers",
+      childIds: ["customers-overview", "accounts-workloads", "weekly-activities"]
+    },
+    {
       id: "kpis",
       label: "KPI Activities",
       childIds: ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
     },
-    { id: "consumption", label: "Consumption", childIds: undefined },
-    {
-      id: "my-customers",
-      label: "My Customers",
-      childIds: ["customers-overview", "accounts-workloads", "weekly-activities"]
-    }
+    { id: "consumption", label: "Consumption", childIds: undefined }
   ],
   "TreeDataProvider owns hierarchy and labels without duplicating Router href data"
 );

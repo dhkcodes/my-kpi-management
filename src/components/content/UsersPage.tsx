@@ -16,6 +16,7 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [dialogError, setDialogError] = useState("");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [displayName, setDisplayName] = useState("");
   const [loginId, setLoginId] = useState("");
@@ -31,16 +32,17 @@ export function UsersPage() {
   useEffect(() => { void refresh(); }, []);
   const clearDialog = () => {
     temporaryPasswordRef.current?.setProperty("value", "");
-    setDisplayName(""); setLoginId(""); setAccess("User"); setDialog(null);
+    setDisplayName(""); setLoginId(""); setAccess("User"); setDialogError(""); setDialog(null);
   };
-  const submitDialog = async (event: Event) => {
-    event.preventDefault();
+  const openDialog = (next: NonNullable<DialogState>) => { setError(""); setDialogError(""); setDialog(next); };
+  const submitDialog = async (event?: Event) => {
+    event?.preventDefault();
     if (!dialog || busy) return;
     const temporaryPassword = String(temporaryPasswordRef.current?.rawValue ?? temporaryPasswordRef.current?.value ?? "");
     if (!temporaryPassword || (dialog.kind === "invite" && (!displayName.trim() || !loginId.trim()))) {
-      setError("Complete all required fields."); return;
+      setDialogError("Complete all required fields."); return;
     }
-    setBusy(true); setError("");
+    setBusy(true); setDialogError("");
     try {
       if (dialog.kind === "invite") await inviteUser({ displayName: displayName.trim(), loginId, access, temporaryPassword });
       else if (dialog.kind === "reissue" && dialog.user) await reissueUserInvite(dialog.user.userKey, temporaryPassword);
@@ -49,7 +51,7 @@ export function UsersPage() {
       await refresh();
     } catch (caught) {
       temporaryPasswordRef.current?.setProperty("value", "");
-      setError(caught instanceof Error ? caught.message : "User action failed.");
+      setDialogError(caught instanceof Error ? caught.message : "User action failed.");
     } finally { setBusy(false); }
   };
   const confirmAction = async (user: AuthSession, label: string, action: () => Promise<void>) => {
@@ -64,7 +66,7 @@ export function UsersPage() {
     <section class="kap-account-page kap-users-page" aria-labelledby="kapUsersTitle">
       <header class="kap-users-header">
         <div><span class="kpi-eyebrow">Administration</span><h2 id="kapUsersTitle">Users</h2><p>Invite users and manage account access.</p></div>
-        <oj-button chroming="callToAction" disabled={busy} onojAction={() => setDialog({ kind: "invite" })}>Invite user</oj-button>
+        <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button>
       </header>
       {error && <div class="kap-form-message kap-form-message--error" role="alert">{error}</div>}
       {loading ? <div class="kap-empty-state" role="status">Loading users…</div> : users.length === 0 ? (
@@ -75,11 +77,11 @@ export function UsersPage() {
           <tbody>{users.map((user) => <tr key={user.userKey}>
             <td>{user.displayName}</td><td>{user.loginId}</td><td>{user.access}</td><td><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td>
             <td><div class="kap-user-actions">
-              {user.status === "INVITED" && <><button type="button" disabled={busy} onClick={() => setDialog({ kind: "reissue", user })}>Reissue</button><button type="button" disabled={busy} onClick={() => void confirmAction(user, "Cancel invite for", () => cancelUserInvite(user.userKey))}>Cancel invite</button></>}
-              {user.status !== "INVITED" && user.status !== "DISABLED" && <button type="button" disabled={busy} onClick={() => setDialog({ kind: "reset", user })}>Reset password</button>}
-              {user.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Lock", () => lockUser(user.userKey))}>Lock</button>}
+              {user.status === "INVITED" && <><button type="button" disabled={busy} onClick={() => openDialog({ kind: "reissue", user })}>Reissue</button><button type="button" disabled={busy} onClick={() => void confirmAction(user, "Cancel invite for", () => cancelUserInvite(user.userKey))}>Cancel invite</button></>}
+              {user.status !== "INVITED" && user.status !== "DISABLED" && <button type="button" disabled={busy} onClick={() => openDialog({ kind: "reset", user })}>Reset password</button>}
+              {user.access !== "Admin" && user.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Lock", () => lockUser(user.userKey))}>Lock</button>}
               {user.status === "LOCKED" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Unlock", () => unlockUser(user.userKey))}>Unlock</button>}
-              {user.status === "DISABLED" ? <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Enable", () => enableUser(user.userKey))}>Enable</button> : <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Disable", () => disableUser(user.userKey))}>Disable</button>}
+              {user.status === "DISABLED" ? <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Enable", () => enableUser(user.userKey))}>Enable</button> : user.access !== "Admin" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Disable", () => disableUser(user.userKey))}>Disable</button>}
             </div></td>
           </tr>)}</tbody>
         </table></div>
@@ -87,14 +89,15 @@ export function UsersPage() {
       {dialog && <div class="kap-dialog-backdrop" role="presentation"><section class="kap-action-dialog" role="dialog" aria-modal="true" aria-labelledby="kapUserDialogTitle">
         <form onSubmit={(event) => void submitDialog(event)}>
           <h3 id="kapUserDialogTitle">{dialog.kind === "invite" ? "Invite user" : dialog.kind === "reissue" ? "Reissue invitation" : "Reset password"}</h3>
+          {dialogError && <div class="kap-form-message kap-form-message--error" role="alert">{dialogError}</div>}
           {dialog.kind === "invite" && <>
             <label>Display name<input value={displayName} onInput={(event) => setDisplayName((event.target as HTMLInputElement).value)} required /></label>
             <label>Login ID<input type="email" value={loginId} onInput={(event) => setLoginId((event.target as HTMLInputElement).value)} required /></label>
             <label>Access<select value={access} onChange={(event) => setAccess((event.target as HTMLSelectElement).value as UserAccess)}><option>Admin</option><option>User</option></select></label>
           </>}
           <oj-input-password ref={temporaryPasswordRef} labelEdge="inside" labelHint="Temporary password" autocomplete="new-password" required disabled={busy}></oj-input-password>
-          <p class="kap-dialog-note">The temporary password is sent once and is cleared from this screen after submission.</p>
-          <footer><oj-button disabled={busy} onojAction={clearDialog}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy}>{busy ? "Submitting…" : "Submit"}</oj-button></footer>
+          <p class="kap-dialog-note">The temporary password is generated once, cleared after submission, and must be delivered securely by the administrator.</p>
+          <footer><oj-button disabled={busy} onojAction={clearDialog}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Submitting…" : "Submit"}</oj-button></footer>
         </form>
       </section></div>}
     </section>
