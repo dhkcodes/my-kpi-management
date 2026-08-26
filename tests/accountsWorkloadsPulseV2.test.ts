@@ -51,6 +51,9 @@ assert.equal(
 );
 
 const pulse = calculateAccountsWorkloadsPulseV2(rows, "FY27", "2026-08-05");
+const urgencyCounts = (summary: typeof pulse.renewalExpand) => Object.fromEntries(
+  Object.entries(summary).map(([level, value]) => [level, { accounts: value.accounts, workloads: value.workloads }])
+);
 
 assert.deepEqual(pulse.metrics, {
   activeAccounts: 5,
@@ -78,7 +81,7 @@ assert.deepEqual(summarizeAccountsWorkloadsByAccount(rows), [
   { account: "Account E", workloads: 1, arrUsd: 7_000, acrUsd: 8_000, importantWorkloads: 0, targetCoverageWorkloads: 1 }
 ]);
 
-assert.deepEqual(pulse.renewalExpand, {
+assert.deepEqual(urgencyCounts(pulse.renewalExpand), {
   critical: { accounts: 1, workloads: 1 },
   attention: { accounts: 1, workloads: 1 },
   upcoming: { accounts: 1, workloads: 1 }
@@ -88,7 +91,7 @@ assert.deepEqual(pulse.topRenewalAction, {
   daysRemaining: 15
 });
 
-assert.deepEqual(pulse.newCommit, {
+assert.deepEqual(urgencyCounts(pulse.newCommit), {
   critical: { accounts: 1, workloads: 1 },
   attention: { accounts: 1, workloads: 1 },
   upcoming: { accounts: 0, workloads: 0 }
@@ -124,7 +127,7 @@ const boundaryRows = [
 ];
 
 assert.deepEqual(
-  calculateAccountsWorkloadsPulseV2(boundaryRows, "FY27", "2026-08-05").renewalExpand,
+  urgencyCounts(calculateAccountsWorkloadsPulseV2(boundaryRows, "FY27", "2026-08-05").renewalExpand),
   {
     critical: { accounts: 2, workloads: 2 },
     attention: { accounts: 2, workloads: 2 },
@@ -146,8 +149,8 @@ assert.equal(renewalAt("2026-11-04").attention.workloads, 1, "renewal day 91 is 
 assert.equal(renewalAt("2027-02-01").attention.workloads, 1, "renewal day 180 is Attention");
 assert.equal(renewalAt("2027-02-02").upcoming.workloads, 1, "renewal day 181 is Upcoming");
 assert.equal(renewalAt("2027-05-02").upcoming.workloads, 1, "renewal day 270 is Upcoming");
-assert.deepEqual(renewalAt("2027-05-03"), emptyUrgencyExpected, "renewal day 271 is outside the summary window");
-assert.deepEqual(renewalAt("2026-08-01", true), emptyUrgencyExpected, "soft-deleted renewal rows are excluded");
+assert.deepEqual(urgencyCounts(renewalAt("2027-05-03")), emptyUrgencyExpected, "renewal day 271 is outside the summary window");
+assert.deepEqual(urgencyCounts(renewalAt("2026-08-01", true)), emptyUrgencyExpected, "soft-deleted renewal rows are excluded");
 
 const newCommitBoundaryRow = row("new-boundary", "New Boundary", {
   startDate: "",
@@ -164,7 +167,7 @@ assert.equal(newCommitAt("2026-03-04").attention.workloads, 1, "day 180 is Atten
 assert.equal(newCommitAt("2026-03-03").upcoming.workloads, 1, "day 181 is Upcoming");
 assert.equal(newCommitAt("2025-12-04").upcoming.workloads, 1, "day 270 is Upcoming");
 assert.deepEqual(
-  newCommitAt("2025-12-03"),
+  urgencyCounts(newCommitAt("2025-12-03")),
   emptyUrgencyExpected,
   "day 271 is outside the New Commit summary window"
 );

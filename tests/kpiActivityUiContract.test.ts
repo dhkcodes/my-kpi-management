@@ -10,6 +10,7 @@ const main = fs.readFileSync(path.resolve("src/main.js"), "utf8");
 const content = fs.readFileSync(path.resolve("src/components/content/index.tsx"), "utf8");
 const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
+const workspace = fs.readFileSync(path.resolve("src/data/kpiWorkspaceDefinition.ts"), "utf8");
 
 assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "Tailnet JET loads must tolerate network latency");
 assert.doesNotMatch(page, /ojdatagrid|RowDataGridProvider|MutableArrayDataProvider|oj-data-grid|loadSkeletons|fillViewport/,
@@ -161,8 +162,10 @@ assert.match(page, /<h3 id="kpiQuarterSummary">Delivery Quarter Count<\/h3>/,
   "count statistics are named for Delivery Date quarters");
 assert.match(page, /const showSummary = activeTab !== "Overview"/,
   "A, F, and H expose reflected Delivery Date quarter summaries");
-assert.match(page, /C1 \+ C2 combined[^\n]*C1[^\n]*C2/,
-  "combined detail summary explains C1 and C2 contributions");
+assert.doesNotMatch(page, /C1 \+ C2 combined|Workshops \/ POCs/,
+  "the combined calculation stays internal and does not restore removed C1/C2 copy");
+assert.match(`${page}\n${workspace}`, /Show and discover workshops/,
+  "C1 uses the approved title across the activity workspace");
 assert.match(app, /listKpiSummary\(fiscalYear\)/,
   "Home loads KPI statistics from the live summary API");
 assert.match(app, /buildLiveFiscalYearDataset/,

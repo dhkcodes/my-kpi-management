@@ -9,7 +9,7 @@ const styles = readFileSync("src/styles/app.css", "utf8");
 assert.match(navigation, /export const navItems[\s\S]*id: "home"[\s\S]*id: "my-customers"[\s\S]*id: "kpis"[\s\S]*id: "consumption"/, "root navigation order is Home, My Customers, KPI Activities, Consumption");
 const customerChildren = navigation.match(/export const customerNavItems[\s\S]*?\];/)?.[0] ?? "";
 assert.doesNotMatch(customerChildren, /id: "consumption"/, "Consumption is no longer nested under My Customers");
-assert.match(content, /\['consumption', 'profile', 'users'\]\.includes\(activeRoute\.module\)[\s\S]*kpi-fiscal-year-panel/, "the global Fiscal Year selector is hidden on Consumption and identity pages");
+assert.match(content, /!\['profile', 'users'\]\.includes\(activeRoute\.module\)[\s\S]*kpi-fiscal-year-panel/, "the global Fiscal Year selector remains visible on Consumption and is hidden only on identity pages");
 
 assert.match(content, /activeRoute\.module === "consumption"[\s\S]*<ConsumptionPage/, "Consumption route renders the implemented page");
 assert.match(page, /import "ojs\/ojchart"/, "Consumption trend uses Oracle JET Chart");

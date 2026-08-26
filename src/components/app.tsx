@@ -199,6 +199,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     }, [activeRoute.id]);
 
     useEffect(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }, [activeRoute.id]);
+
+    useEffect(() => {
       const handleBeforeUnload = (event: BeforeUnloadEvent) => {
         if (!kpiUnsavedChangesRef.current) return;
         event.preventDefault();
@@ -484,9 +488,6 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         setActiveRoute(route);
         historyIndexRef.current += 1;
         window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
-        requestAnimationFrame(() => {
-          document.getElementById("cockpit")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
       };
       const kpiGuard = kpiNavigationGuardRef.current;
       if (kpiGuard) kpiGuard(route.pageTitle, navigate);
@@ -557,12 +558,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
     const handleAccountsWorkloadsQueryChange = async (nextQuery: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => {
       const requestId = ++accountsWorkloadsRequestIdRef.current;
-      setAccountsWorkloadsQuery(nextQuery);
       setAccountsWorkloadsRefreshing(true);
       setAccountsWorkloadsLoadError("");
       try {
         const refreshed = await fetchAccountsWorkloads({ fiscalYear, ...nextQuery });
         if (requestId !== accountsWorkloadsRequestIdRef.current) return;
+        setAccountsWorkloadsQuery(nextQuery);
         setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: refreshed.items }));
         setAccountWorkloadMetadata((current) => ({ ...current, parsedRowCount: refreshed.total }));
         setAccountsWorkloadsDataSource("api");

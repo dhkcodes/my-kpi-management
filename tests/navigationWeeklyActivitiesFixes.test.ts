@@ -90,5 +90,9 @@ assert.doesNotMatch(cssSource, /\.oj-selected/, "JET internal selected classes a
 assert.doesNotMatch(cssSource, /kpi-navigation-item--selected/, "selected background is not duplicated by an app-owned class");
 assert.match(contentSource, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\}/, "Weekly Activities remounts and queries by the common selected FY");
 assert.doesNotMatch(contentSource, /activeRoute\.module !== "weeklyActivities" && <section class="kpi-fiscal-year-panel"/, "the shared FY selector remains visible on Weekly Activities");
+assert.match(appSource, /useEffect\(\(\) => \{[\s\S]{0,250}window\.scrollTo\(\{ top: 0, left: 0, behavior: "auto" \}\)[\s\S]{0,100}\}, \[activeRoute\.id\]\)/,
+  "every committed route renders before the document is deterministically reset to the Fiscal Year panel");
+assert.doesNotMatch(appSource, /document\.getElementById\("cockpit"\)\?\.scrollIntoView\(\{ behavior: "smooth"/,
+  "navigation does not race JET focus/layout with an immediate smooth scroll on the previous render");
 
 console.log("navigation and Weekly Activities UI fixes tests passed");
