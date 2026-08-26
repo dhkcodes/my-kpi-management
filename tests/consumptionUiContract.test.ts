@@ -38,6 +38,8 @@ assert.match(page, /data-readonly=\{actual \? "actual"/, "Actual cells are read-
 assert.match(page, /Quarter Total[\s\S]*PreQ Gap/, "each quarter column group ends with Total and PreQ Gap");
 assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*overflow-x:\s*auto[^}]*scrollbar-width:\s*none/, "the month and quarter area scrolls with its native scrollbar hidden");
 assert.match(styles, /\.consumption-scroll-controls\s*\{[^}]*position:\s*fixed/, "table movement controls stay available at the viewport edge like Accounts & Workloads");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-summary-cards\s*\{[^}]*grid-template-columns:\s*repeat\(5, minmax\(9rem, 1fr\)\)[^}]*overflow-x:\s*auto/, "mobile summary cards remain readable in a contained horizontal rail");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-scroll-controls\s*\{[^}]*position:\s*absolute[^}]*transform:\s*none/, "mobile table controls stay inside the table panel instead of obscuring the viewport");
 assert.match(page, /consumption-scroll-controls[\s\S]*Move table left[\s\S]*Move table right/, "fixed left and right table movement controls are rendered");
 assert.match(page, /event\.key === "ArrowLeft"[\s\S]*moveTableHorizontally\(-1\)[\s\S]*event\.key === "ArrowRight"[\s\S]*moveTableHorizontally\(1\)/, "focused table supports ArrowLeft and ArrowRight movement");
 const accountColumnRule = styles.match(/\.consumption-account-column\s*\{([^}]*)\}/)?.[1] ?? "";

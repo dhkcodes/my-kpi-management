@@ -2416,7 +2416,10 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 720px) {
   .consumption-page__header, .consumption-table-heading { align-items: stretch; flex-direction: column; }
   .consumption-import-actions { align-self: flex-start; }
+  .consumption-summary-cards { grid-template-columns: repeat(5, minmax(9rem, 1fr)); overflow-x: auto; padding-bottom: .25rem; scroll-snap-type: x proximity; }
+  .consumption-summary-cards article { scroll-snap-align: start; }
   .consumption-signal { grid-template-columns: auto minmax(8rem, 1fr) auto; }
   .consumption-signal-change, .consumption-signal-month { grid-column: 2 / -1; justify-items: start; }
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
+  .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
 }
