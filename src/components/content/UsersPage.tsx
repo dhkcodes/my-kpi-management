@@ -1,105 +1,136 @@
-import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
+import "ojs/ojdialog";
 import "ojs/ojinputtext";
-import type { InputPasswordElement } from "ojs/ojinputtext";
-import type { AuthSession, UserAccess } from "../../auth/authSession";
+import "ojs/ojselectsingle";
+import type { DialogElement } from "ojs/ojdialog";
+import type { InputTextElement } from "ojs/ojinputtext";
+import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import {
   cancelUserInvite, disableUser, enableUser, inviteUser, listUsers, lockUser,
-  reissueUserInvite, resetUserPassword, unlockUser
+  reissueUserInvite, resetUserPassword, unlockUser, type UserActionLink
 } from "../../auth/usersApi";
+import type { AuthSession, UserAccess } from "../../auth/authSession";
 
 type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthSession }> | null;
+const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
+
+const actionUrl = (link: UserActionLink): string => {
+  const path = link.purpose === "ACTIVATION" ? "/activate" : "/reset-password";
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set("token", link.actionToken);
+  return url.toString();
+};
 
 export function UsersPage() {
   const [users, setUsers] = useState<AuthSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dialogError, setDialogError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [displayName, setDisplayName] = useState("");
   const [loginId, setLoginId] = useState("");
   const [access, setAccess] = useState<UserAccess>("User");
-  const temporaryPasswordRef = useRef<InputPasswordElement<string> | null>(null);
+  const [issuedLink, setIssuedLink] = useState<UserActionLink | null>(null);
+  const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<DialogElement>(null);
+  const accessProvider = useMemo(() => new ArrayDataProvider(accessOptions, { keyAttributes: "value" }), []);
 
-  const refresh = async () => {
-    setLoading(true); setError("");
-    try { setUsers(await listUsers()); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Users are unavailable."); }
-    finally { setLoading(false); }
+  const reload = async () => {
+    try { setUsers(await listUsers()); setError(""); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load users."); }
   };
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void reload(); }, []);
+  useEffect(() => { if (dialog) dialogRef.current?.open(); }, [dialog]);
+
+  const openDialog = (next: Exclude<DialogState, null>) => {
+    if (busy) return;
+    setDialogError(""); setIssuedLink(null); setCopied(false);
+    setDisplayName(next.user?.displayName ?? ""); setLoginId(next.user?.loginId ?? "");
+    setAccess(next.user?.access ?? "User"); setDialog(next);
+  };
   const clearDialog = () => {
-    temporaryPasswordRef.current?.setProperty("value", "");
-    setDisplayName(""); setLoginId(""); setAccess("User"); setDialogError(""); setDialog(null);
+    setDialog(null); setDialogError(""); setIssuedLink(null); setCopied(false);
+    setDisplayName(""); setLoginId(""); setAccess("User");
   };
-  const openDialog = (next: NonNullable<DialogState>) => { setError(""); setDialogError(""); setDialog(next); };
-  const submitDialog = async (event?: Event) => {
-    event?.preventDefault();
+  const submitDialog = async () => {
     if (!dialog || busy) return;
-    const temporaryPassword = String(temporaryPasswordRef.current?.rawValue ?? temporaryPasswordRef.current?.value ?? "");
-    if (!temporaryPassword || (dialog.kind === "invite" && (!displayName.trim() || !loginId.trim()))) {
-      setDialogError("Complete all required fields."); return;
-    }
-    setBusy(true); setDialogError("");
+    setDialogError(""); setBusy(true);
     try {
-      if (dialog.kind === "invite") await inviteUser({ displayName: displayName.trim(), loginId, access, temporaryPassword });
-      else if (dialog.kind === "reissue" && dialog.user) await reissueUserInvite(dialog.user.userKey, temporaryPassword);
-      else if (dialog.kind === "reset" && dialog.user) await resetUserPassword(dialog.user.userKey, temporaryPassword);
-      clearDialog();
-      await refresh();
-    } catch (caught) {
-      temporaryPasswordRef.current?.setProperty("value", "");
-      setDialogError(caught instanceof Error ? caught.message : "User action failed.");
+      const result = dialog.kind === "invite"
+        ? await inviteUser({ displayName: displayName.trim(), loginId, access })
+        : dialog.kind === "reissue" && dialog.user
+          ? await reissueUserInvite(dialog.user.userKey)
+          : dialog.kind === "reset" && dialog.user
+            ? await resetUserPassword(dialog.user.userKey)
+            : null;
+      if (!result) throw new Error("Unable to create the action link.");
+      setIssuedLink(result);
+      await reload();
+    } catch (cause) {
+      setDialogError(cause instanceof Error ? cause.message : "User action failed.");
     } finally { setBusy(false); }
   };
-  const confirmAction = async (user: AuthSession, label: string, action: () => Promise<void>) => {
-    if (!window.confirm(`${label} ${user.displayName}?`)) return;
-    setBusy(true); setError("");
-    try { await action(); await refresh(); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "User action failed."); }
+  const copyLink = async () => {
+    if (!issuedLink) return;
+    try {
+      await navigator.clipboard.writeText(actionUrl(issuedLink));
+      setCopied(true); setDialogError("");
+    } catch {
+      setDialogError("Copy failed. Select and copy the link manually.");
+    }
+  };
+  const confirmAction = async (message: string, action: () => Promise<void>) => {
+    if (busy) return;
+    if (!window.confirm(message)) return;
+    try { setBusy(true); await action(); await reload(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "User action failed."); }
     finally { setBusy(false); }
   };
 
-  return (
-    <section class="kap-account-page kap-users-page" aria-labelledby="kapUsersTitle">
-      <header class="kap-users-header">
-        <div><span class="kpi-eyebrow">Administration</span><h2 id="kapUsersTitle">Users</h2><p>Invite users and manage account access.</p></div>
-        <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button>
-      </header>
-      {error && <div class="kap-form-message kap-form-message--error" role="alert">{error}</div>}
-      {loading ? <div class="kap-empty-state" role="status">Loading users…</div> : users.length === 0 ? (
-        <div class="kap-empty-state"><span class="oj-ux-ico-contact-group" aria-hidden="true"></span><h3>No users yet</h3><p>Invite the first user to this workspace.</p></div>
-      ) : (
-        <div class="kap-users-table-wrap"><table class="kap-users-table">
-          <thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{users.map((user) => <tr key={user.userKey}>
-            <td>{user.displayName}</td><td>{user.loginId}</td><td>{user.access}</td><td><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td>
-            <td><div class="kap-user-actions">
-              {user.status === "INVITED" && <><button type="button" disabled={busy} onClick={() => openDialog({ kind: "reissue", user })}>Reissue</button><button type="button" disabled={busy} onClick={() => void confirmAction(user, "Cancel invite for", () => cancelUserInvite(user.userKey))}>Cancel invite</button></>}
-              {user.status !== "INVITED" && user.status !== "DISABLED" && <button type="button" disabled={busy} onClick={() => openDialog({ kind: "reset", user })}>Reset password</button>}
-              {user.access !== "Admin" && user.status === "ACTIVE" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Lock", () => lockUser(user.userKey))}>Lock</button>}
-              {user.status === "LOCKED" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Unlock", () => unlockUser(user.userKey))}>Unlock</button>}
-              {user.status === "DISABLED" ? <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Enable", () => enableUser(user.userKey))}>Enable</button> : user.access !== "Admin" && <button type="button" disabled={busy} onClick={() => void confirmAction(user, "Disable", () => disableUser(user.userKey))}>Disable</button>}
-            </div></td>
-          </tr>)}</tbody>
-        </table></div>
-      )}
-      {dialog && <div class="kap-dialog-backdrop" role="presentation"><section class="kap-action-dialog" role="dialog" aria-modal="true" aria-labelledby="kapUserDialogTitle">
-        <form onSubmit={(event) => void submitDialog(event)}>
-          <h3 id="kapUserDialogTitle">{dialog.kind === "invite" ? "Invite user" : dialog.kind === "reissue" ? "Reissue invitation" : "Reset password"}</h3>
-          {dialogError && <div class="kap-form-message kap-form-message--error" role="alert">{dialogError}</div>}
-          {dialog.kind === "invite" && <>
-            <label>Display name<input value={displayName} onInput={(event) => setDisplayName((event.target as HTMLInputElement).value)} required /></label>
-            <label>Login ID<input type="email" value={loginId} onInput={(event) => setLoginId((event.target as HTMLInputElement).value)} required /></label>
-            <label>Access<select value={access} onChange={(event) => setAccess((event.target as HTMLSelectElement).value as UserAccess)}><option>Admin</option><option>User</option></select></label>
-          </>}
-          <oj-input-password ref={temporaryPasswordRef} labelEdge="inside" labelHint="Temporary password" autocomplete="new-password" required disabled={busy}></oj-input-password>
-          <p class="kap-dialog-note">The temporary password is generated once, cleared after submission, and must be delivered securely by the administrator.</p>
-          <footer><oj-button disabled={busy} onojAction={clearDialog}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Submitting…" : "Submit"}</oj-button></footer>
-        </form>
-      </section></div>}
-    </section>
-  );
+  const title = issuedLink
+    ? issuedLink.purpose === "ACTIVATION" ? "Activation link ready" : "Password reset link ready"
+    : dialog?.kind === "invite" ? "Invite user" : dialog?.kind === "reissue" ? "Reissue activation link" : "Create password reset link";
+
+  return <section class="kap-page users-page">
+    <div class="kap-page__heading"><div><h1>Users</h1><p>Manage application access and credential action links.</p></div>
+      <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button></div>
+    {error && <div class="kap-error" role="alert">{error}</div>}
+    <div class="kap-table-card"><table class="kap-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>{users.map((user) => <tr key={user.userKey}><td>{user.displayName}</td><td>{user.loginId}</td><td>{user.access}</td><td><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td><div class="kap-row-actions">
+        {user.status === "INVITED" && <><button disabled={busy} onClick={() => openDialog({ kind: "reissue", user })}>Reissue</button><button disabled={busy} onClick={() => void confirmAction(`Cancel invitation for ${user.loginId}?`, () => cancelUserInvite(user.userKey))}>Cancel invite</button></>}
+        {user.status === "ACTIVE" && <button disabled={busy} onClick={() => openDialog({ kind: "reset", user })}>Reset password</button>}
+        {user.access !== "Admin" && user.status === "ACTIVE" && <button disabled={busy} onClick={() => void confirmAction(`Lock ${user.loginId}?`, () => lockUser(user.userKey))}>Lock</button>}
+        {user.status === "LOCKED" && <button disabled={busy} onClick={() => void confirmAction(`Unlock ${user.loginId}?`, () => unlockUser(user.userKey))}>Unlock</button>}
+        {user.status === "DISABLED" && <button disabled={busy} onClick={() => void confirmAction(`Enable ${user.loginId}?`, () => enableUser(user.userKey))}>Enable</button>}
+        {user.access !== "Admin" && (user.status === "ACTIVE" || user.status === "LOCKED") && <button disabled={busy} onClick={() => void confirmAction(`Disable ${user.loginId}?`, () => disableUser(user.userKey))}>Disable</button>}
+      </div></td></tr>)}</tbody></table></div>
+
+    <oj-dialog ref={dialogRef} dialogTitle={title} cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) clearDialog(); }} class="kap-user-dialog">
+      <div slot="body" class="kap-dialog-body">
+        {issuedLink ? <>
+          <p>No email was sent. Copy this one-time link and deliver it to <strong>{issuedLink.user.loginId}</strong> through an approved secure channel.</p>
+          <label class="kap-field"><span>{issuedLink.purpose === "ACTIVATION" ? "Activation URL" : "Password reset URL"}</span>
+            <oj-input-text value={actionUrl(issuedLink)} readonly={true}></oj-input-text></label>
+          <div class="kap-user-link-meta"><span>Expires</span><strong>{new Date(issuedLink.expiresAt).toLocaleString()}</strong></div>
+          <p class="kap-field__hint">The link expires at the time shown and can be used only once. Creating another link invalidates this one.</p>
+          {copied && <div class="kap-success" role="status">Link copied.</div>}
+        </> : <>
+          {dialog?.kind === "invite" ? <>
+            <label class="kap-field"><span>Display name</span><oj-input-text value={displayName} onvalueChanged={(event: InputTextElement.valueChanged) => setDisplayName(String(event.detail.value ?? ""))}></oj-input-text></label>
+            <label class="kap-field"><span>Login ID</span><oj-input-text value={loginId} onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text></label>
+            <label class="kap-field"><span>Access</span><oj-select-single data={accessProvider} value={access} onvalueChanged={(event: CustomEvent<{ value: UserAccess | null }>) => setAccess(event.detail.value ?? "User")}></oj-select-single></label>
+            <p class="kap-field__hint">Submitting creates an activation URL. It does not send email.</p>
+          </> : <p>{dialog?.kind === "reissue"
+            ? `Create a new activation link for ${dialog.user?.loginId}? Any previous activation link will stop working.`
+            : `Create a one-time password reset link for ${dialog?.user?.loginId}? The current password remains valid until the link is used.`}</p>}
+        </>}
+        {dialogError && <div class="kap-error" role="alert">{dialogError}</div>}
+      </div>
+      <div slot="footer">
+        {issuedLink ? <><oj-button onojAction={() => void copyLink()}>Copy link</oj-button><oj-button chroming="callToAction" onojAction={() => dialogRef.current?.close()}>Done</oj-button></>
+          : <><oj-button disabled={busy} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Creating..." : "Create link"}</oj-button></>}
+      </div>
+    </oj-dialog>
+  </section>;
 }

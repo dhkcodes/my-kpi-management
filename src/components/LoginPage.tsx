@@ -1,117 +1,106 @@
-import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import "ojs/ojbutton";
+import "ojs/ojformlayout";
 import "ojs/ojinputtext";
 import type { InputPasswordElement, InputTextElement } from "ojs/ojinputtext";
-import { activateUser, authenticateUser, completePasswordReset } from "../auth/authApi";
+import {
+  authenticateUser, completeCredentialAction, inspectCredentialAction,
+  type CredentialActionContext, type CredentialActionPurpose
+} from "../auth/authApi";
 import type { AuthSession } from "../auth/authSession";
 
-type LoginMode = "signin" | "activate" | "reset";
-type LoginPageProps = Readonly<{ appName: string; onAuthenticated: (session: AuthSession) => void }>;
+type LoginPageProps = Readonly<{ appName?: string; onAuthenticated: (session: AuthSession) => void }>;
+type Mode = "signIn" | "forgot" | "validating" | "action" | "invalid";
 
-const modeCopy: Record<LoginMode, { title: string; intro: string; submit: string }> = {
-  signin: { title: "Sign in", intro: "Enter your workspace credentials to continue.", submit: "Sign in" },
-  activate: { title: "Activate", intro: "Use the temporary password from your invitation and choose a new password.", submit: "Activate account" },
-  reset: { title: "Reset credential", intro: "Enter the temporary reset password issued by an administrator and choose a new password.", submit: "Reset credential" }
+const requestedAction = (): { token: string; purpose: CredentialActionPurpose } | null => {
+  const url = new URL(window.location.href);
+  const purpose = url.pathname === "/activate" ? "ACTIVATION" : url.pathname === "/reset-password" ? "RESET" : null;
+  const token = url.searchParams.get("token")?.trim() ?? "";
+  return purpose && token ? { purpose, token } : null;
 };
 
-const activationLinkLoginId = () => {
-  if (typeof window === "undefined" || window.location.pathname !== "/activate") return "";
-  return new URLSearchParams(window.location.search).get("loginId")?.trim() ?? "";
-};
-
-export function LoginPage({ appName, onAuthenticated }: LoginPageProps) {
-  const linkedLoginId = activationLinkLoginId();
-  const [mode, setMode] = useState<LoginMode>(linkedLoginId ? "activate" : "signin");
+export function LoginPage({ onAuthenticated }: LoginPageProps) {
+  const initialAction = useMemo(requestedAction, []);
+  const [mode, setMode] = useState<Mode>(initialAction ? "validating" : "signIn");
+  const [actionContext, setActionContext] = useState<CredentialActionContext | null>(null);
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const loginIdRef = useRef<InputTextElement<string> | null>(null);
-  const passwordRef = useRef<InputPasswordElement<string> | null>(null);
-  const temporaryPasswordRef = useRef<InputPasswordElement<string> | null>(null);
-  const newPasswordRef = useRef<InputPasswordElement<string> | null>(null);
-  const confirmPasswordRef = useRef<InputPasswordElement<string> | null>(null);
 
   useEffect(() => {
-    if (linkedLoginId) loginIdRef.current?.setProperty("value", linkedLoginId);
-  }, [linkedLoginId]);
+    if (!initialAction) return;
+    let active = true;
+    void inspectCredentialAction(initialAction.token).then((context) => {
+      if (!active) return;
+      if (context.purpose !== initialAction.purpose) throw new Error("This action link does not match this page.");
+      setActionContext(context); setMode("action"); setError("");
+    }).catch((cause) => {
+      if (!active) return;
+      setError(cause instanceof Error ? cause.message : "This action link is invalid.");
+      setMode("invalid");
+    });
+    return () => { active = false; };
+  }, [initialAction]);
 
-  const valueOf = (ref: { current: InputTextElement<string> | InputPasswordElement<string> | null }) =>
-    String(ref.current?.rawValue ?? ref.current?.value ?? "");
-  const clearSensitive = () => [passwordRef, temporaryPasswordRef, newPasswordRef, confirmPasswordRef]
-    .forEach((ref) => ref.current?.setProperty("value", ""));
-  const selectMode = (nextMode: LoginMode) => {
-    clearSensitive();
-    setError("");
-    setMode(nextMode);
-    if (nextMode === "signin" && typeof window !== "undefined" && window.location.pathname === "/activate") {
-      window.history.replaceState(window.history.state, "", "/");
-    }
+  const returnToSignIn = () => {
+    window.history.replaceState(null, "", "/");
+    setMode("signIn"); setActionContext(null); setError(""); setNewPassword(""); setConfirmPassword("");
   };
 
-  const handleSubmit = async (event?: Event) => {
-    event?.preventDefault();
+  const submit = async (event: Event) => {
+    event.preventDefault();
     if (isSubmitting) return;
-    setError("");
-    const loginId = valueOf(loginIdRef);
-    const password = valueOf(passwordRef);
-    const temporaryPassword = valueOf(temporaryPasswordRef);
-    const newPassword = valueOf(newPasswordRef);
-    const confirmation = valueOf(confirmPasswordRef);
-    if (!loginId.trim() || (mode === "signin" ? !password : !temporaryPassword || !newPassword || !confirmation)) {
-      setError("Complete all required fields.");
-      return;
-    }
-    if (mode !== "signin" && newPassword !== confirmation) {
-      setError("New passwords do not match.");
-      clearSensitive();
-      return;
-    }
-    setIsSubmitting(true);
+    setError(""); setIsSubmitting(true);
     try {
-      const session = mode === "signin"
-        ? await authenticateUser(loginId, password)
-        : mode === "activate"
-          ? await activateUser(loginId, temporaryPassword, newPassword)
-          : await completePasswordReset(loginId, temporaryPassword, newPassword);
-      onAuthenticated(session);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Credential request is temporarily unavailable.");
-    } finally {
-      clearSensitive();
-      setIsSubmitting(false);
-    }
+      if (mode === "signIn") {
+        onAuthenticated(await authenticateUser(loginId, password));
+      } else if (mode === "action" && initialAction && actionContext) {
+        if (newPassword.length < 12) throw new Error("New password must contain at least 12 characters.");
+        if (newPassword !== confirmPassword) throw new Error("New passwords do not match.");
+        onAuthenticated(await completeCredentialAction(actionContext.purpose, initialAction.token, newPassword));
+        window.history.replaceState(null, "", "/");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Credential request failed.");
+    } finally { setIsSubmitting(false); }
   };
 
-  const copy = modeCopy[mode];
-  return (
-    <main id="kapLoginPage" class="kap-login" aria-labelledby="kapLoginTitle">
-      <section class="kap-login__card" aria-label={`${appName} credentials`}>
-        <div class="kap-login__brand" aria-label="Oracle"><span class="demo-oracle-icon" role="img" aria-label="Oracle"></span></div>
-        <p class="kap-login__eyebrow">MY KPI &amp; ACCOUNT PLANNER</p>
-        <h1 id="kapLoginTitle">{copy.title}</h1>
-        <p class="kap-login__intro">{copy.intro}</p>
-        <form id="kapLoginForm" class="kap-login__form" onSubmit={(event) => void handleSubmit(event)} noValidate>
-          <oj-input-text id="kapLoginUserId" ref={loginIdRef} class="kap-login__field" autocomplete="username" labelEdge="inside" labelHint="Login ID" required disabled={isSubmitting || mode === "activate"} userAssistanceDensity="compact"></oj-input-text>
-          {mode === "signin" ? (
-            <oj-input-password id="kapLoginPassword" ref={passwordRef} class="kap-login__field" autocomplete="current-password" labelEdge="inside" labelHint="Password" required disabled={isSubmitting} userAssistanceDensity="compact"></oj-input-password>
-          ) : (
-            <>
-              <oj-input-password id="kapTemporaryPassword" ref={temporaryPasswordRef} class="kap-login__field" autocomplete="current-password" labelEdge="inside" labelHint="Temporary password" required disabled={isSubmitting} userAssistanceDensity="compact"></oj-input-password>
-              <oj-input-password id="kapNewPassword" ref={newPasswordRef} class="kap-login__field" autocomplete="new-password" labelEdge="inside" labelHint="New password" required disabled={isSubmitting} userAssistanceDensity="compact"></oj-input-password>
-              <oj-input-password id="kapConfirmPassword" ref={confirmPasswordRef} class="kap-login__field" autocomplete="new-password" labelEdge="inside" labelHint="Confirm new password" required disabled={isSubmitting} userAssistanceDensity="compact"></oj-input-password>
-            </>
-          )}
-          {error && <div id="kapLoginError" class="kap-login__error" role="alert" aria-live="assertive"><span class="oj-ux-ico-error-s kap-login__error-icon" aria-hidden="true"></span><span>{error}</span></div>}
-          <oj-button id="kapLoginSubmit" class="kap-login__submit" chroming="callToAction" disabled={isSubmitting}>{isSubmitting ? "Working…" : copy.submit}</oj-button>
-          <div class="kap-login__links">
-            {mode === "signin" ? (
-              <button type="button" disabled={isSubmitting} onClick={() => selectMode("reset")}>Forgot or reset credential?</button>
-            ) : (
-              <button type="button" disabled={isSubmitting} onClick={() => selectMode("signin")}>Back to sign in</button>
-            )}
-          </div>
-        </form>
-      </section>
-    </main>
-  );
+  const actionLabel = actionContext?.purpose === "ACTIVATION" ? "Activate account" : "Reset password";
+
+  return <main class="kap-login-page"><section class="kap-login-card" aria-labelledby="kapLoginTitle">
+    <div class="kap-login-brand"><span class="kap-login-brand__mark" aria-hidden="true">K</span><div><strong>My KPI &amp; Account Planner</strong><span>Secure workspace access</span></div></div>
+    <h1 id="kapLoginTitle">{mode === "signIn" ? "Sign in" : mode === "forgot" ? "Reset credential" : mode === "validating" ? "Validating link" : mode === "invalid" ? "Link unavailable" : actionLabel}</h1>
+    {mode === "signIn" && <p>Use your assigned application account.</p>}
+    {mode === "forgot" && <><p>Password reset requires a valid, one-time reset URL.</p><p>Ask an administrator to create a reset link and deliver it through an approved secure channel. No current or temporary password is required.</p></>}
+    {mode === "validating" && <p role="status">Checking the action link…</p>}
+    {mode === "invalid" && <p>The link may be invalid, expired, already used, or intended for a different action.</p>}
+    {mode === "action" && actionContext && <p>{actionContext.purpose === "ACTIVATION" ? "Create the password for" : "Choose a new password for"} <strong>{actionContext.loginId}</strong>. This link expires {new Date(actionContext.expiresAt).toLocaleString()} and works once.</p>}
+
+    {(mode === "signIn" || mode === "action") && <form onSubmit={submit} noValidate>
+      <oj-form-layout maxColumns={1} direction="row">
+        {mode === "signIn" ? <>
+          <oj-input-text id="kapLoginUserId" labelHint="Login ID" value={loginId} autocomplete="username" required
+            onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text>
+          <oj-input-password id="kapLoginPassword" labelHint="Password" value={password} autocomplete="current-password" required
+            onvalueChanged={(event: InputPasswordElement.valueChanged) => setPassword(String(event.detail.value ?? ""))}></oj-input-password>
+        </> : <>
+          <oj-input-password id="kapNewPassword" labelHint="New password" value={newPassword} autocomplete="new-password" required
+            onvalueChanged={(event: InputPasswordElement.valueChanged) => setNewPassword(String(event.detail.value ?? ""))}></oj-input-password>
+          <oj-input-password id="kapConfirmPassword" labelHint="Confirm new password" value={confirmPassword} autocomplete="new-password" required
+            onvalueChanged={(event: InputPasswordElement.valueChanged) => setConfirmPassword(String(event.detail.value ?? ""))}></oj-input-password>
+        </>}
+      </oj-form-layout>
+      {error && <div class="kap-login-error" role="alert">{error}</div>}
+      <oj-button id="kapLoginSubmit" chroming="callToAction" disabled={isSubmitting} onojAction={(event: Event) => void submit(event)}>
+        {isSubmitting ? "Please wait…" : mode === "signIn" ? "Sign in" : actionLabel}
+      </oj-button>
+    </form>}
+    {(mode === "invalid" || mode === "validating") && error && <div class="kap-login-error" role="alert">{error}</div>}
+    {mode === "signIn" && <button class="kap-login-link" type="button" onClick={() => { setMode("forgot"); setError(""); }}>Forgot or reset credential?</button>}
+    {mode === "forgot" && <button class="kap-login-link" type="button" onClick={returnToSignIn}>Back to sign in</button>}
+    {mode === "invalid" && <button class="kap-login-link" type="button" onClick={returnToSignIn}>Back to sign in</button>}
+  </section></main>;
 }

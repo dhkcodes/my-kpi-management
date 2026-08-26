@@ -2291,6 +2291,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-import-result.is-success > span { color: var(--oj-palette-success-90, #3b6f36); }
 .consumption-import-result.is-error > span { color: var(--oj-palette-danger-100, #b13b2e); }
 
+.kap-user-link-meta { align-items: center; background: #f7f5f2; border-radius: .25rem; display: flex; gap: .75rem; justify-content: space-between; padding: .7rem .8rem; }
+.kap-user-link-meta span, .kap-field__hint { color: var(--kpi-muted); font-size: .78rem; }
+.kap-success { background: #eef6ec; border-left: 3px solid var(--oj-palette-success-90, #3b6f36); color: #285524; padding: .65rem .75rem; }
+
 @media (max-width: 1120px) {
   .consumption-pulse-layout { grid-template-columns: minmax(0, 1fr); }
 }

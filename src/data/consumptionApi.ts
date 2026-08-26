@@ -119,9 +119,9 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     fromQuarter = actualQuarters[0] ?? getFiscalQuarter(latestActual);
     toQuarter = getFiscalQuarter(latestActual);
     editablePeriodIds = getNextQuarterMonths(latestActual);
-    const forecastQuarters = [...new Set(editablePeriodIds.map(getFiscalQuarter))];
-    displayQuarterOrder = [toQuarter, ...forecastQuarters.filter((quarter) => quarter !== toQuarter),
-      ...actualQuarters.reverse().filter((quarter) => quarter !== toQuarter)];
+    const forecastQuarters = [...new Set(editablePeriodIds.map(getFiscalQuarter))].reverse();
+    displayQuarterOrder = [...forecastQuarters,
+      ...actualQuarters.reverse().filter((quarter) => !forecastQuarters.includes(quarter))];
   }
   if (!isPeriodKey(currentFiscalMonth) || !isQuarterKey(fromQuarter) || !isQuarterKey(toQuarter)
     || !Array.isArray(editablePeriodIds) || editablePeriodIds.some((period) => !isPeriodKey(period))
