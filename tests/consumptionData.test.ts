@@ -116,6 +116,9 @@ assert.equal(displaySummaries[0].preQGap, 15, "a displayed history quarter compa
 assert.equal(displaySummaries[1].preQGap, 30, "a displayed forecast quarter compares with its chronological predecessor");
 assert.equal(displaySummaries[2].preQGap, null, "the first chronological quarter has no predecessor in the returned range");
 
+const offscreenPriorSummaries = buildDisplayQuarterSummaries(displaySeries, ["FY27-Q1", "FY27-Q2"]);
+assert.equal(offscreenPriorSummaries[0].preQGap, 15, "the first displayed quarter uses a supplied offscreen prior quarter for PreQ Gap");
+
 const signalPlan = (
   id: string,
   actuals: Record<string, number>,

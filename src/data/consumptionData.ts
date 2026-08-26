@@ -8,6 +8,7 @@ export type ConsumptionPlan = Readonly<{
   endUser: string;
   planId: string;
   dataCenter: string;
+  workload?: string;
   planType: string;
   actuals: Record<string, number>;
   forecasts: Record<string, number>;
@@ -281,7 +282,9 @@ export const buildDisplayQuarterSummaries = (
   displayQuarterOrder: readonly string[]
 ): ConsumptionQuarterSummary[] => {
   const displayed = [...new Set(displayQuarterOrder)];
-  const chronological = [...displayed].sort((left, right) => fiscalQuarterOrder(left) - fiscalQuarterOrder(right));
+  const suppliedQuarters = [...new Set([...Object.keys(series.actuals), ...Object.keys(series.forecasts)].map(getFiscalQuarter))];
+  const chronological = [...new Set([...displayed, ...suppliedQuarters])]
+    .sort((left, right) => fiscalQuarterOrder(left) - fiscalQuarterOrder(right));
   let previous: ConsumptionQuarterSummary | null = null;
   const summaries = new Map<string, ConsumptionQuarterSummary>();
   chronological.forEach((quarter) => {

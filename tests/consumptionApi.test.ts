@@ -15,7 +15,7 @@ const payload = {
   currentFiscalMonth: "FY27-AUG", fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1",
   editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
   displayQuarterOrder: ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"],
-  plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC",
+  plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC", workload: "Autonomous Database",
     facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1 },
       { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 999, versionNo: 3 }] }],
   controlTotals: [
@@ -37,6 +37,7 @@ void (async () => {
   assert.deepEqual(workspace.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
   assert.deepEqual(workspace.displayQuarterOrder, ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"]);
   assert.equal(workspace.controlTotalCount, 2, "monthly control entries must be reported as two source Multiple controls");
+  assert.equal(workspace.plans[0].workload, "Autonomous Database", "Plan Number mapping exposes its Workload without a client-side lookup");
   assert.equal(workspace.plans[0].forecasts["FY27-OCT"], 999, "persisted server forecast must remain authoritative");
   assert.equal(workspace.plans[0].forecasts["FY27-NOV"], 100, "only a missing editable forecast month receives the seed default");
   assert.equal("FY27-SEP" in workspace.plans[0].forecasts, true);
@@ -78,6 +79,13 @@ void (async () => {
   assert.equal((putInit?.headers as Record<string, string>)["If-Match"], '"header-etag"');
   assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [{ planId: 11, periodKey: "FY27-OCT", amount: 1001, versionNo: 3 }] });
   assert.equal(saved.etag, '"next-etag"');
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    workspace: payload, planCount: 1, controlTotalCount: 0, insertedCount: 0, updatedCount: 1, appliedCount: 1
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"import-etag"' } });
+  const { applyConsumptionImport } = await import("../src/data/consumptionApi");
+  const imported = await applyConsumptionImport("csv");
+  assert.deepEqual([imported.insertedCount, imported.updatedCount, imported.appliedCount], [0, 1, 1], "overwrite counts are preserved for the import result UI");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     code: "VERSION_CONFLICT", message: "changed", current: { ...payload, etag: '"current-etag"' }

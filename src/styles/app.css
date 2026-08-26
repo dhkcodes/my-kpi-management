@@ -2261,7 +2261,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-summary-cards article { display: grid; gap: .25rem; margin: 0; padding: .85rem; }
 .consumption-summary-cards span, .consumption-summary-cards small { color: var(--kpi-muted); font-size: .7rem; }
 .consumption-summary-cards strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
-.consumption-account-selector { min-width: 13rem; }
+.consumption-account-selector { min-width: 16rem; position: relative; }
+.consumption-account-options { background: #fff; border: 1px solid var(--kpi-border); box-shadow: 0 .5rem 1.25rem rgb(0 0 0 / 12%); display: grid; left: 0; max-height: 14rem; overflow-y: auto; position: absolute; right: 0; top: 100%; z-index: 20; }
+.consumption-account-options button { background: #fff; border: 0; color: var(--kpi-ink); cursor: pointer; font: inherit; padding: .55rem .65rem; text-align: left; }
+.consumption-account-options button:hover, .consumption-account-options button:focus-visible, .consumption-account-options button[aria-selected="true"] { background: #f7f5f2; }
 .consumption-file-input { display: none; }
 .consumption-import-status, .consumption-import-error { border-left: .25rem solid #2f6f9f; font-size: .82rem; padding: .65rem .8rem; }
 .consumption-import-status { background: #eef5fa; color: #245777; }
@@ -2272,7 +2275,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-section-heading h2 { margin: .15rem 0 0; }
 .consumption-count-badge { align-items: center; background: #f0eeeb; border-radius: 999px; display: inline-flex; font-size: .78rem; font-weight: 800; justify-content: center; min-height: 1.8rem; min-width: 1.8rem; padding: .2rem .5rem; }
 .consumption-signal-inbox { border: 1px solid var(--kpi-border); max-height: 23rem; overflow: auto; }
-.consumption-signal { align-items: center; background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; display: grid; font: inherit; gap: .55rem; grid-template-columns: auto minmax(9rem, 1fr) auto auto auto; padding: .65rem; text-align: left; width: 100%; }
+.consumption-signal { align-items: center; background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; display: grid; font: inherit; gap: .55rem; grid-template-columns: auto minmax(9rem, 1fr) auto auto auto auto; padding: .65rem; text-align: left; width: 100%; }
 .consumption-signal:last-child { border-bottom: 0; }
 .consumption-signal:hover, .consumption-signal:focus-visible { background: #f7f5f2; }
 .consumption-signal.is-selected { background: #fff5f2; box-shadow: inset .22rem 0 0 var(--kpi-brand); }
@@ -2280,6 +2283,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-signal-main strong, .consumption-signal-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-signal-main span, .consumption-signal-change span, .consumption-signal-month { color: var(--kpi-muted); font-size: .72rem; }
 .consumption-signal-type { font-size: .72rem; font-weight: 800; white-space: nowrap; }
+.consumption-signal-direction { align-items: center; display: inline-flex; font-size: .7rem; font-weight: 850; gap: .2rem; white-space: nowrap; }
+.consumption-signal-direction.is-rise { color: var(--oj-palette-success-100, #356b31); }
+.consumption-signal-direction.is-fall { color: var(--kpi-danger); }
 .consumption-signal-change { justify-items: end; }
 .consumption-signal-grade { border-radius: 999px; font-size: .64rem; font-weight: 850; letter-spacing: .025em; padding: .24rem .42rem; white-space: nowrap; }
 .consumption-signal-grade.is-critical { background: #fde7e3; color: #a63122; }
@@ -2292,7 +2298,12 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table-heading { align-items: center; }
 .consumption-draft-actions { align-items: center; display: flex; flex: 0 0 auto; gap: .5rem; }
 .consumption-draft-actions > span { color: var(--kap-grid-draft-ink); font-size: .76rem; font-weight: 800; }
-.consumption-table-scroll { border: 1px solid var(--kpi-border); max-width: 100%; overflow-x: auto; position: relative; width: 100%; }
+.consumption-table-panel { position: relative; }
+.consumption-table-scroll { border: 1px solid var(--kpi-border); max-width: 100%; overflow-x: auto; position: relative; scrollbar-width: none; width: 100%; }
+.consumption-table-scroll::-webkit-scrollbar { display: none; }
+.consumption-scroll-controls { align-items: center; display: flex; flex-direction: column; gap: .38rem; position: fixed; right: max(.75rem, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 18; }
+.consumption-scroll-controls button { background: rgb(255 255 255 / 95%); border: 1px solid var(--kpi-border); box-shadow: 0 .6rem 1.5rem rgb(0 0 0 / 14%); color: var(--kpi-ink); cursor: pointer; font-size: 1.35rem; height: 2.55rem; width: 2.55rem; }
+.consumption-scroll-controls button:disabled { color: var(--kpi-muted); cursor: default; opacity: .45; }
 .consumption-table { border-collapse: separate; border-spacing: 0; min-width: 100%; table-layout: fixed; width: max-content; }
 .consumption-table th, .consumption-table td { background: var(--kap-grid-cell-bg); border-bottom: 1px solid var(--kap-grid-border); border-right: 1px solid var(--kap-grid-border); height: 3.25rem; min-width: 7.25rem; padding: .55rem; }
 .consumption-table thead th { background: var(--kap-grid-header-bg); color: var(--kap-grid-header-ink); font-size: .74rem; font-weight: 850; text-align: center; }
@@ -2312,8 +2323,11 @@ h4.weekly-activity-section-label--next-week,
 .consumption-value-cell small { color: var(--kpi-muted); display: block; font-size: .62rem; margin-top: .15rem; text-transform: uppercase; }
 .consumption-quarter-total { background: #f5f7f8 !important; font-weight: 800; }
 .consumption-preq-gap { background: #faf8f5 !important; font-weight: 750; }
-.consumption-forecast-cell { background: #f4f8fb !important; box-shadow: inset 0 -3px 0 #2f6f9f; cursor: cell; }
-.consumption-forecast-cell.is-draft { background: var(--kap-grid-draft-bg) !important; box-shadow: inset 0 -3px 0 var(--kap-grid-draft-line); color: var(--kap-grid-draft-ink); }
+.consumption-forecast-cell { background: #eaf3f8 !important; box-shadow: none; cursor: cell; }
+.consumption-forecast-cell.is-draft { background: var(--kap-grid-draft-bg) !important; box-shadow: none; color: var(--kap-grid-draft-ink); }
+.consumption-month-status { display: block; font-size: .58rem; letter-spacing: .025em; margin-top: .18rem; }
+.consumption-month-status.is-actual { color: var(--oj-palette-neutral-120, #59636b); }
+.consumption-month-status.is-forecast { color: var(--oj-palette-info-100, #24618d); }
 .consumption-forecast-editor { background: #fff; border: 2px solid #2f6f9f; font: inherit; font-variant-numeric: tabular-nums; height: 2.25rem; min-width: 6rem; padding: .35rem; text-align: right; width: 100%; }
 .consumption-account-single { display: grid; gap: .2rem; min-width: 0; }
 .consumption-account-single strong, .consumption-account-single small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -63,6 +63,9 @@ const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "New baseline" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 const shortMonth = (month: string) => month.split("-")[1];
+const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.changeAmount >= 0
+  ? { label: "Rise", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
+  : { label: "Fall", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
@@ -121,12 +124,17 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
   const [currentFiscalMonth, setCurrentFiscalMonth] = useState("");
   const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeInitialized, setRangeInitialized] = useState(false);
+  const [rangeTouched, setRangeTouched] = useState(false);
+  const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
+  const [tableScrollState, setTableScrollState] = useState({ left: 0, max: 0 });
   const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [importResult, setImportResult] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace, status: string) => {
     setSavedPlans(clonePlans(workspace.plans));
@@ -138,6 +146,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setEditablePeriodIds(new Set(workspace.editablePeriodIds));
     setDisplayQuarterOrder([...workspace.displayQuarterOrder]);
     setCurrentFiscalMonth(workspace.currentFiscalMonth);
+    setRangeInitialized(true);
+    setRangeTouched(false);
     setDataMode("backend");
     setConflictRows([]);
     setConflictWorkspace(null);
@@ -160,6 +170,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setEditablePeriodIds(new Set(fallbackEditablePeriods));
         setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
+        setRangeInitialized(true);
+        setRangeTouched(false);
         setDataMode("fallback");
         setImportStatus(`Synthetic fallback · ${initialSeed.importedPlans} plans · Backend unavailable in local preview`);
       } else {
@@ -180,6 +192,34 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     ? allAccountsTotal
     : accounts.find((account) => account.customer === selectedAccount) ?? allAccountsTotal;
   const filteredAccounts = accounts.filter((account) => account.customer.toLowerCase().includes(accountSearch.trim().toLowerCase()));
+
+  const updateTableScrollState = () => {
+    const table = tableScrollRef.current;
+    if (!table) return;
+    setTableScrollState({
+      left: Math.round(table.scrollLeft),
+      max: Math.max(0, Math.round(table.scrollWidth - table.clientWidth))
+    });
+  };
+
+  const moveTableHorizontally = (direction: -1 | 1) => {
+    const table = tableScrollRef.current;
+    if (!table) return;
+    const step = Math.max(320, Math.round(table.clientWidth * 0.72));
+    table.scrollTo({ left: table.scrollLeft + direction * step, behavior: "smooth" });
+    window.setTimeout(updateTableScrollState, 240);
+  };
+
+  const handleTableKeyDown = (event: KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveTableHorizontally(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveTableHorizontally(1);
+    }
+  };
 
   const allMonths = useMemo(() => sortConsumptionMonths([
     ...new Set(displayQuarterOrder.flatMap((quarter) => getQuarterMonths(quarter)))
@@ -210,6 +250,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const forecastTotal = rangeSummaries.filter((summary) => summary.status === "FORECAST" || summary.status === "MIXED")
     .reduce((sum, summary) => sum + (summary.total ?? 0), 0);
   const hasDraftChanges = JSON.stringify(savedPlans) !== JSON.stringify(draftPlans);
+
+  useEffect(() => {
+    updateTableScrollState();
+    window.addEventListener("resize", updateTableScrollState);
+    return () => window.removeEventListener("resize", updateTableScrollState);
+  }, [accounts.length, displayQuarterOrder]);
 
   useEffect(() => {
     if (!hasDraftChanges) {
@@ -399,10 +445,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     try {
       let loadedPlans = pendingImport.planCount;
       let loadedControls = pendingImport.controlTotalCount;
+      let importCountDetail = "";
       if (!pendingImport.useFallback) {
         const result = await applyConsumptionImport(pendingImport.csv);
         loadedPlans = result.planCount;
         loadedControls = result.controlTotalCount;
+        importCountDetail = ` · New plans: ${result.insertedCount} · Overwritten plans: ${result.updatedCount}`;
         adoptWorkspace(result.workspace, `${pendingImport.fileName} · Applied batch ${result.workspace.lastBatchId ?? ""} · ${result.planCount} plans · through ${pendingImport.latestActualMonth}`);
       } else {
         const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
@@ -417,6 +465,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setEditablePeriodIds(new Set(importedEditablePeriods));
         setDisplayQuarterOrder([...importedForecastQuarters, ...importedHistoryQuarters.filter((quarter) => !importedForecastQuarters.includes(quarter))]);
         setCurrentFiscalMonth(pendingImport.latestActualMonth);
+        setRangeInitialized(true);
+        setRangeTouched(false);
         setApiEtag("");
         setDataMode("fallback");
         setConflictRows([]);
@@ -426,7 +476,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setSelectedSignalId("");
       setExpandedAccounts(new Set());
       setEditCell(null);
-      setImportResult(`Successful rows: ${loadedPlans + loadedControls} · Failed rows: 0 · Loaded plans: ${loadedPlans} · Control totals: ${loadedControls}`);
+      setImportResult(`Successful rows: ${loadedPlans + loadedControls} · Failed rows: 0 · Applied plans: ${loadedPlans}${importCountDetail} · Control totals: ${loadedControls}`);
       setImportPhase("complete");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Consumption CSV could not be imported.";
@@ -496,7 +546,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <div>
           <span class="kpi-eyebrow">Signal-integrated Pulse</span>
           <h1 id="consumptionTitle">Consumption</h1>
-          <p>Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast.</p>
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
@@ -509,19 +558,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <label htmlFor="consumptionFromQuarter">From Quarter
-          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => setFromQuarter((event.currentTarget as HTMLSelectElement).value)}>
+          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label htmlFor="consumptionToQuarter">To Quarter
-          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => setToQuarter((event.currentTarget as HTMLSelectElement).value)}>
+          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || hasDraftChanges || dataMode !== "backend"} onojAction={() => void applyQuarterRange()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </oj-button>
-        {!rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
+        {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
       </section>
 
@@ -590,7 +639,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             <span class="consumption-count-badge">{signals.length}</span>
           </div>
           <div id="consumptionSignalInbox" class="consumption-signal-inbox" role="list">
-            {signals.map((signal) => (
+            {signals.map((signal) => {
+              const direction = consumptionSignalDirection(signal);
+              return (
               <button
                 type="button"
                 role="listitem"
@@ -599,11 +650,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 onClick={() => selectSignal(signal.id, signal.customer)}>
                 <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span>
                 <span class="consumption-signal-main"><strong>{signal.customer}</strong><span>{signal.endUser} · {signal.planId}</span></span>
+                <span class={`consumption-signal-direction ${direction.tone}`}><span class={direction.icon} aria-hidden="true"></span>{direction.label}</span>
                 <span class="consumption-signal-type">{signal.type}</span>
                 <span class="consumption-signal-change"><strong>{signedCurrency(signal.changeAmount)}</strong><span>{formatPercent(signal.changePercent)}</span></span>
                 <span class="consumption-signal-month">{signal.month}</span>
               </button>
-            ))}
+              );
+            })}
             {signals.length === 0 && <p class="consumption-empty-state">No material changes were detected in the latest complete month.</p>}
           </div>
         </section>
@@ -616,12 +669,22 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               <p>{selectedAccount === "__all__" ? "All accounts · Total" : `${selectedAccount} · Total`}</p>
             </div>
             <div class="consumption-account-selector">
-              <label htmlFor="consumptionAccountSearch">Search accounts</label>
-              <input id="consumptionAccountSearch" type="search" value={accountSearch} onInput={(event) => setAccountSearch((event.currentTarget as HTMLInputElement).value)} />
-              <select aria-label="Trend account" value={selectedAccount} onChange={(event) => { setSelectedAccount((event.currentTarget as HTMLSelectElement).value); setSelectedSignalId(""); }}>
-                <option value="__all__">All accounts · Total</option>
-                {filteredAccounts.map((account) => <option value={account.customer}>{account.customer}</option>)}
-              </select>
+              <label htmlFor="consumptionAccountSelector">Account</label>
+              <input id="consumptionAccountSelector" type="search" role="combobox" aria-label="Search or select trend account"
+                aria-expanded={accountSelectorOpen} aria-controls="consumptionAccountOptions" autocomplete="off"
+                placeholder={selectedAccount === "__all__" ? "All accounts · Total" : selectedAccount}
+                value={accountSearch}
+                onFocus={() => setAccountSelectorOpen(true)}
+                onInput={(event) => { setAccountSearch((event.currentTarget as HTMLInputElement).value); setAccountSelectorOpen(true); }} />
+              {accountSelectorOpen && (
+                <div id="consumptionAccountOptions" class="consumption-account-options" role="listbox" aria-label="Trend account options">
+                  <button type="button" role="option" aria-selected={selectedAccount === "__all__"} onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => { setSelectedAccount("__all__"); setSelectedSignalId(""); setAccountSearch(""); setAccountSelectorOpen(false); }}>All accounts · Total</button>
+                  {filteredAccounts.map((account) => <button type="button" role="option" aria-selected={selectedAccount === account.customer}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => { setSelectedAccount(account.customer); setSelectedSignalId(""); setAccountSearch(""); setAccountSelectorOpen(false); }}>{account.customer}</button>)}
+                </div>
+              )}
             </div>
           </div>
           <oj-chart
@@ -648,7 +711,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <div>
             <span class="kpi-section-label">Actual + Forecast</span>
             <h2 id="consumptionTableTitle">End User / Plan Consumption</h2>
-            <p>Double-click a Forecast cell. Enter keeps the page draft; Esc restores the edit-entry value.</p>
           </div>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
@@ -658,7 +720,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </div>
           )}
         </div>
-        <div class="consumption-table-scroll" tabIndex={0} aria-label="Horizontally scrollable Consumption table">
+        <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
+          <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
+          <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
+        </div>
+        <div ref={tableScrollRef} class="consumption-table-scroll" tabIndex={0} aria-label="Horizontally scrollable Consumption table" onScroll={updateTableScrollState} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
               <tr>
@@ -667,7 +733,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </tr>
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
-                  ...getQuarterMonths(quarter).map((month) => <th key={`${quarter}-${month}`}>{shortMonth(month)}</th>),
+                  ...getQuarterMonths(quarter).map((month) => {
+                    const status = editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
+                    return <th key={`${quarter}-${month}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
+                  }),
                   <th key={`${quarter}-total`}>Quarter Total</th>,
                   <th key={`${quarter}-gap`}>PreQ Gap</th>
                 ])}
@@ -680,7 +749,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 const singlePlan = account.plans[0];
                 return (
                   <>
-                    <tr key={account.id} class={selectedSignal?.customer === account.customer ? "consumption-account-row is-context" : "consumption-account-row"} data-readonly="account">
+                    <tr key={account.id} class={selectedSignal?.customer === account.customer ? "consumption-account-row is-context" : "consumption-account-row"} data-readonly={expandable ? "account" : undefined}>
                       <th class="consumption-account-column" scope="row">
                         {expandable ? (
                           <button type="button" class="consumption-account-toggle" aria-expanded={expanded} onClick={() => toggleAccount(account.customer)}>
@@ -690,18 +759,18 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                           </button>
                         ) : (
                           <span class="consumption-account-single">
-                            <strong>{account.customer}</strong>
-                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId}</small>
+                            <strong>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
+                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small>
                           </span>
                         )}
                       </th>
-                      {renderQuarterCells(account, true)}
+                      {expandable ? renderQuarterCells(account, true) : singlePlan ? renderQuarterCells(singlePlan, false) : renderQuarterCells(account, true)}
                     </tr>
                     {expandable && expanded && account.plans.map((plan) => (
                       <tr key={plan.id} class={selectedSignal?.planId === plan.planId ? "consumption-plan-row is-context" : "consumption-plan-row"}>
                         <th class="consumption-account-column" scope="row">
-                          <span class="consumption-end-user">{plan.endUser}</span>
-                          <small>Plan {plan.planId} · DC {plan.dataCenter}</small>
+                          <span class="consumption-end-user">{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
+                          <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small>
                         </th>
                         {renderQuarterCells(plan, false)}
                       </tr>

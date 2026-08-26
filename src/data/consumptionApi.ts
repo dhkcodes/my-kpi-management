@@ -16,7 +16,7 @@ const apiBase = () => {
 };
 
 type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number }>;
-type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; facts: RawFact[] }>;
+type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; workload?: string | null; facts: RawFact[] }>;
 type RawSignal = Readonly<{ signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string; type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"]; changeAmount: number; changePercent: number | null; reason: string }>;
 type RawControlTotal = Readonly<{ account: string; periodKey: string }>;
 type RawWorkspace = Readonly<{
@@ -47,7 +47,15 @@ export type ConsumptionApiWorkspace = Readonly<{
 export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionForecastUpdate = Readonly<{ planId: number; periodKey: string; amount: number; versionNo: number }>;
 export type ConsumptionImportPreview = Readonly<{ planCount: number; controlTotalCount: number; sourceRowCount: number; sourceSha256: string }>;
-export type ConsumptionImportResult = Readonly<{ workspace: ConsumptionApiWorkspace; planCount: number; controlTotalCount: number; sourceRowCount: number }>;
+export type ConsumptionImportResult = Readonly<{
+  workspace: ConsumptionApiWorkspace;
+  planCount: number;
+  controlTotalCount: number;
+  insertedCount: number;
+  updatedCount: number;
+  appliedCount: number;
+  sourceRowCount: number;
+}>;
 
 export class ConsumptionApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); this.name = "ConsumptionApiError"; }
@@ -87,6 +95,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
   const basePlans: ConsumptionPlan[] = raw.plans.map((plan) => {
     if (!isPositiveInteger(plan?.planId) || !isNonEmptyString(plan?.stableKey) || !isNonEmptyString(plan?.account)
       || !isNonEmptyString(plan?.endUser) || !isNonEmptyString(plan?.planCode) || !isNonEmptyString(plan?.dataCenter)
+      || (plan.workload !== null && plan.workload !== undefined && !isNonEmptyString(plan.workload))
       || !Array.isArray(plan?.facts)) throw new Error("Malformed Consumption plan response");
     const actuals: Record<string, number> = {};
     const forecasts: Record<string, number> = {};
@@ -100,7 +109,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
       else if (fact.forecastAmount !== null) forecasts[fact.periodKey] = fact.forecastAmount;
     });
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
-      dataCenter: plan.dataCenter, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
+      dataCenter: plan.dataCenter, workload: plan.workload ?? undefined, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
   });
   const metadataMissing = !raw.currentFiscalMonth && !raw.fromQuarter && !raw.toQuarter
     && (!raw.editablePeriodIds || raw.editablePeriodIds.length === 0)
@@ -187,10 +196,14 @@ export const previewConsumptionImport = async (csv: string): Promise<Consumption
 };
 export const applyConsumptionImport = async (csv: string): Promise<ConsumptionImportResult> => {
   const { response, payload } = await request("/consumption/imports/apply", { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: csv });
-  const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown };
+  const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown };
   const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"));
-  if (!isNonNegativeInteger(result.planCount) || !isNonNegativeInteger(result.controlTotalCount)) throw new Error("Malformed Consumption import result");
+  if (!isNonNegativeInteger(result.planCount) || !isNonNegativeInteger(result.controlTotalCount)
+    || !isNonNegativeInteger(result.insertedCount) || !isNonNegativeInteger(result.updatedCount)
+    || !isNonNegativeInteger(result.appliedCount) || result.appliedCount !== result.insertedCount + result.updatedCount)
+    throw new Error("Malformed Consumption import result");
   return { workspace, planCount: result.planCount, controlTotalCount: result.controlTotalCount,
+    insertedCount: result.insertedCount, updatedCount: result.updatedCount, appliedCount: result.appliedCount,
     sourceRowCount: result.planCount + result.controlTotalCount };
 };
 export const saveConsumptionForecasts = async (etag: string, updates: ConsumptionForecastUpdate[]): Promise<ConsumptionApiWorkspace> => {
