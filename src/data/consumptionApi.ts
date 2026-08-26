@@ -73,7 +73,7 @@ export const canUseConsumptionFallback = (error: unknown) => {
   return error instanceof ConsumptionNetworkError || (error instanceof ConsumptionApiError && error.status === 404);
 };
 
-const signalTypes = new Set<ConsumptionSignal["type"]>(["SPIKE", "DROP", "TREND UP", "TREND DOWN", "NEW", "STOPPED"]);
+const signalTypes = new Set<ConsumptionSignal["type"]>(["SPIKE", "DROP"]);
 const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "WATCH"]);
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
@@ -146,9 +146,14 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     if (!isPositiveInteger(signal?.signalId) || !isPositiveInteger(signal?.planId) || !isNonEmptyString(signal?.account)
       || !isNonEmptyString(signal?.endUser) || !isNonEmptyString(signal?.planCode) || !isPeriodKey(signal?.periodKey)
       || !signalTypes.has(signal?.type) || !signalGrades.has(signal?.grade) || !isFiniteNumber(signal?.changeAmount)
-      || !isNullableFiniteNumber(signal?.changePercent) || !isNonEmptyString(signal?.reason)) throw new Error("Malformed Consumption signal response");
+      || !isFiniteNumber(signal?.changePercent) || Math.abs(signal.changeAmount) < 300 || Math.abs(signal.changePercent) < 40
+      || (signal.type === "SPIKE"
+        ? signal.changeAmount <= 0 || signal.changePercent <= 0
+        : signal.changeAmount >= 0 || signal.changePercent >= 0)
+      || !isNonEmptyString(signal?.reason)) throw new Error("Malformed Consumption signal response");
     return {
-      id: `server-signal-${signal.signalId}`, customer: signal.account, endUser: signal.endUser, planId: signal.planCode,
+      id: `server-signal-${signal.signalId}`, serverPlanId: signal.planId,
+      customer: signal.account, endUser: signal.endUser, planId: signal.planCode,
       type: signal.type, grade: signal.grade, month: signal.periodKey, changeAmount: signal.changeAmount,
       changePercent: signal.changePercent, reason: signal.reason, topContributingPlan: byServerId.get(signal.planId)?.planId ?? signal.planCode
     };

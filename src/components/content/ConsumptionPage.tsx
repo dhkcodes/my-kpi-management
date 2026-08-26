@@ -61,11 +61,11 @@ const fallbackForecastQuarters = [...new Set(fallbackEditablePeriods.map(getFisc
 const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackActualQuarters.filter((quarter) => !fallbackForecastQuarters.includes(quarter))];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
-const formatPercent = (value: number | null) => value === null ? "New baseline" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 const shortMonth = (month: string) => month.split("-")[1];
-const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.changeAmount >= 0
-  ? { label: "Rise", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
-  : { label: "Fall", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
+const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.type === "SPIKE"
+  ? { label: "Increased", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
+  : { label: "Decreased", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
@@ -298,7 +298,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   }, [hasDraftChanges, onNavigationGuardChange]);
 
   const selectSignal = (signal: ConsumptionSignal) => {
-    const plan = draftPlans.find((candidate) => candidate.customer === signal.customer && candidate.planId === signal.planId);
+    const plan = signal.serverPlanId === undefined
+      ? draftPlans.find((candidate) => candidate.customer === signal.customer
+        && candidate.endUser === signal.endUser && candidate.planId === signal.planId)
+      : draftPlans.find((candidate) => candidate.serverPlanId === signal.serverPlanId);
     setSelectedSignalId(signal.id);
     if (plan) setSelectedSeriesId(plan.id);
   };
@@ -655,36 +658,39 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <article class="kpi-panel"><span>Range Total</span><strong>{currency.format(rangeTotal)}</strong><small>{fromQuarter} → {toQuarter}</small></article>
         <article class="kpi-panel"><span>Latest Quarter</span><strong>{latestSummary?.total === null || !latestSummary ? "N/A" : currency.format(latestSummary.total)}</strong><small>{latestSummary?.quarter ?? "—"} · {latestSummary?.status ?? "—"}</small></article>
         <article class="kpi-panel"><span>PreQ Change</span><strong>{signedCurrency(latestSummary?.preQGap ?? null)}</strong><small>Chronological predecessor</small></article>
-        <article class="kpi-panel"><span>Anomalies</span><strong>{signals.length}</strong><small>Returned range</small></article>
+        <article class="kpi-panel"><span>MoM Changes</span><strong>{signals.length}</strong><small>Latest Plan comparison</small></article>
         <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
       </section>
 
       <div class="consumption-pulse-layout">
         <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
           <div class="consumption-section-heading">
-            <div><span class="kpi-section-label">Prioritized detection</span><h2 id="consumptionSignalTitle">Change Signal Inbox</h2></div>
+            <div>
+              <span class="kpi-section-label">Latest Plan comparison</span>
+              <h2 id="consumptionSignalTitle">Month-over-Month Plan Changes</h2>
+              <p>Latest actual month vs immediately previous month · ≥ $300 and ≥ 40%</p>
+            </div>
             <span class="consumption-count-badge">{signals.length}</span>
           </div>
-          <div id="consumptionSignalInbox" class="consumption-signal-inbox" role="list">
+          <div id="consumptionSignalInbox" class="consumption-signal-inbox">
             {signals.map((signal) => {
               const direction = consumptionSignalDirection(signal);
               return (
               <button
                 type="button"
-                role="listitem"
                 class={selectedSignal?.id === signal.id ? "consumption-signal is-selected" : "consumption-signal"}
                 aria-pressed={selectedSignal?.id === signal.id}
                 onClick={() => selectSignal(signal)}>
-                <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span>
+                <span class={`consumption-signal-type is-${signal.type.toLowerCase()}`}>{signal.type}</span>
                 <span class="consumption-signal-main"><strong>{signal.customer}</strong><span>{signal.endUser} · {signal.planId}</span></span>
                 <span class={`consumption-signal-direction ${direction.tone}`}><span class={direction.icon} aria-hidden="true"></span>{direction.label}</span>
-                <span class="consumption-signal-type">{signal.type}</span>
+                <span class="consumption-signal-severity">{signal.grade}</span>
                 <span class="consumption-signal-change"><strong>{signedCurrency(signal.changeAmount)}</strong><span>{formatPercent(signal.changePercent)}</span></span>
                 <span class="consumption-signal-month">{signal.month}</span>
               </button>
               );
             })}
-            {signals.length === 0 && <p class="consumption-empty-state">No material changes were detected in the latest complete month.</p>}
+            {signals.length === 0 && <p class="consumption-empty-state">No Plans met both month-over-month change thresholds.</p>}
           </div>
         </section>
 
@@ -729,8 +735,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           </oj-chart>
           {selectedSignal && (
             <div class="consumption-signal-reason" role="note">
-              <span class={`consumption-signal-grade is-${selectedSignal.grade.toLowerCase()}`}>{selectedSignal.grade}</span>
-              <div><strong>{selectedSignal.type} · {selectedSignal.month}</strong><p>{selectedSignal.reason} Top contributing Plan: {selectedSignal.topContributingPlan}.</p></div>
+              <span class={`consumption-signal-type is-${selectedSignal.type.toLowerCase()}`}>{selectedSignal.type}</span>
+              <div><strong>{consumptionSignalDirection(selectedSignal).label} · {selectedSignal.month}</strong><p>{selectedSignal.reason} Plan ID: {selectedSignal.planId}.</p></div>
             </div>
           )}
         </section>

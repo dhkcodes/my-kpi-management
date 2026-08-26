@@ -15,9 +15,15 @@ assert.match(content, /activeRoute\.module === "consumption"[\s\S]*<ConsumptionP
 assert.match(page, /import "ojs\/ojchart"/, "Consumption trend uses Oracle JET Chart");
 assert.match(page, /<oj-chart[\s\S]*type="line"/, "linked trend is a JET line chart");
 assert.match(page, /allMonths\.flatMap[\s\S]*value === null \? \[\]/, "missing Plan months are omitted from the trend instead of rendered as zero");
-assert.match(page, /id="consumptionSignalInbox"/, "Change Signal Inbox is rendered");
+assert.match(page, /id="consumptionSignalInbox"/, "month-over-month Plan change inbox is rendered");
+assert.match(page, /Month-over-Month Plan Changes/, "Inbox title states the latest month-over-month Plan comparison");
+assert.match(page, /Latest actual month vs immediately previous month[\s\S]*≥ \$300 and ≥ 40%/, "Inbox explains the comparison window and combined thresholds");
 assert.match(page, /setSelectedSignalId/, "signal selection drives linked context");
-assert.match(page, /consumptionSignalDirection[\s\S]*signal\.changeAmount >= 0[\s\S]*Rise[\s\S]*Fall/, "signals visibly expose rise and fall direction");
+assert.doesNotMatch(page, /role="listitem"/, "signal controls preserve native button semantics");
+assert.match(page, /candidate\.serverPlanId === signal\.serverPlanId/, "signal selection preserves exact server Plan ID identity");
+assert.match(page, /consumptionSignalDirection[\s\S]*signal\.type === "SPIKE"[\s\S]*Increased[\s\S]*Decreased/, "signals visibly expose increase and decrease direction from SPIKE or DROP");
+assert.match(page, /consumption-signal-type[^\n]*is-\$\{signal\.type\.toLowerCase\(\)\}[\s\S]*\{signal\.type\}/, "SPIKE and DROP are the primary signal badges");
+assert.doesNotMatch(page, /Prioritized detection|Change Signal Inbox|New baseline/, "legacy broad-anomaly language is removed");
 assert.match(page, /accept="\.csv,text\/csv"/, "runtime CSV import accepts CSV files");
 assert.match(page, /parseConsumptionCsv/, "CSV import uses the normalized parser");
 assert.match(page, /seedForecastMonths/, "the next quarter receives editable forecast cells");

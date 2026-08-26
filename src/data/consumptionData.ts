@@ -1,5 +1,5 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
-export type ConsumptionSignalType = "SPIKE" | "DROP" | "TREND UP" | "TREND DOWN" | "NEW" | "STOPPED";
+export type ConsumptionSignalType = "SPIKE" | "DROP";
 export type ConsumptionSignalGrade = "CRITICAL" | "HIGH" | "WATCH";
 
 export type ConsumptionPlan = Readonly<{
@@ -51,6 +51,7 @@ export type ConsumptionQuarterSummary = Readonly<{
 
 export type ConsumptionSignal = Readonly<{
   id: string;
+  serverPlanId?: number;
   customer: string;
   endUser: string;
   planId: string;
@@ -326,54 +327,28 @@ const signalGrade = (amount: number, percent: number | null): ConsumptionSignalG
 
 const reasonFor = (type: ConsumptionSignalType, amount: number, percent: number | null) => {
   const direction = amount >= 0 ? "increased" : "decreased";
-  const percentText = percent === null ? "from a zero baseline" : `${Math.abs(percent).toFixed(1)}%`;
-  if (type === "NEW") return `Consumption started after at least three zero months; ${percentText}.`;
-  if (type === "STOPPED") return "Consumption remained at zero for two consecutive months after prior usage.";
-  if (type === "TREND UP" || type === "TREND DOWN") return `Consumption ${direction} in the same direction for three consecutive month-over-month changes.`;
-  return `Month-over-month consumption ${direction} by ${percentText} and ${Math.abs(amount).toLocaleString("en-US")}.`;
+  return `Plan consumption ${direction} by ${Math.abs(amount).toLocaleString("en-US")} (${Math.abs(percent ?? 0).toFixed(1)}%) versus the previous month.`;
 };
 
-const areConsecutiveFiscalMonths = (months: readonly string[]) =>
-  months.every((month, index) => index === 0 || fiscalMonthOrder(month) - fiscalMonthOrder(months[index - 1]) === 1);
-
-const detectLatestPlanSignal = (plan: ConsumptionPlan): ConsumptionSignal | null => {
-  const months = sortConsumptionMonths(Object.keys(plan.actuals));
-  if (months.length < 2) return null;
-  const index = months.length - 1;
-  if (!areConsecutiveFiscalMonths(months.slice(index - 1, index + 1))) return null;
-  const current = plan.actuals[months[index]];
-  const previous = plan.actuals[months[index - 1]];
+const detectPlanSignal = (plan: ConsumptionPlan, previousMonth: string, currentMonth: string): ConsumptionSignal | null => {
+  if (!Object.prototype.hasOwnProperty.call(plan.actuals, previousMonth)
+    || !Object.prototype.hasOwnProperty.call(plan.actuals, currentMonth)) return null;
+  const current = plan.actuals[currentMonth];
+  const previous = plan.actuals[previousMonth];
+  if (previous === 0) return null;
   const amount = current - previous;
-  const percent = previous === 0 ? null : (amount / previous) * 100;
-  let type: ConsumptionSignalType | null = null;
-  if (index >= 3
-    && areConsecutiveFiscalMonths(months.slice(index - 3, index + 1))
-    && current > 0
-    && months.slice(index - 3, index).every((month) => plan.actuals[month] === 0)) {
-    type = "NEW";
-  } else if (index >= 2
-    && areConsecutiveFiscalMonths(months.slice(index - 2, index + 1))
-    && current === 0
-    && previous === 0
-    && plan.actuals[months[index - 2]] > 0) {
-    type = "STOPPED";
-  } else if (index >= 3 && areConsecutiveFiscalMonths(months.slice(index - 3, index + 1))) {
-    const changes = months.slice(index - 3, index + 1).slice(1).map((month, changeIndex) =>
-      plan.actuals[month] - plan.actuals[months[index - 3 + changeIndex]]
-    );
-    if (changes.every((change) => change > 0)) type = "TREND UP";
-    else if (changes.every((change) => change < 0)) type = "TREND DOWN";
-  }
-  if (!type && Math.abs(amount) >= 100 && Math.abs(percent ?? 0) >= 30) type = amount > 0 ? "SPIKE" : "DROP";
-  if (!type) return null;
+  const percent = (amount / previous) * 100;
+  if (Math.abs(amount) < 300 || Math.abs(percent) < 40) return null;
+  const type: ConsumptionSignalType = amount > 0 ? "SPIKE" : "DROP";
   return {
-    id: `${plan.id}::${months[index]}::${type}`,
+    id: `${plan.id}::${currentMonth}::${type}`,
+    serverPlanId: plan.serverPlanId,
     customer: plan.customer,
     endUser: plan.endUser,
     planId: plan.planId,
     type,
     grade: signalGrade(amount, percent),
-    month: months[index],
+    month: currentMonth,
     changeAmount: amount,
     changePercent: percent,
     reason: reasonFor(type, amount, percent),
@@ -382,7 +357,13 @@ const detectLatestPlanSignal = (plan: ConsumptionPlan): ConsumptionSignal | null
 };
 
 const gradeOrder: Record<ConsumptionSignalGrade, number> = { CRITICAL: 0, HIGH: 1, WATCH: 2 };
-export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[]): ConsumptionSignal[] =>
-  plans.map(detectLatestPlanSignal)
+export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[]): ConsumptionSignal[] => {
+  const currentMonth = getLatestActualMonth(plans);
+  if (!currentMonth) return [];
+  const previousMonth = sortConsumptionMonths([...new Set(plans.flatMap((plan) => Object.keys(plan.actuals)))])
+    .find((month) => fiscalMonthOrder(month) === fiscalMonthOrder(currentMonth) - 1);
+  if (!previousMonth) return [];
+  return plans.map((plan) => detectPlanSignal(plan, previousMonth, currentMonth))
     .filter((signal): signal is ConsumptionSignal => signal !== null)
     .sort((left, right) => gradeOrder[left.grade] - gradeOrder[right.grade] || Math.abs(right.changeAmount) - Math.abs(left.changeAmount));
+};

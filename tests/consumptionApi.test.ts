@@ -108,6 +108,20 @@ void (async () => {
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-signal"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
+    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
+      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: null, reason: "bad" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-mom-signal"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
+    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
+      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: -50, reason: "bad" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-mom-sign"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
+
   runtime.fetch = async () => new Response(JSON.stringify({ ...payload, lastBatchId: "7" }),
     { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-metadata"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption workspace metadata/);

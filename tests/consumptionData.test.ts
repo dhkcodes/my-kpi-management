@@ -144,12 +144,12 @@ const signals = detectConsumptionSignals([
   signalPlan("UP", values([100, 140, 200, 280, 390])),
   signalPlan("DOWN", values([500, 420, 330, 240, 150])),
   signalPlan("NEW", values([0, 0, 0, 0, 300])),
-  signalPlan("STOPPED", values([300, 300, 300, 0, 0]))
+  signalPlan("STOPPED", values([300, 300, 300, 0, 0])),
+  signalPlan("STALE", { "FY27-JUN": 100, "FY27-JUL": 500 })
 ]);
-const types = new Set(signals.map((signal) => signal.type));
-for (const type of ["SPIKE", "DROP", "TREND UP", "TREND DOWN", "NEW", "STOPPED"] as const) {
-  assert.equal(types.has(type), true, `${type} must be detectable`);
-}
+assert.deepEqual(new Set(signals.map((signal) => signal.type)), new Set(["SPIKE", "DROP"]), "only latest-month SPIKE and DROP are detectable");
+assert.deepEqual(new Set(signals.map((signal) => signal.planId)), new Set(["SPIKE", "DROP"]), "long trends, zero baselines and missing global comparison months are excluded");
+assert.equal(signals.every((signal) => signal.month === "FY27-OCT" && signal.changePercent !== null), true, "all signals use the shared latest comparison month and have a valid percentage");
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
 
 console.log("consumptionData tests passed");
