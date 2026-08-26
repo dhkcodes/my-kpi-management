@@ -38,8 +38,8 @@ assert.match(pulse, /aria-expanded=\{expandedUrgency === key\}/);
 assert.match(pulse, /items\.map/);
 assert.match(content, /statusToneClassName\(quarter\.status\)/,
   "New Workload uses semantic KPI status, not best-rate warning tone");
-assert.match(content, /onAccountsWorkloadsQueryChange\(\{ \.\.\.accountsWorkloadsQuery, search: account, includeDeleted: false \}\)[\s\S]*onNavigate\("accounts-workloads"\)/,
-  "Account links preserve the automatic Accounts & Workloads filter handoff");
+assert.match(content, /onNavigate\("accounts-workloads"\)[\s\S]*onAccountsWorkloadsQueryChange\(\{ \.\.\.accountsWorkloadsQuery, search: account, includeDeleted: false \}\)/,
+  "Account navigation invalidates old requests before starting the automatic filter request");
 assert.match(accounts, /accounts-workloads-table-meta/);
 assert.doesNotMatch(accounts, /Loaded rows:/);
 assert.match(kpi, /Data through/);

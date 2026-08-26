@@ -411,8 +411,8 @@ export function Content({
     setSelectedGuideCode(code);
   };
   const openAccountWorkloads = (account: string) => {
-    onAccountsWorkloadsQueryChange({ ...accountsWorkloadsQuery, search: account, includeDeleted: false });
     onNavigate("accounts-workloads");
+    onAccountsWorkloadsQueryChange({ ...accountsWorkloadsQuery, search: account, includeDeleted: false });
   };
 
   return (
