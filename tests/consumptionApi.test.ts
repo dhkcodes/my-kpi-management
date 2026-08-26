@@ -23,6 +23,15 @@ const payload = {
     { account: "B", periodKey: "FY27-AUG" }, { account: "B", periodKey: "FY27-SEP" }
   ], signals: []
 };
+const changeSignal = {
+  signalId: 11, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUL",
+  type: "NEW_USAGE", grade: "WATCH", latestActual: 52, baselineMedian: 0, changeAmount: 52,
+  changePercent: null, mad: 0, allowance: 50, previousActual: 92, previousDirection: "DECREASED",
+  sparkline: [
+    { periodKey: "FY26-APR", actualAmount: 0 }, { periodKey: "FY26-MAY", actualAmount: 0 },
+    { periodKey: "FY27-JUN", actualAmount: 92 }, { periodKey: "FY27-JUL", actualAmount: 52 }
+  ], reason: "New consumption exceeded the usual zero baseline and decreased versus the previous month."
+};
 runtime.fetch = async (input) => {
   assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace?fromQuarter=FY26-Q1&toQuarter=FY27-Q1");
   return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json", ETag: '"header-etag"' } });
@@ -45,14 +54,14 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
-    signals: [{ signalId: 11, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUL",
-      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: 40, reason: "strict three-month rise" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"trend"' } });
-  const trendWorkspace = await fetchConsumptionWorkspace();
+    signals: [changeSignal]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"change"' } });
+  const changeWorkspace = await fetchConsumptionWorkspace();
   assert.deepEqual(
-    [trendWorkspace.signals[0].type, trendWorkspace.signals[0].serverPlanId, trendWorkspace.signals[0].planId],
-    ["RISING", 11, "P1"],
-    "approved trend signals retain their exact numeric server Plan identity"
+    [changeWorkspace.signals[0].type, changeWorkspace.signals[0].previousDirection,
+      changeWorkspace.signals[0].serverPlanId, changeWorkspace.signals[0].planId],
+    ["NEW_USAGE", "DECREASED", 11, "P1"],
+    "usual-level classification, previous-month direction and numeric Plan identity remain independent"
   );
 
   runtime.fetch = async () => new Response(JSON.stringify({
@@ -114,31 +123,40 @@ void (async () => {
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption fact response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
-    ...payload,
-    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "RISING", grade: "UNTRUSTED", changeAmount: 1, changePercent: 1, reason: "bad" }]
+    ...payload, signals: [{ ...changeSignal, grade: "UNTRUSTED" }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-signal"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
-    ...payload,
-    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: null, reason: "bad" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-trend-signal"' } });
+    ...payload, signals: [{ ...changeSignal, allowance: 51 }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-threshold"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
-    ...payload,
-    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-OCT",
-      type: "RISING", grade: "HIGH", changeAmount: 400, changePercent: -50, reason: "bad" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-trend-sign"' } });
+    ...payload, signals: [{ ...changeSignal, previousDirection: "INCREASED" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-direction"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
-    ...payload,
-    signals: [{ signalId: 1, planId: 11, account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUL",
-      type: "SPIKE", grade: "HIGH", changeAmount: 400, changePercent: 50, reason: "legacy MoM" }]
-  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"legacy-mom-signal"' } });
+    ...payload, signals: [{ ...changeSignal, baselineMedian: 1, changeAmount: 51, allowance: 50, type: "ABOVE_USUAL", changePercent: 5100 }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"mismatched-median"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/,
+    "decoder rejects a baseline median that contradicts the first three sparkline points");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, signals: [{ ...changeSignal, mad: 1 }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"mismatched-mad"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/,
+    "decoder rejects a MAD that contradicts the first three sparkline points");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, signals: [{ ...changeSignal, type: "RISING" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"legacy-trend-signal"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, signals: [{ ...changeSignal, sparkline: changeSignal.sparkline.slice(1) }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-sparkline"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption signal response/);
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...payload, lastBatchId: "7" }),

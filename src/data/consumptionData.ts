@@ -1,5 +1,6 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
-export type ConsumptionSignalType = "RISING" | "FALLING";
+export type ConsumptionSignalType = "ABOVE_USUAL" | "BELOW_USUAL" | "NEW_USAGE";
+export type ConsumptionPreviousDirection = "INCREASED" | "DECREASED" | "UNCHANGED";
 export type ConsumptionSignalGrade = "CRITICAL" | "HIGH" | "WATCH";
 
 export type ConsumptionPlan = Readonly<{
@@ -49,6 +50,11 @@ export type ConsumptionQuarterSummary = Readonly<{
   preQGap: number | null;
 }>;
 
+export type ConsumptionSignalPoint = Readonly<{
+  periodKey: string;
+  actualAmount: number;
+}>;
+
 export type ConsumptionSignal = Readonly<{
   id: string;
   serverPlanId?: number;
@@ -58,8 +64,15 @@ export type ConsumptionSignal = Readonly<{
   type: ConsumptionSignalType;
   grade: ConsumptionSignalGrade;
   month: string;
+  latestActual: number;
+  baselineMedian: number;
   changeAmount: number;
   changePercent: number | null;
+  mad: number;
+  allowance: number;
+  previousActual: number;
+  previousDirection: ConsumptionPreviousDirection;
+  sparkline: readonly ConsumptionSignalPoint[];
   reason: string;
   topContributingPlan: string;
 }>;
@@ -325,26 +338,38 @@ const signalGrade = (amount: number, percent: number | null): ConsumptionSignalG
   return "WATCH";
 };
 
-const reasonFor = (type: ConsumptionSignalType, amount: number, percent: number | null) => {
-  const direction = type === "RISING" ? "rose" : "fell";
-  return `Plan consumption ${direction} consistently over three completed months by ${Math.abs(amount).toLocaleString("en-US")} (${Math.abs(percent ?? 0).toFixed(1)}%).`;
+const medianOf = (values: readonly number[]) => {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-const detectPlanSignal = (plan: ConsumptionPlan, firstMonth: string, middleMonth: string, lastMonth: string): ConsumptionSignal | null => {
-  if (!Object.prototype.hasOwnProperty.call(plan.actuals, firstMonth)
-    || !Object.prototype.hasOwnProperty.call(plan.actuals, middleMonth)
-    || !Object.prototype.hasOwnProperty.call(plan.actuals, lastMonth)) return null;
-  const first = plan.actuals[firstMonth];
-  const middle = plan.actuals[middleMonth];
-  const last = plan.actuals[lastMonth];
-  if (first === 0) return null;
-  const rising = first < middle && middle < last;
-  const falling = first > middle && middle > last;
-  if (!rising && !falling) return null;
-  const amount = last - first;
-  const percent = (amount / Math.abs(first)) * 100;
-  if (Math.abs(amount) < 300 || Math.abs(percent) < 30) return null;
-  const type: ConsumptionSignalType = rising ? "RISING" : "FALLING";
+const previousDirectionFor = (latest: number, previous: number): ConsumptionPreviousDirection =>
+  latest > previous ? "INCREASED" : latest < previous ? "DECREASED" : "UNCHANGED";
+
+const reasonFor = (type: ConsumptionSignalType, amount: number, percent: number | null, previousDirection: ConsumptionPreviousDirection) => {
+  const prior = previousDirection === "INCREASED" ? "increased" : previousDirection === "DECREASED" ? "decreased" : "was unchanged";
+  if (type === "NEW_USAGE") return `New consumption exceeded the usual zero baseline and ${prior} versus the previous month.`;
+  return `Plan consumption was ${type === "ABOVE_USUAL" ? "above" : "below"} its prior three-month median by ${Math.abs(amount).toLocaleString("en-US")} (${Math.abs(percent ?? 0).toFixed(1)}%) and ${prior} versus the previous month.`;
+};
+
+const detectPlanSignal = (plan: ConsumptionPlan, months: readonly string[]): ConsumptionSignal | null => {
+  if (months.length !== 4 || months.some((month) => !Object.prototype.hasOwnProperty.call(plan.actuals, month))) return null;
+  const actuals = months.map((month) => plan.actuals[month]);
+  if (actuals.some((amount) => !Number.isFinite(amount))) return null;
+  const baseline = actuals.slice(0, 3);
+  const baselineMedian = medianOf(baseline);
+  const mad = medianOf(baseline.map((amount) => Math.abs(amount - baselineMedian)));
+  const allowance = Math.max(50, Math.abs(baselineMedian) * 0.05, mad * 3);
+  const latestActual = actuals[3];
+  const previousActual = actuals[2];
+  const changeAmount = latestActual - baselineMedian;
+  if (Math.abs(changeAmount) <= allowance) return null;
+  const changePercent = baselineMedian === 0 ? null : changeAmount / Math.abs(baselineMedian) * 100;
+  const type: ConsumptionSignalType = baselineMedian === 0 && latestActual > 0
+    ? "NEW_USAGE" : changeAmount > 0 ? "ABOVE_USUAL" : "BELOW_USUAL";
+  const previousDirection = previousDirectionFor(latestActual, previousActual);
+  const lastMonth = months[3];
   return {
     id: `${plan.id}::${lastMonth}::${type}`,
     serverPlanId: plan.serverPlanId,
@@ -352,11 +377,18 @@ const detectPlanSignal = (plan: ConsumptionPlan, firstMonth: string, middleMonth
     endUser: plan.endUser,
     planId: plan.planId,
     type,
-    grade: signalGrade(amount, percent),
+    grade: signalGrade(changeAmount, changePercent),
     month: lastMonth,
-    changeAmount: amount,
-    changePercent: percent,
-    reason: reasonFor(type, amount, percent),
+    latestActual,
+    baselineMedian,
+    changeAmount,
+    changePercent,
+    mad,
+    allowance,
+    previousActual,
+    previousDirection,
+    sparkline: months.map((periodKey, index) => ({ periodKey, actualAmount: actuals[index] })),
+    reason: reasonFor(type, changeAmount, changePercent, previousDirection),
     topContributingPlan: plan.planId
   };
 };
@@ -373,8 +405,8 @@ const completedFiscalMonth = (asOf: Date, monthsBack: number) => {
 };
 
 export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[], asOf = new Date()): ConsumptionSignal[] => {
-  const [firstMonth, middleMonth, lastMonth] = [3, 2, 1].map((monthsBack) => completedFiscalMonth(asOf, monthsBack));
-  return plans.map((plan) => detectPlanSignal(plan, firstMonth, middleMonth, lastMonth))
+  const months = [4, 3, 2, 1].map((monthsBack) => completedFiscalMonth(asOf, monthsBack));
+  return plans.map((plan) => detectPlanSignal(plan, months))
     .filter((signal): signal is ConsumptionSignal => signal !== null)
     .sort((left, right) => gradeOrder[left.grade] - gradeOrder[right.grade] || Math.abs(right.changeAmount) - Math.abs(left.changeAmount));
 };

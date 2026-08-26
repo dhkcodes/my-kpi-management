@@ -63,9 +63,47 @@ const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 const shortMonth = (month: string) => month.split("-")[1];
-const consumptionSignalDirection = (signal: ConsumptionSignal) => signal.type === "RISING"
-  ? { label: "Rising", icon: "oj-ux-ico-arrow-up", tone: "is-rise" }
-  : { label: "Falling", icon: "oj-ux-ico-arrow-down", tone: "is-fall" };
+const consumptionSignalPresentation = (signal: ConsumptionSignal) => signal.type === "ABOVE_USUAL"
+  ? { label: "ABOVE USUAL", tone: "is-above-usual" }
+  : signal.type === "BELOW_USUAL"
+    ? { label: "BELOW USUAL", tone: "is-below-usual" }
+    : { label: "NEW USAGE", tone: "is-new-usage" };
+const consumptionPreviousDirection = (signal: ConsumptionSignal) => signal.previousDirection === "INCREASED"
+  ? { label: "Increased", icon: "oj-ux-ico-arrow-up", tone: "is-increased" }
+  : signal.previousDirection === "DECREASED"
+    ? { label: "Decreased", icon: "oj-ux-ico-arrow-down", tone: "is-decreased" }
+    : { label: "Unchanged", icon: "oj-ux-ico-minus", tone: "is-unchanged" };
+const consumptionSignalAccessibleLabel = (signal: ConsumptionSignal) => {
+  const presentation = consumptionSignalPresentation(signal);
+  const previousDirection = consumptionPreviousDirection(signal);
+  const sparkline = signal.sparkline
+    .map((point) => `${shortMonth(point.periodKey)} ${currency.format(point.actualAmount)}`)
+    .join(", ");
+  return `${signal.customer} Plan ${signal.planId}. ${presentation.label}. Severity ${signal.grade}. `
+    + `${signal.month} actual ${currency.format(signal.latestActual)}. Previous three-month median ${currency.format(signal.baselineMedian)}. `
+    + `Change ${signedCurrency(signal.changeAmount)}, ${formatPercent(signal.changePercent)}. Allowance ${currency.format(signal.allowance)}. `
+    + `Previous month ${previousDirection.label}. Recent four completed months: ${sparkline}. Open this Plan's Consumption Trend.`;
+};
+
+const SignalSparkline = ({ signal }: Readonly<{ signal: ConsumptionSignal }>) => {
+  const width = 92;
+  const height = 30;
+  const padding = 3;
+  const values = signal.sparkline.map((point) => point.actualAmount);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = maximum - minimum;
+  const points = values.map((value, index) => {
+    const x = padding + index * ((width - padding * 2) / Math.max(1, values.length - 1));
+    const y = range === 0 ? height / 2 : padding + (maximum - value) / range * (height - padding * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return (
+    <svg class="consumption-sparkline" viewBox={`0 0 ${width} ${height}`} aria-hidden="true" focusable="false">
+      <polyline points={points}></polyline>
+    </svg>
+  );
+};
 
 type EditCell = Readonly<{ planKey: string; month: string }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
@@ -658,7 +696,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <article class="kpi-panel"><span>Range Total</span><strong>{currency.format(rangeTotal)}</strong><small>{fromQuarter} → {toQuarter}</small></article>
         <article class="kpi-panel"><span>Latest Quarter</span><strong>{latestSummary?.total === null || !latestSummary ? "N/A" : currency.format(latestSummary.total)}</strong><small>{latestSummary?.quarter ?? "—"} · {latestSummary?.status ?? "—"}</small></article>
         <article class="kpi-panel"><span>PreQ Change</span><strong>{signedCurrency(latestSummary?.preQGap ?? null)}</strong><small>Chronological predecessor</small></article>
-        <article class="kpi-panel"><span>Trend Alerts</span><strong>{signals.length}</strong><small>Strict completed-month direction</small></article>
+        <article class="kpi-panel"><span>Change Alerts</span><strong>{signals.length}</strong><small>Previous 3 completed months · Median + MAD</small></article>
         <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
       </section>
 
@@ -666,31 +704,34 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
           <div class="consumption-section-heading">
             <div>
-              <span class="kpi-section-label">Completed-month trend</span>
-              <h2 id="consumptionSignalTitle">3-Month Plan Trend Alerts</h2>
-              <p>Strict 3-month direction · ≥ $300 and ≥ 30%</p>
+              <span class="kpi-section-label">Usual-level comparison</span>
+              <h2 id="consumptionSignalTitle">Consumption Change Alerts</h2>
+              <p>Previous 3 completed months · Median · MAX($50, 5%, MAD × 3)</p>
             </div>
             <span class="consumption-count-badge">{signals.length}</span>
           </div>
           <div id="consumptionSignalInbox" class="consumption-signal-inbox">
             {signals.map((signal) => {
-              const direction = consumptionSignalDirection(signal);
+              const presentation = consumptionSignalPresentation(signal);
+              const previousDirection = consumptionPreviousDirection(signal);
               return (
               <button
                 type="button"
                 class={selectedSignal?.id === signal.id ? "consumption-signal is-selected" : "consumption-signal"}
                 aria-pressed={selectedSignal?.id === signal.id}
+                aria-label={consumptionSignalAccessibleLabel(signal)}
                 onClick={() => selectSignal(signal)}>
-                <span class={`consumption-signal-type is-${signal.type.toLowerCase()}`}>{signal.type}</span>
+                <span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
                 <span class="consumption-signal-main"><strong>{signal.customer}</strong><span>{signal.endUser} · {signal.planId}</span></span>
-                <span class={`consumption-signal-direction ${direction.tone}`}><span class={direction.icon} aria-hidden="true"></span>{direction.label}</span>
-                <span class="consumption-signal-severity">{signal.grade}</span>
+                <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual {currency.format(signal.latestActual)}</strong><span>Median {currency.format(signal.baselineMedian)} · MAD {currency.format(signal.mad)}</span></span>
                 <span class="consumption-signal-change"><strong>{signedCurrency(signal.changeAmount)}</strong><span>{formatPercent(signal.changePercent)}</span></span>
-                <span class="consumption-signal-month">{signal.month}</span>
+                <span class={`consumption-signal-direction ${previousDirection.tone}`}><span class={previousDirection.icon} aria-hidden="true"></span>Previous month: {previousDirection.label}</span>
+                <SignalSparkline signal={signal} />
+                <span class="consumption-signal-severity">{signal.grade}</span>
               </button>
               );
             })}
-            {signals.length === 0 && <p class="consumption-empty-state">No Plans met the strict 3-month trend thresholds.</p>}
+            {signals.length === 0 && <p class="consumption-empty-state">No Plans exceeded the three-month median and MAD allowance.</p>}
           </div>
         </section>
 
@@ -733,12 +774,16 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             aria-label="Linked monthly consumption trend">
             <template slot="itemTemplate" render={renderConsumptionChartItem}></template>
           </oj-chart>
-          {selectedSignal && (
+          {selectedSignal && (() => {
+            const presentation = consumptionSignalPresentation(selectedSignal);
+            const previousDirection = consumptionPreviousDirection(selectedSignal);
+            return (
             <div class="consumption-signal-reason" role="note">
-              <span class={`consumption-signal-type is-${selectedSignal.type.toLowerCase()}`}>{selectedSignal.type}</span>
-              <div><strong>{consumptionSignalDirection(selectedSignal).label} · {selectedSignal.month}</strong><p>{selectedSignal.reason} Plan ID: {selectedSignal.planId}.</p></div>
+              <span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
+              <div><strong>{selectedSignal.month} · Previous month: {previousDirection.label}</strong><p>{selectedSignal.reason} Allowance: {currency.format(selectedSignal.allowance)}. Plan ID: {selectedSignal.planId}.</p></div>
             </div>
-          )}
+            );
+          })()}
         </section>
       </div>
 

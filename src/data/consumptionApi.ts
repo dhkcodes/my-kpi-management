@@ -17,7 +17,13 @@ const apiBase = () => {
 
 type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number }>;
 type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; workload?: string | null; facts: RawFact[] }>;
-type RawSignal = Readonly<{ signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string; type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"]; changeAmount: number; changePercent: number | null; reason: string }>;
+type RawSignalPoint = Readonly<{ periodKey: string; actualAmount: number }>;
+type RawSignal = Readonly<{
+  signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string;
+  type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"]; latestActual: number; baselineMedian: number;
+  changeAmount: number; changePercent: number | null; mad: number; allowance: number; previousActual: number;
+  previousDirection: ConsumptionSignal["previousDirection"]; sparkline: RawSignalPoint[]; reason: string
+}>;
 type RawControlTotal = Readonly<{ account: string; periodKey: string }>;
 type RawWorkspace = Readonly<{
   etag: string;
@@ -73,7 +79,8 @@ export const canUseConsumptionFallback = (error: unknown) => {
   return error instanceof ConsumptionNetworkError || (error instanceof ConsumptionApiError && error.status === 404);
 };
 
-const signalTypes = new Set<ConsumptionSignal["type"]>(["RISING", "FALLING"]);
+const signalTypes = new Set<ConsumptionSignal["type"]>(["ABOVE_USUAL", "BELOW_USUAL", "NEW_USAGE"]);
+const previousDirections = new Set<ConsumptionSignal["previousDirection"]>(["INCREASED", "DECREASED", "UNCHANGED"]);
 const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "WATCH"]);
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
@@ -84,6 +91,21 @@ const isNonNegativeInteger = (value: unknown): value is number => Number.isInteg
 const isPositiveInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) > 0;
 const isPeriodKey = (value: unknown): value is string => typeof value === "string" && fiscalPeriodPattern.test(value);
 const isQuarterKey = (value: unknown): value is string => typeof value === "string" && fiscalQuarterPattern.test(value);
+const nearlyEqual = (left: number, right: number) => Math.abs(left - right) <= 1e-6 * Math.max(1, Math.abs(left), Math.abs(right));
+const fiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
+const fiscalPeriodOrder = (periodKey: string) => {
+  const match = /^FY(\d{2})-([A-Z]{3})$/.exec(periodKey);
+  return match ? Number(match[1]) * fiscalMonths.length + fiscalMonths.indexOf(match[2]) : Number.NaN;
+};
+const medianOf = (values: readonly number[]) => {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+const round4 = (value: number) => Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 10_000) / 10_000;
+const expectedSignalGrade = (amount: number, percent: number | null): ConsumptionSignal["grade"] =>
+  Math.abs(amount) >= 1000 || Math.abs(percent ?? 0) >= 100 ? "CRITICAL"
+    : Math.abs(amount) >= 300 || Math.abs(percent ?? 0) >= 30 ? "HIGH" : "WATCH";
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {
   if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption workspace response");
@@ -143,19 +165,51 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
   }));
   const byServerId = new Map(plans.map((plan) => [plan.serverPlanId, plan]));
   const signals: ConsumptionSignal[] = raw.signals.map((signal) => {
-    if (!isPositiveInteger(signal?.signalId) || !isPositiveInteger(signal?.planId) || !isNonEmptyString(signal?.account)
-      || !isNonEmptyString(signal?.endUser) || !isNonEmptyString(signal?.planCode) || !isPeriodKey(signal?.periodKey)
-      || !signalTypes.has(signal?.type) || !signalGrades.has(signal?.grade) || !isFiniteNumber(signal?.changeAmount)
-      || !isFiniteNumber(signal?.changePercent) || Math.abs(signal.changeAmount) < 300 || Math.abs(signal.changePercent) < 30
-      || (signal.type === "RISING"
-        ? signal.changeAmount <= 0 || signal.changePercent <= 0
-        : signal.changeAmount >= 0 || signal.changePercent >= 0)
-      || !isNonEmptyString(signal?.reason) || !byServerId.has(signal.planId)) throw new Error("Malformed Consumption signal response");
+    if (!isPositiveInteger(signal?.signalId) || !isPositiveInteger(signal?.planId) || signal.signalId !== signal.planId
+      || !isNonEmptyString(signal?.account) || !isNonEmptyString(signal?.endUser) || !isNonEmptyString(signal?.planCode)
+      || !isPeriodKey(signal?.periodKey) || !signalTypes.has(signal?.type) || !signalGrades.has(signal?.grade)
+      || !isFiniteNumber(signal?.latestActual) || signal.latestActual < 0
+      || !isFiniteNumber(signal?.baselineMedian) || signal.baselineMedian < 0
+      || !isFiniteNumber(signal?.changeAmount) || !isNullableFiniteNumber(signal?.changePercent)
+      || !isFiniteNumber(signal?.mad) || signal.mad < 0 || !isFiniteNumber(signal?.allowance) || signal.allowance < 0
+      || !isFiniteNumber(signal?.previousActual) || signal.previousActual < 0
+      || !previousDirections.has(signal?.previousDirection) || !Array.isArray(signal?.sparkline)
+      || signal.sparkline.length !== 4 || !isNonEmptyString(signal?.reason) || !byServerId.has(signal.planId)) {
+      throw new Error("Malformed Consumption signal response");
+    }
+    const sparklineValid = signal.sparkline.every((point, index) => isPeriodKey(point?.periodKey)
+      && isFiniteNumber(point?.actualAmount) && point.actualAmount >= 0
+      && (index === 0 || fiscalPeriodOrder(point.periodKey) === fiscalPeriodOrder(signal.sparkline[index - 1].periodKey) + 1));
+    const baselineValues = signal.sparkline.slice(0, 3).map((point) => point.actualAmount);
+    const computedMedian = medianOf(baselineValues);
+    const computedMad = medianOf(baselineValues.map((value) => Math.abs(value - computedMedian)));
+    const expectedChange = signal.latestActual - computedMedian;
+    const expectedAllowance = Math.max(50, Math.abs(computedMedian) * 0.05, computedMad * 3);
+    const expectedPercent = computedMedian === 0 ? null : round4(expectedChange / Math.abs(computedMedian) * 100);
+    const expectedType: ConsumptionSignal["type"] = computedMedian === 0 && signal.latestActual > 0
+      ? "NEW_USAGE" : expectedChange > 0 ? "ABOVE_USUAL" : "BELOW_USUAL";
+    const expectedDirection: ConsumptionSignal["previousDirection"] = signal.latestActual > signal.previousActual
+      ? "INCREASED" : signal.latestActual < signal.previousActual ? "DECREASED" : "UNCHANGED";
+    const plan = byServerId.get(signal.planId);
+    if (!sparklineValid || signal.sparkline[3].periodKey !== signal.periodKey
+      || !nearlyEqual(signal.sparkline[3].actualAmount, signal.latestActual)
+      || !nearlyEqual(signal.sparkline[2].actualAmount, signal.previousActual)
+      || !nearlyEqual(signal.baselineMedian, computedMedian) || !nearlyEqual(signal.mad, computedMad)
+      || !nearlyEqual(signal.changeAmount, expectedChange) || !nearlyEqual(signal.allowance, expectedAllowance)
+      || Math.abs(signal.changeAmount) <= signal.allowance || signal.type !== expectedType
+      || signal.previousDirection !== expectedDirection || signal.grade !== expectedSignalGrade(signal.changeAmount, signal.changePercent)
+      || (expectedPercent === null ? signal.changePercent !== null : signal.changePercent === null || !nearlyEqual(signal.changePercent, expectedPercent))
+      || plan?.customer !== signal.account || plan?.endUser !== signal.endUser || plan?.planId !== signal.planCode) {
+      throw new Error("Malformed Consumption signal response");
+    }
     return {
       id: `server-signal-${signal.signalId}`, serverPlanId: signal.planId,
       customer: signal.account, endUser: signal.endUser, planId: signal.planCode,
-      type: signal.type, grade: signal.grade, month: signal.periodKey, changeAmount: signal.changeAmount,
-      changePercent: signal.changePercent, reason: signal.reason, topContributingPlan: byServerId.get(signal.planId)?.planId ?? signal.planCode
+      type: signal.type, grade: signal.grade, month: signal.periodKey, latestActual: signal.latestActual,
+      baselineMedian: signal.baselineMedian, changeAmount: signal.changeAmount, changePercent: signal.changePercent,
+      mad: signal.mad, allowance: signal.allowance, previousActual: signal.previousActual,
+      previousDirection: signal.previousDirection, sparkline: signal.sparkline.map((point) => ({ ...point })),
+      reason: signal.reason, topContributingPlan: plan.planId
     };
   });
   return {

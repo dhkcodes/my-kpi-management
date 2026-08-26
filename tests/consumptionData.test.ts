@@ -136,23 +136,25 @@ const signalPlan = (
   actuals,
   forecasts: {}
 });
-const signalMonths = ["FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"];
+const signalMonths = ["FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"];
 const values = (items: number[]) => Object.fromEntries(signalMonths.map((month, index) => [month, items[index]]));
 const signals = detectConsumptionSignals([
-  signalPlan("RISING", values([100, 250, 500, 10])),
-  signalPlan("FALLING", values([1000, 700, 500, 2000])),
-  signalPlan("SPIKE-RETURN", values([100, 900, 500, 1000])),
-  signalPlan("DROP-RETURN", values([1000, 100, 500, 0])),
-  signalPlan("AMOUNT-SMALL", values([100, 250, 399, 1000])),
-  signalPlan("PERCENT-SMALL", values([2000, 2300, 2599, 1000])),
-  signalPlan("ZERO", values([0, 200, 500, 1000])),
-  signalPlan("MISSING", { "FY26-MAY": 100, "FY27-JUL": 500 })
+  signalPlan("ABOVE", values([100, 100, 100, 151, 1])),
+  signalPlan("BELOW", values([300, 300, 300, 249, 2000])),
+  signalPlan("NEW", values([0, 0, 92, 52, 1000])),
+  signalPlan("BOUNDARY", values([100, 100, 100, 150, 1000])),
+  signalPlan("MAD-BOUNDARY", values([100, 200, 300, 500, 1000])),
+  signalPlan("MISSING", { "FY26-APR": 100, "FY27-JUN": 100, "FY27-JUL": 200 })
 ], new Date("2026-08-26T00:00:00Z"));
-assert.deepEqual(new Set(signals.map((signal) => signal.type)), new Set(["RISING", "FALLING"]), "only strict three-month directions are detectable");
-assert.deepEqual(new Set(signals.map((signal) => signal.planId)), new Set(["RISING", "FALLING"]), "reversals, threshold misses, zero baselines and missing completed months are excluded");
-assert.equal(signals.every((signal) => signal.month === "FY27-JUL" && signal.changePercent !== null), true, "all signals use the shared latest completed three-month window");
+assert.deepEqual(new Set(signals.map((signal) => signal.type)), new Set(["ABOVE_USUAL", "BELOW_USUAL", "NEW_USAGE"]), "median and MAD classify the approved change-alert types");
+assert.deepEqual(new Set(signals.map((signal) => signal.planId)), new Set(["ABOVE", "BELOW", "NEW"]), "exact threshold boundaries and incomplete baselines are excluded");
+const newUsage = signals.find((signal) => signal.type === "NEW_USAGE");
+assert.equal(newUsage?.changePercent, null, "a zero median does not invent a percentage");
+assert.equal(newUsage?.previousDirection, "DECREASED", "NEW USAGE stays separate from the previous-month direction");
+assert.deepEqual(newUsage?.sparkline.map((point) => point.actualAmount), [0, 0, 92, 52], "the alert includes the prior three months and latest completed month");
+assert.equal(signals.every((signal) => signal.month === "FY27-JUL" && signal.sparkline.length === 4), true, "all signals use the shared latest four-completed-month window");
 const monthBoundarySignals = detectConsumptionSignals([
-  signalPlan("RISING", values([100, 250, 500, 10]))
+  signalPlan("ABOVE", values([100, 100, 100, 151, 10]))
 ], new Date("2026-07-31T15:30:00Z"));
 assert.equal(monthBoundarySignals[0]?.month, "FY27-JUL", "completed months advance at midnight in the Asia/Seoul business zone");
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
