@@ -63,6 +63,11 @@ export type ConsumptionSignal = Readonly<{
   topContributingPlan: string;
 }>;
 
+export const getConsumptionPlanLabel = (plan: Pick<ConsumptionPlan, "customer" | "workload" | "planId">): string =>
+  plan.workload
+    ? `${plan.customer} - ${plan.workload} (${plan.planId})`
+    : `${plan.customer} (${plan.planId})`;
+
 const oracleFiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"] as const;
 const quarterMonths: Record<string, readonly string[]> = {
   Q1: ["JUN", "JUL", "AUG"],

@@ -7,6 +7,7 @@ import {
   detectConsumptionSignals,
   getFiscalQuarter,
   getLatestActualMonth,
+  getConsumptionPlanLabel,
   getNextQuarterMonths,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
@@ -21,6 +22,8 @@ const csv = [
 ].join("\n");
 
 const parsed = parseConsumptionCsv(csv);
+assert.equal(getConsumptionPlanLabel({ ...parsed.plans[0], workload: "Database" }), "Example Account - Database (PLAN-1)");
+assert.equal(getConsumptionPlanLabel(parsed.plans[0]), "Example Account (PLAN-1)");
 assert.equal(parsed.plans.length, 2, "Multiple control rows must not become detailed plan facts");
 assert.equal(parsed.controlTotals.length, 1, "Multiple rows remain available only as import control totals");
 assert.equal("soldTo" in parsed.controlTotals[0], false, "Sold To is removed even from control rows");

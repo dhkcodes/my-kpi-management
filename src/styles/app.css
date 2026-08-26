@@ -41,6 +41,44 @@ body {
 
 *, *::before, *::after { box-sizing: border-box; }
 
+.kap-login-page {
+  align-items: center;
+  background: var(--oj-core-bg-color-content, #fff);
+  color: var(--oj-core-text-color-primary, var(--kpi-ink));
+  display: grid;
+  justify-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.kap-login-card {
+  background: var(--oj-core-bg-color-content, #fff);
+  border: 1px solid var(--oj-core-divider-color, var(--kpi-border));
+  border-radius: var(--oj-core-border-radius-lg, .5rem);
+  box-shadow: var(--oj-core-box-shadow-sm, 0 .5rem 1.5rem rgb(22 21 19 / 10%));
+  max-width: 100%;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  width: 30rem;
+}
+.kap-login-card h1 { font-size: clamp(1.75rem, 7vw, 2.35rem); margin: 1.5rem 0 .5rem; }
+.kap-login-card > p { color: var(--oj-core-text-color-secondary, var(--kpi-muted)); line-height: 1.5; margin: .5rem 0 1.5rem; }
+.kap-login-brand { align-items: center; display: flex; gap: .75rem; }
+.kap-login-brand__mark { align-items: center; background: var(--kpi-brand); border-radius: .3rem; color: #fff; display: inline-flex; font-size: 1.15rem; font-weight: 800; height: 2.5rem; justify-content: center; width: 2.5rem; }
+.kap-login-brand > div { display: grid; gap: .15rem; }
+.kap-login-brand span { color: var(--oj-core-text-color-secondary, var(--kpi-muted)); font-size: .75rem; }
+.kap-login-form { display: grid; gap: 1rem; }
+.kap-login-error { background: var(--oj-core-danger-1, #fff2f0); border-left: .25rem solid var(--oj-core-danger-3, var(--kpi-danger)); color: var(--oj-core-danger-3, var(--kpi-danger)); margin: .75rem 0; padding: .75rem; }
+.kap-login-success { background: var(--oj-core-success-1, #eef6ec); border-left: .25rem solid var(--oj-core-success-3, var(--kpi-success)); margin: 1rem 0; padding: .85rem; }
+.kap-login-success p { color: var(--oj-core-text-color-secondary, var(--kpi-muted)); line-height: 1.45; margin: .35rem 0 0; }
+.kap-login-link { background: transparent; border: 0; color: var(--oj-link-text-color, #174f82); cursor: pointer; display: inline-block; font: inherit; margin: 1rem .75rem 0 0; padding: .35rem 0; text-decoration: underline; }
+.kap-login-link:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
+
+@media (max-width: 480px) {
+  .kap-login-page { align-items: start; padding: 0; }
+  .kap-login-card { border-width: 0; border-radius: 0; box-shadow: none; min-height: 100dvh; padding: 1.5rem 1rem; width: 100%; }
+}
+
 .kap-login {
   align-items: center;
   background:
@@ -1689,12 +1727,16 @@ body {
 .kap-login__modes button.is-active { border-bottom-color: var(--kpi-brand); color: var(--kpi-brand); }
 .kap-account-page { background: var(--kpi-surface); border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); box-shadow: var(--kpi-shadow); padding: clamp(1rem, 2vw, 1.5rem); }
 .kap-account-page h2 { margin: .25rem 0; }
+.kap-profile-header { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
 .kap-profile-fields { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 1.25rem 0; }
 .kap-profile-fields div { background: var(--kpi-soft); border: 1px solid var(--kpi-border); padding: .85rem; }
 .kap-profile-fields dt { color: var(--kpi-muted); font-size: .75rem; font-weight: 800; margin-bottom: .35rem; }
 .kap-profile-fields dd { font-weight: 800; margin: 0; overflow-wrap: anywhere; }
 .kap-password-form { border-top: 1px solid var(--kpi-border); display: grid; gap: .75rem; max-width: 32rem; padding-top: 1rem; }
 .kap-password-form h3 { margin: 0; }
+.kap-password-dialog { --oj-dialog-width: min(32rem, calc(100vw - 2rem)); }
+.kap-password-dialog__body { display: grid; gap: .85rem; min-width: min(28rem, 74vw); }
+.kap-password-policy-hint { color: var(--oj-core-text-color-secondary, var(--kpi-muted)); font-size: .78rem; line-height: 1.45; margin: 0; }
 .kap-form-message { background: color-mix(in srgb, var(--kpi-green) 10%, var(--kpi-surface)); border-left: .25rem solid var(--kpi-green); padding: .7rem; }
 .kap-form-message--error { background: #fff2f0; border-left-color: var(--kpi-danger); color: var(--kpi-danger); }
 .kap-users-header { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
@@ -1703,6 +1745,9 @@ body {
 .kap-users-table { border-collapse: collapse; min-width: 52rem; width: 100%; }
 .kap-users-table th, .kap-users-table td { border-bottom: 1px solid var(--kpi-border); padding: .7rem; text-align: left; }
 .kap-users-table th { background: var(--kpi-soft); color: var(--kpi-muted); font-size: .75rem; text-transform: uppercase; }
+.kap-users-table tbody tr:hover { background: var(--kap-grid-hover-bg); }
+.kap-users-table td { vertical-align: middle; }
+.kap-access-badge { background: var(--oj-core-neutral-10, #f4f2f0); border: 1px solid var(--kpi-border); border-radius: 999px; display: inline-flex; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; }
 .kap-status { border-radius: 999px; display: inline-flex; font-size: .72rem; font-weight: 850; padding: .25rem .55rem; }
 .kap-status--active { background: #e6f4ea; color: #176b3a; }
 .kap-status--invited { background: #eaf2fb; color: #245879; }
@@ -1721,7 +1766,20 @@ body {
 .kap-action-dialog input, .kap-action-dialog select { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); font: inherit; min-height: 2.5rem; padding: .5rem; }
 .kap-action-dialog footer { display: flex; gap: .5rem; justify-content: flex-end; }
 .kap-dialog-note { color: var(--kpi-muted); font-size: .78rem; margin: 0; }
-@media (max-width: 640px) { .kap-profile-fields { grid-template-columns: 1fr; } .kap-users-header { align-items: stretch; flex-direction: column; } }
+@media (max-width: 720px) {
+  .kap-profile-fields { grid-template-columns: 1fr; }
+  .kap-users-header { align-items: stretch; flex-direction: column; }
+  .kap-users-table-wrap { border: 0; overflow: visible; }
+  .kap-users-table { display: block; min-width: 0; }
+  .kap-users-table thead { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+  .kap-users-table tbody, .kap-users-table tr, .kap-users-table td { display: block; width: 100%; }
+  .kap-users-table tr { background: var(--kpi-surface); border: 1px solid var(--kpi-border); box-shadow: 0 .25rem .8rem rgb(22 21 19 / 6%); margin-top: .75rem; padding: .75rem; }
+  .kap-users-table td { align-items: start; border: 0; display: grid; gap: .75rem; grid-template-columns: minmax(6.5rem, 34%) minmax(0, 1fr); padding: .45rem 0; }
+  .kap-users-table td { min-width: 0; overflow-wrap: anywhere; white-space: normal; word-break: break-word; }
+  .kap-users-table td::before { color: var(--kpi-muted); content: attr(data-label); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+  .kap-user-actions { display: grid; gap: .25rem; margin-top: -.25rem; min-width: 0; width: 100%; }
+  .kap-user-actions oj-button { max-width: 100%; width: 100%; }
+}
 
 .accounts-workloads-clone-content { display: grid; gap: 1rem; min-width: min(36rem, 80vw); }
 .accounts-workloads-clone-groups { display: grid; gap: .75rem; max-height: 50vh; overflow-y: auto; }
@@ -2313,9 +2371,13 @@ h4.weekly-activity-section-label--next-week,
 .consumption-account-column { left: 0; min-width: 19rem !important; position: sticky; text-align: left !important; width: 19rem; z-index: 3; }
 .consumption-table thead .consumption-account-column { z-index: 6; }
 .consumption-account-row .consumption-account-column { background: #f7f5f2; }
-.consumption-account-toggle { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: grid; font: inherit; gap: .2rem .45rem; grid-template-columns: auto minmax(0, 1fr); padding: 0; text-align: left; width: 100%; }
-.consumption-account-toggle > span { grid-row: 1 / 3; }
-.consumption-account-toggle strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumption-account-toggle { background: transparent; border: 0; border-radius: var(--oj-core-border-radius-sm); color: inherit; cursor: pointer; display: block; font: inherit; padding: .2rem; text-align: left; width: 100%; }
+.consumption-account-toggle:hover { background: var(--oj-core-bg-color-hover, #eeebe8); }
+.consumption-account-toggle:focus-visible { box-shadow: 0 0 0 2px var(--oj-core-focus-border-color, #0572ce); outline: none; }
+.consumption-leading { align-items: start; display: grid; gap: .2rem .45rem; grid-template-columns: 1.25rem minmax(0, 1fr); min-width: 0; width: 100%; }
+.consumption-disclosure-slot { align-items: center; display: inline-flex; grid-column: 1; grid-row: 1 / 3; justify-content: center; min-height: 1.2rem; width: 1.25rem; }
+.consumption-leading-copy { display: grid; gap: .2rem; grid-column: 2; min-width: 0; }
+.consumption-leading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-account-toggle small, .consumption-account-column > small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; }
 .consumption-plan-row .consumption-account-column { padding-left: 2rem; }
 .consumption-end-user { display: block; font-size: .82rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

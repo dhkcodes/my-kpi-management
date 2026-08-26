@@ -32,13 +32,28 @@ export function authenticateUser(userId: string, password: string, fetchImpl: Fe
   return postProfile("/api/v1/auth/login", { userId: normalizeLogin(userId), password }, fetchImpl);
 }
 
+export async function requestPasswordReset(loginId: string, fetchImpl: FetchLike = fetch): Promise<void> {
+  const response = await apiFetch("/api/v1/auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ loginId: normalizeLogin(loginId) })
+  }, fetchImpl, false);
+  if (!response.ok) throw new Error("Password reset request is temporarily unavailable.");
+}
+
 export async function inspectCredentialAction(token: string, fetchImpl: FetchLike = fetch): Promise<CredentialActionContext> {
   const response = await apiFetch("/api/v1/auth/action-token/inspect", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ token })
-  }, fetchImpl);
-  if (response.status === 401) throw new Error(INVALID_ACTION_LINK_MESSAGE);
+  }, fetchImpl, false);
+  if (response.status === 401) throw new Error("This action link is invalid.");
+  if (response.status === 410) {
+    const error = await response.json().catch(() => ({})) as { outcome?: unknown };
+    if (error.outcome === "EXPIRED") throw new Error("This action link has expired. Request a new link to continue.");
+    if (error.outcome === "USED") throw new Error("This action link has already been used. Request a new link to continue.");
+    throw new Error(INVALID_ACTION_LINK_MESSAGE);
+  }
   if (!response.ok) throw new Error("Credential link validation is temporarily unavailable.");
   const value: unknown = await response.json();
   if (typeof value !== "object" || value === null) throw new Error("Invalid credential link response.");
@@ -50,24 +65,35 @@ export async function inspectCredentialAction(token: string, fetchImpl: FetchLik
   return { loginId: candidate.loginId, purpose: candidate.purpose as CredentialActionPurpose, expiresAt: candidate.expiresAt };
 }
 
-export function completeCredentialAction(purpose: CredentialActionPurpose, token: string, newPassword: string,
-  fetchImpl: FetchLike = fetch): Promise<AuthSession> {
+export async function completeCredentialAction(purpose: CredentialActionPurpose, token: string, newPassword: string,
+  confirmPasswordOrFetch: string | FetchLike = newPassword, fetchImpl: FetchLike = fetch): Promise<void> {
+  const confirmPassword = typeof confirmPasswordOrFetch === "string" ? confirmPasswordOrFetch : newPassword;
+  if (typeof confirmPasswordOrFetch === "function") fetchImpl = confirmPasswordOrFetch;
   const path = purpose === "ACTIVATION" ? "/api/v1/auth/activate" : "/api/v1/auth/reset-complete";
-  return postProfile(path, { token, newPassword }, fetchImpl, INVALID_ACTION_LINK_MESSAGE);
+  const response = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ token, newPassword, confirmPassword })
+  }, fetchImpl, false);
+  if (response.status === 401 || response.status === 410) throw new Error(INVALID_ACTION_LINK_MESSAGE);
+  if (!response.ok) throw new Error("The password does not meet the required policy or confirmation does not match.");
 }
 
-export async function changePassword(currentPassword: string, newPassword: string, fetchImpl: FetchLike = fetch): Promise<void> {
+export async function changePassword(currentPassword: string, newPassword: string,
+  confirmPasswordOrFetch: string | FetchLike = newPassword, fetchImpl: FetchLike = fetch): Promise<void> {
+  const confirmPassword = typeof confirmPasswordOrFetch === "string" ? confirmPasswordOrFetch : newPassword;
+  if (typeof confirmPasswordOrFetch === "function") fetchImpl = confirmPasswordOrFetch;
   const response = await apiFetch("/api/v1/auth/change-password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ currentPassword, newPassword })
+    body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
   }, fetchImpl);
   if (response.status === 401) throw new Error("The current password is incorrect or the session has expired.");
   if (!response.ok) throw new Error("Password change is temporarily unavailable.");
 }
 
 export async function getAuthenticatedSession(fetchImpl: FetchLike = fetch): Promise<AuthSession | null> {
-  const response = await apiFetch("/api/v1/auth/session", { method: "GET", headers: { Accept: "application/json" } }, fetchImpl);
+  const response = await apiFetch("/api/v1/auth/session", { method: "GET", headers: { Accept: "application/json" } }, fetchImpl, false);
   if (response.status === 401) return null;
   if (!response.ok) throw new Error("Session verification is temporarily unavailable.");
   const profile = parseAuthProfile(await response.json());

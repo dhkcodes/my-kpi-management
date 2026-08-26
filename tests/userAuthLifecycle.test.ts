@@ -4,9 +4,11 @@ import {
   changePassword,
   completeCredentialAction,
   getAuthenticatedSession,
-  inspectCredentialAction
+  inspectCredentialAction,
+  requestPasswordReset
 } from "../src/auth/authApi";
 import { apiFetch, resetAuthRequiredNotification, subscribeAuthRequired } from "../src/auth/apiFetch";
+import { validatePasswordPolicy } from "../src/auth/passwordPolicy";
 import {
   cancelUserInvite, disableUser, enableUser, inviteUser, listUsers, lockUser,
   reissueUserInvite, resetUserPassword, unlockUser
@@ -22,6 +24,11 @@ const profile = {
 const action = { user: profile, actionToken: "signed.action-token", expiresAt: "2026-08-27T00:00:00Z", purpose: "ACTIVATION" as const };
 
 async function main() {
+  assert.match(validatePasswordPolicy("short") ?? "", /12 characters/);
+  assert.match(validatePasswordPolicy("alllowercase12") ?? "", /uppercase/);
+  assert.match(validatePasswordPolicy("ALLUPPERCASE12") ?? "", /lowercase/);
+  assert.match(validatePasswordPolicy("NoNumbersHere") ?? "", /number/);
+  assert.equal(validatePasswordPolicy("ValidPassword1"), null);
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const jsonFetch: typeof fetch = async (input, init) => {
     calls.push({ url: String(input), init });
@@ -39,15 +46,18 @@ async function main() {
   assert.deepEqual(await getAuthenticatedSession(jsonFetch), profile);
 
   assert.equal((await inspectCredentialAction("signed.action-token", jsonFetch)).purpose, "ACTIVATION");
-  await completeCredentialAction("ACTIVATION", "signed.action-token", "replacement-password", jsonFetch);
+  await completeCredentialAction("ACTIVATION", "signed.action-token", "replacement-password", "replacement-password", jsonFetch);
   assert.deepEqual(JSON.parse(String(calls[calls.length - 1]?.init?.body)), {
-    token: "signed.action-token", newPassword: "replacement-password"
+    token: "signed.action-token", newPassword: "replacement-password", confirmPassword: "replacement-password"
   });
   assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/activate");
-  await completeCredentialAction("RESET", "signed.reset-token", "replacement-password", jsonFetch);
+  await completeCredentialAction("RESET", "signed.reset-token", "replacement-password", "replacement-password", jsonFetch);
   assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/reset-complete");
-  await changePassword("current", "replacement", jsonFetch);
+  await changePassword("current", "replacement", "replacement", jsonFetch);
   assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/change-password");
+  await requestPasswordReset("  ADA@EXAMPLE.COM ", jsonFetch);
+  assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/forgot-password");
+  assert.deepEqual(JSON.parse(String(calls[calls.length - 1]?.init?.body)), { loginId: "ada@example.com" });
 
   let authRequiredCount = 0;
   const unsubscribe = subscribeAuthRequired(() => { authRequiredCount += 1; });

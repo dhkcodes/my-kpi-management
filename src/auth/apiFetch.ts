@@ -28,9 +28,10 @@ function emitAuthRequired(): void {
 export async function apiFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  notifyAuthRequired = true
 ): Promise<Response> {
   const response = await fetchImpl(input, { ...init, credentials: "include" });
-  if (response.status === 401) emitAuthRequired();
+  if (notifyAuthRequired && response.status === 401) emitAuthRequired();
   return response;
 }

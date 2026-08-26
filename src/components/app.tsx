@@ -720,6 +720,7 @@ export const App = registerCustomElement(
       if (authChecking || session || typeof window === "undefined") return undefined;
 
       const keepLoginAtHomePath = () => {
+        if (["/activate", "/reset-password", "/request-reset"].includes(window.location.pathname)) return;
         if (window.location.pathname !== "/" || window.location.search || window.location.hash) {
           window.history.replaceState(null, "", "/");
         }

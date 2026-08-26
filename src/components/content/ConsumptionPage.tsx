@@ -6,7 +6,7 @@ import {
   ConsumptionSignal,
   aggregateConsumptionAccounts,
   buildDisplayQuarterSummaries,
-  detectConsumptionSignals,
+  getConsumptionPlanLabel,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths,
@@ -106,8 +106,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
   const [selectedSignalId, setSelectedSignalId] = useState("");
-  const [selectedAccount, setSelectedAccount] = useState("__all__");
-  const [accountSearch, setAccountSearch] = useState("");
+  const [selectedSeriesId, setSelectedSeriesId] = useState("__all__");
+  const [planSearch, setPlanSearch] = useState("");
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(() => new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
   const [importStatus, setImportStatus] = useState("Loading authoritative Consumption workspace…");
@@ -127,6 +127,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [rangeInitialized, setRangeInitialized] = useState(false);
   const [rangeTouched, setRangeTouched] = useState(false);
   const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
+  const [activePlanIndex, setActivePlanIndex] = useState(0);
   const [tableScrollState, setTableScrollState] = useState({ left: 0, max: 0 });
   const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
@@ -183,15 +184,40 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   }, []);
 
   const accounts = useMemo(() => aggregateConsumptionAccounts(draftPlans), [draftPlans]);
-  const signals = useMemo(() => serverSignals ?? detectConsumptionSignals(draftPlans), [draftPlans, serverSignals]);
+  const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => aggregateConsumptionAccounts(
     draftPlans.map((plan) => ({ ...plan, customer: "All accounts" }))
   )[0] ?? null, [draftPlans]);
-  const selectedPlan = selectedAccount === "__all__"
+  const selectedPlan = selectedSeriesId === "__all__"
     ? allAccountsTotal
-    : accounts.find((account) => account.customer === selectedAccount) ?? allAccountsTotal;
-  const filteredAccounts = accounts.filter((account) => account.customer.toLowerCase().includes(accountSearch.trim().toLowerCase()));
+    : draftPlans.find((plan) => plan.id === selectedSeriesId) ?? allAccountsTotal;
+  const selectedPlanLabel = selectedSeriesId === "__all__" || !("planId" in (selectedPlan ?? {}))
+    ? "All accounts · Total"
+    : getConsumptionPlanLabel(selectedPlan as ConsumptionPlan);
+  const filteredPlans = draftPlans.filter((plan) => getConsumptionPlanLabel(plan).toLowerCase().includes(planSearch.trim().toLowerCase()));
+  const selectTrendPlan = (plan: ConsumptionPlan | null) => {
+    setSelectedSeriesId(plan?.id ?? "__all__");
+    setSelectedSignalId("");
+    setPlanSearch("");
+    setAccountSelectorOpen(false);
+  };
+  const handlePlanSelectorKeyDown = (event: KeyboardEvent) => {
+    const optionCount = filteredPlans.length + 1;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setAccountSelectorOpen(true);
+      setActivePlanIndex((current) => (current + (event.key === "ArrowDown" ? 1 : optionCount - 1)) % optionCount);
+    } else if (event.key === "Enter" && accountSelectorOpen) {
+      event.preventDefault();
+      selectTrendPlan(activePlanIndex === 0 ? null : filteredPlans[activePlanIndex - 1] ?? null);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setAccountSelectorOpen(false);
+    } else if (event.key === "Tab") {
+      setAccountSelectorOpen(false);
+    }
+  };
 
   const updateTableScrollState = () => {
     const table = tableScrollRef.current;
@@ -236,13 +262,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           : null;
       return value === null ? [] : [{
         id: `${selectedPlan.id}-${month}`,
-        seriesId: selectedAccount === "__all__" ? "All accounts · Total" : `${selectedPlan.customer} · Total`,
+        seriesId: selectedPlanLabel,
         groupId: month,
         value,
         shortDesc: `${month}: ${currency.format(value)}`
       }];
     })
-    : [], [allMonths, selectedAccount, selectedPlan]);
+    : [], [allMonths, selectedPlan, selectedPlanLabel]);
   const trendDataProvider = useMemo(() => new ArrayDataProvider(trendPoints, { keyAttributes: "id" }), [trendPoints]);
   const rangeSummaries = useMemo(() => selectedPlan ? buildDisplayQuarterSummaries(selectedPlan, displayQuarterOrder) : [], [displayQuarterOrder, selectedPlan]);
   const rangeTotal = rangeSummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0);
@@ -271,9 +297,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     return () => onNavigationGuardChange(null, false);
   }, [hasDraftChanges, onNavigationGuardChange]);
 
-  const selectSignal = (signalId: string, customer: string) => {
-    setSelectedSignalId(signalId);
-    setSelectedAccount(customer);
+  const selectSignal = (signal: ConsumptionSignal) => {
+    const plan = draftPlans.find((candidate) => candidate.customer === signal.customer && candidate.planId === signal.planId);
+    setSelectedSignalId(signal.id);
+    if (plan) setSelectedSeriesId(plan.id);
   };
 
   const applyQuarterRange = async () => {
@@ -284,7 +311,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       const workspace = await fetchConsumptionWorkspace({ fromQuarter, toQuarter });
       adoptWorkspace(workspace, `Backend connected · ${workspace.fromQuarter} to ${workspace.toQuarter} · ${workspace.plans.length} plans`);
       setSelectedSignalId("");
-      setSelectedAccount("__all__");
+      setSelectedSeriesId("__all__");
       setExpandedAccounts(new Set());
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption range could not be loaded.");
@@ -647,7 +674,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 role="listitem"
                 class={selectedSignal?.id === signal.id ? "consumption-signal is-selected" : "consumption-signal"}
                 aria-pressed={selectedSignal?.id === signal.id}
-                onClick={() => selectSignal(signal.id, signal.customer)}>
+                onClick={() => selectSignal(signal)}>
                 <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span>
                 <span class="consumption-signal-main"><strong>{signal.customer}</strong><span>{signal.endUser} · {signal.planId}</span></span>
                 <span class={`consumption-signal-direction ${direction.tone}`}><span class={direction.icon} aria-hidden="true"></span>{direction.label}</span>
@@ -666,23 +693,26 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             <div>
               <span class="kpi-section-label">Linked context</span>
               <h2 id="consumptionTrendTitle">Consumption Trend</h2>
-              <p>{selectedAccount === "__all__" ? "All accounts · Total" : `${selectedAccount} · Total`}</p>
+              <p>{selectedPlanLabel}</p>
             </div>
             <div class="consumption-account-selector">
-              <label htmlFor="consumptionAccountSelector">Account</label>
-              <input id="consumptionAccountSelector" type="search" role="combobox" aria-label="Search or select trend account"
+              <label htmlFor="consumptionAccountSelector">Plan</label>
+              <input id="consumptionAccountSelector" type="search" role="combobox" aria-label="Search or select trend plan"
                 aria-expanded={accountSelectorOpen} aria-controls="consumptionAccountOptions" autocomplete="off"
-                placeholder={selectedAccount === "__all__" ? "All accounts · Total" : selectedAccount}
-                value={accountSearch}
-                onFocus={() => setAccountSelectorOpen(true)}
-                onInput={(event) => { setAccountSearch((event.currentTarget as HTMLInputElement).value); setAccountSelectorOpen(true); }} />
+                aria-activedescendant={accountSelectorOpen ? `consumptionPlanOption-${activePlanIndex}` : undefined}
+                placeholder={selectedPlanLabel}
+                value={planSearch}
+                onFocus={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
+                onBlur={() => setAccountSelectorOpen(false)}
+                onKeyDown={handlePlanSelectorKeyDown}
+                onInput={(event) => { setPlanSearch((event.currentTarget as HTMLInputElement).value); setActivePlanIndex(0); setAccountSelectorOpen(true); }} />
               {accountSelectorOpen && (
-                <div id="consumptionAccountOptions" class="consumption-account-options" role="listbox" aria-label="Trend account options">
-                  <button type="button" role="option" aria-selected={selectedAccount === "__all__"} onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => { setSelectedAccount("__all__"); setSelectedSignalId(""); setAccountSearch(""); setAccountSelectorOpen(false); }}>All accounts · Total</button>
-                  {filteredAccounts.map((account) => <button type="button" role="option" aria-selected={selectedAccount === account.customer}
+                <div id="consumptionAccountOptions" class="consumption-account-options" role="listbox" aria-label="Trend plan options">
+                  <button id="consumptionPlanOption-0" type="button" role="option" aria-selected={selectedSeriesId === "__all__"} onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectTrendPlan(null)}>All accounts · Total</button>
+                  {filteredPlans.map((plan, index) => <button id={`consumptionPlanOption-${index + 1}`} key={plan.id} type="button" role="option" aria-selected={selectedSeriesId === plan.id}
                     onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => { setSelectedAccount(account.customer); setSelectedSignalId(""); setAccountSearch(""); setAccountSelectorOpen(false); }}>{account.customer}</button>)}
+                    onClick={() => selectTrendPlan(plan)}>{getConsumptionPlanLabel(plan)}</button>)}
                 </div>
               )}
             </div>
@@ -752,15 +782,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                     <tr key={account.id} class={selectedSignal?.customer === account.customer ? "consumption-account-row is-context" : "consumption-account-row"} data-readonly={expandable ? "account" : undefined}>
                       <th class="consumption-account-column" scope="row">
                         {expandable ? (
-                          <button type="button" class="consumption-account-toggle" aria-expanded={expanded} onClick={() => toggleAccount(account.customer)}>
-                            <span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
-                            <strong>{account.customer}</strong>
-                            <small>Multiple · {account.plans.length} Plans</small>
+                          <button type="button" class="consumption-account-toggle" aria-expanded={expanded}
+                            aria-label={`${expanded ? "Collapse" : "Expand"} ${account.customer} Plans`}
+                            onClick={() => toggleAccount(account.customer)}>
+                            <span class="consumption-leading">
+                              <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
+                              <span class="consumption-leading-copy"><strong>{account.customer}</strong><small>Multiple · {account.plans.length} Plans · display only</small></span>
+                            </span>
                           </button>
                         ) : (
-                          <span class="consumption-account-single">
-                            <strong>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
-                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small>
+                          <span class="consumption-leading consumption-account-single">
+                            <span class="consumption-disclosure-slot" aria-hidden="true"></span>
+                            <span class="consumption-leading-copy"><strong>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
+                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
                           </span>
                         )}
                       </th>
@@ -769,8 +803,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                     {expandable && expanded && account.plans.map((plan) => (
                       <tr key={plan.id} class={selectedSignal?.planId === plan.planId ? "consumption-plan-row is-context" : "consumption-plan-row"}>
                         <th class="consumption-account-column" scope="row">
-                          <span class="consumption-end-user">{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
-                          <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small>
+                          <span class="consumption-leading">
+                            <span class="consumption-disclosure-slot" aria-hidden="true"></span>
+                            <span class="consumption-leading-copy"><span class="consumption-end-user">{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
+                            <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
+                          </span>
                         </th>
                         {renderQuarterCells(plan, false)}
                       </tr>

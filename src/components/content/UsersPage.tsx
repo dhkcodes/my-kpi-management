@@ -92,18 +92,18 @@ export function UsersPage() {
     ? issuedLink.purpose === "ACTIVATION" ? "Activation link ready" : "Password reset link ready"
     : dialog?.kind === "invite" ? "Invite user" : dialog?.kind === "reissue" ? "Reissue activation link" : "Create password reset link";
 
-  return <section class="kap-page users-page">
-    <div class="kap-page__heading"><div><h1>Users</h1><p>Manage application access and credential action links.</p></div>
+  return <section class="kap-account-page users-page">
+    <div class="kap-users-header"><div><span class="kpi-eyebrow">Administration</span><h1>Users</h1><p>Manage application access and credential action links.</p></div>
       <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button></div>
     {error && <div class="kap-error" role="alert">{error}</div>}
-    <div class="kap-table-card"><table class="kap-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>{users.map((user) => <tr key={user.userKey}><td>{user.displayName}</td><td>{user.loginId}</td><td>{user.access}</td><td><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td><div class="kap-row-actions">
-        {user.status === "INVITED" && <><button disabled={busy} onClick={() => openDialog({ kind: "reissue", user })}>Reissue</button><button disabled={busy} onClick={() => void confirmAction(`Cancel invitation for ${user.loginId}?`, () => cancelUserInvite(user.userKey))}>Cancel invite</button></>}
-        {user.status === "ACTIVE" && <button disabled={busy} onClick={() => openDialog({ kind: "reset", user })}>Reset password</button>}
-        {user.access !== "Admin" && user.status === "ACTIVE" && <button disabled={busy} onClick={() => void confirmAction(`Lock ${user.loginId}?`, () => lockUser(user.userKey))}>Lock</button>}
-        {user.status === "LOCKED" && <button disabled={busy} onClick={() => void confirmAction(`Unlock ${user.loginId}?`, () => unlockUser(user.userKey))}>Unlock</button>}
-        {user.status === "DISABLED" && <button disabled={busy} onClick={() => void confirmAction(`Enable ${user.loginId}?`, () => enableUser(user.userKey))}>Enable</button>}
-        {user.access !== "Admin" && (user.status === "ACTIVE" || user.status === "LOCKED") && <button disabled={busy} onClick={() => void confirmAction(`Disable ${user.loginId}?`, () => disableUser(user.userKey))}>Disable</button>}
+    <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Actions"><div class="kap-user-actions">
+        {user.status === "INVITED" && <><oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reissue", user })}>Reissue</oj-button><oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Cancel invitation for ${user.loginId}?`, () => cancelUserInvite(user.userKey))}>Cancel invite</oj-button></>}
+        {user.status === "ACTIVE" && <oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reset", user })}>Reset password</oj-button>}
+        {user.status === "ACTIVE" && <oj-button chroming="borderless" disabled={busy || user.access === "Admin"} title={user.access === "Admin" ? "Admin accounts cannot be locked" : "Lock user"} onojAction={() => void confirmAction(`Lock ${user.loginId}?`, () => lockUser(user.userKey))}>Lock</oj-button>}
+        {user.status === "LOCKED" && <oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Unlock ${user.loginId}?`, () => unlockUser(user.userKey))}>Unlock</oj-button>}
+        {user.status === "DISABLED" && <oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Enable ${user.loginId}?`, () => enableUser(user.userKey))}>Enable</oj-button>}
+        {(user.status === "ACTIVE" || user.status === "LOCKED") && <oj-button chroming="borderless" disabled={busy || user.access === "Admin"} title={user.access === "Admin" ? "Admin accounts cannot be disabled" : "Disable user"} onojAction={() => void confirmAction(`Disable ${user.loginId}?`, () => disableUser(user.userKey))}>Disable</oj-button>}
       </div></td></tr>)}</tbody></table></div>
 
     <oj-dialog ref={dialogRef} dialogTitle={title} cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) clearDialog(); }} class="kap-user-dialog">

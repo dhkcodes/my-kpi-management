@@ -69,8 +69,13 @@ assert.match(page, /workspace\.fromQuarter[\s\S]*workspace\.toQuarter[\s\S]*work
 assert.match(page, /useState\("__all__"\)/, "trend defaults to All accounts");
 assert.match(page, /All accounts · Total/, "the default trend is the total across all accounts");
 assert.doesNotMatch(page, /Search accounts/, "the separate Trend Search field is removed");
-assert.match(page, /role="combobox"[\s\S]*aria-label="Search or select trend account"[\s\S]*role="listbox"[\s\S]*filteredAccounts\.map/, "one searchable selection component includes every matching account");
-assert.match(page, /selectSignal[\s\S]*setSelectedAccount/, "signal selection links the account into trend context");
+assert.match(page, /role="combobox"[\s\S]*aria-label="Search or select trend plan"[\s\S]*role="listbox"[\s\S]*filteredPlans\.map/, "one searchable selection component includes every matching Plan");
+assert.match(page, /event\.key === "ArrowDown"[\s\S]*event\.key === "ArrowUp"[\s\S]*event\.key === "Enter"[\s\S]*event\.key === "Escape"[\s\S]*aria-activedescendant/, "the Plan combobox supports active-option keyboard selection and dismissal");
+assert.match(page, /getConsumptionPlanLabel\(plan\)/, "selector labels are Account - Workload (Plan ID), falling back to Account (Plan ID)");
+assert.match(page, /selectedSeriesId[\s\S]*draftPlans\.find\(\(plan\) => plan\.id === selectedSeriesId\)/, "same-account Plans retain independent trend selection by stable Plan identity");
+assert.match(page, /selectSignal[\s\S]*signal\.customer[\s\S]*signal\.planId[\s\S]*setSelectedSeriesId\(plan\.id\)/, "signal selection links the exact Plan ID into trend context");
+assert.match(page, /const signals = useMemo\(\(\) => serverSignals \?\? \[\]/, "Inbox renders only meaningful anomalies returned by the backend");
+assert.doesNotMatch(page, /serverSignals \?\? detectConsumptionSignals/, "the Inbox never invents client-side anomalies");
 assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
 assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
 assert.match(page, /displayQuarterOrder\.flatMap/, "table columns follow the backend display quarter order");
@@ -78,6 +83,9 @@ assert.match(page, /const expandable = account\.plans\.length > 1/, "only Multip
 assert.match(page, /expandable \? \([\s\S]*consumption-account-toggle[\s\S]*\) : \(/, "single-plan End Users render without an expand control");
 assert.match(page, /renderQuarterCells\(singlePlan, false\)/, "single-plan account rows render editable detailed Forecast cells");
 assert.match(page, /renderQuarterCells\(account, true\)/, "Multiple aggregate rows are always read-only");
+assert.match(page, /class="consumption-leading"[\s\S]*class="consumption-disclosure-slot"/, "Account and End User leading content shares one aligned grid");
+assert.match(page, /class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*aria-label=/, "Multiple rows expose a named native-button disclosure with aria-expanded");
+assert.match(styles, /\.consumption-account-toggle:hover[\s\S]*\.consumption-account-toggle:focus-visible/, "Multiple disclosure has visible hover and keyboard focus states");
 assert.match(styles, /\.consumption-forecast-cell\s*\{[^}]*background:[^}]*box-shadow:\s*none/, "editable Forecast cells use background color without an underline");
 assert.match(page, /const status = editablePeriodIds\.has\(month\) \? "FORECAST" : "ACTUAL"[\s\S]*consumption-month-status/, "month headings visibly distinguish Actual and Forecast from backend editability metadata");
 assert.match(page, /singlePlan\?\.customer[\s\S]*singlePlan\?\.workload[\s\S]*singlePlan\?\.endUser[\s\S]*singlePlan\?\.planId[\s\S]*singlePlan\?\.dataCenter/, "single Plan rows show Account, mapped Workload, End User, Plan ID and DC from API fields");
