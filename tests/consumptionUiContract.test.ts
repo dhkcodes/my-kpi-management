@@ -124,7 +124,8 @@ assert.doesNotMatch(page.match(/id="consumptionSignalInbox"[\s\S]*?signals\.leng
 assert.match(page, /consumption-pulse-toggle[\s\S]*aria-expanded=\{pulseExpanded\}[\s\S]*Consumption Change Alerts & Trend/, "Alerts and Trend share one disclosure control");
 assert.match(page, /consumption-table-toggle[\s\S]*aria-expanded=\{tableExpanded\}/, "End User Plan table has an independent disclosure control");
 assert.match(page, /visibleTableRowCount > 10 \? "consumption-table-scroll is-scrollable-y"/, "vertical table scrolling starts only after more than ten visible rows");
-assert.match(styles, /\.consumption-table-scroll\.is-scrollable-y\s*\{[^}]*max-height:\s*calc\(6\.5rem \+ 10 \* 3\.25rem/, "table viewport is sized for two header rows plus ten data rows");
+assert.match(styles, /\.consumption-table-scroll\.is-scrollable-y\s*\{[^}]*max-height:\s*calc\(6\.5rem \+ 10 \* 3\.25rem[^}]*scrollbar-width:\s*thin/, "table viewport is sized for ten data rows and exposes a vertical scrollbar only when needed");
+assert.match(styles, /\.consumption-table-scroll\.is-scrollable-y::-webkit-scrollbar\s*\{[^}]*display:\s*block/, "WebKit browsers show the over-ten-row vertical scrollbar");
 assert.match(styles, /\.consumption-table thead tr:first-child th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/, "first table header row stays fixed during vertical scroll");
 assert.match(styles, /\.consumption-table thead tr:nth-child\(2\) th\s*\{[^}]*position:\s*sticky[^}]*top:\s*3\.25rem/, "second table header row stays fixed below the first");
 assert.doesNotMatch(page, /Backend connected/, "Consumption omits Backend connected status copy");

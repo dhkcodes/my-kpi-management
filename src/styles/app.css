@@ -2380,8 +2380,11 @@ h4.weekly-activity-section-label--next-week,
 .consumption-draft-actions > span { color: var(--kap-grid-draft-ink); font-size: .76rem; font-weight: 800; }
 .consumption-table-panel { position: relative; }
 .consumption-table-scroll { border: 1px solid var(--kpi-border); max-width: 100%; overflow-x: auto; position: relative; scrollbar-width: none; width: 100%; }
-.consumption-table-scroll.is-scrollable-y { max-height: calc(6.5rem + 10 * 3.25rem + 2px); overflow-y: auto; }
+.consumption-table-scroll.is-scrollable-y { max-height: calc(6.5rem + 10 * 3.25rem + 2px); overflow-y: auto; scrollbar-color: #8b8b8b #f2f2f2; scrollbar-width: thin; }
 .consumption-table-scroll::-webkit-scrollbar { display: none; }
+.consumption-table-scroll.is-scrollable-y::-webkit-scrollbar { display: block; height: .65rem; width: .65rem; }
+.consumption-table-scroll.is-scrollable-y::-webkit-scrollbar-thumb { background: #8b8b8b; border: 2px solid #f2f2f2; border-radius: 999px; }
+.consumption-table-scroll.is-scrollable-y::-webkit-scrollbar-track { background: #f2f2f2; }
 .consumption-scroll-controls { align-items: center; display: flex; flex-direction: column; gap: .38rem; position: fixed; right: max(.75rem, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 18; }
 .consumption-scroll-controls button { background: rgb(255 255 255 / 95%); border: 1px solid var(--kpi-border); box-shadow: 0 .6rem 1.5rem rgb(0 0 0 / 14%); color: var(--kpi-ink); cursor: pointer; font-size: 1.35rem; height: 2.55rem; width: 2.55rem; }
 .consumption-scroll-controls button:disabled { color: var(--kpi-muted); cursor: default; opacity: .45; }
