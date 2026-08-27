@@ -82,6 +82,17 @@ export const getConsumptionPlanLabel = (plan: Pick<ConsumptionPlan, "customer" |
     ? `${plan.customer} - ${plan.workload} (${plan.planId})`
     : `${plan.customer} (${plan.planId})`;
 
+export const restoreForecastEntry = (
+  draft: ConsumptionPlan,
+  saved: ConsumptionPlan,
+  month: string
+): ConsumptionPlan => {
+  const forecasts = { ...draft.forecasts };
+  if (Object.prototype.hasOwnProperty.call(saved.forecasts, month)) forecasts[month] = saved.forecasts[month];
+  else delete forecasts[month];
+  return { ...draft, forecasts };
+};
+
 const oracleFiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"] as const;
 const quarterMonths: Record<string, readonly string[]> = {
   Q1: ["JUN", "JUL", "AUG"],

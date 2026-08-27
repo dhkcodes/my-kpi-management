@@ -14,6 +14,7 @@ import {
   getQuarterMonths,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
+  restoreForecastEntry,
   seedForecastMonths,
   sortConsumptionMonths
 } from "../../data/consumptionData";
@@ -386,11 +387,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const cancelForecastEdit = () => {
-    if (!editCell || editEntryValueRef.current === null) {
+    if (!editCell) {
       setEditCell(null);
       return;
     }
-    updateForecast(editCell.planKey, editCell.month, editEntryValueRef.current);
+    setDraftPlans((current) => current.map((plan) => {
+      if (plan.id !== editCell.planKey) return plan;
+      const saved = savedPlans.find((candidate) => candidate.id === plan.id);
+      return saved ? restoreForecastEntry(plan, saved, editCell.month) : plan;
+    }));
     editEntryValueRef.current = null;
     setEditCell(null);
   };

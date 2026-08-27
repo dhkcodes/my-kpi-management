@@ -38,7 +38,8 @@ assert.match(page, /plan\.id === planKey/, "Forecast updates change only the sel
 assert.match(page, /savedPlans\.find\(\(plan\) => plan\.id === series\.id\)/, "dirty comparison uses the same stable Plan identity");
 assert.match(page, /onDblClick[\s\S]*beginForecastEdit/, "double-click enters Forecast editing");
 assert.match(page, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the current cell into the page draft");
-assert.match(page, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the current edit-entry value");
+assert.match(page, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the original value and value type");
+assert.match(page, /restoreForecastEntry\(plan, saved, editCell\.month\)/, "Escape preserves an editable future Actual as Actual instead of manufacturing a Forecast draft");
 assert.match(page, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel appear only for draft changes");
 assert.match(page, /await saveConsumptionForecasts\(apiEtag, updates\)[\s\S]*adoptWorkspace/, "Save adopts the authoritative backend snapshot");
 assert.match(page, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the whole saved snapshot");

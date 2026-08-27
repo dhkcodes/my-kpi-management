@@ -12,6 +12,7 @@ import {
   getNextQuarterMonths,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
+  restoreForecastEntry,
   seedForecastMonths
 } from "../src/data/consumptionData";
 
@@ -98,6 +99,17 @@ assert.equal(forecasted[0].forecasts["FY27-SEP"], 350, "next-quarter seed uses t
 const preserved = seedForecastMonths([{ ...parsed.plans[0], forecasts: { "FY27-SEP": 999 } }], ["FY27-SEP", "FY27-OCT"]);
 assert.equal(preserved[0].forecasts["FY27-SEP"], 999, "authoritative persisted forecasts must not be overwritten by seed defaults");
 assert.equal(preserved[0].forecasts["FY27-OCT"], 350, "missing forecast months still receive a seed default");
+const futureActualPlan: ConsumptionPlan = {
+  ...parsed.plans[0],
+  actuals: { ...parsed.plans[0].actuals, "FY27-SEP": 888 },
+  forecasts: {}
+};
+const editedFutureActual = { ...futureActualPlan, forecasts: { "FY27-SEP": 777 } };
+const restoredFutureActual = restoreForecastEntry(editedFutureActual, futureActualPlan, "FY27-SEP");
+assert.equal("FY27-SEP" in restoredFutureActual.forecasts, false, "Escape restores a future Actual without manufacturing a Forecast entry");
+const savedForecastPlan = { ...futureActualPlan, forecasts: { "FY27-SEP": 999 } };
+const restoredForecast = restoreForecastEntry({ ...savedForecastPlan, forecasts: { "FY27-SEP": 777 } }, savedForecastPlan, "FY27-SEP");
+assert.equal(restoredForecast.forecasts["FY27-SEP"], 999, "Escape restores the original persisted Forecast value");
 const forecastAccount = aggregateConsumptionAccounts(forecasted)[0];
 const fy27q2 = buildQuarterSummary(forecastAccount, "FY27-Q2", fy27q1);
 assert.equal(fy27q2.total, 2400);
