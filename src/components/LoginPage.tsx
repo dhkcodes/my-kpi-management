@@ -103,8 +103,10 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
       } else if (mode === "forgot") {
         if (!loginId.trim()) throw new Error("Enter your Login ID.");
         const reset = await requestPasswordReset(loginId);
-        setResetLink(reset.resetLink);
-        setSuccessMessage("Reset link created. Use the one-time link below to choose a new password. No temporary password is created.");
+        setResetLink(reset.resetLink ?? "");
+        setSuccessMessage(reset.resetLink
+          ? "Reset link created. Use the one-time link below to choose a new password. No temporary password is created."
+          : "Reset request accepted. If the account is eligible, an administrator can provide a one-time reset link through the approved secure channel.");
         setMode("success");
       } else if (mode === "action" && initialAction && actionContext) {
         const policyError = validatePasswordPolicy(newPassword);

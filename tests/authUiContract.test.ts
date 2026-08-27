@@ -19,7 +19,7 @@ assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="k
 assert.match(login, /role="alert"/, "credential failures are announced");
 assert.match(login, /authenticateUser\(loginId, password\)/, "the sign-in form delegates credentials to the Backend auth API");
 assert.match(login, /isSubmitting[\s\S]*disabled=\{isSubmitting\}/, "duplicate login submissions are locked while authentication is pending");
-assert.match(login, /const reset = await requestPasswordReset\(loginId\)[\s\S]*setResetLink\(reset\.resetLink\)/, "forgot password retains the actual API reset link");
+assert.match(login, /const reset = await requestPasswordReset\(loginId\)[\s\S]*setResetLink\(reset\.resetLink \?\? ""\)/, "forgot password can render a reset link only when a trusted API flow supplies one");
 assert.match(login, /href=\{resetLink\}[\s\S]*Reset password now/, "forgot-password completion renders the actual reset link as a clickable anchor");
 assert.match(login, /kap-login-warning[\s\S]*Anyone with this link/, "the sensitive-link warning is explicit and announced with improved contrast");
 assert.match(login, /history\.replaceState\(null, "", window\.location\.pathname\)/, "captured action tokens are removed from the visible URL and browser history");

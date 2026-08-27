@@ -35,7 +35,7 @@ async function main() {
   const jsonFetch: typeof fetch = async (input, init) => {
     calls.push({ url: String(input), init });
     if (String(input).endsWith("/forgot-password")) {
-      return new Response(JSON.stringify({ resetLink: "/reset-password?token=signed.reset-token" }),
+      return new Response(JSON.stringify({ code: "RESET_REQUEST_ACCEPTED" }),
         { status: 202, headers: { "Content-Type": "application/json" } });
     }
     if (String(input).endsWith("/action-token/inspect")) {
@@ -62,7 +62,7 @@ async function main() {
   await changePassword("current", "replacement", "replacement", jsonFetch);
   assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/change-password");
   const requestedReset = await requestPasswordReset("  ADA@EXAMPLE.COM ", jsonFetch);
-  assert.equal(requestedReset.resetLink, "/reset-password?token=signed.reset-token");
+  assert.equal(requestedReset.resetLink, undefined);
   assert.equal(calls[calls.length - 1]?.url, "/api/v1/auth/forgot-password");
   assert.deepEqual(JSON.parse(String(calls[calls.length - 1]?.init?.body)), { loginId: "ada@example.com" });
   const malformedReset: typeof fetch = async () => new Response(JSON.stringify({ resetLink: "javascript:alert(1)" }), {
