@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   ConsumptionPlan,
   aggregateConsumptionAccounts,
+  aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
   buildQuarterSummary,
   detectConsumptionSignals,
@@ -80,6 +81,14 @@ for (const malformed of ["1 2", "1e3", "0x10", "1,2"]) {
 
 const account = aggregateConsumptionAccounts(parsed.plans)[0];
 assert.equal(account.actuals["FY27-AUG"], 800, "account totals must sum detailed plans only once");
+assert.equal(
+  aggregateConsumptionActualTotals([
+    { ...parsed.plans[0], actuals: { "FY27-AUG": 350 } },
+    { ...parsed.plans[1], actuals: { "FY27-JUL": 400, "FY27-AUG": 450 } }
+  ]).actuals["FY27-JUL"],
+  400,
+  "All accounts Trend sums every available ACTUAL without requiring every Plan to contain the month"
+);
 
 const fy26q4 = buildQuarterSummary(account, "FY26-Q4", null);
 assert.deepEqual(fy26q4, {
@@ -181,8 +190,8 @@ const activityPlans = [
 ];
 assert.deepEqual(
   filterActiveConsumptionPlans(activityPlans, "FY27-AUG").map((plan) => plan.planId),
-  ["CURRENT-ACTUAL", "PREVIOUS-ACTUAL", "MISSING-ACTUAL"],
-  "plans are excluded only when previous and current ACTUAL are both zero; Forecast values are ignored"
+  ["CURRENT-ACTUAL", "PREVIOUS-ACTUAL"],
+  "plans are excluded when previous/current ACTUAL are zero or missing; Forecast values are ignored"
 );
 
 console.log("consumptionData tests passed");

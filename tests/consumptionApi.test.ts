@@ -48,8 +48,8 @@ void (async () => {
   assert.equal(workspace.controlTotalCount, 2, "monthly control entries must be reported as two source Multiple controls");
   assert.equal(workspace.plans[0].workload, "Autonomous Database", "Plan Number mapping exposes its Workload without a client-side lookup");
   assert.equal(workspace.plans[0].forecasts["FY27-OCT"], 999, "persisted server forecast must remain authoritative");
-  assert.equal(workspace.plans[0].forecasts["FY27-NOV"], 100, "only a missing editable forecast month receives the seed default");
-  assert.equal("FY27-SEP" in workspace.plans[0].forecasts, true);
+  assert.equal(workspace.plans[0].forecasts["FY27-NOV"], undefined, "a missing editable forecast month remains absent");
+  assert.equal("FY27-SEP" in workspace.plans[0].forecasts, false);
   assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 3);
 
   runtime.fetch = async () => new Response(JSON.stringify({
@@ -77,9 +77,9 @@ void (async () => {
   const pastRange = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q4", toQuarter: "FY26-Q4" });
   assert.deepEqual(pastRange.displayQuarterOrder, ["FY27-Q2", "FY26-Q4"], "Forecast stays left of a historical To Quarter");
   const summaries = buildDisplayQuarterSummaries(pastRange.plans[0], pastRange.displayQuarterOrder);
-  assert.equal(summaries[0].status, "FORECAST");
-  assert.deepEqual(summaries[0].months.map((month) => pastRange.plans[0].forecasts[month]), [100, 100, 100], "all Forecast months are projected and seeded from the current Actual");
-  assert.equal(summaries[0].total, 300);
+  assert.equal(summaries[0].status, "INCOMPLETE");
+  assert.deepEqual(summaries[0].months.map((month) => pastRange.plans[0].forecasts[month]), [undefined, undefined, undefined], "missing future months remain absent instead of becoming generated Forecast values");
+  assert.equal(summaries[0].total, null);
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: '"legacy-etag"', lastBatchId: null, plans: payload.plans,

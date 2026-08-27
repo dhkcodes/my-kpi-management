@@ -6,6 +6,7 @@ import {
   ConsumptionPlan,
   ConsumptionSignal,
   aggregateConsumptionAccounts,
+  aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
   filterActiveConsumptionPlans,
   getConsumptionPlanLabel,
@@ -16,7 +17,6 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
-  seedForecastMonths,
   sortConsumptionMonths
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
@@ -50,7 +50,7 @@ const createSeedPlans = (csv: string) => {
   const latestActualMonth = getLatestActualMonth(parsed.plans);
   if (!latestActualMonth) throw new Error("Consumption CSV has no usable month columns.");
   return {
-    plans: seedForecastMonths(parsed.plans, getNextQuarterMonths(latestActualMonth)),
+    plans: parsed.plans,
     importedPlans: parsed.plans.length,
     controls: parsed.controlTotals.length,
     latestActualMonth
@@ -181,7 +181,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [planSearch, setPlanSearch] = useState("");
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(() => new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
-  const [importStatus, setImportStatus] = useState("Loading authoritative Consumption workspace…");
   const [importError, setImportError] = useState("");
   const [apiEtag, setApiEtag] = useState("");
   const [dataMode, setDataMode] = useState<"loading" | "backend" | "fallback" | "error">("loading");
@@ -192,6 +191,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [fromQuarter, setFromQuarter] = useState("");
   const [toQuarter, setToQuarter] = useState("");
   const [displayQuarterOrder, setDisplayQuarterOrder] = useState<string[]>([]);
+  const [availableQuarterOptions, setAvailableQuarterOptions] = useState<string[]>([]);
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
   const [currentFiscalMonth, setCurrentFiscalMonth] = useState("");
   const [rangeLoading, setRangeLoading] = useState(false);
@@ -210,7 +210,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const adoptWorkspace = (workspace: ConsumptionApiWorkspace, status: string) => {
+  const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
     setSavedPlans(clonePlans(workspace.plans));
     setDraftPlans(clonePlans(workspace.plans));
     setServerSignals(workspace.signals);
@@ -219,19 +219,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setToQuarter(workspace.toQuarter);
     setEditablePeriodIds(new Set(workspace.editablePeriodIds));
     setDisplayQuarterOrder([...workspace.displayQuarterOrder]);
+    setAvailableQuarterOptions((current) => [...new Set([...current, ...workspace.displayQuarterOrder, workspace.fromQuarter, workspace.toQuarter].filter(Boolean))].sort());
     setCurrentFiscalMonth(workspace.currentFiscalMonth);
     setRangeInitialized(true);
     setRangeTouched(false);
     setDataMode("backend");
     setConflictRows([]);
     setConflictWorkspace(null);
-    setImportStatus(status);
   };
 
   useEffect(() => {
     let active = true;
     void fetchConsumptionWorkspace().then((workspace) => {
-      if (active) adoptWorkspace(workspace, `Loaded ${workspace.plans.length} plans · ${workspace.controlTotalCount} control totals`);
+      if (active) adoptWorkspace(workspace);
     }).catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
@@ -243,11 +243,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setToQuarter(fallbackForecastQuarters[fallbackForecastQuarters.length - 1] ?? fallbackActualQuarters[0] ?? "");
         setEditablePeriodIds(new Set(fallbackEditablePeriods));
         setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
+        setAvailableQuarterOptions([...new Set([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters])].sort());
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
         setRangeInitialized(true);
         setRangeTouched(false);
         setDataMode("fallback");
-        setImportStatus(`Synthetic fallback · ${initialSeed.importedPlans} plans · Backend unavailable in local preview`);
+
       } else {
         setDataMode("error");
         setImportError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
@@ -261,9 +262,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const visibleTableRowCount = accounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
-  const allAccountsTotal = useMemo(() => aggregateConsumptionAccounts(
-    draftPlans.map((plan) => ({ ...plan, customer: "All accounts" }))
-  )[0] ?? null, [draftPlans]);
+  const allAccountsTotal = useMemo(() => aggregateConsumptionActualTotals(draftPlans), [draftPlans]);
   const selectedPlan = selectedSeriesId === "__all__"
     ? allAccountsTotal
     : draftPlans.find((plan) => plan.id === selectedSeriesId) ?? allAccountsTotal;
@@ -326,7 +325,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     ...new Set(displayQuarterOrder.flatMap((quarter) => getQuarterMonths(quarter)))
   ]), [displayQuarterOrder]);
   const quarters = displayQuarterOrder;
-  const quarterOptions = [...new Set([...displayQuarterOrder, fromQuarter, toQuarter].filter(Boolean))].sort();
+  const quarterOptions = availableQuarterOptions;
   const rangeValid = isConsumptionQuarterRangeValid(fromQuarter, toQuarter);
   const trendPoints = useMemo<ConsumptionChartPoint[]>(() => selectedPlan
     ? allMonths.flatMap((month) => {
@@ -383,7 +382,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setImportError("");
     try {
       const workspace = await fetchConsumptionWorkspace({ fromQuarter, toQuarter });
-      adoptWorkspace(workspace, `Loaded ${workspace.fromQuarter} to ${workspace.toQuarter} · ${workspace.plans.length} plans`);
+      adoptWorkspace(workspace);
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
       setExpandedAccounts(new Set());
@@ -467,12 +466,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     try {
       if (dataMode === "fallback") {
         setSavedPlans(clonePlans(draftPlans));
-        setImportStatus((current) => `${current.split(" · Saved")[0]} · Saved in local fallback`);
+
       } else if (dataMode !== "backend" || !apiEtag) {
         throw new Error("Authoritative Consumption workspace is not ready; Forecast was not saved.");
       } else {
         const workspace = await saveConsumptionForecasts(apiEtag, updates);
-        adoptWorkspace(workspace, `Forecast saved · ${workspace.plans.length} plans`);
+        adoptWorkspace(workspace);
       }
       setEditCell(null);
       editEntryValueRef.current = null;
@@ -556,10 +555,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         loadedPlans = result.planCount;
         loadedControls = result.controlTotalCount;
         importCountDetail = ` · New plans: ${result.insertedCount} · Overwritten plans: ${result.updatedCount}`;
-        adoptWorkspace(result.workspace, `${pendingImport.fileName} · Applied batch ${result.workspace.lastBatchId ?? ""} · ${result.planCount} plans · through ${pendingImport.latestActualMonth}`);
+        adoptWorkspace(result.workspace);
       } else {
         const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
-        const imported = seedForecastMonths(pendingImport.parsed.plans, importedEditablePeriods);
+        const imported = pendingImport.parsed.plans;
         const importedHistoryQuarters = [...new Set(pendingImport.parsed.monthKeys.map(getFiscalQuarter))].reverse();
         const importedForecastQuarters = [...new Set(importedEditablePeriods.map(getFiscalQuarter))];
         setSavedPlans(clonePlans(imported));
@@ -569,6 +568,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setToQuarter(importedForecastQuarters[importedForecastQuarters.length - 1] ?? importedHistoryQuarters[0] ?? "");
         setEditablePeriodIds(new Set(importedEditablePeriods));
         setDisplayQuarterOrder([...importedForecastQuarters, ...importedHistoryQuarters.filter((quarter) => !importedForecastQuarters.includes(quarter))]);
+        setAvailableQuarterOptions([...new Set([...importedHistoryQuarters, ...importedForecastQuarters])].sort());
         setCurrentFiscalMonth(pendingImport.latestActualMonth);
         setRangeInitialized(true);
         setRangeTouched(false);
@@ -576,7 +576,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setDataMode("fallback");
         setConflictRows([]);
         setConflictWorkspace(null);
-        setImportStatus(`${pendingImport.fileName} · Local fallback · ${imported.length} plans · through ${pendingImport.latestActualMonth}`);
+
       }
       setSelectedSignalId("");
       setExpandedAccounts(new Set());
@@ -647,7 +647,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         }),
         <td key={`${series.id}-${quarter}-total`} class={`consumption-value-cell consumption-quarter-total${forecastQuarter ? " is-forecast" : ""}`}>
           {summary.total === null ? "N/A" : currency.format(summary.total)}
-          <small>{summary.status}</small>
+          <small class={`is-${summary.status.toLowerCase()}`}>{summary.status}</small>
         </td>,
         <td key={`${series.id}-${quarter}-gap`} class={`consumption-value-cell consumption-preq-gap${forecastQuarter ? " is-forecast" : ""}`}>
           {signedCurrency(summary.preQGap)}
@@ -689,7 +689,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
       </section>
 
-      <div class="consumption-import-status" role="status">{importStatus}</div>
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
       <oj-dialog
         id="consumptionImportDialog"
@@ -735,7 +734,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <table><thead><tr><th>Plan / Month</th><th>Saved baseline</th><th>My draft</th><th>Current server</th></tr></thead>
             <tbody>{conflictRows.map((row) => <tr key={`${row.plan}-${row.month}`}><th>{row.plan} · {row.month}</th><td>{row.saved === null ? "—" : currency.format(row.saved)}</td><td>{row.draft === null ? "—" : currency.format(row.draft)}</td><td>{row.current === null ? "—" : currency.format(row.current)}</td></tr>)}</tbody>
           </table>
-          <oj-button chroming="outlined" onojAction={() => conflictWorkspace && adoptWorkspace(conflictWorkspace, "Adopted current server values after conflict")}>Use current server</oj-button>
+          <oj-button chroming="outlined" onojAction={() => conflictWorkspace && adoptWorkspace(conflictWorkspace)}>Use current server</oj-button>
         </section>
       )}
 
@@ -852,7 +851,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             aria-controls="consumptionTableContent" onClick={() => setTableExpanded((expanded) => !expanded)}>
             <span class={tableExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
             <span><span class="kpi-section-label">Actual + Forecast</span>
-              <strong id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption</strong></span>
+              <strong id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></span>
           </button>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">

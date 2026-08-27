@@ -56,6 +56,8 @@ assert.match(styles, /\.kpi-cell-editor-overlay--textarea\s*\{[^}]*min-height:\s
 assert.match(styles, /\.kpi-cell-editor-control--textarea\s*\{[^}]*min-height:\s*8rem[^}]*overflow:\s*auto[^}]*padding:\s*\.75rem/);
 assert.match(page, /field\.type === "date" \? " kpi-cell-editor-overlay--date"/, "Delivery Date marks the outer editor surface for date-specific composition");
 assert.match(styles, /\.kpi-cell-editor-overlay--date\s*\{[^}]*border:\s*0[^}]*box-shadow:\s*none[^}]*padding:\s*0/, "Delivery Date keeps the JET input border and removes only the duplicate outer overlay frame");
+assert.match(styles, /\.kpi-cell-editor-overlay--date \.kpi-cell-editor-control--date\s*\{[^}]*box-sizing:\s*border-box[^}]*height:\s*100%[^}]*width:\s*100%/, "Delivery Date host fills the common cell editor bounds");
+assert.doesNotMatch(page, /<p class="kpi-api-status"/, "KPI Activities removes the Data through status area on every route");
 assert.match(page, /function KpiClippedCellText[\s\S]*scrollWidth > element\.clientWidth[\s\S]*scrollHeight > element\.clientHeight/, "the common KPI cell renderer opens Full Text only for actually clipped single-line or multiline text");
 assert.match(page, /createPortal[\s\S]*kpi-clipped-cell-tooltip/, "KPI Full Text is portaled outside table overflow containers");
 assert.match(page, /field\.type === "textarea" \? <KpiClippedCellText[\s\S]*: <KpiClippedCellText/, "textarea and ordinary KPI fields share one clipped-text renderer");

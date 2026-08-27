@@ -3,8 +3,7 @@ import {
   ConsumptionSignal,
   getFiscalQuarter,
   getLatestActualMonth,
-  getNextQuarterMonths,
-  seedForecastMonths
+  getNextQuarterMonths
 } from "./consumptionData";
 import { apiFetch } from "../auth/apiFetch";
 
@@ -159,10 +158,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     || !Array.isArray(displayQuarterOrder) || displayQuarterOrder.some((quarter) => !isQuarterKey(quarter))
     || new Set(editablePeriodIds).size !== editablePeriodIds.length
     || new Set(displayQuarterOrder).size !== displayQuarterOrder.length) throw new Error("Malformed Consumption workspace metadata");
-  const plans = seedForecastMonths(basePlans, editablePeriodIds).map((plan) => ({
-    ...plan,
-    versions: Object.fromEntries(Object.keys(plan.forecasts).map((month) => [month, plan.versions?.[month] ?? 0]).concat(Object.entries(plan.versions ?? {})))
-  }));
+  const plans = basePlans;
   const byServerId = new Map(plans.map((plan) => [plan.serverPlanId, plan]));
   const signals: ConsumptionSignal[] = raw.signals.map((signal) => {
     if (!isPositiveInteger(signal?.signalId) || !isPositiveInteger(signal?.planId) || signal.signalId !== signal.planId

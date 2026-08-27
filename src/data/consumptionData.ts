@@ -226,6 +226,15 @@ export const aggregateConsumptionAccounts = (plans: readonly ConsumptionPlan[]):
   });
 };
 
+export const aggregateConsumptionActualTotals = (plans: readonly ConsumptionPlan[]): ConsumptionAccount => {
+  const actuals: Record<string, number> = {};
+  plans.forEach((plan) => Object.entries(plan.actuals).forEach(([month, amount]) => {
+    actuals[month] = (actuals[month] ?? 0) + amount;
+  }));
+  return { id: "account::all", customer: "All accounts", endUser: "", planId: "", dataCenter: "",
+    planType: "Aggregate", actuals, forecasts: {}, plans: [...plans] };
+};
+
 const fiscalMonthOrder = (key: string): number => {
   const match = /^FY(\d{2})-([A-Z]{3})$/.exec(key);
   if (!match) return Number.MAX_SAFE_INTEGER;
@@ -253,7 +262,7 @@ export const filterActiveConsumptionPlans = (
 ): ConsumptionPlan[] => {
   const previousMonth = previousFiscalMonth(currentFiscalMonth);
   if (!previousMonth) return [...plans];
-  return plans.filter((plan) => plan.actuals[previousMonth] !== 0 || plan.actuals[currentFiscalMonth] !== 0);
+  return plans.filter((plan) => (plan.actuals[previousMonth] ?? 0) !== 0 || (plan.actuals[currentFiscalMonth] ?? 0) !== 0);
 };
 
 export const getLatestActualMonth = (plans: readonly ConsumptionPlan[]): string | null => {

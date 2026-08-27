@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/ConsumptionPage.tsx", "utf8");
+const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 const accountsPage = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
@@ -32,7 +33,8 @@ assert.doesNotMatch(page, /3-Month Plan Trend Alerts|RISING|FALLING|Month-over-M
 assert.doesNotMatch(styles, /is-rising|is-falling|is-rise|is-fall/, "legacy trend CSS is removed");
 assert.match(page, /accept="\.csv,text\/csv"/, "runtime CSV import accepts CSV files");
 assert.match(page, /parseConsumptionCsv/, "CSV import uses the normalized parser");
-assert.match(page, /seedForecastMonths/, "the next quarter receives editable forecast cells");
+assert.doesNotMatch(page, /seedForecastMonths/, "CSV import and fallback never manufacture Forecast values absent from the source");
+assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "workspace parsing preserves ACTUAL-only imports without generating forecasts");
 assert.match(page, /data-forecast-cell/, "forecast cells expose a browser-verifiable edit contract");
 assert.match(page, /type EditCell = Readonly<\{ planKey:/, "the active editor is keyed by stable account-scoped Plan identity");
 assert.match(page, /plan\.id === planKey/, "Forecast updates change only the selected stable Plan row");
@@ -73,7 +75,7 @@ assert.match(page, /saveConsumptionForecasts/, "Forecast Save uses the atomic ba
 assert.match(page, /ConsumptionConflictError/, "HTTP 409 is handled as a typed conflict");
 assert.match(page, /Saved baseline[\s\S]*My draft[\s\S]*Current server/, "409 UX compares saved, draft and current server values");
 assert.match(page, /useState<ConsumptionPlan\[\]>\(\[\]\)/, "production starts without rendering synthetic Consumption data");
-assert.match(page, /dataMode === "fallback"[\s\S]*Saved in local fallback[\s\S]*dataMode !== "backend"/, "local-only fallback is explicit and production fails closed before Save");
+assert.match(page, /dataMode === "fallback"[\s\S]*setSavedPlans\(clonePlans\(draftPlans\)\)[\s\S]*dataMode !== "backend"/, "local-only fallback save is explicit and production fails closed before Save");
 assert.match(page, /canUseConsumptionFallback\(error\)[\s\S]*setSavedPlans\(fallbackPlans\)/, "synthetic plans are adopted only after a localhost fallback decision");
 assert.match(page, /setApiEtag\(""\)[\s\S]*setDataMode\("fallback"\)/, "local import fallback clears the prior server ETag");
 assert.match(page, /if \(isSaving\) return;[\s\S]*setIsSaving\(true\)[\s\S]*finally[\s\S]*setIsSaving\(false\)/, "Forecast Save submissions are serialized by an in-flight guard");
@@ -96,6 +98,7 @@ assert.match(page, /const signals = useMemo\(\(\) => serverSignals \?\? \[\]/, "
 assert.doesNotMatch(page, /serverSignals \?\? detectConsumptionSignals/, "the Inbox never invents client-side anomalies");
 assert.match(page, /const trendPoints[\s\S]*selectedPlan\.actuals\[month\][\s\S]*value === undefined \? \[\]/, "Trend renders ACTUAL values only and omits Forecast values");
 assert.doesNotMatch(page.match(/const trendPoints[\s\S]*?const trendDataProvider/)?.[0] ?? "", /selectedPlan\.forecasts/, "Trend never falls back to Forecast values");
+assert.match(page, /aggregateConsumptionActualTotals\(draftPlans\)/, "All accounts Trend totals every available ACTUAL without complete-month suppression");
 assert.match(page, /id="consumptionAccountSelector"[\s\S]*onClick=\{\(\) => \{ setAccountSelectorOpen\(true\)/, "every Plan selector click opens the list immediately, including an already-focused input");
 assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
 assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
@@ -105,6 +108,11 @@ assert.match(page, /expandable \? \([\s\S]*consumption-account-toggle[\s\S]*\) :
 assert.match(page, /renderQuarterCells\(singlePlan, false\)/, "single-plan account rows render editable detailed Forecast cells");
 assert.match(page, /renderQuarterCells\(account, true\)/, "Multiple aggregate rows are always read-only");
 assert.match(page, /filterActiveConsumptionPlans\(draftPlans, currentFiscalMonth\)[\s\S]*aggregateConsumptionAccounts\(visiblePlans\)/, "the End User / Plan table excludes only plans with zero previous/current ACTUAL");
+assert.match(page, /availableQuarterOptions[\s\S]*quarterOptions = availableQuarterOptions/, "From and To selectors retain their immutable full option list after range Apply");
+assert.doesNotMatch(page, /class="consumption-import-status"/, "loaded Plan and control-total status copy is removed");
+assert.doesNotMatch(page, /Loaded \$\{workspace\.plans\.length\} plans/, "legacy loaded-plan and control-total banner copy is removed");
+assert.match(page, /consumption-table-plan-count[\s\S]*visiblePlans\.length/, "the End User / Plan title shows the live filtered Plan count");
+assert.match(styles, /\.consumption-month-status\.is-actual[\s\S]*\.consumption-month-status\.is-forecast[\s\S]*\.consumption-quarter-total small\.is-incomplete/, "ACTUAL, FORECAST and INCOMPLETE use distinct semantic text colors");
 assert.match(page, /class="consumption-leading"[\s\S]*class="consumption-disclosure-slot"/, "Account and End User leading content shares one aligned grid");
 assert.match(page, /class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*aria-label=/, "Multiple rows expose a named native-button disclosure with aria-expanded");
 assert.match(styles, /\.consumption-account-toggle:hover[\s\S]*\.consumption-account-toggle:focus-visible/, "Multiple disclosure has visible hover and keyboard focus states");
