@@ -1,4 +1,23 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
+export type ConsumptionAmountSplit = Readonly<{
+  actualAmount: number;
+  forecastAmount: number;
+  totalAmount: number;
+  status: ConsumptionMonthStatus;
+}>;
+export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
+  serverPlanId: number; planId: string; endUser: string; dataCenter: string;
+  percentage: number;
+  actualTrend: readonly Readonly<{ periodKey: string; actualAmount: number }>[];
+}>;
+export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
+  workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
+}>;
+export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
+  account: string; percentage: number; workloads: readonly ConsumptionAnalysisWorkload[];
+}>;
+export type ConsumptionAccountSort = "account" | "amount";
+export type ConsumptionSortDirection = "asc" | "desc";
 export type ConsumptionSignalType = "ABOVE_USUAL" | "BELOW_USUAL" | "NEW_USAGE";
 export type ConsumptionPreviousDirection = "INCREASED" | "DECREASED" | "UNCHANGED";
 export type ConsumptionSignalGrade = "CRITICAL" | "HIGH" | "WATCH";
@@ -249,6 +268,15 @@ export const sortConsumptionMonths = (months: readonly string[]) =>
 export const sortConsumptionMonthsNewestFirst = (months: readonly string[]) =>
   [...months].sort((left, right) => fiscalMonthOrder(right) - fiscalMonthOrder(left));
 
+export const initialConsumptionRecordsBatchSize = (viewportHeight: number): number =>
+  Math.min(100, Math.max(10, Math.ceil((Math.max(0, viewportHeight) - 360) / 44)));
+
+export const shouldRestartConsumptionRecordsPage = (
+  append: boolean,
+  currentEtag: string,
+  nextEtag: string
+): boolean => append && currentEtag.length > 0 && currentEtag !== nextEtag;
+
 const previousFiscalMonth = (month: string): string | null => {
   const match = /^FY(\d{2})-([A-Z]{3})$/.exec(month);
   if (!match) return null;
@@ -452,3 +480,19 @@ export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[], asOf
     .filter((signal): signal is ConsumptionSignal => signal !== null)
     .sort((left, right) => gradeOrder[left.grade] - gradeOrder[right.grade] || Math.abs(right.changeAmount) - Math.abs(left.changeAmount));
 };
+
+/** Local workspace view transform. The loaded workspace remains authoritative; a server adapter can replace this boundary later. */
+export const sortAndFilterConsumptionAccounts = (
+  accounts: readonly ConsumptionAnalysisAccount[], search: string,
+  sort: ConsumptionAccountSort, direction: ConsumptionSortDirection
+): ConsumptionAnalysisAccount[] => {
+  const query = search.trim().toLocaleLowerCase();
+  const filtered = query ? accounts.filter((account) => account.account.toLocaleLowerCase().includes(query)) : [...accounts];
+  const factor = direction === "asc" ? 1 : -1;
+  return filtered.sort((left, right) => factor * (sort === "amount"
+    ? left.totalAmount - right.totalAmount || left.account.localeCompare(right.account)
+    : left.account.localeCompare(right.account)));
+};
+
+export const nextConsumptionBatchSize = (total: number, current: number, batchSize = 10): number =>
+  Math.min(Math.max(0, total), Math.max(batchSize, current + batchSize));

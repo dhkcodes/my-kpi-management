@@ -6,7 +6,7 @@ import { navItems, NavigationItem } from "../src/data/kpiMockData";
 const flattenLeaves = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => item.children ? flattenLeaves(item.children) : [item]);
 
-assert.equal(flattenLeaves(navItems).length, 13, "the provider exposes Home plus twelve real leaf destinations");
+assert.equal(flattenLeaves(navItems).length, 14, "the provider exposes Home plus thirteen real leaf destinations");
 
 assert.deepEqual(
   navItems.map(({ id, label, children }) => ({ id, label, childIds: children?.map((child) => child.id) })),
@@ -22,7 +22,7 @@ assert.deepEqual(
       label: "KPI Activities",
       childIds: ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
     },
-    { id: "consumption", label: "Consumption", childIds: undefined }
+    { id: "consumption", label: "Consumption", childIds: ["usage-insights", "usage-records"] }
   ],
   "TreeDataProvider owns hierarchy and labels without duplicating Router href data"
 );

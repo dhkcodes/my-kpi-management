@@ -67,9 +67,13 @@ export const customerNavItems: NavigationItem[] = [
   { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" },
   { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" }
 ];
+export const consumptionNavItems: NavigationItem[] = [
+  { id: "usage-insights", label: "Usage Insights", icon: "oj-ux-ico-chart-line" },
+  { id: "usage-records", label: "Usage Records", icon: "oj-ux-ico-table" }
+];
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", icon: "oj-ux-ico-home" },
   { id: "my-customers", label: "My Customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
   { id: "kpis", label: "KPI Activities", icon: "oj-ux-ico-book", children: kpiNavItems },
-  { id: "consumption", label: "Consumption", icon: "oj-ux-ico-chart-line" }
+  { id: "consumption", label: "Consumption", icon: "oj-ux-ico-chart-line", children: consumptionNavItems }
 ];

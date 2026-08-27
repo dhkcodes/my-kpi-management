@@ -8,11 +8,12 @@ import {
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
-  filterActiveConsumptionPlans,
   getConsumptionPlanLabel,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths,
+  initialConsumptionRecordsBatchSize,
+  shouldRestartConsumptionRecordsPage,
   getQuarterMonths,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
@@ -26,6 +27,7 @@ import {
   ConsumptionConflictError,
   applyConsumptionImport,
   canUseConsumptionFallback,
+  fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
   saveConsumptionForecasts
@@ -201,6 +203,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
   const [activePlanIndex, setActivePlanIndex] = useState(0);
   const [tableScrollState, setTableScrollState] = useState({ left: 0, max: 0 });
+  const [recordSearch, setRecordSearch] = useState("");
+  const [debouncedRecordSearch, setDebouncedRecordSearch] = useState("");
+  const [recordSort, setRecordSort] = useState<"account" | "amount">("account");
+  const [recordDirection, setRecordDirection] = useState<"asc" | "desc">("asc");
+  const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
+  const [recordsNextOffset, setRecordsNextOffset] = useState(0);
+  const [recordsHasMore, setRecordsHasMore] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
   const [pulseExpanded, setPulseExpanded] = useState(true);
   const [tableExpanded, setTableExpanded] = useState(true);
   const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
@@ -210,6 +220,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const recordsRequestGeneration = useRef(0);
+  const recordsLoadingRef = useRef(false);
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
     setSavedPlans(clonePlans(workspace.plans));
@@ -229,11 +241,73 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setConflictWorkspace(null);
   };
 
+  const loadRecordsPage = async (append: boolean, range = { fromQuarter, toQuarter }) => {
+    if (append && (recordsLoadingRef.current || JSON.stringify(savedPlans) !== JSON.stringify(draftPlans))) return;
+    recordsLoadingRef.current = true;
+    setRecordsLoading(true);
+    if (!append) {
+      setSavedPlans([]);
+      setDraftPlans([]);
+      setRecordsTotalAccounts(0);
+      setRecordsNextOffset(0);
+      setRecordsHasMore(false);
+      setExpandedAccounts(new Set());
+    }
+    const generation = ++recordsRequestGeneration.current;
+    try {
+      const page = await fetchConsumptionRecords({
+        fromQuarter: range.fromQuarter, toQuarter: range.toQuarter, search: debouncedRecordSearch,
+        offset: append ? recordsNextOffset : 0,
+        limit: append ? 10 : initialConsumptionRecordsBatchSize(window.innerHeight),
+        sort: recordSort.toUpperCase() as "ACCOUNT" | "AMOUNT",
+        direction: recordDirection.toUpperCase() as "ASC" | "DESC"
+      });
+      if (generation !== recordsRequestGeneration.current) return;
+      if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
+        await loadRecordsPage(false, range);
+        return;
+      }
+      const mergePlans = (current: readonly ConsumptionPlan[]) => {
+        const accountPlans = new Map<string, ConsumptionPlan[]>();
+        if (append) current.forEach((plan) => accountPlans.set(plan.customer, [...(accountPlans.get(plan.customer) ?? []), plan]));
+        page.accountGroups.forEach((group) => {
+          const plans = new Map((accountPlans.get(group.account) ?? []).map((plan) => [plan.id, plan]));
+          group.plans.forEach((plan) => plans.set(plan.id, plan));
+          accountPlans.set(group.account, [...plans.values()]);
+        });
+        return [...accountPlans.values()].flat();
+      };
+      setSavedPlans((current) => clonePlans(mergePlans(current)));
+      setDraftPlans((current) => clonePlans(mergePlans(current)));
+      setApiEtag(page.etag);
+      setFromQuarter(page.fromQuarter);
+      setToQuarter(page.toQuarter);
+      setEditablePeriodIds(new Set(page.editablePeriodIds));
+      setDisplayQuarterOrder([...page.displayQuarterOrder]);
+      setAvailableQuarterOptions((current) => [...new Set([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean))].sort());
+      setCurrentFiscalMonth(page.currentFiscalMonth);
+      setRecordsTotalAccounts(page.totalAccounts);
+      setRecordsNextOffset(page.nextOffset);
+      setRecordsHasMore(page.hasMore);
+      setRangeInitialized(true);
+      setRangeTouched(false);
+      setDataMode("backend");
+      setConflictRows([]);
+      setConflictWorkspace(null);
+    } catch (error) {
+      if (generation !== recordsRequestGeneration.current) return;
+      throw error;
+    } finally {
+      if (generation === recordsRequestGeneration.current) {
+        recordsLoadingRef.current = false;
+        setRecordsLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    void fetchConsumptionWorkspace().then((workspace) => {
-      if (active) adoptWorkspace(workspace);
-    }).catch((error) => {
+    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "" }).catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
         const fallbackPlans = clonePlans(initialSeed.plans);
@@ -246,21 +320,35 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
         setAvailableQuarterOptions([...new Set([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters])].sort());
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
+        setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
+        setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);
+        setRecordsHasMore(false);
         setRangeInitialized(true);
         setRangeTouched(false);
         setDataMode("fallback");
-
       } else {
         setDataMode("error");
         setImportError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
       }
     });
-    return () => { active = false; };
+    return () => { active = false; recordsRequestGeneration.current++; };
   }, []);
 
-  const visiblePlans = useMemo(() => filterActiveConsumptionPlans(draftPlans, currentFiscalMonth), [currentFiscalMonth, draftPlans]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedRecordSearch(recordSearch.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [recordSearch]);
+
+  useEffect(() => {
+    if (!rangeInitialized || dataMode !== "backend" || JSON.stringify(savedPlans) !== JSON.stringify(draftPlans)) return;
+    void loadRecordsPage(false).catch((error) => setImportError(error instanceof Error ? error.message : "Usage Records could not be loaded."));
+  }, [debouncedRecordSearch, recordSort, recordDirection]);
+
+  const visiblePlans = draftPlans;
   const accounts = useMemo(() => aggregateConsumptionAccounts(visiblePlans), [visiblePlans]);
-  const visibleTableRowCount = accounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
+  const renderedRecordAccounts = accounts;
+  const loadedAccountCount = renderedRecordAccounts.length;
+  const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => aggregateConsumptionActualTotals(draftPlans), [draftPlans]);
@@ -301,6 +389,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       left: Math.round(table.scrollLeft),
       max: Math.max(0, Math.round(table.scrollWidth - table.clientWidth))
     });
+  };
+
+  const handleTableScroll = (event: Event) => {
+    updateTableScrollState();
+    const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
+    if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
+      void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
+    }
   };
 
   const moveTableHorizontally = (direction: -1 | 1) => {
@@ -355,6 +451,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   }, [accounts.length, displayQuarterOrder]);
 
   useEffect(() => {
+    if (isSaving) {
+      const guard: KpiNavigationGuard = () => window.alert("Consumption forecast save is in progress. Please wait for it to finish.");
+      onNavigationGuardChange(guard, true);
+      return () => onNavigationGuardChange(null, false);
+    }
     if (!hasDraftChanges) {
       onNavigationGuardChange(null, false);
       return;
@@ -366,7 +467,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     };
     onNavigationGuardChange(guard, true);
     return () => onNavigationGuardChange(null, false);
-  }, [hasDraftChanges, onNavigationGuardChange]);
+  }, [hasDraftChanges, isSaving, onNavigationGuardChange]);
 
   const selectSignal = (signal: ConsumptionSignal) => {
     const plan = signal.serverPlanId === undefined
@@ -384,6 +485,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     try {
       const workspace = await fetchConsumptionWorkspace({ fromQuarter, toQuarter });
       adoptWorkspace(workspace);
+      await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter });
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
       setExpandedAccounts(new Set());
@@ -410,7 +512,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const beginForecastEdit = (plan: ConsumptionPlan, month: string) => {
-    if (isSaving || (dataMode !== "backend" && dataMode !== "fallback")) return;
+    if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = plan.forecasts[month] ?? plan.actuals[month] ?? 0;
     setEditCell({ planKey: plan.id, month });
   };
@@ -448,7 +550,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const saveForecasts = async () => {
-    if (isSaving) return;
+    if (isSaving || recordsLoading) return;
     setEditCell(null);
     editEntryValueRef.current = null;
     setIsSaving(true);
@@ -473,6 +575,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       } else {
         const workspace = await saveConsumptionForecasts(apiEtag, updates);
         adoptWorkspace(workspace);
+        try {
+          await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter });
+        } catch (refreshError) {
+          adoptWorkspace(workspace);
+          setRecordsTotalAccounts(aggregateConsumptionAccounts(workspace.plans).length);
+          setRecordsNextOffset(aggregateConsumptionAccounts(workspace.plans).length);
+          setRecordsHasMore(false);
+          setImportError(`Forecasts were saved, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        }
       }
       setEditCell(null);
       editEntryValueRef.current = null;
@@ -557,6 +668,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         loadedControls = result.controlTotalCount;
         importCountDetail = ` · New plans: ${result.insertedCount} · Overwritten plans: ${result.updatedCount}`;
         adoptWorkspace(result.workspace);
+        try {
+          await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter });
+        } catch (refreshError) {
+          adoptWorkspace(result.workspace);
+          setRecordsTotalAccounts(aggregateConsumptionAccounts(result.workspace.plans).length);
+          setRecordsNextOffset(aggregateConsumptionAccounts(result.workspace.plans).length);
+          setRecordsHasMore(false);
+          setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        }
       } else {
         const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
         const imported = pendingImport.parsed.plans;
@@ -660,8 +780,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
         <div>
-          <span class="kpi-eyebrow">Signal-integrated Pulse</span>
-          <h1 id="consumptionTitle">Consumption</h1>
+          <span class="kpi-eyebrow">Consumption</span>
+          <h1 id="consumptionTitle">Usage Records</h1>
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
@@ -739,113 +859,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         </section>
       )}
 
-      <section class="consumption-summary-cards" aria-label="Consumption range summary">
-        <article class="kpi-panel"><span>Range Total</span><strong>{currency.format(rangeTotal)}</strong><small>{fromQuarter} → {toQuarter}</small></article>
-        <article class="kpi-panel"><span>Latest Quarter</span><strong>{latestSummary?.total === null || !latestSummary ? "N/A" : currency.format(latestSummary.total)}</strong><small>{latestSummary?.quarter ?? "—"} · {latestSummary?.status ?? "—"}</small></article>
-        <article class="kpi-panel"><span>PreQ Change</span><strong>{signedCurrency(latestSummary?.preQGap ?? null)}</strong><small>Chronological predecessor</small></article>
-        <article class="kpi-panel"><span>Change Alerts</span><strong>{signals.length}</strong><small>Previous 3 completed months · Median + MAD</small></article>
-        <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
-      </section>
-
-      <section class="consumption-pulse-group" aria-labelledby="consumptionPulseGroupTitle">
-        <button type="button" class="consumption-disclosure consumption-pulse-toggle" aria-expanded={pulseExpanded}
-          aria-controls="consumptionPulseContent" onClick={() => setPulseExpanded((expanded) => !expanded)}>
-          <span class={pulseExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
-          <span id="consumptionPulseGroupTitle">Consumption Change Alerts & Trend</span>
-        </button>
-      {pulseExpanded && <div id="consumptionPulseContent" class="consumption-pulse-layout">
-        <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
-          <div class="consumption-section-heading">
-            <div>
-              <span class="kpi-section-label">Usual-level comparison</span>
-              <h2 id="consumptionSignalTitle">Consumption Change Alerts</h2>
-              <p>Previous 3 completed months · <span class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
-                data-tooltip="Median is the middle of the previous three completed monthly ACTUAL values, so one unusually high or low month has less influence.">Median</span> · MAX($50, 5%, <span
-                class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
-                data-tooltip="MAD is the median absolute deviation from the Median. It measures the Plan's usual month-to-month spread and helps avoid noisy alerts.">MAD</span> × 3)</p>
-            </div>
-            <span class="consumption-count-badge">{signals.length}</span>
-          </div>
-          <div id="consumptionSignalInbox" class="consumption-signal-inbox">
-            {signals.map((signal) => {
-              const presentation = consumptionSignalPresentation(signal);
-              const linkedPlan = draftPlans.find((plan) => signal.serverPlanId !== undefined
-                ? plan.serverPlanId === signal.serverPlanId
-                : plan.customer === signal.customer && plan.planId === signal.planId);
-              return (
-              <button
-                type="button"
-                class={selectedSignal?.id === signal.id ? "consumption-signal is-selected" : "consumption-signal"}
-                aria-pressed={selectedSignal?.id === signal.id}
-                aria-label={consumptionSignalAccessibleLabel(signal)}
-                onClick={() => selectSignal(signal)}>
-                <span class="consumption-signal-main"><strong>{signal.customer}</strong>
-                  <span>Workload: {linkedPlan?.workload || "Not mapped"}</span>
-                  <small>{signal.endUser} · Plan {signal.planId}</small></span>
-                <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual</strong><span>{currency.format(signal.latestActual)}</span></span>
-                <span class="consumption-signal-status"><span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-                  <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span></span>
-              </button>
-              );
-            })}
-            {signals.length === 0 && <p class="consumption-empty-state">No Plans exceeded the three-month median and MAD allowance.</p>}
-          </div>
-        </section>
-
-        <section class="kpi-panel consumption-trend-panel" aria-labelledby="consumptionTrendTitle">
-          <div class="consumption-section-heading">
-            <div>
-              <span class="kpi-section-label">Linked context</span>
-              <h2 id="consumptionTrendTitle">Consumption Trend</h2>
-              <p>{selectedPlanLabel}</p>
-            </div>
-            <div class="consumption-account-selector">
-              <label htmlFor="consumptionAccountSelector">Plan</label>
-              <input id="consumptionAccountSelector" type="search" role="combobox" aria-label="Search or select trend plan"
-                aria-expanded={accountSelectorOpen} aria-controls="consumptionAccountOptions" autocomplete="off"
-                aria-activedescendant={accountSelectorOpen ? `consumptionPlanOption-${activePlanIndex}` : undefined}
-                placeholder={selectedPlanLabel}
-                value={planSearch}
-                onFocus={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
-                onClick={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
-                onBlur={() => setAccountSelectorOpen(false)}
-                onKeyDown={handlePlanSelectorKeyDown}
-                onInput={(event) => { setPlanSearch((event.currentTarget as HTMLInputElement).value); setActivePlanIndex(0); setAccountSelectorOpen(true); }} />
-              {accountSelectorOpen && (
-                <div id="consumptionAccountOptions" class="consumption-account-options" role="listbox" aria-label="Trend plan options">
-                  <button id="consumptionPlanOption-0" type="button" role="option" aria-selected={selectedSeriesId === "__all__"} onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectTrendPlan(null)}>All accounts · Total</button>
-                  {filteredPlans.map((plan, index) => <button id={`consumptionPlanOption-${index + 1}`} key={plan.id} type="button" role="option" aria-selected={selectedSeriesId === plan.id}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectTrendPlan(plan)}>{getConsumptionPlanLabel(plan)}</button>)}
-                </div>
-              )}
-            </div>
-          </div>
-          <oj-chart
-            id="consumptionTrendChart"
-            type="line"
-            data={trendDataProvider}
-            animationOnDisplay="auto"
-            animationOnDataChange="auto"
-            legend={{ rendered: "off" }}
-            aria-label="Linked monthly consumption trend">
-            <template slot="itemTemplate" render={renderConsumptionChartItem}></template>
-          </oj-chart>
-          {selectedSignal && (() => {
-            const presentation = consumptionSignalPresentation(selectedSignal);
-            const previousDirection = consumptionPreviousDirection(selectedSignal);
-            return (
-            <div class="consumption-signal-reason" role="note">
-              <span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-              <div><strong>{selectedSignal.month} · Previous month: {previousDirection.label}</strong><p>{selectedSignal.reason} Allowance: {currency.format(selectedSignal.allowance)}. Plan ID: {selectedSignal.planId}.</p></div>
-            </div>
-            );
-          })()}
-        </section>
-      </div>}
-      </section>
-
       <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
         <div class="consumption-section-heading consumption-table-heading">
           <button type="button" class="consumption-disclosure consumption-table-toggle" aria-expanded={tableExpanded}
@@ -863,11 +876,22 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           )}
         </div>
         {tableExpanded && <div id="consumptionTableContent" class="consumption-table-content">
+        <div class="consumption-record-controls" role="toolbar" aria-label="Usage Records server query controls">
+          <label>Search records<input type="search" value={recordSearch} placeholder="Account, workload, end user, or Plan"
+            disabled={hasDraftChanges || recordsLoading} onInput={(event) => setRecordSearch(event.currentTarget.value)} /></label>
+          <label>Sort<select value={recordSort} disabled={hasDraftChanges || recordsLoading} onChange={(event) => setRecordSort(event.currentTarget.value as "account" | "amount")}>
+            <option value="account">Account</option><option value="amount">Range amount</option>
+          </select></label>
+          <label>Direction<select value={recordDirection} disabled={hasDraftChanges || recordsLoading} onChange={(event) => setRecordDirection(event.currentTarget.value as "asc" | "desc")}>
+            <option value="asc">Ascending</option><option value="desc">Descending</option>
+          </select></label>
+          <small>{hasDraftChanges ? "Save or cancel Forecast changes before changing the query." : "Search and sort are applied by the server."}</small>
+        </div>
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
         </div>
-        <div ref={tableScrollRef} class={visibleTableRowCount > 10 ? "consumption-table-scroll is-scrollable-y" : "consumption-table-scroll"} tabIndex={0} aria-label="Scrollable Consumption table" onScroll={updateTableScrollState} onKeyDown={handleTableKeyDown}>
+        <div ref={tableScrollRef} class={recordsTotalAccounts > 10 ? "consumption-table-scroll is-scrollable-y" : "consumption-table-scroll"} tabIndex={0} aria-label="Scrollable Usage Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
               <tr>
@@ -889,7 +913,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </tr>
             </thead>
             <tbody>
-              {accounts.map((account) => {
+              {renderedRecordAccounts.map((account) => {
                 const expandable = account.plans.length > 1;
                 const expanded = expandable && expandedAccounts.has(account.customer);
                 const singlePlan = account.plans[0];
@@ -934,6 +958,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </tbody>
           </table>
         </div>
+        {recordsHasMore && <div class="consumption-load-more">
+          <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>
+          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
+        </div>}
         </div>}
       </section>
     </section>

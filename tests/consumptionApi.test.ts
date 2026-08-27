@@ -3,6 +3,7 @@ import {
   canUseConsumptionFallback,
   ConsumptionConflictError,
   ConsumptionNetworkError,
+  fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   saveConsumptionForecasts
 } from "../src/data/consumptionApi";
@@ -51,6 +52,35 @@ void (async () => {
   assert.equal(workspace.plans[0].forecasts["FY27-NOV"], undefined, "a missing editable forecast month remains absent");
   assert.equal("FY27-SEP" in workspace.plans[0].forecasts, false);
   assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 3);
+
+  runtime.fetch = async (input) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=FY26-Q1&toQuarter=FY27-Q1&search=database&sort=AMOUNT&direction=DESC&offset=10&limit=10");
+    return new Response(JSON.stringify({
+      etag: '\"records-etag\"', lastBatchId: 7,
+      currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
+      editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
+      accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 11, nextOffset: 11, hasMore: false
+    }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"records-header\"' } });
+  };
+  const records = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "database",
+    sort: "AMOUNT", direction: "DESC", offset: 10, limit: 10 });
+  assert.equal(records.etag, '\"records-header\"');
+  assert.deepEqual(records.accountGroups.map((group) => group.account), ["A"]);
+  assert.equal(records.accountGroups[0].plans[0].workload, "Autonomous Database");
+  assert.deepEqual([records.totalAccounts, records.nextOffset, records.hasMore], [11, 11, false]);
+
+  runtime.fetch = async (input) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=&toQuarter=&search=&sort=ACCOUNT&direction=ASC&offset=0&limit=10");
+    return new Response(JSON.stringify({
+      etag: '\"default-range\"', lastBatchId: 7,
+      currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
+      editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
+      accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 1, nextOffset: 1, hasMore: false
+    }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"default-range\"' } });
+  };
+  const defaultRangeRecords = await fetchConsumptionRecords({ fromQuarter: "", toQuarter: "", search: "",
+    sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 });
+  assert.deepEqual([defaultRangeRecords.fromQuarter, defaultRangeRecords.toQuarter], ["FY26-Q1", "FY27-Q1"]);
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,

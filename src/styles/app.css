@@ -2505,3 +2505,37 @@ h4.weekly-activity-section-label--next-week,
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
   .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
 }
+
+/* Consumption Usage Insights and incremental Usage Records */
+.consumption-insights-page { display: grid; gap: 1rem; min-width: 0; }
+.consumption-insights-portfolio, .consumption-insights-quarter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.consumption-insights-quarter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.consumption-insights-amount { display: grid; gap: .25rem; }
+.consumption-insights-amount > span:first-child { color: var(--oj-core-text-color-secondary); font-weight: 600; }
+.consumption-insights-amount strong { font-size: clamp(1.3rem, 2vw, 1.8rem); }
+.consumption-insights-amount small { color: var(--oj-core-text-color-secondary); }
+.consumption-insights-status { justify-self: start; border-radius: .25rem; padding: .15rem .45rem; font-size: .72rem; font-weight: 700; }
+.consumption-insights-status.is-actual { color: #34601f; background: #eef6ec; }
+.consumption-insights-status.is-forecast { color: #175b8e; background: #e4f0f6; }
+.consumption-insights-status.is-mixed { color: #8a4b08; background: #fff2df; }
+.consumption-insights-status.is-incomplete { color: #9a382d; background: #fceeed; }
+.consumption-insights-qoq { display: flex; align-items: baseline; gap: .4rem; margin-top: .8rem; padding-top: .65rem; border-top: 1px solid var(--oj-core-divider-color); }
+.consumption-insights-qoq span { margin-right: auto; color: var(--oj-core-text-color-secondary); }
+.consumption-insights-trend { display: grid; gap: .4rem; }
+.consumption-insights-trend > div { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem .7rem; background: var(--oj-core-bg-color-content); border-radius: .25rem; }
+.consumption-insights-controls, .consumption-record-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; margin-bottom: .75rem; }
+.consumption-insights-controls label, .consumption-record-controls label { display: grid; gap: .2rem; color: var(--oj-core-text-color-secondary); font-size: .78rem; font-weight: 600; }
+.consumption-insights-controls input, .consumption-insights-controls select, .consumption-record-controls input, .consumption-record-controls select { min-height: 2.25rem; border: 1px solid var(--oj-core-border-color-enabled); border-radius: .25rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); padding: .35rem .55rem; }
+.consumption-record-controls small { flex: 1 1 100%; color: var(--oj-core-text-color-secondary); }
+.consumption-insights-contribution-list, .consumption-insights-detail aside, .consumption-insights-detail > div { display: grid; gap: .4rem; }
+.consumption-insights-contribution-list button, .consumption-insights-detail button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .8rem; text-align: left; border: 1px solid var(--oj-core-divider-color); border-radius: .25rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); padding: .65rem .75rem; cursor: pointer; }
+.consumption-insights-contribution-list button small, .consumption-insights-detail button small { grid-column: 1 / -1; color: var(--oj-core-text-color-secondary); }
+.consumption-insights-detail { display: grid; grid-template-columns: minmax(14rem, .8fr) minmax(18rem, 1.2fr); gap: 1rem; }
+.consumption-insights-detail button.is-selected { border-color: var(--oj-core-focus-border-color); background: var(--oj-core-bg-color-hover); }
+.consumption-load-more { display: flex; justify-content: center; align-items: center; gap: .75rem; padding: .75rem; }
+.consumption-load-more button, .consumption-insights-controls button { border: 1px solid var(--oj-button-outlined-chrome-border-color); border-radius: .25rem; background: var(--oj-button-outlined-chrome-bg-color); color: var(--oj-button-outlined-chrome-text-color); min-height: 2.25rem; padding: .4rem .75rem; cursor: pointer; }
+.consumption-insights-controls button[aria-pressed="true"] { background: var(--oj-button-outlined-chrome-bg-color-selected); border-color: var(--oj-button-outlined-chrome-border-color-selected); }
+@media (max-width: 900px) { .consumption-insights-quarter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .consumption-insights-portfolio, .consumption-insights-quarter-grid, .consumption-insights-detail { grid-template-columns: minmax(0, 1fr); }
+}
