@@ -14,7 +14,8 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
-  seedForecastMonths
+  seedForecastMonths,
+  sortConsumptionMonthsNewestFirst
 } from "../src/data/consumptionData";
 
 const csv = [
@@ -39,6 +40,11 @@ assert.equal(getFiscalQuarter("FY27-JUN"), "FY27-Q1");
 assert.deepEqual(getNextQuarterMonths("FY27-JUL"), ["FY27-AUG", "FY27-SEP", "FY27-OCT"], "Forecast starts in the month immediately after the last populated Actual");
 assert.deepEqual(getNextQuarterMonths("FY27-AUG"), ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
 assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY28-AUG"]);
+assert.deepEqual(
+  sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
+  ["FY27-NOV", "FY27-OCT", "FY27-SEP"],
+  "table month display order is derived dynamically from fiscal period keys, newest first"
+);
 
 const sparseCsv = [
   "Customer,End User,Plan ID,Data Center,Plan Type,FY27-JUN,FY27-JUL,FY27-AUG,FY27-SEP",
