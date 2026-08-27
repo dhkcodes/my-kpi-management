@@ -169,6 +169,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
   const [activePlanIndex, setActivePlanIndex] = useState(0);
   const [tableScrollState, setTableScrollState] = useState({ left: 0, max: 0 });
+  const [pulseExpanded, setPulseExpanded] = useState(true);
+  const [tableExpanded, setTableExpanded] = useState(true);
   const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [importResult, setImportResult] = useState("");
@@ -198,7 +200,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   useEffect(() => {
     let active = true;
     void fetchConsumptionWorkspace().then((workspace) => {
-      if (active) adoptWorkspace(workspace, `Backend connected · ${workspace.plans.length} plans · ${workspace.controlTotalCount} control totals`);
+      if (active) adoptWorkspace(workspace, `Loaded ${workspace.plans.length} plans · ${workspace.controlTotalCount} control totals`);
     }).catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
@@ -225,6 +227,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const visiblePlans = useMemo(() => filterActiveConsumptionPlans(draftPlans, currentFiscalMonth), [currentFiscalMonth, draftPlans]);
   const accounts = useMemo(() => aggregateConsumptionAccounts(visiblePlans), [visiblePlans]);
+  const visibleTableRowCount = accounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => aggregateConsumptionAccounts(
@@ -349,7 +352,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setImportError("");
     try {
       const workspace = await fetchConsumptionWorkspace({ fromQuarter, toQuarter });
-      adoptWorkspace(workspace, `Backend connected · ${workspace.fromQuarter} to ${workspace.toQuarter} · ${workspace.plans.length} plans`);
+      adoptWorkspace(workspace, `Loaded ${workspace.fromQuarter} to ${workspace.toQuarter} · ${workspace.plans.length} plans`);
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
       setExpandedAccounts(new Set());
@@ -438,7 +441,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         throw new Error("Authoritative Consumption workspace is not ready; Forecast was not saved.");
       } else {
         const workspace = await saveConsumptionForecasts(apiEtag, updates);
-        adoptWorkspace(workspace, `Backend connected · Forecast saved atomically · ${workspace.plans.length} plans`);
+        adoptWorkspace(workspace, `Forecast saved · ${workspace.plans.length} plans`);
       }
       setEditCell(null);
       editEntryValueRef.current = null;
@@ -713,20 +716,31 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
       </section>
 
-      <div class="consumption-pulse-layout">
+      <section class="consumption-pulse-group" aria-labelledby="consumptionPulseGroupTitle">
+        <button type="button" class="consumption-disclosure consumption-pulse-toggle" aria-expanded={pulseExpanded}
+          aria-controls="consumptionPulseContent" onClick={() => setPulseExpanded((expanded) => !expanded)}>
+          <span class={pulseExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
+          <span id="consumptionPulseGroupTitle">Consumption Change Alerts & Trend</span>
+        </button>
+      {pulseExpanded && <div id="consumptionPulseContent" class="consumption-pulse-layout">
         <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
           <div class="consumption-section-heading">
             <div>
               <span class="kpi-section-label">Usual-level comparison</span>
               <h2 id="consumptionSignalTitle">Consumption Change Alerts</h2>
-              <p>Previous 3 completed months · Median · MAX($50, 5%, MAD × 3)</p>
+              <p>Previous 3 completed months · <span class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
+                data-tooltip="Median is the middle of the previous three completed monthly ACTUAL values, so one unusually high or low month has less influence.">Median</span> · MAX($50, 5%, <span
+                class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
+                data-tooltip="MAD is the median absolute deviation from the Median. It measures the Plan's usual month-to-month spread and helps avoid noisy alerts.">MAD</span> × 3)</p>
             </div>
             <span class="consumption-count-badge">{signals.length}</span>
           </div>
           <div id="consumptionSignalInbox" class="consumption-signal-inbox">
             {signals.map((signal) => {
               const presentation = consumptionSignalPresentation(signal);
-              const previousDirection = consumptionPreviousDirection(signal);
+              const linkedPlan = draftPlans.find((plan) => signal.serverPlanId !== undefined
+                ? plan.serverPlanId === signal.serverPlanId
+                : plan.customer === signal.customer && plan.planId === signal.planId);
               return (
               <button
                 type="button"
@@ -734,13 +748,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 aria-pressed={selectedSignal?.id === signal.id}
                 aria-label={consumptionSignalAccessibleLabel(signal)}
                 onClick={() => selectSignal(signal)}>
-                <span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-                <span class="consumption-signal-main"><strong>{signal.customer}</strong><span>{signal.endUser} · {signal.planId}</span></span>
-                <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual {currency.format(signal.latestActual)}</strong><span>Median {currency.format(signal.baselineMedian)} · MAD {currency.format(signal.mad)}</span></span>
-                <span class="consumption-signal-change"><strong>{signedCurrency(signal.changeAmount)}</strong><span>{formatPercent(signal.changePercent)}</span></span>
-                <span class={`consumption-signal-direction ${previousDirection.tone}`}><span class={previousDirection.icon} aria-hidden="true"></span>Previous month: {previousDirection.label}</span>
-                <SignalSparkline signal={signal} />
-                <span class="consumption-signal-severity">{signal.grade}</span>
+                <span class="consumption-signal-main"><strong>{signal.customer}</strong>
+                  <span>Workload: {linkedPlan?.workload || "Not mapped"}</span>
+                  <small>{signal.endUser} · Plan {signal.planId}</small></span>
+                <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual</strong><span>{currency.format(signal.latestActual)}</span></span>
+                <span class="consumption-signal-status"><span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
+                  <span class="consumption-signal-severity">{signal.grade}</span></span>
               </button>
               );
             })}
@@ -799,14 +812,17 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             );
           })()}
         </section>
-      </div>
+      </div>}
+      </section>
 
       <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
         <div class="consumption-section-heading consumption-table-heading">
-          <div>
-            <span class="kpi-section-label">Actual + Forecast</span>
-            <h2 id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption</h2>
-          </div>
+          <button type="button" class="consumption-disclosure consumption-table-toggle" aria-expanded={tableExpanded}
+            aria-controls="consumptionTableContent" onClick={() => setTableExpanded((expanded) => !expanded)}>
+            <span class={tableExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
+            <span><span class="kpi-section-label">Actual + Forecast</span>
+              <strong id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption</strong></span>
+          </button>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
               <span>Draft changes</span>
@@ -815,11 +831,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </div>
           )}
         </div>
+        {tableExpanded && <div id="consumptionTableContent">
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
         </div>
-        <div ref={tableScrollRef} class="consumption-table-scroll" tabIndex={0} aria-label="Horizontally scrollable Consumption table" onScroll={updateTableScrollState} onKeyDown={handleTableKeyDown}>
+        <div ref={tableScrollRef} class={visibleTableRowCount > 10 ? "consumption-table-scroll is-scrollable-y" : "consumption-table-scroll"} tabIndex={0} aria-label="Scrollable Consumption table" onScroll={updateTableScrollState} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
               <tr>
@@ -855,14 +872,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><strong title={account.customer}>{account.customer}</strong><small title={`Multiple · ${account.plans.length} Plans`}>Multiple · {account.plans.length} Plans</small></span>
+                              <span class="consumption-leading-copy"><strong class="consumption-fast-tooltip" tabIndex={0} data-tooltip={account.customer}>{account.customer}</strong><small>Multiple · {account.plans.length} Plans</small></span>
                             </span>
                           </button>
                         ) : (
                           <span class="consumption-leading consumption-account-single">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><strong title={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`}>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
-                            <small title={`${singlePlan?.endUser ?? ""} · Plan ${singlePlan?.planId ?? ""} · DC ${singlePlan?.dataCenter ?? ""}`}>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><strong class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`}>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
+                            <small class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${singlePlan?.endUser ?? ""} · Plan ${singlePlan?.planId ?? ""} · DC ${singlePlan?.dataCenter ?? ""}`}>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
                           </span>
                         )}
                       </th>
@@ -873,8 +890,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                         <th class="consumption-account-column" scope="row">
                           <span class="consumption-leading">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><span class="consumption-end-user" title={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`}>{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
-                            <small title={`${plan.endUser} · Plan ${plan.planId} · DC ${plan.dataCenter}`}>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><span class="consumption-end-user consumption-fast-tooltip" tabIndex={0} data-tooltip={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`}>{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
+                            <small class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${plan.endUser} · Plan ${plan.planId} · DC ${plan.dataCenter}`}>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
                           </span>
                         </th>
                         {renderQuarterCells(plan, false)}
@@ -886,6 +903,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </tbody>
           </table>
         </div>
+        </div>}
       </section>
     </section>
   );
