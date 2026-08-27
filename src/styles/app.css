@@ -382,8 +382,9 @@ body {
 
 .kpi-content:has(.accounts-workloads-page) {
   align-content: start;
-  gap: 0.25rem;
+  gap: 1rem;
 }
+.kpi-content:has(.accounts-workloads-page.is-empty) { gap: 0.25rem; }
 
 .kpi-content:has(.kpi-spreadsheet-page) { align-content: start; }
 
@@ -2223,7 +2224,7 @@ h4.weekly-activity-section-label--next-week,
 
 /* KPI-only Preact-owned native table. Accounts & Workloads remains untouched. */
 .kpi-activities-table-wrap { border: 1px solid var(--kpi-border); box-sizing: border-box; max-width: 100%; min-width: 0; overflow-x: auto; width: 100%; }
-.kpi-activities-table { border-collapse: collapse; table-layout: fixed; width: max-content; }
+.kpi-activities-table { border-collapse: collapse; min-width: 100%; table-layout: fixed; width: max-content; }
 .kpi-activities-table th, .kpi-activities-table td { background: var(--kap-grid-cell-bg); border-bottom: 1px solid var(--kap-grid-border); border-right: 1px solid var(--kap-grid-border); box-sizing: border-box; min-height: 3rem; vertical-align: middle; }
 .kpi-activities-table thead th { background: var(--kap-grid-header-bg); position: sticky; top: 0; z-index: 4; }
 .kpi-activities-table tbody tr:last-child td { border-bottom: 0; }
@@ -2235,7 +2236,10 @@ h4.weekly-activity-section-label--next-week,
 .kpi-grid-cell.is-unsaved-cell { background: var(--kap-grid-draft-bg); color: var(--kap-grid-draft-ink); }
 .kpi-grid-cell.is-unsaved-cell::after { background: var(--kap-grid-draft-line); bottom: 0; content: ""; height: 3px; left: .35rem; position: absolute; right: .35rem; z-index: 2; }
 .kpi-grid-cell > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-clipped-cell-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-clipped-cell-tooltip { background: #252525; border-radius: .25rem; box-sizing: border-box; color: #fff; font-size: 1rem; font-weight: 600; line-height: 1.4; max-width: min(32rem, calc(100vw - 1rem)); overflow: auto; overflow-wrap: anywhere; padding: .6rem .75rem; pointer-events: none; position: fixed; white-space: pre-wrap; z-index: 1000; }
 .kpi-grid-cell--fixed > span { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.kpi-grid-cell--fixed > .kpi-clipped-cell-text { overflow: hidden; text-overflow: ellipsis; }
 .kpi-cell-description { display: -webkit-box; line-height: 1.45; max-height: 7.25rem; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .kpi-grid-column-header { background: var(--kap-grid-header-bg); border-right: 1px solid var(--kap-grid-border); box-sizing: border-box; height: 100%; min-width: 0; width: 100%; }
 .kpi-grid-sort-button { align-items: center; background: transparent; border: 0; color: var(--kap-grid-header-ink); cursor: pointer; display: grid; font: inherit; font-weight: 800; gap: .55rem; grid-template-columns: minmax(max-content, 1fr) auto; height: 100%; letter-spacing: .01em; padding: .4rem .65rem; text-align: left; width: 100%; }
@@ -2276,6 +2280,7 @@ h4.weekly-activity-section-label--next-week,
 }
 .kpi-cell-editor-overlay { background: #fff; border: 2px solid #2f6f9f; box-shadow: 0 8px 24px rgba(22,21,19,.2); box-sizing: border-box; display: flex; padding: .2rem; position: fixed; z-index: 120; }
 .kpi-cell-editor-overlay--textarea { min-height: 8rem; overflow: auto; padding: .75rem; }
+.kpi-cell-editor-overlay--date { border: 0; box-shadow: none; padding: 0; }
 .kpi-cell-editor-control, .kpi-workload-launcher > input { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; font: inherit; height: 100%; min-height: 2.4rem; padding: .5rem; width: 100%; }
 .kpi-cell-editor-control--textarea { line-height: 1.5; min-height: 8rem; overflow: auto; padding: .75rem; resize: none; white-space: pre-wrap; }
 .kpi-cell-editor-control--date { align-self: stretch; }
@@ -2340,7 +2345,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table-toggle .consumption-table-title { display: block; }
 .consumption-signal-panel, .consumption-trend-panel, .consumption-table-panel { margin: 0; min-width: 0; }
 .consumption-section-heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .85rem; }
-.consumption-section-heading h2 { margin: .15rem 0 0; }
+.consumption-section-heading h2 { font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.02em; margin: .15rem 0 0; }
 .consumption-count-badge { align-items: center; background: #f0eeeb; border-radius: 999px; display: inline-flex; font-size: .78rem; font-weight: 800; justify-content: center; min-height: 1.8rem; min-width: 1.8rem; padding: .2rem .5rem; }
 .consumption-signal-inbox { border: 1px solid var(--kpi-border); max-height: 23rem; overflow-x: hidden; overflow-y: auto; }
 .consumption-signal { align-items: start; background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; display: grid; font: inherit; gap: .45rem .8rem; grid-template-columns: minmax(0, 1fr) auto; padding: .75rem; text-align: left; width: 100%; }
@@ -2358,7 +2363,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-signal-type.is-above-usual { background: var(--oj-palette-success-20, #e8f3e7); color: var(--oj-palette-success-120, #285b28); }
 .consumption-signal-type.is-below-usual { background: #fde7e3; color: #a63122; }
 .consumption-signal-type.is-new-usage { background: #e9f2f8; color: #245777; }
-.consumption-signal-severity { color: var(--kpi-muted); font-size: .68rem; font-weight: 750; white-space: nowrap; }
+
 .consumption-signal-direction { align-items: center; display: inline-flex; font-size: .7rem; font-weight: 850; gap: .2rem; white-space: nowrap; }
 .consumption-signal-direction.is-increased { color: var(--oj-palette-success-100, #356b31); }
 .consumption-signal-direction.is-decreased { color: var(--kpi-danger); }
@@ -2376,6 +2381,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-signal-reason p { color: var(--kpi-muted); line-height: 1.4; margin: .2rem 0 0; }
 .consumption-table-heading { align-items: center; }
 .consumption-table-title { font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.02em; }
+.consumption-table-content { position: relative; }
 .consumption-draft-actions { align-items: center; display: flex; flex: 0 0 auto; gap: .5rem; }
 .consumption-draft-actions > span { color: var(--kap-grid-draft-ink); font-size: .76rem; font-weight: 800; }
 .consumption-table-panel { position: relative; }
@@ -2385,19 +2391,20 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table-scroll.is-scrollable-y::-webkit-scrollbar { display: block; height: .65rem; width: .65rem; }
 .consumption-table-scroll.is-scrollable-y::-webkit-scrollbar-thumb { background: #8b8b8b; border: 2px solid #f2f2f2; border-radius: 999px; }
 .consumption-table-scroll.is-scrollable-y::-webkit-scrollbar-track { background: #f2f2f2; }
-.consumption-scroll-controls { align-items: center; display: flex; flex-direction: column; gap: .38rem; position: fixed; right: max(.75rem, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 18; }
+.consumption-scroll-controls { align-items: center; display: flex; flex-direction: column; gap: .38rem; position: absolute; right: .65rem; top: 50%; transform: translateY(-50%); z-index: 18; }
 .consumption-scroll-controls button { background: rgb(255 255 255 / 95%); border: 1px solid var(--kpi-border); box-shadow: 0 .6rem 1.5rem rgb(0 0 0 / 14%); color: var(--kpi-ink); cursor: pointer; font-size: 1.35rem; height: 2.55rem; width: 2.55rem; }
 .consumption-scroll-controls button:disabled { color: var(--kpi-muted); cursor: default; opacity: .45; }
 .consumption-table { border-collapse: separate; border-spacing: 0; min-width: 100%; table-layout: fixed; width: max-content; }
 .consumption-table th, .consumption-table td { background: var(--kap-grid-cell-bg); border-bottom: 1px solid var(--kap-grid-border); border-right: 1px solid var(--kap-grid-border); height: 3.25rem; min-width: 7.25rem; padding: .55rem; }
 .consumption-table thead th { background: var(--kap-grid-header-bg); color: var(--kap-grid-header-ink); font-size: .74rem; font-weight: 850; text-align: center; }
+
 .consumption-table thead tr:first-child th { border-bottom-color: #d7dde2; }
 .consumption-table thead tr:first-child th { position: sticky; top: 0; z-index: 7; }
 .consumption-table thead tr:nth-child(2) th { position: sticky; top: 3.25rem; z-index: 7; }
 .consumption-table tbody tr:hover > td, .consumption-table tbody tr:hover > th { background: var(--kap-grid-hover-bg); }
 .consumption-table tbody tr.is-context > td, .consumption-table tbody tr.is-context > th { background: #fff7f3; }
 .consumption-account-column { left: 0; min-width: 19rem !important; position: sticky; text-align: left !important; width: 19rem; z-index: 3; }
-.consumption-table thead .consumption-account-column { z-index: 6; }
+.consumption-table thead .consumption-account-column { font-size: .86rem; padding-left: 2.35rem; text-align: left; z-index: 6; }
 .consumption-account-row .consumption-account-column { background: #f7f5f2; }
 .consumption-account-toggle { background: transparent; border: 0; border-radius: var(--oj-core-border-radius-sm); color: inherit; cursor: pointer; display: block; font: inherit; padding: .2rem; text-align: left; width: 100%; }
 .consumption-account-toggle:hover { background: var(--oj-core-bg-color-hover, #eeebe8); }
@@ -2412,6 +2419,8 @@ h4.weekly-activity-section-label--next-week,
 .consumption-fast-tooltip { position: relative; }
 .consumption-fast-tooltip::after { background: #252525; border-radius: .25rem; color: #fff; content: attr(data-tooltip); font-size: 1rem; font-weight: 600; left: 0; line-height: 1.35; max-width: min(28rem, 70vw); opacity: 0; padding: .55rem .7rem; pointer-events: none; position: absolute; top: calc(100% + .25rem); transform: translateY(-.15rem); visibility: hidden; white-space: normal; width: max-content; z-index: 40; }
 .consumption-fast-tooltip:hover::after, .consumption-fast-tooltip:focus-visible::after { opacity: 1; transform: translateY(0); visibility: visible; }
+.consumption-clipped-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumption-clipped-tooltip { background: #252525; border-radius: .25rem; color: #fff; font-size: 1rem; font-weight: 600; line-height: 1.35; max-width: min(28rem, calc(100vw - 1rem)); overflow-wrap: anywhere; padding: .55rem .7rem; pointer-events: none; position: fixed; white-space: normal; z-index: 1000; }
 .consumption-metric-help { border-bottom: 1px dotted currentColor; cursor: help; font-weight: 750; }
 .consumption-value-cell { font-variant-numeric: tabular-nums; text-align: right; }
 .consumption-value-cell small { color: var(--kpi-muted); display: block; font-size: .62rem; margin-top: .15rem; text-transform: uppercase; }

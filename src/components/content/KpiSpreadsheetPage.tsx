@@ -1,4 +1,5 @@
 import { Fragment, h } from "preact";
+import { createPortal } from "preact/compat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { ojDialog } from "ojs/ojdialog";
@@ -151,6 +152,47 @@ const displayValue = (row: KpiSpreadsheetRow, key: KpiFieldKey) => key === "mana
   ? (row.manageTimeReflected ? "Reflected in internal system" : "Not reflected in internal system")
   : key === "targetQuarter" ? (joinTargetPeriod(row.targetFiscalYear, row.targetQuarter) || "—")
     : key === "stage" && row.stage ? stageLabels[row.stage] : row[key] === null ? "—" : String(row[key] || "—");
+
+type KpiCellTooltipPosition = Readonly<{ left: number; top?: number; bottom?: number; maxWidth: number; maxHeight: number }>;
+
+function KpiClippedCellText({ text, multiline = false }: Readonly<{ text: string; multiline?: boolean }>) {
+  const textRef = useRef<HTMLSpanElement | null>(null);
+  const [position, setPosition] = useState<KpiCellTooltipPosition | null>(null);
+  useEffect(() => {
+    const element = textRef.current;
+    const cell = element?.closest("td");
+    if (!element || !cell) return;
+    const show = () => {
+      const clipped = element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight;
+      if (!clipped) { setPosition(null); return; }
+      const rect = element.getBoundingClientRect();
+      const maxWidth = Math.max(176, Math.min(512, window.innerWidth - 16));
+      const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - maxWidth - 8));
+      const spaceBelow = Math.max(96, window.innerHeight - rect.bottom - 14);
+      const spaceAbove = Math.max(96, rect.top - 14);
+      setPosition(spaceBelow >= 160 || spaceBelow >= spaceAbove
+        ? { left, top: rect.bottom + 6, maxWidth, maxHeight: spaceBelow }
+        : { left, bottom: window.innerHeight - rect.top + 6, maxWidth, maxHeight: spaceAbove });
+    };
+    const hide = () => setPosition(null);
+    cell.addEventListener("mouseenter", show);
+    cell.addEventListener("mouseleave", hide);
+    cell.addEventListener("focusin", show);
+    cell.addEventListener("focusout", hide);
+    return () => {
+      cell.removeEventListener("mouseenter", show);
+      cell.removeEventListener("mouseleave", hide);
+      cell.removeEventListener("focusin", show);
+      cell.removeEventListener("focusout", hide);
+    };
+  }, [text]);
+  return <>
+    <span ref={textRef} class={multiline ? "kpi-cell-description" : "kpi-clipped-cell-text"}>{text}</span>
+    {position && createPortal(<div class="kpi-clipped-cell-tooltip" role="tooltip"
+      style={{ left: `${position.left}px`, top: position.top === undefined ? undefined : `${position.top}px`,
+        bottom: position.bottom === undefined ? undefined : `${position.bottom}px`, maxWidth: `${position.maxWidth}px`, maxHeight: `${position.maxHeight}px` }}>{text}</div>, document.body)}
+  </>;
+}
 
 function KpiWorkspaceTabs({ routeId, onNavigate, disabled }: Readonly<{
   routeId: string;
@@ -411,7 +453,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   };
 
   const overlayStyle = { left: `${rect.left}px`, top: `${rect.top}px`, width: `${overlayWidth}px`, height: `${overlayHeight}px` };
-  const commonClass = `kpi-cell-editor-overlay${isTextarea ? " kpi-cell-editor-overlay--textarea" : ""}`;
+  const commonClass = `kpi-cell-editor-overlay${isTextarea ? " kpi-cell-editor-overlay--textarea" : ""}${field.type === "date" ? " kpi-cell-editor-overlay--date" : ""}`;
   let editor: h.JSX.Element;
   if (field.type === "workload") {
     editor = <div class="kpi-workload-launcher">
@@ -520,6 +562,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const deleteCancelButtonRef = useRef<any>(null);
   const sessionVersion = useRef(0);
   const sessionKeyRef = useRef(`${routeId}:${fiscalYear}`);
+  const loadedFiscalYearRef = useRef<FiscalYear | null>(null);
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
 
   const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
@@ -727,14 +770,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
   useEffect(() => {
     let active = true;
-    setPageLoading(true);
-    setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
+    const fiscalYearChanged = loadedFiscalYearRef.current !== fiscalYear;
+    if (fiscalYearChanged) {
+      setPageLoading(true);
+      setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
+    }
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
       setApiMessage(`${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
     }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); })
-      .finally(() => { if (active) setPageLoading(false); });
+      .finally(() => {
+        if (active) {
+          loadedFiscalYearRef.current = fiscalYear;
+          setPageLoading(false);
+        }
+      });
     return () => { active = false; };
   }, [fiscalYear, reloadVersion]);
 
@@ -756,7 +807,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       window.removeEventListener("resize", schedule);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [activeTab, fields]);
+  }, [activeTab, fields, pageLoading]);
 
   const selectableVisibleIds = visibleRows.map((row) => row.id);
   const selectedRows = visibleRows.filter((row) => selectedIds.has(row.id));
@@ -823,7 +874,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
             <span class={row.manageTimeReflected ? "oj-ux-ico-check-circle" : "oj-ux-ico-clock"} aria-hidden="true"></span>
             <span aria-hidden="true">{row.manageTimeReflected ? "Reflected" : "Pending"}</span>
           </span>
-        : field.type === "textarea" ? <span class="kpi-cell-description">{displayValue(row, field.key)}</span> : <span>{displayValue(row, field.key)}</span>}
+        : field.type === "textarea" ? <KpiClippedCellText text={displayValue(row, field.key)} multiline /> : <KpiClippedCellText text={displayValue(row, field.key)} />}
     </td>;
   };
 
@@ -892,6 +943,23 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     return () => { active = false; };
   }, [saving]);
 
+  const settleDialogClosed = useCallback(async (dialog: ojDialog | null): Promise<boolean> => {
+    if (!dialog) return true;
+    try {
+      const busyContext = Context.getContext(dialog).getBusyContext();
+      await busyContext.whenReady();
+      if (!dialog.isOpen()) return true;
+      const closed = new Promise<void>((resolve) => dialog.addEventListener("ojClose", () => resolve(), { once: true }));
+      dialog.close();
+      await closed;
+      await busyContext.whenReady();
+      return !dialog.isOpen();
+    } catch (error) {
+      console.error("KPI dialog close failed", error);
+      return false;
+    }
+  }, []);
+
   const settleSavingDialogClosed = useCallback(async (): Promise<boolean> => {
     savingDialogDesiredRef.current = false;
     savingDialogGenerationRef.current += 1;
@@ -900,7 +968,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     try {
       const busyContext = Context.getContext(dialog).getBusyContext();
       await busyContext.whenReady();
-      if (dialog.isOpen()) dialog.close();
+      if (!dialog.isOpen()) return true;
+      const closed = new Promise<void>((resolve) => dialog.addEventListener("ojClose", () => resolve(), { once: true }));
+      dialog.close();
+      await closed;
       await busyContext.whenReady();
       return !dialog.isOpen();
     } catch (error) {
@@ -941,7 +1012,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       });
       setDrafts([]);
       setSelectedIds(new Set());
-      setReloadVersion((current) => current + 1);
     }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
       await settleSavingDialogClosed();
@@ -950,6 +1020,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setApiMessage(failed ? "KPI changes could not be saved. Drafts are unchanged; retry when ready." : `${saved.length} KPI activity row(s) saved atomically`);
     await settleSavingDialogClosed();
     endWrite();
+    if (!failed) setReloadVersion((current) => current + 1);
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failed }));
     return !failed;
   };
@@ -974,9 +1045,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     setDrafts((current) => current.filter((row) => !deletedIds.has(row.id)));
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);
-    setReloadVersion((current) => current + 1);
     await settleSavingDialogClosed();
     endWrite();
+    setReloadVersion((current) => current + 1);
   };
 
   const requestProtectedNavigation = useCallback<KpiNavigationGuard>((label, action) => {
@@ -1156,29 +1227,46 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     <oj-dialog ref={savingDialogRef} class="kpi-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
       <div class="kpi-saving-content" role="status" aria-live="polite"><oj-progress-circle value={-1} size="sm" aria-label="Saving KPI activities"></oj-progress-circle><span>Saving KPI activities…</span></div>
     </oj-dialog>
-    <oj-dialog ref={cancelDialogRef} class="kpi-cancel-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" modality="modal" cancelBehavior="escape"
+    <oj-dialog ref={cancelDialogRef} class="kpi-cancel-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" modality="modal" cancelBehavior="icon"
       onojOpen={() => cancelKeepButtonRef.current?.focus()}>
       <div slot="body"><p>You have unsaved KPI changes. Choose whether to save them, discard them, or keep editing.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <oj-button disabled={saving || saveDisabled} onojAction={() => { cancelDialogRef.current?.close(); void saveDrafts(); }}>Save changes</oj-button>
+        <oj-button disabled={saving || saveDisabled} onojAction={() => { void (async () => {
+          if (!await settleDialogClosed(cancelDialogRef.current)) { setApiMessage("Dialog could not close. Keep editing and retry."); return; }
+          await saveDrafts();
+        })(); }}>Save changes</oj-button>
         <oj-button chroming="danger" disabled={saving} onojAction={cancelDrafts}>Discard changes</oj-button>
         <oj-button ref={cancelKeepButtonRef} disabled={saving} onojAction={() => cancelDialogRef.current?.close()}>Keep editing</oj-button>
       </div>
     </oj-dialog>
-    <oj-dialog ref={navigationDialogRef} dialogTitle="Unsaved KPI changes" initialVisibility="hide" cancelBehavior="escape"
+    <oj-dialog ref={navigationDialogRef} class="kpi-navigation-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" cancelBehavior="icon"
       onojOpen={() => navigationStayButtonRef.current?.focus()} onojClose={() => setPendingNavigation(null)}>
       <div slot="body"><p>You have unsaved KPI changes. Save them before continuing to {pendingNavigation?.label}, or discard them.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <oj-button ref={navigationStayButtonRef} disabled={saving} onojAction={() => { navigationDialogRef.current?.close(); setPendingNavigation(null); }}>Stay</oj-button>
-        <oj-button disabled={saving || saveDisabled} onojAction={() => { const action = pendingNavigation?.action; navigationDialogRef.current?.close(); setPendingNavigation(null); void (async () => { if (await saveDrafts()) action?.(); })(); }}>Save and Continue</oj-button>
-        <oj-button disabled={saving} onojAction={() => { const action = pendingNavigation?.action; cancelDrafts(); navigationDialogRef.current?.close(); setPendingNavigation(null); action?.(); }}>Discard and Continue</oj-button>
+        <oj-button ref={navigationStayButtonRef} disabled={saving} onojAction={() => { void (async () => {
+          if (!await settleDialogClosed(navigationDialogRef.current)) { setApiMessage("Dialog could not close. Stay on this KPI and retry."); return; }
+          setPendingNavigation(null);
+        })(); }}>Stay</oj-button>
+        <oj-button disabled={saving || saveDisabled} onojAction={() => { const action = pendingNavigation?.action; void (async () => {
+          if (!await settleDialogClosed(navigationDialogRef.current)) { setApiMessage("Dialog could not close. Navigation was cancelled."); return; }
+          setPendingNavigation(null); if (await saveDrafts()) action?.();
+        })(); }}>Save and Continue</oj-button>
+        <oj-button disabled={saving} onojAction={() => { const action = pendingNavigation?.action; void (async () => {
+          if (!await settleDialogClosed(navigationDialogRef.current)) { setApiMessage("Dialog could not close. Navigation was cancelled."); return; }
+          cancelDrafts(); setPendingNavigation(null); action?.();
+        })(); }}>Discard and Continue</oj-button>
       </div>
     </oj-dialog>
-    <oj-dialog ref={deleteDialogRef} dialogTitle="Delete selected KPI activities" initialVisibility="hide" cancelBehavior="escape" onojOpen={() => deleteCancelButtonRef.current?.focus()}>
+    <oj-dialog ref={deleteDialogRef} class="kpi-delete-dialog" dialogTitle="Delete selected KPI activities" initialVisibility="hide" cancelBehavior="icon" onojOpen={() => deleteCancelButtonRef.current?.focus()}>
       <div slot="body"><p>Delete {selectedRows.length} selected KPI activity row(s)? This action is applied only after confirmation.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <oj-button ref={deleteCancelButtonRef} disabled={saving} onojAction={() => deleteDialogRef.current?.close()}>Cancel</oj-button>
-        <oj-button chroming="danger" disabled={saving} onojAction={() => { deleteDialogRef.current?.close(); void removeSelected(); }}>Delete</oj-button>
+        <oj-button ref={deleteCancelButtonRef} disabled={saving} onojAction={() => { void (async () => {
+          if (!await settleDialogClosed(deleteDialogRef.current)) setApiMessage("Dialog could not close. Delete was cancelled.");
+        })(); }}>Cancel</oj-button>
+        <oj-button chroming="danger" disabled={saving} onojAction={() => { void (async () => {
+          if (!await settleDialogClosed(deleteDialogRef.current)) { setApiMessage("Dialog could not close. Delete was cancelled."); return; }
+          await removeSelected();
+        })(); }}>Delete</oj-button>
       </div>
     </oj-dialog>
   </section>;

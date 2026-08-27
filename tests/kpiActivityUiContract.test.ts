@@ -54,6 +54,12 @@ assert.match(contract, /field\("title", "SR Description", "textarea"\)/);
 assert.match(contract, /H:\s*\[manageTime, field\("title", "Content", "textarea"\)/);
 assert.match(styles, /\.kpi-cell-editor-overlay--textarea\s*\{[^}]*min-height:\s*8rem/);
 assert.match(styles, /\.kpi-cell-editor-control--textarea\s*\{[^}]*min-height:\s*8rem[^}]*overflow:\s*auto[^}]*padding:\s*\.75rem/);
+assert.match(page, /field\.type === "date" \? " kpi-cell-editor-overlay--date"/, "Delivery Date marks the outer editor surface for date-specific composition");
+assert.match(styles, /\.kpi-cell-editor-overlay--date\s*\{[^}]*border:\s*0[^}]*box-shadow:\s*none[^}]*padding:\s*0/, "Delivery Date keeps the JET input border and removes only the duplicate outer overlay frame");
+assert.match(page, /function KpiClippedCellText[\s\S]*scrollWidth > element\.clientWidth[\s\S]*scrollHeight > element\.clientHeight/, "the common KPI cell renderer opens Full Text only for actually clipped single-line or multiline text");
+assert.match(page, /createPortal[\s\S]*kpi-clipped-cell-tooltip/, "KPI Full Text is portaled outside table overflow containers");
+assert.match(page, /field\.type === "textarea" \? <KpiClippedCellText[\s\S]*: <KpiClippedCellText/, "textarea and ordinary KPI fields share one clipped-text renderer");
+assert.match(styles, /\.kpi-clipped-cell-tooltip\s*\{[^}]*max-width:\s*min\(32rem, calc\(100vw - 1rem\)\)[^}]*pointer-events:\s*none[^}]*position:\s*fixed[^}]*z-index:/, "KPI Full Text is multiline, viewport-constrained, and cannot intercept link clicks");
 assert.doesNotMatch(page, /cellOptions[\s\S]{0,400}height:152px/,
   "the editor overlay owns multiline height");
 
@@ -104,6 +110,10 @@ assert.match(page, /computeKpiColumnLayout\(fields, Math\.max\(0, host\.clientWi
   "column layout must use the border-excluded viewport with one pixel of collapse\/rounding safety");
 assert.match(page, /<colgroup>[\s\S]*columnLayout\.widths\[field\.key\]/);
 assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
+assert.match(styles, /\.kpi-activities-table\s*\{[^}]*min-width:\s*100%[^}]*width:\s*max-content/, "KPI tables fill the available panel while retaining horizontal overflow on narrow screens");
+assert.match(page, /\}, \[activeTab, fields, pageLoading\]\);/, "column widths are recalculated after the loading view mounts the table host");
+assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== fiscalYear[\s\S]*if \(fiscalYearChanged\)[\s\S]*setPageLoading\(true\)/, "same-FY post-save refresh keeps the mounted table and dialog host intact");
+assert.match(page, /const settleDialogClosed = useCallback[\s\S]*await busyContext\.whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*await busyContext\.whenReady\(\)/, "all chained KPI dialogs settle their JET BusyContext before another modal or route action starts");
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*var\(--kap-grid-header-ink\)/,
   "KPI header titles use the calm slate token instead of red");
 assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align-content:\s*start/);
@@ -156,10 +166,10 @@ assert.match(styles, /\.kpi-status-badge--not-started\s*\{[^}]*background:\s*#f5
   "future-quarter Not Started badges use an explicit neutral treatment");
 assert.match(page, /Promise\.all\(\[listKpiRows\(fiscalYear\), listKpiOverview\(fiscalYear\), listKpiSummary\(fiscalYear\)\]\)/,
   "rows, overview, and summary share one FY-scoped refresh");
-assert.match(page, /setReloadVersion\(\(current\) => current \+ 1\)[\s\S]{0,500}KPI activity row\(s\) saved atomically/,
-  "successful Save refreshes authoritative rows, overview, and summary");
-assert.match(page, /KPI activity row\(s\) deleted[\s\S]{0,500}setReloadVersion\(\(current\) => current \+ 1\)/,
-  "Delete refreshes authoritative rows, overview, and summary");
+assert.match(page, /KPI activity row\(s\) saved atomically[\s\S]{0,600}await settleSavingDialogClosed\(\)[\s\S]{0,300}setReloadVersion\(\(current\) => current \+ 1\)/,
+  "successful Save closes and settles the modal before a refresh can replace the page DOM");
+assert.match(page, /KPI activity row\(s\) deleted[\s\S]{0,600}await settleSavingDialogClosed\(\)[\s\S]{0,300}setReloadVersion\(\(current\) => current \+ 1\)/,
+  "Delete closes and settles the modal before refreshing authoritative data");
 assert.doesNotMatch(page, /KPI_QUARTER_COUNT_TARGETS/, "B and other count targets come from summary API policy");
 assert.match(page, /<h3 id="kpiQuarterSummary">Delivery Quarter Count<\/h3>/,
   "count statistics are named for Delivery Date quarters");
@@ -262,5 +272,12 @@ assert.match(styles, /\.accounts-workloads-grid td\.is-unsaved-cell::after[^{]*\
   "Accounts drafts expose the shared pink 3px line");
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
   "KPI drafts expose the same pink 3px line");
+
+assert.match(page, /const closed = new Promise<void>\(\(resolve\) => dialog\.addEventListener\("ojClose"/,
+  "dialog cleanup waits for the real JET ojClose lifecycle event");
+assert.match(page, /if \(!await settleDialogClosed\(navigationDialogRef\.current\)\)[\s\S]*Navigation was cancelled[\s\S]*return/,
+  "navigation must abort and report when the JET dialog cannot settle closed");
+assert.match(page, /if \(!await settleDialogClosed\(deleteDialogRef\.current\)\)[\s\S]*Delete was cancelled[\s\S]*return/,
+  "Delete must abort and report when the JET dialog cannot settle closed");
 
 console.log("kpiActivityUiContract tests passed");

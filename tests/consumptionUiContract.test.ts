@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/ConsumptionPage.tsx", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+const accountsPage = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
@@ -49,7 +50,10 @@ assert.match(page, /data-readonly=\{expandable \? "account" : undefined\}/, "onl
 assert.match(page, /data-readonly=\{!editable && actual \? "actual"/, "past Actual cells are read-only while backend-declared future periods remain editable");
 assert.match(page, /Quarter Total[\s\S]*PreQ Gap/, "each quarter column group ends with Total and PreQ Gap");
 assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*overflow-x:\s*auto[^}]*scrollbar-width:\s*none/, "the month and quarter area scrolls with its native scrollbar hidden");
-assert.match(styles, /\.consumption-scroll-controls\s*\{[^}]*position:\s*fixed/, "table movement controls stay available at the viewport edge like Accounts & Workloads");
+assert.match(page, /id="consumptionTableContent" class="consumption-table-content"/, "horizontal movement controls are scoped by the table content container");
+assert.match(styles, /\.consumption-table-content\s*\{[^}]*position:\s*relative/, "the table content owns the controls' positioning context");
+assert.match(styles, /\.consumption-scroll-controls\s*\{[^}]*position:\s*absolute/, "table movement controls remain inside the table instead of following the viewport");
+assert.doesNotMatch(styles, /\.consumption-scroll-controls\s*\{[^}]*position:\s*fixed/, "desktop table movement controls must not escape into Trend or other sections");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-summary-cards\s*\{[^}]*grid-template-columns:\s*repeat\(5, minmax\(9rem, 1fr\)\)[^}]*overflow-x:\s*auto/, "mobile summary cards remain readable in a contained horizontal rail");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-scroll-controls\s*\{[^}]*position:\s*absolute[^}]*transform:\s*none/, "mobile table controls stay inside the table panel instead of obscuring the viewport");
 assert.match(page, /consumption-scroll-controls[\s\S]*Move table left[\s\S]*Move table right/, "fixed left and right table movement controls are rendered");
@@ -113,10 +117,16 @@ assert.match(page, /const editable = editablePeriodIds\.has\(month\)[\s\S]*serie
 assert.match(page, /const savedValue = savedPlan\?\.forecasts\[month\] \?\? savedPlan\?\.actuals\[month\][\s\S]*const dirty = savedValue !== value/, "an editable future ACTUAL is not marked draft until its displayed value changes");
 assert.match(page, /onFocus=\{\(event\) => \(event\.currentTarget as HTMLInputElement\)\.select\(\)\}/, "opening a Forecast editor immediately selects its complete value");
 assert.doesNotMatch(page, /display only/i, "Account / End User rows no longer show display-only copy");
-assert.match(page, /class="consumption-leading-copy"[\s\S]*data-tooltip=\{account\.customer\}/, "truncated Account labels expose their full value with an immediate custom tooltip");
-assert.match(page, /class="consumption-end-user consumption-fast-tooltip"[\s\S]*data-tooltip=\{`\$\{plan\.customer\}/, "truncated expanded Plan labels expose their full value with an immediate custom tooltip");
+assert.match(page, /function ConsumptionTruncatedText[\s\S]*scrollWidth > element\.clientWidth/, "full-text help is enabled only when the Account and Workload text is actually clipped");
+assert.match(page, /createPortal[\s\S]*consumption-clipped-tooltip/, "clipped Account and Workload help is portaled outside overflow-clipped table containers");
+assert.match(page, /ConsumptionTruncatedText text=\{`\$\{singlePlan\?\.customer[\s\S]*singlePlan\?\.workload/, "the fast tooltip targets the Account (Workload) text rather than the entire row");
 assert.match(styles, /\.consumption-quarter-heading\.is-forecast[\s\S]*\.consumption-month-heading\.is-forecast[\s\S]*\.consumption-quarter-total\.is-forecast[\s\S]*\.consumption-preq-gap\.is-forecast/, "Forecast quarter, month, value total and PreQ Gap areas have a distinct background treatment");
 assert.match(styles, /\.consumption-table-title\s*\{[^}]*font-size:\s*clamp\(/, "End User / Plan table title is enlarged responsively");
+assert.match(styles, /\.consumption-section-heading h2\s*\{[^}]*font-size:\s*clamp\(1\.35rem, 2vw, 1\.75rem\)/, "Alerts and Trend titles match the End User / Plan title scale");
+assert.match(page, /consumption-signal-grade is-\$\{signal\.grade\.toLowerCase\(\)\}/, "CRITICAL and HIGH severities use semantic badge classes");
+assert.match(styles, /\.consumption-signal-grade\.is-critical\s*\{[^}]*background:[^}]*color:/, "critical severity has an accessible high-emphasis badge");
+assert.match(styles, /\.consumption-signal-grade\.is-high\s*\{[^}]*background:[^}]*color:/, "high severity has an accessible warning badge");
+assert.match(styles, /\.consumption-table thead \.consumption-account-column\s*\{[^}]*font-size:[^}]*padding-left:[^}]*text-align:\s*left/, "Account / End User header is enlarged and aligned with the leading text");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-signal\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/, "small-screen Change Alerts collapse into one non-overlapping content column");
 assert.doesNotMatch(page, /Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast\./, "the requested Consumption helper copy is removed");
 assert.match(page, /const linkedPlan = draftPlans\.find[\s\S]*Workload:[\s\S]*linkedPlan\?\.workload/, "Change Alert list shows the linked Workload");
@@ -130,8 +140,11 @@ assert.match(styles, /\.consumption-table thead tr:first-child th\s*\{[^}]*posit
 assert.match(styles, /\.consumption-table thead tr:nth-child\(2\) th\s*\{[^}]*position:\s*sticky[^}]*top:\s*3\.25rem/, "second table header row stays fixed below the first");
 assert.doesNotMatch(page, /Backend connected/, "Consumption omits Backend connected status copy");
 assert.match(page, /consumption-metric-help[\s\S]*data-tooltip="Median is the middle[\s\S]*data-tooltip="MAD/, "Median and MAD expose concise hover and focus explanations");
-assert.match(page, /data-tooltip=\{account\.customer\}[\s\S]*data-tooltip=\{`\$\{plan\.customer\}/, "truncated Account and End User labels use immediate custom full-text tooltips");
-assert.match(styles, /\.consumption-fast-tooltip::after\s*\{[^}]*font-size:\s*1rem[\s\S]*\.consumption-fast-tooltip:hover::after/, "full-text tooltips appear immediately with larger text");
+assert.match(styles, /\.consumption-clipped-tooltip\s*\{[^}]*max-width:\s*min\(28rem, calc\(100vw - 1rem\)\)[^}]*position:\s*fixed[^}]*z-index:/, "portaled full-text help is constrained to the viewport and remains above cards");
+assert.match(page, /text=\{account\.customer\} focusable=\{false\}/, "account disclosure button must not contain a nested focusable tooltip trigger");
+assert.match(accountsPage, /rows\.length === 0 \? "accounts-workloads-page is-empty" : "accounts-workloads-page"/, "empty Accounts & Workloads data opts into compact Fiscal Year spacing");
+assert.match(styles, /\.kpi-content:has\(\.accounts-workloads-page\)\s*\{[^}]*gap:\s*1rem/, "populated Accounts & Workloads uses the standard Portfolio and Weekly Activities gap");
+assert.match(styles, /\.kpi-content:has\(\.accounts-workloads-page\.is-empty\)\s*\{[^}]*gap:\s*0\.25rem/, "an empty Accounts & Workloads page stays close to Fiscal Year without dead space");
 assert.match(content, /!\['profile', 'users', 'consumption'\]\.includes\(activeRoute\.module\)/, "global Fiscal Year is hidden on Consumption");
 assert.doesNotMatch(page, /Double-click a Forecast cell\. Enter keeps the page draft; Esc restores the edit-entry value\./, "the requested Forecast editing helper copy is removed");
 

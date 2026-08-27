@@ -1,4 +1,5 @@
 import { h } from "preact";
+import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import {
@@ -86,6 +87,36 @@ const consumptionSignalAccessibleLabel = (signal: ConsumptionSignal) => {
     + `Change ${signedCurrency(signal.changeAmount)}, ${formatPercent(signal.changePercent)}. Allowance ${currency.format(signal.allowance)}. `
     + `Previous month ${previousDirection.label}. Recent four completed months: ${sparkline}. Open this Plan's Consumption Trend.`;
 };
+
+type ConsumptionTooltipPosition = Readonly<{ left: number; top?: number; bottom?: number; maxWidth: number }>;
+
+function ConsumptionTruncatedText({ text, className = "", focusable = true }: Readonly<{ text: string; className?: string; focusable?: boolean }>) {
+  const textRef = useRef<HTMLElement | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<ConsumptionTooltipPosition | null>(null);
+  const showTooltip = () => {
+    const element = textRef.current;
+    if (!element) return;
+    const isTruncated = element.scrollWidth > element.clientWidth;
+    if (!isTruncated) {
+      setTooltipPosition(null);
+      return;
+    }
+    const rect = element.getBoundingClientRect();
+    const maxWidth = Math.max(160, Math.min(448, window.innerWidth - 16));
+    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - maxWidth - 8));
+    setTooltipPosition(rect.bottom < window.innerHeight * .7
+      ? { left, top: rect.bottom + 6, maxWidth }
+      : { left, bottom: window.innerHeight - rect.top + 6, maxWidth });
+  };
+  const hideTooltip = () => setTooltipPosition(null);
+  return <>
+    <strong ref={textRef as any} class={`consumption-clipped-text ${className}`.trim()} tabIndex={focusable ? 0 : undefined}
+      onMouseEnter={showTooltip} onMouseLeave={hideTooltip} onFocus={focusable ? showTooltip : undefined} onBlur={focusable ? hideTooltip : undefined}>{text}</strong>
+    {tooltipPosition && createPortal(<div class="consumption-clipped-tooltip" role="tooltip"
+      style={{ left: `${tooltipPosition.left}px`, top: tooltipPosition.top === undefined ? undefined : `${tooltipPosition.top}px`,
+        bottom: tooltipPosition.bottom === undefined ? undefined : `${tooltipPosition.bottom}px`, maxWidth: `${tooltipPosition.maxWidth}px` }}>{text}</div>, document.body)}
+  </>;
+}
 
 const SignalSparkline = ({ signal }: Readonly<{ signal: ConsumptionSignal }>) => {
   const width = 92;
@@ -753,7 +784,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                   <small>{signal.endUser} · Plan {signal.planId}</small></span>
                 <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual</strong><span>{currency.format(signal.latestActual)}</span></span>
                 <span class="consumption-signal-status"><span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-                  <span class="consumption-signal-severity">{signal.grade}</span></span>
+                  <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span></span>
               </button>
               );
             })}
@@ -831,7 +862,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </div>
           )}
         </div>
-        {tableExpanded && <div id="consumptionTableContent">
+        {tableExpanded && <div id="consumptionTableContent" class="consumption-table-content">
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
@@ -872,14 +903,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><strong class="consumption-fast-tooltip" tabIndex={0} data-tooltip={account.customer}>{account.customer}</strong><small>Multiple · {account.plans.length} Plans</small></span>
+                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /><small>Multiple · {account.plans.length} Plans</small></span>
                             </span>
                           </button>
                         ) : (
                           <span class="consumption-leading consumption-account-single">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><strong class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`}>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
-                            <small class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${singlePlan?.endUser ?? ""} · Plan ${singlePlan?.planId ?? ""} · DC ${singlePlan?.dataCenter ?? ""}`}>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><ConsumptionTruncatedText text={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`} />
+                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
                           </span>
                         )}
                       </th>
@@ -890,8 +921,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                         <th class="consumption-account-column" scope="row">
                           <span class="consumption-leading">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><span class="consumption-end-user consumption-fast-tooltip" tabIndex={0} data-tooltip={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`}>{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
-                            <small class="consumption-fast-tooltip" tabIndex={0} data-tooltip={`${plan.endUser} · Plan ${plan.planId} · DC ${plan.dataCenter}`}>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><ConsumptionTruncatedText className="consumption-end-user" text={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`} />
+                            <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
                           </span>
                         </th>
                         {renderQuarterCells(plan, false)}

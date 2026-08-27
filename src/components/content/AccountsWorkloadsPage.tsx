@@ -946,7 +946,7 @@ export function AccountsWorkloadsPage({
   };
 
   return (
-    <section class="accounts-workloads-page" aria-labelledby="accountsWorkloadsTitle">
+    <section class={rows.length === 0 ? "accounts-workloads-page is-empty" : "accounts-workloads-page"} aria-labelledby="accountsWorkloadsTitle">
       <div class="accounts-workloads-header">
         <div>
           <span class="kpi-eyebrow">My Customers 360</span>
