@@ -83,3 +83,6 @@ export const lockUser = (key: string, fetchImpl: FetchLike = fetch) => stateActi
 export const unlockUser = (key: string, fetchImpl: FetchLike = fetch) => stateAction(key, "unlock", fetchImpl);
 export const enableUser = (key: string, fetchImpl: FetchLike = fetch) => stateAction(key, "enable", fetchImpl);
 export const disableUser = (key: string, fetchImpl: FetchLike = fetch) => stateAction(key, "disable", fetchImpl);
+export const deleteUser = async (key: string, fetchImpl: FetchLike = fetch): Promise<void> => {
+  await request(`/${encodeURIComponent(key)}`, { method: "DELETE" }, fetchImpl);
+};

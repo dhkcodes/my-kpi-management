@@ -7,7 +7,7 @@ import type { DialogElement } from "ojs/ojdialog";
 import type { InputTextElement } from "ojs/ojinputtext";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import {
-  cancelUserInvite, disableUser, enableUser, inviteUser, listUsers, lockUser,
+  cancelUserInvite, deleteUser, disableUser, enableUser, inviteUser, listUsers, lockUser,
   reissueUserInvite, resetUserPassword, unlockUser, type UserActionLink
 } from "../../auth/usersApi";
 import type { AuthSession, UserAccess } from "../../auth/authSession";
@@ -22,7 +22,7 @@ const actionUrl = (link: UserActionLink): string => {
   return url.toString();
 };
 
-export function UsersPage() {
+export function UsersPage({ currentUserKey }: Readonly<{ currentUserKey: string }>) {
   const [users, setUsers] = useState<AuthSession[]>([]);
   const [error, setError] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -33,7 +33,10 @@ export function UsersPage() {
   const [access, setAccess] = useState<UserAccess>("User");
   const [issuedLink, setIssuedLink] = useState<UserActionLink | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<AuthSession | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const dialogRef = useRef<DialogElement>(null);
+  const deleteDialogRef = useRef<DialogElement>(null);
   const accessProvider = useMemo(() => new ArrayDataProvider(accessOptions, { keyAttributes: "value" }), []);
 
   const reload = async () => {
@@ -42,6 +45,7 @@ export function UsersPage() {
   };
   useEffect(() => { void reload(); }, []);
   useEffect(() => { if (dialog) dialogRef.current?.open(); }, [dialog]);
+  useEffect(() => { if (deleteCandidate) deleteDialogRef.current?.open(); }, [deleteCandidate]);
 
   const openDialog = (next: Exclude<DialogState, null>) => {
     if (busy) return;
@@ -87,6 +91,24 @@ export function UsersPage() {
     catch (cause) { setError(cause instanceof Error ? cause.message : "User action failed."); }
     finally { setBusy(false); }
   };
+  const openDeleteDialog = (user: AuthSession) => {
+    if (busy || user.userKey === currentUserKey) return;
+    setDeleteError("");
+    setDeleteCandidate(user);
+  };
+  const confirmPermanentDelete = async () => {
+    if (!deleteCandidate || busy || deleteCandidate.userKey === currentUserKey) return;
+    setDeleteError("");
+    setBusy(true);
+    try {
+      await deleteUser(deleteCandidate.userKey);
+      await reload();
+      deleteDialogRef.current?.close();
+      setDeleteCandidate(null);
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : "User deletion failed.");
+    } finally { setBusy(false); }
+  };
 
   const title = issuedLink
     ? issuedLink.purpose === "ACTIVATION" ? "Activation link ready" : "Password reset link ready"
@@ -104,9 +126,12 @@ export function UsersPage() {
         {user.status === "LOCKED" && <oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Unlock ${user.loginId}?`, () => unlockUser(user.userKey))}>Unlock</oj-button>}
         {user.status === "DISABLED" && <oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Enable ${user.loginId}?`, () => enableUser(user.userKey))}>Enable</oj-button>}
         {(user.status === "ACTIVE" || user.status === "LOCKED") && <oj-button chroming="borderless" disabled={busy || user.access === "Admin"} title={user.access === "Admin" ? "Admin accounts cannot be disabled" : "Disable user"} onojAction={() => void confirmAction(`Disable ${user.loginId}?`, () => disableUser(user.userKey))}>Disable</oj-button>}
+        <oj-button chroming="borderless" disabled={busy || user.userKey === currentUserKey}
+          title={user.userKey === currentUserKey ? "You cannot permanently delete your own signed-in account" : "Permanently delete user"}
+          onojAction={() => openDeleteDialog(user)}>Delete</oj-button>
       </div></td></tr>)}</tbody></table></div>
 
-    <oj-dialog ref={dialogRef} dialogTitle={title} cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) clearDialog(); }} class="kap-user-dialog">
+    <oj-dialog ref={dialogRef} initialVisibility="hide" dialogTitle={title} cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) clearDialog(); }} class="kap-user-dialog">
       <div slot="body" class="kap-dialog-body">
         {issuedLink ? <>
           <p>No email was sent. Copy this one-time link and deliver it to <strong>{issuedLink.user.loginId}</strong> through an approved secure channel.</p>
@@ -130,6 +155,19 @@ export function UsersPage() {
       <div slot="footer">
         {issuedLink ? <><oj-button onojAction={() => void copyLink()}>Copy link</oj-button><oj-button chroming="callToAction" onojAction={() => dialogRef.current?.close()}>Done</oj-button></>
           : <><oj-button disabled={busy} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Creating..." : "Create link"}</oj-button></>}
+      </div>
+    </oj-dialog>
+    <oj-dialog ref={deleteDialogRef} initialVisibility="hide" dialogTitle="Permanently delete user"
+      cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) { setDeleteCandidate(null); setDeleteError(""); } }}
+      class="kap-user-dialog">
+      <div slot="body" class="kap-dialog-body">
+        <div class="kap-destructive-warning" role="alert"><strong>This action cannot be undone.</strong> The user and their application access will be permanently deleted.</div>
+        {deleteCandidate && <p>Permanently delete <strong>{deleteCandidate.displayName}</strong> ({deleteCandidate.loginId})?</p>}
+        {deleteError && <div class="kap-error" role="alert">{deleteError}</div>}
+      </div>
+      <div slot="footer">
+        <oj-button disabled={busy} onojAction={() => deleteDialogRef.current?.close()}>Cancel</oj-button>
+        <oj-button chroming="callToAction" disabled={busy} onojAction={() => void confirmPermanentDelete()}>{busy ? "Deleting…" : "Permanently delete"}</oj-button>
       </div>
     </oj-dialog>
   </section>;

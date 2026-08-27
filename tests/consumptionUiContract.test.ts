@@ -14,7 +14,7 @@ assert.match(content, /!\['profile', 'users'\]\.includes\(activeRoute\.module\)[
 assert.match(content, /activeRoute\.module === "consumption"[\s\S]*<ConsumptionPage/, "Consumption route renders the implemented page");
 assert.match(page, /import "ojs\/ojchart"/, "Consumption trend uses Oracle JET Chart");
 assert.match(page, /<oj-chart[\s\S]*type="line"/, "linked trend is a JET line chart");
-assert.match(page, /allMonths\.flatMap[\s\S]*value === null \? \[\]/, "missing Plan months are omitted from the trend instead of rendered as zero");
+assert.match(page, /allMonths\.flatMap[\s\S]*value === undefined \? \[\]/, "missing Plan ACTUAL months are omitted from the trend instead of rendered as zero");
 assert.match(page, /id="consumptionSignalInbox"/, "three-month usual-level change inbox is rendered");
 assert.match(page, /Consumption Change Alerts/, "Inbox title states the approved change-alert rule");
 assert.match(page, /Previous 3 completed months[\s\S]*Median[\s\S]*MAD × 3/, "Inbox explains median and MAD thresholds");
@@ -45,7 +45,7 @@ assert.match(page, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores
 assert.match(page, /onNavigationGuardChange/, "Consumption Draft reuses the KAP navigation guard contract");
 assert.match(page, /window\.confirm\(/, "Leaving with a Draft requires an explicit decision");
 assert.match(page, /data-readonly=\{expandable \? "account" : undefined\}/, "only Multiple account aggregate rows are marked read-only");
-assert.match(page, /data-readonly=\{actual \? "actual"/, "Actual cells are read-only");
+assert.match(page, /data-readonly=\{!editable && actual \? "actual"/, "past Actual cells are read-only while backend-declared future periods remain editable");
 assert.match(page, /Quarter Total[\s\S]*PreQ Gap/, "each quarter column group ends with Total and PreQ Gap");
 assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*overflow-x:\s*auto[^}]*scrollbar-width:\s*none/, "the month and quarter area scrolls with its native scrollbar hidden");
 assert.match(styles, /\.consumption-scroll-controls\s*\{[^}]*position:\s*fixed/, "table movement controls stay available at the viewport edge like Accounts & Workloads");
@@ -89,6 +89,9 @@ assert.match(page, /selectedSeriesId[\s\S]*draftPlans\.find\(\(plan\) => plan\.i
 assert.match(page, /selectSignal[\s\S]*signal\.customer[\s\S]*signal\.planId[\s\S]*setSelectedSeriesId\(plan\.id\)/, "signal selection links the exact Plan ID into trend context");
 assert.match(page, /const signals = useMemo\(\(\) => serverSignals \?\? \[\]/, "Inbox renders only meaningful anomalies returned by the backend");
 assert.doesNotMatch(page, /serverSignals \?\? detectConsumptionSignals/, "the Inbox never invents client-side anomalies");
+assert.match(page, /const trendPoints[\s\S]*selectedPlan\.actuals\[month\][\s\S]*value === undefined \? \[\]/, "Trend renders ACTUAL values only and omits Forecast values");
+assert.doesNotMatch(page.match(/const trendPoints[\s\S]*?const trendDataProvider/)?.[0] ?? "", /selectedPlan\.forecasts/, "Trend never falls back to Forecast values");
+assert.match(page, /id="consumptionAccountSelector"[\s\S]*onClick=\{\(\) => \{ setAccountSelectorOpen\(true\)/, "every Plan selector click opens the list immediately, including an already-focused input");
 assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
 assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
 assert.match(page, /displayQuarterOrder\.flatMap/, "table columns follow the backend display quarter order");
@@ -96,6 +99,7 @@ assert.match(page, /const expandable = account\.plans\.length > 1/, "only Multip
 assert.match(page, /expandable \? \([\s\S]*consumption-account-toggle[\s\S]*\) : \(/, "single-plan End Users render without an expand control");
 assert.match(page, /renderQuarterCells\(singlePlan, false\)/, "single-plan account rows render editable detailed Forecast cells");
 assert.match(page, /renderQuarterCells\(account, true\)/, "Multiple aggregate rows are always read-only");
+assert.match(page, /filterActiveConsumptionPlans\(draftPlans, currentFiscalMonth\)[\s\S]*aggregateConsumptionAccounts\(visiblePlans\)/, "the End User / Plan table excludes only plans with zero previous/current ACTUAL");
 assert.match(page, /class="consumption-leading"[\s\S]*class="consumption-disclosure-slot"/, "Account and End User leading content shares one aligned grid");
 assert.match(page, /class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*aria-label=/, "Multiple rows expose a named native-button disclosure with aria-expanded");
 assert.match(styles, /\.consumption-account-toggle:hover[\s\S]*\.consumption-account-toggle:focus-visible/, "Multiple disclosure has visible hover and keyboard focus states");
@@ -104,6 +108,15 @@ assert.match(page, /const status = editablePeriodIds\.has\(month\) \? "FORECAST"
 assert.match(page, /singlePlan\?\.customer[\s\S]*singlePlan\?\.workload[\s\S]*singlePlan\?\.endUser[\s\S]*singlePlan\?\.planId[\s\S]*singlePlan\?\.dataCenter/, "single Plan rows show Account, mapped Workload, End User, Plan ID and DC from API fields");
 assert.match(page, /plan\.customer[\s\S]*plan\.workload[\s\S]*plan\.endUser[\s\S]*plan\.planId[\s\S]*plan\.dataCenter/, "expanded Plan rows show Account, mapped Workload, End User, Plan ID and DC from API fields");
 assert.match(page, /rangeInitialized && rangeTouched && !rangeValid/, "reversed range validation waits for initialized, meaningful user interaction");
+assert.match(page, /const editable = editablePeriodIds\.has\(month\)[\s\S]*series\.forecasts\[month\] \?\? series\.actuals\[month\] \?\? null[\s\S]*if \(!readOnly && editable/, "backend-declared future months remain editable regardless of whether their loaded value is typed ACTUAL or FORECAST");
+assert.match(page, /const savedValue = savedPlan\?\.forecasts\[month\] \?\? savedPlan\?\.actuals\[month\][\s\S]*const dirty = savedValue !== value/, "an editable future ACTUAL is not marked draft until its displayed value changes");
+assert.match(page, /onFocus=\{\(event\) => \(event\.currentTarget as HTMLInputElement\)\.select\(\)\}/, "opening a Forecast editor immediately selects its complete value");
+assert.doesNotMatch(page, /display only/i, "Account / End User rows no longer show display-only copy");
+assert.match(page, /class="consumption-leading-copy"[\s\S]*title=\{account\.customer\}/, "truncated Account labels expose their full value with a native title tooltip");
+assert.match(page, /class="consumption-end-user" title=\{`\$\{plan\.customer\}/, "truncated expanded Plan labels expose their full value with a native title tooltip");
+assert.match(styles, /\.consumption-quarter-heading\.is-forecast[\s\S]*\.consumption-month-heading\.is-forecast[\s\S]*\.consumption-quarter-total\.is-forecast[\s\S]*\.consumption-preq-gap\.is-forecast/, "Forecast quarter, month, value total and PreQ Gap areas have a distinct background treatment");
+assert.match(styles, /\.consumption-table-title\s*\{[^}]*font-size:\s*clamp\(/, "End User / Plan table title is enlarged responsively");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-signal\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/, "small-screen Change Alerts collapse into one non-overlapping content column");
 assert.doesNotMatch(page, /Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast\./, "the requested Consumption helper copy is removed");
 assert.doesNotMatch(page, /Double-click a Forecast cell\. Enter keeps the page draft; Esc restores the edit-entry value\./, "the requested Forecast editing helper copy is removed");
 

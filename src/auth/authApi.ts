@@ -11,6 +11,7 @@ export type CredentialActionContext = Readonly<{
   purpose: CredentialActionPurpose;
   expiresAt: string;
 }>;
+export type PasswordResetRequest = Readonly<{ resetLink: string }>;
 
 const normalizeLogin = (value: string) => value.trim().normalize("NFKC").toLowerCase();
 
@@ -32,13 +33,25 @@ export function authenticateUser(userId: string, password: string, fetchImpl: Fe
   return postProfile("/api/v1/auth/login", { userId: normalizeLogin(userId), password }, fetchImpl);
 }
 
-export async function requestPasswordReset(loginId: string, fetchImpl: FetchLike = fetch): Promise<void> {
+export async function requestPasswordReset(loginId: string, fetchImpl: FetchLike = fetch): Promise<PasswordResetRequest> {
   const response = await apiFetch("/api/v1/auth/forgot-password", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ loginId: normalizeLogin(loginId) })
   }, fetchImpl, false);
   if (!response.ok) throw new Error("Password reset request is temporarily unavailable.");
+  const value: unknown = await response.json().catch(() => null);
+  if (typeof value !== "object" || value === null || typeof (value as Record<string, unknown>).resetLink !== "string") {
+    throw new Error("Invalid password reset response.");
+  }
+  const resetLink = (value as { resetLink: string }).resetLink.trim();
+  try {
+    const parsed = new URL(resetLink, "https://kap.invalid");
+    if (!resetLink || !["http:", "https:"].includes(parsed.protocol)) throw new Error();
+  } catch {
+    throw new Error("Invalid password reset response.");
+  }
+  return { resetLink };
 }
 
 export async function inspectCredentialAction(token: string, fetchImpl: FetchLike = fetch): Promise<CredentialActionContext> {

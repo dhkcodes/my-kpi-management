@@ -482,6 +482,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const activeTab = getKpiTabForRoute(routeId);
   const tableScopeKey = `${fiscalYear}:${activeTab}`;
   const [rows, setRows] = useState<KpiSpreadsheetRow[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
   const [overviewItems, setOverviewItems] = useState<KpiOverviewItem[]>([]);
   const [activitySummary, setActivitySummary] = useState<KpiActivitySummary | null>(null);
   const [selectionByScope, setSelectionByScope] = useState<Record<string, Set<string>>>({});
@@ -726,12 +727,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
   useEffect(() => {
     let active = true;
+    setPageLoading(true);
     setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
       setApiMessage(`${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
-    }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); });
+    }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); })
+      .finally(() => { if (active) setPageLoading(false); });
     return () => { active = false; };
   }, [fiscalYear, reloadVersion]);
 
@@ -995,6 +998,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     if (drafts.length === 0) return;
     void waitForFrame().then(() => cancelDialogRef.current?.open());
   };
+
+  if (pageLoading) return <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="kpiActivitiesLoadingText">
+    <oj-progress-circle value={-1} size="md" aria-label="Loading KPI Activities"></oj-progress-circle>
+    <span id="kpiActivitiesLoadingText">Loading KPI Activities data…</span>
+  </section>;
 
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
     <header class="kpi-spreadsheet-page__header"><div><span class="kpi-eyebrow">KPI Activities / {activeTab}</span>

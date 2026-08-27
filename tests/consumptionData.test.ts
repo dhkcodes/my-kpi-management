@@ -5,6 +5,7 @@ import {
   buildDisplayQuarterSummaries,
   buildQuarterSummary,
   detectConsumptionSignals,
+  filterActiveConsumptionPlans,
   getFiscalQuarter,
   getLatestActualMonth,
   getConsumptionPlanLabel,
@@ -158,5 +159,18 @@ const monthBoundarySignals = detectConsumptionSignals([
 ], new Date("2026-07-31T15:30:00Z"));
 assert.equal(monthBoundarySignals[0]?.month, "FY27-JUL", "completed months advance at midnight in the Asia/Seoul business zone");
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
+
+const activityPlans = [
+  signalPlan("ZERO-ACTUALS", { "FY27-JUL": 0, "FY27-AUG": 0 }),
+  { ...signalPlan("FORECAST-ONLY", { "FY27-JUL": 0, "FY27-AUG": 0 }), forecasts: { "FY27-AUG": 999, "FY27-SEP": 999 } },
+  signalPlan("CURRENT-ACTUAL", { "FY27-JUL": 0, "FY27-AUG": 1 }),
+  signalPlan("PREVIOUS-ACTUAL", { "FY27-JUL": 1, "FY27-AUG": 0 }),
+  signalPlan("MISSING-ACTUAL", { "FY27-AUG": 0 })
+];
+assert.deepEqual(
+  filterActiveConsumptionPlans(activityPlans, "FY27-AUG").map((plan) => plan.planId),
+  ["CURRENT-ACTUAL", "PREVIOUS-ACTUAL", "MISSING-ACTUAL"],
+  "plans are excluded only when previous and current ACTUAL are both zero; Forecast values are ignored"
+);
 
 console.log("consumptionData tests passed");

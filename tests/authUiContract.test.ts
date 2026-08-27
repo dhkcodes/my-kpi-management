@@ -19,11 +19,14 @@ assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="k
 assert.match(login, /role="alert"/, "credential failures are announced");
 assert.match(login, /authenticateUser\(loginId, password\)/, "the sign-in form delegates credentials to the Backend auth API");
 assert.match(login, /isSubmitting[\s\S]*disabled=\{isSubmitting\}/, "duplicate login submissions are locked while authentication is pending");
-assert.match(login, /requestPasswordReset\(loginId\)/, "forgot password submits the reset-link API flow");
-assert.match(login, /Reset link requested[\s\S]*temporary password/i, "forgot-password response promises a reset link and never a temporary password");
+assert.match(login, /const reset = await requestPasswordReset\(loginId\)[\s\S]*setResetLink\(reset\.resetLink\)/, "forgot password retains the actual API reset link");
+assert.match(login, /href=\{resetLink\}[\s\S]*Reset password now/, "forgot-password completion renders the actual reset link as a clickable anchor");
+assert.match(login, /kap-login-warning[\s\S]*Anyone with this link/, "the sensitive-link warning is explicit and announced with improved contrast");
 assert.match(login, /history\.replaceState\(null, "", window\.location\.pathname\)/, "captured action tokens are removed from the visible URL and browser history");
 assert.match(login, /class="kap-login-page oj-bg-neutral-0"[\s\S]*class="kap-login-card"/, "login and reset use a Redwood Light responsive card");
 assert.match(styles, /\.kap-login-page\s*\{[\s\S]*\.kap-login-card\s*\{[\s\S]*@media \(max-width: 480px\)[\s\S]*\.kap-login-card/, "Redwood Light auth card has a narrow-screen layout");
+assert.match(styles, /\.kap-login-warning\s*\{[\s\S]*background:[\s\S]*border-left:[\s\S]*color:/, "auth warning has explicit high-contrast surface, edge, and text");
+assert.match(styles, /\.kap-login-success p\s*\{[\s\S]*color: var\(--oj-core-text-color-primary/, "success guidance keeps primary text contrast");
 assert.doesNotMatch(login, /KAP_AUTH_CONFIG|authenticateConfiguredUser/, "the UI does not read a browser-visible credential config");
 assert.match(header, /value === "logout"[\s\S]*onLogout\(\)/, "the profile menu invokes logout");
 assert.match(header, /profile\.loginId/, "the Header identity comes from the authenticated profile");

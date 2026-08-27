@@ -46,6 +46,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState(initialRoute.missingActionToken ? "This action link is invalid, expired, or already used." : "");
   const [successMessage, setSuccessMessage] = useState("");
+  const [resetLink, setResetLink] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     setActionContext(null);
     setError("");
     setSuccessMessage("");
+    setResetLink("");
     setNewPassword("");
     setConfirmPassword("");
   };
@@ -86,6 +88,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     setActionContext(null);
     setError("");
     setSuccessMessage("");
+    setResetLink("");
   };
 
   const submit = async (event: Event) => {
@@ -99,8 +102,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         onAuthenticated(await authenticateUser(loginId, password));
       } else if (mode === "forgot") {
         if (!loginId.trim()) throw new Error("Enter your Login ID.");
-        await requestPasswordReset(loginId);
-        setSuccessMessage("Reset link requested. If the account is eligible, a one-time reset link will be sent through the approved delivery channel. No temporary password is created.");
+        const reset = await requestPasswordReset(loginId);
+        setResetLink(reset.resetLink);
+        setSuccessMessage("Reset link created. Use the one-time link below to choose a new password. No temporary password is created.");
         setMode("success");
       } else if (mode === "action" && initialAction && actionContext) {
         const policyError = validatePasswordPolicy(newPassword);
@@ -134,7 +138,10 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     {mode === "validating" && <p role="status">Checking the action link…</p>}
     {mode === "invalid" && <p>The link is invalid, expired, or already used. Request a new link to continue.</p>}
     {mode === "action" && actionContext && <p>{actionContext.purpose === "ACTIVATION" ? "Create the password for" : "Choose a new password for"} <strong>{actionContext.loginId}</strong>. This link expires {new Date(actionContext.expiresAt).toLocaleString()} and works once.</p>}
-    {mode === "success" && <div class="kap-login-success" role="status"><strong>{successMessage.startsWith("Password set successfully") ? "Password set successfully" : "Reset link requested"}</strong><p>{successMessage}</p></div>}
+    {mode === "success" && <div class="kap-login-success" role="status"><strong>{successMessage.startsWith("Password set successfully") ? "Password set successfully" : "Reset link created"}</strong><p>{successMessage}</p>
+      {resetLink && <><a class="kap-login-reset-link" href={resetLink}>Reset password now</a>
+        <div class="kap-login-warning" role="note"><strong>Keep this link private.</strong> Anyone with this link can reset the password until it is used or expires.</div></>}
+    </div>}
 
     {(mode === "signIn" || mode === "forgot" || mode === "action") && <form class="kap-login-form" onSubmit={submit} noValidate>
       <oj-form-layout maxColumns={1} direction="row">

@@ -18,6 +18,9 @@ assert.doesNotMatch(page, /ojdatagrid|RowDataGridProvider|MutableArrayDataProvid
 assert.match(page, /import "ojs\/ojdatetimepicker"/);
 assert.match(page, /import "ojs\/ojdialog"/);
 assert.match(page, /import "ojs\/ojprogress-circle"/);
+assert.match(page, /const \[pageLoading, setPageLoading\] = useState\(true\)/, "KPI Activities owns an explicit initial loading state");
+assert.match(page, /setPageLoading\(true\)[\s\S]*Promise\.all\([\s\S]*finally\([\s\S]*setPageLoading\(false\)/, "KPI Activities loading follows its authoritative API request lifecycle");
+assert.match(page, /pageLoading[\s\S]*aria-label="Loading KPI Activities"[\s\S]*Loading KPI Activities data/, "KPI Activities mirrors the Accounts & Workloads indeterminate loading view");
 assert.match(page, /<table[^>]*class="kpi-activities-table"/);
 assert.match(page, /<tr key=\{`\$\{tableScopeKey\}:\$\{row\.id\}`\} data-kpi-row-id=\{row\.id\}/);
 assert.match(page, /<td key=\{field\.key\} class=\{classes\} data-kpi-grid-row=\{row\.id\} data-kpi-grid-field=\{field\.key\}/);

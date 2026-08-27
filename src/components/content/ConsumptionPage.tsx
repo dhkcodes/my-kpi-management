@@ -6,6 +6,7 @@ import {
   ConsumptionSignal,
   aggregateConsumptionAccounts,
   buildDisplayQuarterSummaries,
+  filterActiveConsumptionPlans,
   getConsumptionPlanLabel,
   getFiscalQuarter,
   getLatestActualMonth,
@@ -221,7 +222,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     return () => { active = false; };
   }, []);
 
-  const accounts = useMemo(() => aggregateConsumptionAccounts(draftPlans), [draftPlans]);
+  const visiblePlans = useMemo(() => filterActiveConsumptionPlans(draftPlans, currentFiscalMonth), [currentFiscalMonth, draftPlans]);
+  const accounts = useMemo(() => aggregateConsumptionAccounts(visiblePlans), [visiblePlans]);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => aggregateConsumptionAccounts(
@@ -293,12 +295,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const rangeValid = isConsumptionQuarterRangeValid(fromQuarter, toQuarter);
   const trendPoints = useMemo<ConsumptionChartPoint[]>(() => selectedPlan
     ? allMonths.flatMap((month) => {
-      const value = Object.prototype.hasOwnProperty.call(selectedPlan.actuals, month)
-        ? selectedPlan.actuals[month]
-        : Object.prototype.hasOwnProperty.call(selectedPlan.forecasts, month)
-          ? selectedPlan.forecasts[month]
-          : null;
-      return value === null ? [] : [{
+      const value = selectedPlan.actuals[month];
+      return value === undefined ? [] : [{
         id: `${selectedPlan.id}-${month}`,
         seriesId: selectedPlanLabel,
         groupId: month,
@@ -378,7 +376,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const beginForecastEdit = (plan: ConsumptionPlan, month: string) => {
     if (isSaving || (dataMode !== "backend" && dataMode !== "fallback")) return;
-    editEntryValueRef.current = plan.forecasts[month] ?? 0;
+    editEntryValueRef.current = plan.forecasts[month] ?? plan.actuals[month] ?? 0;
     setEditCell({ planKey: plan.id, month });
   };
 
@@ -557,18 +555,27 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const closeImportDialog = () => importDialogRef.current?.close();
 
   const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], readOnly: boolean) =>
-    buildDisplayQuarterSummaries(series, displayQuarterOrder).flatMap((summary) => {
+    buildDisplayQuarterSummaries({
+      ...series,
+      actuals: Object.fromEntries(Object.entries(series.actuals).filter(([month]) =>
+        !editablePeriodIds.has(month) || !Object.prototype.hasOwnProperty.call(series.forecasts, month)))
+    }, displayQuarterOrder).flatMap((summary) => {
       const quarter = summary.quarter;
+      const forecastQuarter = summary.months.some((month) => editablePeriodIds.has(month));
       return [
         ...summary.months.map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(series.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(series.forecasts, month);
-          const value = actual ? series.actuals[month] : forecast ? series.forecasts[month] : null;
+          const editable = editablePeriodIds.has(month);
+          const value = editable
+            ? series.forecasts[month] ?? series.actuals[month] ?? null
+            : actual ? series.actuals[month] : forecast ? series.forecasts[month] : null;
           const key = `${series.id}-${month}`;
-          if (!readOnly && forecast && editablePeriodIds.has(month) && "planId" in series && series.planType !== "Aggregate") {
+          if (!readOnly && editable && "planId" in series && series.planType !== "Aggregate") {
             const editing = editCell?.planKey === series.id && editCell.month === month;
             const savedPlan = savedPlans.find((plan) => plan.id === series.id);
-            const dirty = savedPlan?.forecasts[month] !== value;
+            const savedValue = savedPlan?.forecasts[month] ?? savedPlan?.actuals[month];
+            const dirty = savedValue !== value;
             return (
               <td
                 key={key}
@@ -586,6 +593,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                     value={`${value ?? 0}`}
                     aria-label={`${series.endUser} ${month} forecast`}
                     disabled={isSaving}
+                    onFocus={(event) => (event.currentTarget as HTMLInputElement).select()}
                     onInput={(event) => updateForecast(series.id, month, Math.max(0, Number((event.currentTarget as HTMLInputElement).value) || 0))}
                     onKeyDown={editorKeyDown}
                     autofocus
@@ -596,13 +604,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </td>
             );
           }
-          return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : readOnly ? "account" : undefined}>{value === null ? "—" : currency.format(value)}</td>;
+          return <td key={key} class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}`} data-readonly={!editable && actual ? "actual" : readOnly ? "account" : undefined}>{value === null ? "—" : currency.format(value)}</td>;
         }),
-        <td key={`${series.id}-${quarter}-total`} class="consumption-value-cell consumption-quarter-total">
+        <td key={`${series.id}-${quarter}-total`} class={`consumption-value-cell consumption-quarter-total${forecastQuarter ? " is-forecast" : ""}`}>
           {summary.total === null ? "N/A" : currency.format(summary.total)}
           <small>{summary.status}</small>
         </td>,
-        <td key={`${series.id}-${quarter}-gap`} class="consumption-value-cell consumption-preq-gap">
+        <td key={`${series.id}-${quarter}-gap`} class={`consumption-value-cell consumption-preq-gap${forecastQuarter ? " is-forecast" : ""}`}>
           {signedCurrency(summary.preQGap)}
         </td>
       ];
@@ -750,6 +758,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 placeholder={selectedPlanLabel}
                 value={planSearch}
                 onFocus={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
+                onClick={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
                 onBlur={() => setAccountSelectorOpen(false)}
                 onKeyDown={handlePlanSelectorKeyDown}
                 onInput={(event) => { setPlanSearch((event.currentTarget as HTMLInputElement).value); setActivePlanIndex(0); setAccountSelectorOpen(true); }} />
@@ -791,7 +800,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         <div class="consumption-section-heading consumption-table-heading">
           <div>
             <span class="kpi-section-label">Actual + Forecast</span>
-            <h2 id="consumptionTableTitle">End User / Plan Consumption</h2>
+            <h2 id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption</h2>
           </div>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
@@ -810,16 +819,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             <thead>
               <tr>
                 <th class="consumption-account-column" rowSpan={2}>Account / End User</th>
-                {quarters.map((quarter) => <th key={quarter} colSpan={5}>{quarter}</th>)}
+                {quarters.map((quarter) => {
+                  const forecastQuarter = getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month));
+                  return <th key={quarter} colSpan={5} class={`consumption-quarter-heading${forecastQuarter ? " is-forecast" : ""}`}>{quarter}</th>;
+                })}
               </tr>
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
                   ...getQuarterMonths(quarter).map((month) => {
                     const status = editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
-                    return <th key={`${quarter}-${month}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
+                    return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
                   }),
-                  <th key={`${quarter}-total`}>Quarter Total</th>,
-                  <th key={`${quarter}-gap`}>PreQ Gap</th>
+                  <th key={`${quarter}-total`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-quarter-total is-forecast" : "consumption-quarter-total"}>Quarter Total</th>,
+                  <th key={`${quarter}-gap`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-preq-gap is-forecast" : "consumption-preq-gap"}>PreQ Gap</th>
                 ])}
               </tr>
             </thead>
@@ -838,14 +850,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><strong>{account.customer}</strong><small>Multiple · {account.plans.length} Plans · display only</small></span>
+                              <span class="consumption-leading-copy"><strong title={account.customer}>{account.customer}</strong><small title={`Multiple · ${account.plans.length} Plans`}>Multiple · {account.plans.length} Plans</small></span>
                             </span>
                           </button>
                         ) : (
                           <span class="consumption-leading consumption-account-single">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><strong>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
-                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><strong title={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`}>{singlePlan?.customer}{singlePlan?.workload ? ` (${singlePlan.workload})` : ""}</strong>
+                            <small title={`${singlePlan?.endUser ?? ""} · Plan ${singlePlan?.planId ?? ""} · DC ${singlePlan?.dataCenter ?? ""}`}>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
                           </span>
                         )}
                       </th>
@@ -856,8 +868,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                         <th class="consumption-account-column" scope="row">
                           <span class="consumption-leading">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
-                            <span class="consumption-leading-copy"><span class="consumption-end-user">{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
-                            <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
+                            <span class="consumption-leading-copy"><span class="consumption-end-user" title={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`}>{plan.customer}{plan.workload ? ` (${plan.workload})` : ""}</span>
+                            <small title={`${plan.endUser} · Plan ${plan.planId} · DC ${plan.dataCenter}`}>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
                           </span>
                         </th>
                         {renderQuarterCells(plan, false)}

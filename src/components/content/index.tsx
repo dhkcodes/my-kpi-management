@@ -471,7 +471,7 @@ export function Content({
       {activeRoute.module === "profile" ? (
         <ProfilePage profile={profile} />
       ) : activeRoute.module === "users" ? (
-        profile.access === "Admin" ? <UsersPage /> : <section class="kap-empty-state" role="alert"><h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
+        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} /> : <section class="kap-empty-state" role="alert"><h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (
         <>
           <AccountsWorkloadsPulseV2
@@ -577,12 +577,19 @@ export function Content({
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
           onWriteStateChange={onKpiWriteStateChange} />
       ) : activeRoute.module === "myCustomers360" ? (
-        <MyCustomers360Page
-          fiscalYear={fiscalYear}
-          rows={accountsWorkloadsRows}
-          dataAvailable={accountsWorkloadsDatasetAvailable}
-          onOpenAccount={openAccountWorkloads}
-        />
+        accountsWorkloadsLoading ? (
+          <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
+            <oj-progress-circle value={-1} size="md" aria-label="Loading Account Portfolio"></oj-progress-circle>
+            <span id="accountPortfolioLoadingText">Loading Account Portfolio data…</span>
+          </section>
+        ) : (
+          <MyCustomers360Page
+            fiscalYear={fiscalYear}
+            rows={accountsWorkloadsRows}
+            dataAvailable={accountsWorkloadsDatasetAvailable}
+            onOpenAccount={openAccountWorkloads}
+          />
+        )
       ) : activeRoute.module === "accountsWorkloads" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">

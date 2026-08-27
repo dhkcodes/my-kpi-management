@@ -226,6 +226,25 @@ const fiscalMonthOrder = (key: string): number => {
 export const sortConsumptionMonths = (months: readonly string[]) =>
   [...months].sort((left, right) => fiscalMonthOrder(left) - fiscalMonthOrder(right));
 
+const previousFiscalMonth = (month: string): string | null => {
+  const match = /^FY(\d{2})-([A-Z]{3})$/.exec(month);
+  if (!match) return null;
+  const monthIndex = oracleFiscalMonths.indexOf(match[2] as typeof oracleFiscalMonths[number]);
+  if (monthIndex < 0) return null;
+  const previousIndex = (monthIndex + oracleFiscalMonths.length - 1) % oracleFiscalMonths.length;
+  const previousFiscalYear = Number(match[1]) - (monthIndex === 0 ? 1 : 0);
+  return `FY${String(previousFiscalYear).padStart(2, "0")}-${oracleFiscalMonths[previousIndex]}`;
+};
+
+export const filterActiveConsumptionPlans = (
+  plans: readonly ConsumptionPlan[],
+  currentFiscalMonth: string
+): ConsumptionPlan[] => {
+  const previousMonth = previousFiscalMonth(currentFiscalMonth);
+  if (!previousMonth) return [...plans];
+  return plans.filter((plan) => plan.actuals[previousMonth] !== 0 || plan.actuals[currentFiscalMonth] !== 0);
+};
+
 export const getLatestActualMonth = (plans: readonly ConsumptionPlan[]): string | null => {
   const populatedMonths = new Set(plans.flatMap((plan) => Object.keys(plan.actuals)));
   const orderedMonths = sortConsumptionMonths([...populatedMonths]);

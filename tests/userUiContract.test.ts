@@ -9,6 +9,7 @@ const app = read("src/components/app.tsx");
 const header = read("src/components/header.tsx");
 const profile = read("src/components/content/ProfilePage.tsx");
 const users = read("src/components/content/UsersPage.tsx");
+const content = read("src/components/content/index.tsx");
 const routes = read("src/components/navigationRoutes.ts");
 const passwordPolicy = read("src/auth/passwordPolicy.ts");
 
@@ -18,7 +19,7 @@ assert.match(login, /pathname === "\/activate"[\s\S]*pathname === "\/reset-passw
 assert.match(login, /inspectCredentialAction[\s\S]*completeCredentialAction/, "links are validated before one-time completion");
 assert.doesNotMatch(login, /temporaryPassword/, "activation and reset never request a temporary password");
 assert.match(login, /oj-input-password/, "credential values use masked JET inputs");
-assert.match(passwordPolicy, /at least 12 characters/, "new credentials enforce the server minimum before submission");
+assert.match(passwordPolicy, /at least 8 characters/, "activation, reset, and profile changes enforce the server minimum before submission");
 assert.match(login, /validatePasswordPolicy\(newPassword\)/, "activation and reset share the client password policy");
 assert.match(login, /mode === "success"[\s\S]*Password set successfully[\s\S]*Sign in/, "activation/reset completion offers sign-in only after success");
 assert.doesNotMatch(login, /onAuthenticated\(await completeCredentialAction/, "credential completion does not silently sign the user in");
@@ -56,6 +57,12 @@ assert.match(users, /navigator\.clipboard\.writeText[\s\S]*Expires/, "Admin can 
 assert.match(users, /works once|used only once/, "one-time use is explicit");
 assert.match(users, /onojAction=\{\(\) => void submitDialog\(\)\}/, "JET Submit explicitly invokes the user action");
 assert.match(users, /window\.confirm|confirmAction/, "destructive state changes require confirmation");
+assert.match(content, /<UsersPage currentUserKey=\{profile\.userKey\}/, "Users receives the signed-in identity for self-delete protection");
+assert.match(users, /import "ojs\/ojdialog"[\s\S]*deleteDialogRef[\s\S]*initialVisibility="hide"[\s\S]*Permanently delete user/, "permanent deletion uses a mounted Redwood JET confirmation dialog");
+assert.match(users, /user\.userKey === currentUserKey[\s\S]*You cannot permanently delete your own signed-in account/, "the current user's permanent Delete action is disabled with an explanation");
+assert.match(users, /await deleteUser\(deleteCandidate\.userKey\)[\s\S]*await reload\(\)/, "confirmed permanent deletion calls the API and refreshes users");
+assert.match(users, /This action cannot be undone[\s\S]*Permanently delete/, "the permanent-delete dialog states impact before confirmation");
+assert.match(read("src/styles/app.css"), /\.kap-destructive-warning\s*\{[\s\S]*background:[\s\S]*border-left:[\s\S]*color:/, "permanent-delete warning has explicit high contrast");
 assert.match(users, /class="kap-users-table-wrap"[\s\S]*class="kap-users-table"/, "Users uses the Redwood admin table contract");
 assert.match(users, /data-label="Display name"[\s\S]*data-label="Actions"/, "responsive user rows expose card field labels");
 assert.match(users, /<oj-button[\s\S]*Reissue[\s\S]*Cancel invite[\s\S]*Reset password[\s\S]*Lock[\s\S]*Disable/, "row actions use official JET buttons");
