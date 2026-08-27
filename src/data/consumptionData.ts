@@ -246,6 +246,9 @@ const fiscalMonthOrder = (key: string): number => {
 export const sortConsumptionMonths = (months: readonly string[]) =>
   [...months].sort((left, right) => fiscalMonthOrder(left) - fiscalMonthOrder(right));
 
+export const sortConsumptionMonthsNewestFirst = (months: readonly string[]) =>
+  [...months].sort((left, right) => fiscalMonthOrder(right) - fiscalMonthOrder(left));
+
 const previousFiscalMonth = (month: string): string | null => {
   const match = /^FY(\d{2})-([A-Z]{3})$/.exec(month);
   if (!match) return null;

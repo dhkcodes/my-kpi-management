@@ -20,9 +20,11 @@ export function Header({ appName, profile, navigationOpen, onToggleNavigation, o
     <header role="banner" class="oj-web-applayout-header kpi-header">
       <div class="oj-flex-bar oj-sm-align-items-center kpi-header__bar">
         <div class="oj-flex-bar-start oj-sm-align-items-center kpi-header__start">
-          <oj-button id="navigationToggle" chroming="borderless" display="icons" aria-label={navigationOpen ? "Close navigation" : "Open navigation"} aria-controls="kpiSideNavigation" aria-expanded={navigationOpen ? "true" : "false"} onojAction={onToggleNavigation}>
-            <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
-          </oj-button>
+          <span class="kpi-header__toggle">
+            <oj-button id="navigationToggle" chroming="borderless" display="icons" aria-label={navigationOpen ? "Close navigation" : "Open navigation"} aria-controls="kpiSideNavigation" aria-expanded={navigationOpen ? "true" : "false"} onojAction={onToggleNavigation}>
+              <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
+            </oj-button>
+          </span>
           <div class="kpi-header__brand" aria-label="My KPI & Account Planner"><span class="demo-oracle-icon" role="img" aria-label="Oracle"></span><span class="kpi-header__divider" aria-hidden="true"></span><span class="kpi-header__title">{appName}</span></div>
         </div>
         <div class="oj-flex-bar-end kpi-header__end">

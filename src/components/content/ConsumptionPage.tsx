@@ -17,7 +17,8 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
-  sortConsumptionMonths
+  sortConsumptionMonths,
+  sortConsumptionMonthsNewestFirst
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import {
@@ -602,7 +603,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       const quarter = summary.quarter;
       const forecastQuarter = summary.months.some((month) => editablePeriodIds.has(month));
       return [
-        ...summary.months.map((month) => {
+        ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(series.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(series.forecasts, month);
           const editable = editablePeriodIds.has(month);
@@ -878,7 +879,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </tr>
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
-                  ...getQuarterMonths(quarter).map((month) => {
+                  ...sortConsumptionMonthsNewestFirst(getQuarterMonths(quarter)).map((month) => {
                     const status = editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
                     return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
                   }),

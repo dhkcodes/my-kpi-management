@@ -7,6 +7,7 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 const accountsPage = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
+const header = readFileSync("src/components/header.tsx", "utf8");
 
 assert.match(navigation, /export const navItems[\s\S]*id: "home"[\s\S]*id: "my-customers"[\s\S]*id: "kpis"[\s\S]*id: "consumption"/, "root navigation order is Home, My Customers, KPI Activities, Consumption");
 const customerChildren = navigation.match(/export const customerNavItems[\s\S]*?\];/)?.[0] ?? "";
@@ -103,6 +104,8 @@ assert.match(page, /id="consumptionAccountSelector"[\s\S]*onClick=\{\(\) => \{ s
 assert.match(page, /editablePeriodIds\.has\(month\)/, "only backend-declared period IDs are editable");
 assert.match(page, /buildDisplayQuarterSummaries/, "table totals and PreQ gaps are calculated independently of backend display ordering");
 assert.match(page, /displayQuarterOrder\.flatMap/, "table columns follow the backend display quarter order");
+assert.match(page, /sortConsumptionMonthsNewestFirst\(summary\.months\)/, "table value cells render each current quarter newest month first");
+assert.match(page, /sortConsumptionMonthsNewestFirst\(getQuarterMonths\(quarter\)\)/, "table month headings use the same dynamic newest-first order as the value cells");
 assert.match(page, /const expandable = account\.plans\.length > 1/, "only Multiple End Users are expandable");
 assert.match(page, /expandable \? \([\s\S]*consumption-account-toggle[\s\S]*\) : \(/, "single-plan End Users render without an expand control");
 assert.match(page, /renderQuarterCells\(singlePlan, false\)/, "single-plan account rows render editable detailed Forecast cells");
@@ -135,6 +138,11 @@ assert.match(page, /consumption-signal-grade is-\$\{signal\.grade\.toLowerCase\(
 assert.match(styles, /\.consumption-signal-grade\.is-critical\s*\{[^}]*background:[^}]*color:/, "critical severity has an accessible high-emphasis badge");
 assert.match(styles, /\.consumption-signal-grade\.is-high\s*\{[^}]*background:[^}]*color:/, "high severity has an accessible warning badge");
 assert.match(styles, /\.consumption-table thead \.consumption-account-column\s*\{[^}]*font-size:[^}]*padding-left:[^}]*text-align:\s*left/, "Account / End User header is enlarged and aligned with the leading text");
+assert.match(styles, /--consumption-grid-font-size:\s*1rem/, "Consumption table defines one shared Redwood-readable grid font size");
+assert.match(styles, /\.consumption-table thead th\s*\{[^}]*font-size:\s*var\(--consumption-grid-font-size\)/, "month and status header typography matches the table numeric data size");
+assert.match(styles, /\.consumption-value-cell\s*\{[^}]*font-size:\s*var\(--consumption-grid-font-size\)/, "Consumption numeric cells use the shared grid font size");
+assert.match(header, /kpi-header__toggle[\s\S]*navigationToggle[\s\S]*kpi-header__brand/, "brand header groups the navigation control and Oracle lockup without changing their functions");
+assert.match(styles, /\.kpi-header__brand\s*\{[^}]*border-left:[^}]*display:\s*flex/, "Oracle logo and app title use a restrained Redwood brand separator");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-signal\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/, "small-screen Change Alerts collapse into one non-overlapping content column");
 assert.doesNotMatch(page, /Detect unusual monthly change, inspect its Plan context, and manage the next-quarter Forecast\./, "the requested Consumption helper copy is removed");
 assert.match(page, /const linkedPlan = draftPlans\.find[\s\S]*Workload:[\s\S]*linkedPlan\?\.workload/, "Change Alert list shows the linked Workload");
