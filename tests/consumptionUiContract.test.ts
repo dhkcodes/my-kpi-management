@@ -37,7 +37,7 @@ assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\
 assert.match(insightsPage, /\{alert\.workload\} · Plan \{alert\.planId\} · DC \{plan\?\.dataCenter \?\? "N\/A"\}/, "each alert places Plan ID and Data Center directly beside the Workload name");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
-assert.match(insightsPage, /slice\(-4\)[\s\S]*is-emphasized/, "the latest four points in the six-month ACTUAL trend are emphasized");
+assert.match(insightsPage, /slice\(-4\)[\s\S]*markerSize:\s*emphasizedTrendPeriods\.has\(point\.periodKey\) \? 9 : 5/, "the latest four points in the six-month ACTUAL trend retain emphasized chart markers");
 assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoints\.map\([\s\S]*value: point\.actualAmount/, "the trend DataProvider retains all six month groups");
 assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
@@ -56,6 +56,9 @@ assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumpti
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
 assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Trend point labels use the approved compact USD format");
+assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
+assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
+assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
@@ -128,7 +131,7 @@ assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-a
 // Approved Consumption follow-up: clearer visual regions, accessible alerts, stable records and zoom-safe navigation.
 assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
 assert.match(insightsPage, /consumption-signal-badges[\s\S]*consumption-signal-type[\s\S]*aria-hidden="true"[\s\S]*consumption-signal-grade/, "alert type and grade are separate accessible icon and text badges");
-assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*28rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*height:\s*28rem/, "alert and trend panels have equal height with internal alert scrolling");
+assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*24rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto[^}]*height:\s*24rem[\s\S]*\.consumption-insights-actual-chart[^}]*height:\s*100%[^}]*min-height:\s*15rem/, "alert and trend panels compact naturally after duplicate-list removal while preserving equal height and chart space");
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
 assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\{`Severity[^`]+`\}/, "Alert type and severity badges expose explicit accessible labels");
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");

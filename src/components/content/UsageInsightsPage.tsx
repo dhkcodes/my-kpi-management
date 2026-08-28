@@ -280,10 +280,9 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         </button>; })}{analysis.alerts.length === 0 && <p class="consumption-empty-state">No ACTUAL usage change alerts for this context.</p>}</div>
         <div class="consumption-insights-linked-trend">
           <div><h3>ACTUAL Trend</h3><p>{selectedAlert ? `${selectedAlert.account} · ${selectedAlert.workload} · ${selectedAlert.planId}` : contextTrendLabel}</p></div>
-          {trendPoints.length === 6 ? <><oj-chart class="consumption-insights-actual-chart" type="line" data={trendChart} legend={{ rendered: "off" }}
+          {trendPoints.length === 6 ? <oj-chart class="consumption-insights-actual-chart" type="line" data={trendChart} legend={{ rendered: "off" }}
             dataLabel={trendDataLabel} styleDefaults={{ dataLabelPosition: "aboveMarker", dataLabelCollision: "fitInBounds", hideOverlappingLabels: "on", markerDisplayed: "on" }}
             aria-label={`${selectedAlert ? "Selected Plan" : contextTrendLabel} six-month ACTUAL Trend`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
-            <ol class="consumption-insights-trend-periods">{trendPoints.map((point) => <li key={point.periodKey} class={emphasizedTrendPeriods.has(point.periodKey) ? "is-emphasized" : ""}><span>{point.periodKey}</span><strong>{point.actualAmount === null ? "N/A" : compactCurrency.format(point.actualAmount)}</strong></li>)}</ol></>
             : <p class="consumption-empty-state">Six contiguous ACTUAL months ending at the alert month are unavailable.</p>}
           {selectedAlert && <p class="consumption-signal-reason"><strong>Why flagged:</strong> {selectedAlert.reason}</p>}
         </div>

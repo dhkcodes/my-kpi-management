@@ -2569,21 +2569,17 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-qoq-cards .is-negative strong { color: var(--kpi-danger); }
 .consumption-insights-qoq-cards small, .consumption-insights-note { color: var(--kpi-muted); font-size: .66rem; }
 .consumption-insights-alert-trend-grid { align-items: stretch; display: grid; gap: .8rem; grid-template-columns: minmax(17rem, .72fr) minmax(28rem, 1.28fr); min-width: 0; }
-.consumption-insights-alert-trend .consumption-signal-inbox { box-sizing: border-box; height: 28rem; max-height: 28rem; overflow-y: auto; }
+.consumption-insights-alert-trend .consumption-signal-inbox { box-sizing: border-box; height: 24rem; max-height: 24rem; overflow-y: auto; }
 .consumption-insights-alert-trend .consumption-signal-main > strong { font-size: 1rem; }
 .consumption-insights-alert-trend .consumption-signal-main > span:not(.consumption-signal-badges) { font-size: .88rem; font-weight: 700; }
 .consumption-insights-alert-trend .consumption-signal-metrics > strong { font-size: 1.2rem; }
 .consumption-insights-alert-trend .consumption-signal-metrics > small { font-size: .82rem; font-weight: 800; }
 .consumption-signal-badges { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .2rem; }
 .consumption-signal-badges .consumption-signal-type, .consumption-signal-badges .consumption-signal-grade { align-items: center; display: inline-flex; gap: .25rem; }
-.consumption-insights-linked-trend { border: 1px solid var(--kpi-border); box-sizing: border-box; display: grid; gap: .5rem; height: 28rem; min-width: 0; overflow: hidden; padding: .7rem; }
+.consumption-insights-linked-trend { border: 1px solid var(--kpi-border); box-sizing: border-box; display: grid; gap: .5rem; grid-template-rows: auto minmax(0, 1fr) auto; height: 24rem; min-width: 0; overflow: hidden; padding: .7rem; }
 .consumption-insights-linked-trend h3, .consumption-insights-linked-trend p { margin: 0; }
 .consumption-insights-linked-trend > div > p { color: var(--kpi-ink); font-size: 1rem; font-weight: 750; }
-.consumption-insights-actual-chart { display: block; height: 15rem; width: 100%; }
-.consumption-insights-trend-periods { display: grid; gap: .25rem; grid-template-columns: repeat(6, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
-.consumption-insights-trend-periods li { border-top: 2px solid var(--kpi-border); color: var(--kpi-muted); display: grid; font-size: .63rem; gap: .15rem; padding-top: .3rem; }
-.consumption-insights-trend-periods li.is-emphasized { border-top-color: #315f75; color: var(--kpi-ink); }
-.consumption-insights-trend-periods strong { font-size: .76rem; }
+.consumption-insights-actual-chart { display: block; height: 100%; min-height: 15rem; width: 100%; }
 .consumption-insights-status { border-radius: var(--oj-core-border-radius-sm); font-size: .64rem; font-weight: 800; justify-self: start; padding: .18rem .4rem; }
 .consumption-insights-status.is-actual { background: #e8f3e7; color: #285b28; }
 .consumption-insights-status.is-forecast { background: #e4f0f6; color: #175b8e; }
@@ -2629,5 +2625,4 @@ h4.weekly-activity-section-label--next-week,
 }
 @media (max-width: 520px) {
   .consumption-insights-kpis, .consumption-insights-qoq-cards { grid-template-columns: minmax(0, 1fr); }
-  .consumption-insights-trend-periods { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
