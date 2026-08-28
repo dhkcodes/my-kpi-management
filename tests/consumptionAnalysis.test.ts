@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, filterActiveConsumptionPlans, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, filterActiveConsumptionPlans, getAlertActualTrend, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -8,6 +8,7 @@ runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
 const analysis = {
   fiscalYear: "FY27",
   priorFiscalYear: "FY26",
+  selectedAccount: null,
   portfolio: {
     actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", coveragePercent: 75,
     priorActualAmount: 900, priorForecastAmount: 0, priorTotalAmount: 900, priorStatus: "ACTUAL", priorCoveragePercent: 100
@@ -18,6 +19,7 @@ const analysis = {
     { quarter: "Q3", actualAmount: 0, forecastAmount: 300, totalAmount: 300, status: "FORECAST", coveragePercent: 100, qoqChangeAmount: -100, qoqChangePercent: -25 },
     { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
   ],
+  accountCandidates: [{ account: "Acme", workloads: ["Database"], planIds: ["P1"] }],
   alerts: [{
     alertId: "alert-1", serverPlanId: 1, account: "Acme", workload: "Database", planId: "P1", periodKey: "FY27-AUG",
     type: "ABOVE_USUAL", grade: "HIGH", actualAmount: 250, baselineMedian: 100, changeAmount: 150,
@@ -29,23 +31,53 @@ const analysis = {
       workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
       plans: [{ serverPlanId: 1, planId: "P1", endUser: "Acme", dataCenter: "IAD", actualAmount: 600, forecastAmount: 400,
         totalAmount: 1000, status: "MIXED", percentage: 100,
-        actualTrend: [{ periodKey: "FY27-JUN", actualAmount: 200 }, { periodKey: "FY27-JUL", actualAmount: 200 }, { periodKey: "FY27-AUG", actualAmount: 200 }] }]
+        actualTrend: [
+          { periodKey: "FY26-MAR", actualAmount: null, alertCalculationMonth: false },
+          { periodKey: "FY26-APR", actualAmount: 20, alertCalculationMonth: false },
+          { periodKey: "FY26-MAY", actualAmount: 30, alertCalculationMonth: true },
+          { periodKey: "FY27-JUN", actualAmount: 40, alertCalculationMonth: true },
+          { periodKey: "FY27-JUL", actualAmount: 50, alertCalculationMonth: true },
+          { periodKey: "FY27-AUG", actualAmount: 60, alertCalculationMonth: true }
+        ] }]
     }]
   }]
 };
 
 void (async () => {
   runtime.fetch = async (input, init) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=");
     assert.equal(init?.method, undefined);
     return new Response(JSON.stringify(analysis), { status: 200, headers: { "Content-Type": "application/json" } });
   };
-  const decoded = await fetchConsumptionAnalysis("FY27");
+  const decoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
   assert.equal(decoded.portfolio.status, "MIXED");
   assert.equal(decoded.portfolio.coveragePercent, 75);
   assert.equal(decoded.quarters[3].coveragePercent, 0);
   assert.deepEqual(decoded.quarters.map((quarter) => quarter.quarter), ["Q1", "Q2", "Q3", "Q4"]);
-  assert.equal(decoded.accounts[0].workloads[0].plans[0].actualTrend.length, 3);
+  assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
+  assert.equal(decoded.accounts[0].workloads[0].plans[0].actualTrend.length, 6);
+  assert.deepEqual(getAlertActualTrend(decoded.accounts[0].workloads[0].plans[0].actualTrend, "FY27-AUG").map((point) => point.periodKey),
+    ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
+    "the selected alert base month anchors the preceding five ACTUAL months");
+
+  runtime.fetch = async (input) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=%ED%95%9C%EA%B5%AD&account=Acme");
+    return new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "한국", account: "Acme" });
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme",
+    accounts: [{ ...analysis.accounts[0], account: "Wrong account" }] }),
+    { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "Acme" }),
+    /Malformed Consumption analysis/, "a successful response for another Account must fail closed");
+
+  const legacyAnalysis = { ...analysis } as Partial<typeof analysis>;
+  delete legacyAnalysis.accountCandidates;
+  runtime.fetch = async () => new Response(JSON.stringify(legacyAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
+  const legacyDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.deepEqual(legacyDecoded.accountCandidates, analysis.accountCandidates,
+    "the strict typed client derives candidates from validated Accounts while the backend child rolls out the new field");
 
   const signedAnalysis = {
     ...analysis,
@@ -54,10 +86,10 @@ void (async () => {
     accounts: [{ ...analysis.accounts[0], actualAmount: -100, forecastAmount: 50, totalAmount: -50, percentage: 125,
       workloads: [{ ...analysis.accounts[0].workloads[0], actualAmount: -100, forecastAmount: 50, totalAmount: -50, percentage: -25,
         plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualAmount: -100, forecastAmount: 50, totalAmount: -50,
-          percentage: 125, actualTrend: [{ periodKey: "FY27-JUN", actualAmount: -25 }] }] }] }]
+          percentage: 125, actualTrend: [{ periodKey: "FY27-JUN", actualAmount: -25, alertCalculationMonth: true }] }] }] }]
   };
   runtime.fetch = async () => new Response(JSON.stringify(signedAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
-  const signedDecoded = await fetchConsumptionAnalysis("FY27");
+  const signedDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
   assert.equal(signedDecoded.portfolio.totalAmount, -50, "valid credits and negative adjustments remain analyzable");
   assert.equal(signedDecoded.accounts[0].percentage, 125, "signed portfolios may produce contribution percentages outside 0–100");
 
@@ -72,12 +104,12 @@ void (async () => {
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [analysis.accounts[0].workloads[0], { ...analysis.accounts[0].workloads[0], plans: [] }] }] },
     { ...analysis, alerts: [analysis.alerts[0], { ...analysis.alerts[0] }] },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], serverPlanId: 9_007_199_254_740_992 }] }] }], alerts: [] },
-    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUN", actualAmount: 1 }, { periodKey: "FY27-JUN", actualAmount: 2 }] }] }] }] },
-    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUL", actualAmount: 1 }, { periodKey: "FY27-JUN", actualAmount: 2 }] }] }] }] },
-    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY25-MAY", actualAmount: 1 }] }] }] }] }
+    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUN", actualAmount: 1, alertCalculationMonth: true }, { periodKey: "FY27-JUN", actualAmount: 2, alertCalculationMonth: true }] }] }] }] },
+    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUL", actualAmount: 1, alertCalculationMonth: true }, { periodKey: "FY27-JUN", actualAmount: 2, alertCalculationMonth: true }] }] }] }] },
+    { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY25-MAY", actualAmount: 1, alertCalculationMonth: true }] }] }] }] }
   ]) {
     runtime.fetch = async () => new Response(JSON.stringify(malformed), { status: 200, headers: { "Content-Type": "application/json" } });
-    await assert.rejects(() => fetchConsumptionAnalysis("FY27"), /Malformed Consumption analysis/);
+    await assert.rejects(() => fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" }), /Malformed Consumption analysis/);
   }
 
   const accountRows = [

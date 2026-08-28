@@ -18,19 +18,28 @@ assert.match(content, /activeRoute\.module === "consumptionInsights"[\s\S]*<Usag
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Usage Records renders the preserved editable workspace");
 assert.match(content, /!\['profile', 'users', 'consumptionRecords'\]\.includes\(activeRoute\.module\)/, "global FY is visible for Usage Insights and hidden for Usage Records");
 
-// Usage Insights: FY-only summaries, ACTUAL-only alerts/trend and Account→Plan drilldown.
-assert.match(insightsPage, /fetchConsumptionAnalysis\(fiscalYear\)/, "Usage Insights loads one FY analysis contract");
-assert.match(insightsPage, /FY Portfolio[\s\S]*Prior FY[\s\S]*Coverage[\s\S]*Q1 Q2 Q3 Q4/, "FY portfolio and quarterly context render data coverage");
-assert.match(insightsPage, /Forecast QoQ[\s\S]*Projected QoQ[\s\S]*QoQ N\/A/, "Quarter summaries distinguish forecast, projected, and unavailable QoQ");
-assert.match(insightsPage, /ACTUAL only[\s\S]*Consumption Change Alerts[\s\S]*Plan ACTUAL Trend/, "Change Alerts and the linked trend are ACTUAL only");
-assert.match(insightsPage, /actualTrend[\s\S]*actualAmount/, "the linked Plan trend consumes ACTUAL points only");
+// Usage Insights: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Usage Insights loads one server-owned FY/account analysis context");
+assert.match(insightsPage, /analysisResponse\.fiscalYear === fiscalYear[\s\S]*analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "Analysis renders only when the response FY and Account match the requested context");
+assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
+assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
+assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
+assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
+assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
+assert.match(insightsPage, /FY & Quarter totals[\s\S]*Q1[\s\S]*Q2[\s\S]*Q3[\s\S]*Q4/, "FY and all four Quarter stacked totals share one section");
+assert.match(insightsPage, /Quarter-over-quarter[\s\S]*qoqChangePercent/, "QoQ values render as decision cards");
+assert.match(insightsPage, /Consumption Change Alerts & linked Plan Trend[\s\S]*getAlertActualTrend[\s\S]*actualTrend/, "Alert and six-month ACTUAL Plan Trend are one combined decision section");
+assert.match(insightsPage, /slice\(-4\)[\s\S]*is-emphasized/, "the latest four points in the six-month ACTUAL trend are emphasized");
+assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoints\.map\([\s\S]*value: point\.actualAmount/, "the trend DataProvider retains all six month groups");
+assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
-assert.match(insightsPage, /sortAndFilterConsumptionAccounts/, "Account Contribution applies approved search and sort logic");
-assert.match(insightsPage, /Top 5 \+ Other[\s\S]*All accounts[\s\S]*Search accounts/, "Account Contribution exposes approved list and search modes");
-assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*Workload[\s\S]*Plan[\s\S]*% of Account/, "Account drilldown reaches workload and plan detail with Account-relative contribution percentages");
-assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-portfolio-chart[\s\S]*consumption-insights-qoq-chart[\s\S]*consumption-insights-actual-chart[\s\S]*consumption-insights-contribution-chart[\s\S]*consumption-insights-plan-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
+assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
+assert.match(insightsPage, /accounts\.slice\(0, 5\)[\s\S]*accounts\.slice\(5\)[\s\S]*>Other</, "Account contribution renders Top 5 plus an actual excluded-account Other sum");
+assert.match(insightsPage, /workloads\.flatMap[\s\S]*consumption-insights-plan-list/, "selected Account plans are flattened into the direct Plan contribution column with Workload metadata");
+assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
-assert.match(apiSource, /request\(`\/consumption\/analysis\?\$\{new URLSearchParams\(\{ fiscalYear \}\)\}`\)/, "Analysis client sends only the FY query");
+assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
+assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
 // Usage Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /<h1 id="consumptionTitle">Usage Records<\/h1>/, "data-management leaf uses the approved name");
@@ -74,12 +83,14 @@ assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never 
 
 // Redwood table behavior and responsive containment.
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
-assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*height:\s*max\(18rem, calc\(100dvh - 16rem\)\)[^}]*overflow:\s*auto/, "the table owns responsive viewport-based scrolling");
+assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
+assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*height:\s*max\(18rem, calc\(100dvh - [^)]+\)\)[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table alone owns Quarter\/Month horizontal overflow and available-height scrolling");
+assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
 assert.match(styles, /\.consumption-account-column\s*\{[^}]*left:\s*0[^}]*position:\s*sticky/, "Account column remains sticky");
 assert.match(styles, /\.consumption-table thead tr:first-child th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/, "first header row remains sticky");
 assert.match(styles, /\.consumption-table thead tr:nth-child\(2\) th\s*\{[^}]*position:\s*sticky[^}]*top:\s*2\.6rem/, "second compact header row remains sticky");
-assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-quarter-grid[\s\S]*\.consumption-insights-contribution-list/, "Insights styling is page-scoped");
+assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-alert-trend-grid[\s\S]*\.consumption-insights-contribution-list/, "Insights styling is page-scoped");
 
 console.log("consumptionUiContract tests passed");

@@ -2,6 +2,7 @@ import {
   ConsumptionPlan,
   ConsumptionSignal,
   ConsumptionAnalysisAccount,
+  ConsumptionAnalysisAccountCandidate,
   ConsumptionAmountSplit,
   getFiscalQuarter,
   getLatestActualMonth,
@@ -77,15 +78,17 @@ export type ConsumptionAnalysisAlert = Readonly<{
   actualAmount: number; baselineMedian: number; changeAmount: number; changePercent: number | null; reason: string;
 }>;
 export type ConsumptionAnalysis = Readonly<{
-  fiscalYear: string; priorFiscalYear: string;
+  fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
   }>;
   quarters: readonly ConsumptionAnalysisQuarter[];
+  accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
 }>;
+export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string }>;
 export type ConsumptionForecastUpdate = Readonly<{ planId: number; periodKey: string; amount: number; versionNo: number }>;
 export type ConsumptionControlForecastUpdate = Readonly<{ account: string; periodKey: string; amount: number | null }>;
 export type ConsumptionImportPreview = Readonly<{ planCount: number; controlTotalCount: number; sourceRowCount: number; sourceSha256: string }>;
@@ -165,8 +168,10 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
   const actualTrend = raw.actualTrend.map((point) => {
     if (typeof point !== "object" || point === null) return malformedAnalysis();
     const rawPoint = point as Record<string, unknown>;
-    if (!isPeriodKey(rawPoint.periodKey) || !isFiniteNumber(rawPoint.actualAmount)) return malformedAnalysis();
-    return { periodKey: rawPoint.periodKey, actualAmount: rawPoint.actualAmount };
+    if (!isPeriodKey(rawPoint.periodKey) || !isNullableFiniteNumber(rawPoint.actualAmount)
+      || typeof rawPoint.alertCalculationMonth !== "boolean") return malformedAnalysis();
+    return { periodKey: rawPoint.periodKey, actualAmount: rawPoint.actualAmount,
+      alertCalculationMonth: rawPoint.alertCalculationMonth };
   });
   let priorTrendOrder = Number.NEGATIVE_INFINITY;
   const seenTrendPeriods = new Set<string>();
@@ -183,7 +188,9 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
-  if (!isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear) || !Array.isArray(raw.quarters)
+  if (!isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
+    || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
+    || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
@@ -216,6 +223,22 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     return { ...split, account: account.account, percentage: account.percentage, workloads };
   });
   if (new Set(accounts.map((account) => account.account)).size !== accounts.length) return malformedAnalysis();
+  const rawAccountCandidates = Array.isArray(raw.accountCandidates) ? raw.accountCandidates : accounts.map((account) => ({
+    account: account.account,
+    workloads: account.workloads.map((workload) => workload.workload),
+    planIds: [...new Set(account.workloads.flatMap((workload) => workload.plans.map((plan) => plan.planId)))]
+  }));
+  const accountCandidates: ConsumptionAnalysisAccountCandidate[] = rawAccountCandidates.map((value) => {
+    if (typeof value !== "object" || value === null) return malformedAnalysis();
+    const candidate = value as Record<string, unknown>;
+    if (!isNonEmptyString(candidate.account) || !Array.isArray(candidate.workloads) || !Array.isArray(candidate.planIds)
+      || candidate.workloads.some((workload) => !isNonEmptyString(workload))
+      || candidate.planIds.some((planId) => !isNonEmptyString(planId))
+      || new Set(candidate.workloads).size !== candidate.workloads.length
+      || new Set(candidate.planIds).size !== candidate.planIds.length) return malformedAnalysis();
+    return { account: candidate.account, workloads: candidate.workloads as string[], planIds: candidate.planIds as string[] };
+  });
+  if (new Set(accountCandidates.map((candidate) => candidate.account)).size !== accountCandidates.length) return malformedAnalysis();
   const seenAnalysisPlanIds = new Set<number>();
   accounts.forEach((account) => account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
     if (seenAnalysisPlanIds.has(plan.serverPlanId)) return malformedAnalysis();
@@ -236,11 +259,11 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const matches = accounts.flatMap((account) => account.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: account.account, workload: workload.workload, plan })))).filter((entry) => entry.account === alert.account && entry.workload === alert.workload && entry.plan.serverPlanId === alert.serverPlanId && entry.plan.planId === alert.planId);
     if (matches.length !== 1) return malformedAnalysis();
   });
-  return { fiscalYear: raw.fiscalYear, priorFiscalYear: raw.priorFiscalYear,
+  return { fiscalYear: raw.fiscalYear, priorFiscalYear: raw.priorFiscalYear, selectedAccount: raw.selectedAccount,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, alerts, accounts };
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, alerts, accounts };
 };
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {
@@ -440,12 +463,18 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
     editablePeriodIds: workspace.editablePeriodIds, displayQuarterOrder: workspace.displayQuarterOrder,
     accountGroups, totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
 };
-export const fetchConsumptionAnalysis = async (fiscalYear: string): Promise<ConsumptionAnalysis> => {
-  if (!isFiscalYear(fiscalYear)) throw new Error("Invalid Consumption analysis fiscal year");
-  const { payload } = await request(`/consumption/analysis?${new URLSearchParams({ fiscalYear })}`);
+export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery): Promise<ConsumptionAnalysis> => {
+  if (!isFiscalYear(query.fiscalYear) || typeof query.search !== "string" || query.search.length > 160
+    || typeof query.account !== "string" || query.account.length > 160) throw new Error("Invalid Consumption analysis query");
+  const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account });
+  const { payload } = await request(`/consumption/analysis?${parameters}`);
   const decoded = parseConsumptionAnalysis(payload);
-  const expectedPriorFiscalYear = `FY${String((Number(fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;
-  if (decoded.fiscalYear !== fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();
+  const expectedPriorFiscalYear = `FY${String((Number(query.fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;
+  if (decoded.fiscalYear !== query.fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();
+  const expectedAccount = query.account.trim() || null;
+  if (decoded.selectedAccount !== expectedAccount) return malformedAnalysis();
+  if (query.account && (decoded.accounts.some((account) => account.account !== query.account)
+    || decoded.alerts.some((alert) => alert.account !== query.account))) return malformedAnalysis();
   return decoded;
 };
 export const previewConsumptionImport = async (csv: string): Promise<ConsumptionImportPreview> => {

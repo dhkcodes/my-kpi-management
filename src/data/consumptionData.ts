@@ -8,13 +8,18 @@ export type ConsumptionAmountSplit = Readonly<{
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
   percentage: number;
-  actualTrend: readonly Readonly<{ periodKey: string; actualAmount: number }>[];
+  actualTrend: readonly Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
   workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
 }>;
 export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
   account: string; percentage: number; workloads: readonly ConsumptionAnalysisWorkload[];
+}>;
+export type ConsumptionAnalysisAccountCandidate = Readonly<{
+  account: string;
+  workloads: readonly string[];
+  planIds: readonly string[];
 }>;
 export type ConsumptionAccountSort = "account" | "amount";
 export type ConsumptionSortDirection = "asc" | "desc";
@@ -285,6 +290,23 @@ const previousFiscalMonth = (month: string): string | null => {
   const previousIndex = (monthIndex + oracleFiscalMonths.length - 1) % oracleFiscalMonths.length;
   const previousFiscalYear = Number(match[1]) - (monthIndex === 0 ? 1 : 0);
   return `FY${String(previousFiscalYear).padStart(2, "0")}-${oracleFiscalMonths[previousIndex]}`;
+};
+
+/** Return the alert month and its previous five contiguous ACTUAL-only monthly slots. */
+export const getAlertActualTrend = (
+  points: readonly Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>[],
+  alertPeriodKey: string
+): ReadonlyArray<Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>> => {
+  const byPeriod = new Map(points.map((point) => [point.periodKey, point]));
+  const periods = [alertPeriodKey];
+  for (let index = 1; index < 6; index += 1) {
+    const previous = previousFiscalMonth(periods[0]);
+    if (!previous) return [];
+    periods.unshift(previous);
+  }
+  return periods.every((period) => byPeriod.has(period))
+    ? periods.map((period) => byPeriod.get(period) as Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>)
+    : [];
 };
 
 export const filterActiveConsumptionPlans = (
