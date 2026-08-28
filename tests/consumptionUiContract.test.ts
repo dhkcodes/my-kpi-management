@@ -71,8 +71,9 @@ assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S
 assert.match(recordsPage, /data-forecast-editor=\{key\}[\s\S]*ref=\{selectForecastEditor\(key\)\}/, "each editable Forecast input binds whole-value selection to its stable cell key");
 assert.match(recordsPage, /class="consumption-forecast-editor" type="text" inputMode="decimal" value=\{value === null[\s\S]*data-forecast-editor=\{key\}/, "Multiple Control Forecast editor also exposes a measurable whole-text selection range");
 assert.match(recordsPage, /class="consumption-forecast-editor" type="text" inputMode="decimal" value=\{`\$\{value \?\? 0\}`\}[\s\S]*data-forecast-editor=\{key\}/, "Plan Forecast editor exposes a measurable whole-text selection range while keeping a decimal numeric keyboard");
-assert.match(recordsPage, /const parsed = Number\(raw\); if \(raw === "" \|\| Number\.isFinite\(parsed\)\)[\s\S]*updateControlForecast/, "text-based Control Forecast editing rejects non-finite transient input before it can become a null API amount");
-assert.match(recordsPage, /const parsed = Number\(event\.currentTarget\.value\); if \(Number\.isFinite\(parsed\)\)[\s\S]*updateForecast/, "text-based Plan Forecast editing rejects non-finite transient input instead of coercing it to zero");
+assert.match(recordsPage, /parseForecastDecimal[\s\S]*\^\[\+-\]\?\(\?:\\d\+[\s\S]*Number\.isFinite/, "text Forecast editors accept only finite signed decimal syntax, rejecting whitespace and JavaScript hex/binary literals");
+assert.match(recordsPage, /raw === "" \? null : parseForecastDecimal\(raw\)[\s\S]*parsed !== null[\s\S]*updateControlForecast/, "Control Forecast preserves exact empty-to-null semantics and ignores invalid non-empty text");
+assert.match(recordsPage, /raw === "" \? 0 : parseForecastDecimal\(raw\)[\s\S]*parsed !== null[\s\S]*updateForecast/, "Plan Forecast preserves empty-to-zero semantics while ignoring invalid non-empty text");
 assert.match(recordsPage, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the cell draft");
 assert.match(recordsPage, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the cell edit entry value");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");

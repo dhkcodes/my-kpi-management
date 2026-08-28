@@ -83,6 +83,11 @@ const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackAct
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+const parseForecastDecimal = (raw: string): number | null => {
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 const shortMonth = (month: string) => month.split("-")[1];
 const consumptionSignalPresentation = (signal: ConsumptionSignal) => signal.type === "ABOVE_USUAL"
   ? { label: "ABOVE USUAL", tone: "is-above-usual" }
@@ -834,7 +839,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={value === null ? "" : `${value}`}
                 data-forecast-editor={key} ref={selectForecastEditor(key)}
                 aria-label={`${series.customer} ${month} Multiple Control Total`} disabled={isSaving}
-                onInput={(event) => { const raw = event.currentTarget.value; const parsed = Number(raw); if (raw === "" || Number.isFinite(parsed)) updateControlForecast(series.customer, month, raw === "" ? null : parsed); }}
+                onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
                 : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}
                   {editable && <small>{canEditControl ? "CONTROL" : "PLAN SUM"}</small>}</span>}
@@ -852,7 +857,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={`${value ?? 0}`}
                   data-forecast-editor={key} ref={selectForecastEditor(key)}
                   aria-label={`${series.endUser} ${month} forecast`} disabled={isSaving}
-                  onInput={(event) => { const parsed = Number(event.currentTarget.value); if (Number.isFinite(parsed)) updateForecast(series.id, month, Math.max(0, parsed)); }}
+                  onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? 0 : parseForecastDecimal(raw); if (parsed !== null) updateForecast(series.id, month, Math.max(0, parsed)); }}
                   onKeyDown={editorKeyDown} autofocus />
                   : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}</span>}
               </td>
