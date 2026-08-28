@@ -2415,7 +2415,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-draft-actions { align-items: center; display: flex; flex: 0 0 auto; gap: .5rem; }
 .consumption-draft-actions > span { color: var(--kap-grid-draft-ink); font-size: .76rem; font-weight: 800; }
 .consumption-table-panel { padding: .75rem; position: relative; }
-.consumption-table-scroll { border: 1px solid var(--kpi-border); height: max(18rem, calc(100dvh - 16rem)); max-height: calc(100dvh - 8rem); max-width: 100%; overflow: auto; position: relative; scrollbar-color: #8b8b8b #f2f2f2; scrollbar-width: thin; width: 100%; }
+.consumption-table-scroll { border: 1px solid var(--kpi-border); height: max(18rem, calc(100dvh - 16rem)); max-width: 100%; overflow: auto; position: relative; scrollbar-color: #8b8b8b #f2f2f2; scrollbar-width: thin; width: 100%; }
 .consumption-table-scroll.is-scrollable-y { overflow: auto; scrollbar-color: #8b8b8b #f2f2f2; scrollbar-width: thin; }
 .consumption-table-scroll::-webkit-scrollbar { display: none; }
 .consumption-table-scroll.is-scrollable-y::-webkit-scrollbar { display: block; height: .65rem; width: .65rem; }
