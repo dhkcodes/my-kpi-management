@@ -89,6 +89,7 @@ export type ConsumptionAnalysis = Readonly<{
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
   otherContribution: ConsumptionOtherContribution | null;
+  otherContributionUnavailableReason: string | null;
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
 }>;
@@ -201,6 +202,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
     || !(raw.otherContribution === null || (typeof raw.otherContribution === "object" && raw.otherContribution !== null))
+    || !(raw.otherContributionUnavailableReason === null || isNonEmptyString(raw.otherContributionUnavailableReason))
+    || (raw.otherContribution !== null && raw.otherContributionUnavailableReason !== null)
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
@@ -289,7 +292,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, otherContribution, alerts, accounts };
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, otherContribution,
+    otherContributionUnavailableReason: raw.otherContributionUnavailableReason as string | null, alerts, accounts };
 };
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {

@@ -34,6 +34,7 @@ const analysis = {
       actualAmount: 50, forecastAmount: 25, totalAmount: 75, status: "MIXED", percentage: 100,
       actualTrend: [{ periodKey: "FY27-AUG", actualAmount: 50, alertCalculationMonth: true }] }]
   },
+  otherContributionUnavailableReason: null,
   alerts: [{
     alertId: "alert-1", serverPlanId: 1, account: "Acme", workload: "Database", planId: "P1", periodKey: "FY27-AUG",
     type: "ABOVE_USUAL", grade: "HIGH", actualAmount: 250, baselineMedian: 100, changeAmount: 150,
@@ -73,6 +74,7 @@ void (async () => {
   assert.deepEqual(decoded.otherContribution?.accountNames, ["Bravo", "Zulu"]);
   assert.equal(decoded.otherContribution?.plans[0].account, "Bravo");
   assert.equal(decoded.otherContribution?.plans[0].workload, "Compute");
+  assert.equal(decoded.otherContributionUnavailableReason, null);
   assert.equal(decoded.accounts[0].workloads[0].plans[0].actualTrend.length, 6);
   assert.deepEqual(getAlertActualTrend(decoded.accounts[0].workloads[0].plans[0].actualTrend, "FY27-AUG").map((point) => point.periodKey),
     ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
@@ -83,6 +85,19 @@ void (async () => {
     return new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme" }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "한국", account: "Acme" });
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...analysis, otherContribution: null,
+    otherContributionUnavailableReason: "Other Account percentages are unavailable because the signed group Consumption total is zero." }),
+    { status: 200, headers: { "Content-Type": "application/json" } });
+  const netZero = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.equal(netZero.otherContribution, null);
+  assert.match(netZero.otherContributionUnavailableReason ?? "", /signed group Consumption total is zero/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...analysis,
+    otherContributionUnavailableReason: "This reason must not coexist with a contribution." }),
+    { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" }),
+    /Malformed Consumption analysis/, "a contribution and its unavailable reason must not coexist");
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme",
     accounts: [{ ...analysis.accounts[0], account: "Wrong account" }] }),

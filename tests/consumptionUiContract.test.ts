@@ -46,6 +46,7 @@ assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*ana
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
 assert.match(insightsPage, /otherContribution = analysis\?\.otherContribution/, "Other Contribution consumes the backend top-level nullable contract");
 assert.match(insightsPage, /<button type="button" class="consumption-insights-account-other"[\s\S]*setOtherSelected/, "Other is an interactive native button");
+assert.match(insightsPage, /consumption-insights-account-unavailable[\s\S]*Other Accounts[\s\S]*N\/A[\s\S]*otherContributionUnavailableReason/, "undefined signed net-zero Other denominator renders N/A with its server explanation");
 assert.match(insightsPage, /otherContribution\?\.plans\.map[\s\S]*percentageContext: "Other Accounts"/, "selecting Other renders all backend group plans with the approved percentage denominator");
 assert.match(insightsPage, /otherContribution\?\.plans\.map\(\(plan\) => \(\{ account: plan\.account[\s\S]*otherSelected &&[\s\S]*<b>\{account\}<\/b>/, "Other plan rows preserve their source Account identity");
 assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");

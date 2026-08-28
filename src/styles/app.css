@@ -2590,6 +2590,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-contribution-list, .consumption-insights-plan-list { align-content: start; display: grid; max-height: 25rem; overflow-y: auto; padding-right: .35rem; }
 .consumption-insights-contribution-list button { background: transparent; border: 0; border-bottom: 1px solid var(--kpi-border); color: inherit; cursor: pointer; display: grid; gap: .25rem .6rem; grid-template-columns: minmax(0, 1fr) auto; padding: .65rem 0; text-align: left; }
 .consumption-insights-account-other { font: inherit; width: 100%; }
+.consumption-insights-account-unavailable { border-bottom: 1px solid var(--kpi-border); display: grid; gap: .25rem .6rem; grid-template-columns: minmax(0, 1fr) auto; padding: .65rem 0; }
+.consumption-insights-account-unavailable > span { font-size: 1rem; font-weight: 800; }
+.consumption-insights-account-unavailable > strong { color: var(--kpi-muted); font-size: 1.05rem; }
+.consumption-insights-account-unavailable > small { color: var(--kpi-muted); grid-column: 1 / -1; }
 .consumption-insights-contribution-list button.is-selected { background: #fff5f2; box-shadow: inset 3px 0 0 var(--kpi-brand); padding-left: .65rem; }
 .consumption-insights-contribution-list button[aria-pressed="true"] { background: #fff5f2; box-shadow: inset 3px 0 0 var(--kpi-brand); padding-left: .65rem; }
 .consumption-insights-contribution-list small, .consumption-insights-contribution-list i { grid-column: 1 / -1; }

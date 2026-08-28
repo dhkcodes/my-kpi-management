@@ -301,7 +301,10 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
             onClick={() => { setOtherSelected(true); setSelectedAccountName(""); }}>
             <span>Other Accounts</span><strong>{compactCurrency.format(otherContribution.totalAmount)}</strong><small>{otherContribution.percentage.toFixed(1)}% · {splitLabel(otherContribution)}</small>
             <i><b style={`width:${Math.max(0, Math.min(100, otherContribution.percentage))}%`}></b></i>
-          </button>}</div>
+          </button>}
+          {!otherContribution && analysis?.otherContributionUnavailableReason && <div class="consumption-insights-account-unavailable" role="status" aria-label={`Other Accounts N/A. ${analysis.otherContributionUnavailableReason}`}>
+            <span>Other Accounts</span><strong>N/A</strong><small>{analysis.otherContributionUnavailableReason}</small>
+          </div>}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{otherSelected ? "Other Accounts" : selectedAccount?.account ?? "Select an Account"}</p></div></div>
           <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · {plan.dataCenter} · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
