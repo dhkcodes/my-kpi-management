@@ -542,6 +542,16 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setEditCell({ planKey: plan.id, month });
   };
 
+  const selectForecastEditor = (key: string) => (input: HTMLInputElement | null) => {
+    if (!input || input.dataset.forecastSelection === key) return;
+    input.dataset.forecastSelection = key;
+    window.requestAnimationFrame(() => {
+      if (!input.isConnected) return;
+      input.focus();
+      input.select();
+    });
+  };
+
   const beginControlEdit = (account: string, month: string, value: number | null) => {
     if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = value;
@@ -821,9 +831,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
               onDblClick={() => canEditControl && beginControlEdit(series.customer, month, value)}>
-              {editing ? <input class="consumption-forecast-editor" type="number" value={value === null ? "" : `${value}`}
+              {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={value === null ? "" : `${value}`}
+                data-forecast-editor={key} ref={selectForecastEditor(key)}
                 aria-label={`${series.customer} ${month} Multiple Control Total`} disabled={isSaving}
-                onInput={(event) => { const raw = event.currentTarget.value; updateControlForecast(series.customer, month, raw === "" ? null : Number(raw)); }}
+                onInput={(event) => { const raw = event.currentTarget.value; const parsed = Number(raw); if (raw === "" || Number.isFinite(parsed)) updateControlForecast(series.customer, month, raw === "" ? null : parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
                 : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}
                   {editable && <small>{canEditControl ? "CONTROL" : "PLAN SUM"}</small>}</span>}
@@ -838,10 +849,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               <td key={key} data-forecast-cell={`${series.id}:${month}`}
                 class={`consumption-value-cell consumption-forecast-cell${dirty ? " is-draft" : ""}`}
                 onDblClick={(event) => { if (!(event.target as Element).closest("input")) beginForecastEdit(series, month); }}>
-                {editing ? <input class="consumption-forecast-editor" type="number" min="0" value={`${value ?? 0}`}
+                {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={`${value ?? 0}`}
+                  data-forecast-editor={key} ref={selectForecastEditor(key)}
                   aria-label={`${series.endUser} ${month} forecast`} disabled={isSaving}
-                  onFocus={(event) => event.currentTarget.select()}
-                  onInput={(event) => updateForecast(series.id, month, Math.max(0, Number(event.currentTarget.value) || 0))}
+                  onInput={(event) => { const parsed = Number(event.currentTarget.value); if (Number.isFinite(parsed)) updateForecast(series.id, month, Math.max(0, parsed)); }}
                   onKeyDown={editorKeyDown} autofocus />
                   : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}</span>}
               </td>

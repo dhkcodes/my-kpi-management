@@ -34,6 +34,7 @@ assert.match(insightsPage, /const contextTrendLabel[\s\S]*selectedAlert \?[^:]+:
 assert.match(insightsPage, /setSelectedAlertId\(\(current\) => current === alert\.alertId \? "" : alert\.alertId\)/, "clicking a selected alert toggles it off");
 assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.alertId === alert\.alertId\}/, "native alert buttons expose pressed state for mouse, Enter, and Space activation");
 assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
+assert.match(insightsPage, /\{alert\.workload\} · Plan \{alert\.planId\} · DC \{plan\?\.dataCenter \?\? "N\/A"\}/, "each alert places Plan ID and Data Center directly beside the Workload name");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
 assert.match(insightsPage, /slice\(-4\)[\s\S]*is-emphasized/, "the latest four points in the six-month ACTUAL trend are emphasized");
@@ -53,6 +54,8 @@ assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.pe
 assert.match(apiSource, /other\.accountNames[\s\S]*accountNames: other\.accountNames/, "Other Contribution decodes the backend accountNames member exactly");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
+assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
+assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Trend point labels use the approved compact USD format");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
@@ -64,6 +67,12 @@ assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains av
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
 assert.match(recordsPage, /onDblClick[\s\S]*beginForecastEdit/, "double click enters Forecast cell editing");
+assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
+assert.match(recordsPage, /data-forecast-editor=\{key\}[\s\S]*ref=\{selectForecastEditor\(key\)\}/, "each editable Forecast input binds whole-value selection to its stable cell key");
+assert.match(recordsPage, /class="consumption-forecast-editor" type="text" inputMode="decimal" value=\{value === null[\s\S]*data-forecast-editor=\{key\}/, "Multiple Control Forecast editor also exposes a measurable whole-text selection range");
+assert.match(recordsPage, /class="consumption-forecast-editor" type="text" inputMode="decimal" value=\{`\$\{value \?\? 0\}`\}[\s\S]*data-forecast-editor=\{key\}/, "Plan Forecast editor exposes a measurable whole-text selection range while keeping a decimal numeric keyboard");
+assert.match(recordsPage, /const parsed = Number\(raw\); if \(raw === "" \|\| Number\.isFinite\(parsed\)\)[\s\S]*updateControlForecast/, "text-based Control Forecast editing rejects non-finite transient input before it can become a null API amount");
+assert.match(recordsPage, /const parsed = Number\(event\.currentTarget\.value\); if \(Number\.isFinite\(parsed\)\)[\s\S]*updateForecast/, "text-based Plan Forecast editing rejects non-finite transient input instead of coercing it to zero");
 assert.match(recordsPage, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the cell draft");
 assert.match(recordsPage, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the cell edit entry value");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
@@ -105,6 +114,8 @@ assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never 
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
 assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
 assert.match(styles, /\.consumption-table-content\s*\{[^}]*grid-template-rows:\s*minmax\(18rem, 1fr\) 3\.75rem[\s\S]*\.consumption-table-scroll\s*\{[^}]*height:\s*auto[^}]*min-height:\s*18rem[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table fills the card while owning Quarter\/Month overflow and preserving the 18rem accessibility minimum");
+assert.match(styles, /@media \(min-width:\s*64rem\) and \(min-height:\s*42rem\)[\s\S]*\.kpi-shell:has\(\.consumption-page\)[^}]*height:\s*100dvh[^}]*overflow:\s*hidden[\s\S]*\.kpi-shell__body:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.kpi-content:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden/, "standard desktop confines Usage Records to the viewport while mobile and high zoom retain document scrolling");
+assert.match(styles, /\.consumption-page[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)[^}]*min-height:\s*0[\s\S]*\.consumption-table-panel[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.consumption-table-scroll[^}]*min-height:\s*0[^}]*min-width:\s*0[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "desktop card, table, and Footer share remaining height while only the table data region owns scrolling");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
