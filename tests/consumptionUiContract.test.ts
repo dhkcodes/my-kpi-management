@@ -107,6 +107,6 @@ assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showi
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-bar oj-button[^}]*height:\s*2\.25rem/, "range, search, and Apply controls share height and padding rhythm");
 assert.doesNotMatch(recordsPage, /setRecordsTotalAccounts\(0\)[\s\S]*setRecordsHasMore\(false\)/, "replacement loading keeps the prior successful rows and Footer context until the latest response succeeds");
 assert.match(styles, /\.consumption-load-more[^}]*(?:^|;)\s*height:\s*3\.75rem/m, "Records footer has a fixed placeholder height during replacement loading");
-assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(4\.5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
+assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
 
 console.log("consumptionUiContract tests passed");

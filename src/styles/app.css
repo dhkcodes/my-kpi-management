@@ -707,14 +707,14 @@ body {
     bottom: 0;
     box-shadow: var(--kpi-shadow);
     box-sizing: border-box;
-    height: calc(100dvh - 4.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     left: 0;
     max-height: none;
     opacity: 1;
     padding: 0.75rem 0.35rem max(0.75rem, env(safe-area-inset-bottom));
     pointer-events: auto;
     position: fixed;
-    top: calc(4.5rem + env(safe-area-inset-top));
+    top: calc(5rem + env(safe-area-inset-top));
     transform: none;
     transition: width 180ms ease, padding 180ms ease;
     width: 4.5rem;
@@ -763,10 +763,10 @@ body {
   .kpi-side-nav,
   .kpi-side-nav.is-closed,
   .kpi-side-nav.is-open {
-    height: calc(100dvh - 4.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     max-height: none;
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-    top: calc(4.5rem + env(safe-area-inset-top));
+    top: calc(5rem + env(safe-area-inset-top));
     width: 4.25rem;
   }
   .kpi-panel__header,
