@@ -25,7 +25,9 @@ type RawSignal = Readonly<{
   changeAmount: number; changePercent: number | null; mad: number; allowance: number; previousActual: number;
   previousDirection: ConsumptionSignal["previousDirection"]; sparkline: RawSignalPoint[]; reason: string
 }>;
-type RawControlTotal = Readonly<{ account: string; periodKey: string }>;
+type RawControlTotal = Readonly<{
+  account: string; periodKey: string; controlAmount: number; detailAmount: number | null; matchStatus: string;
+}>;
 type RawWorkspace = Readonly<{
   etag: string;
   lastBatchId: number | null;
@@ -43,6 +45,7 @@ export type ConsumptionApiWorkspace = Readonly<{
   etag: string;
   plans: ConsumptionPlan[];
   signals: ConsumptionSignal[];
+  controlTotals: ConsumptionApiControlTotal[];
   controlTotalCount: number;
   lastBatchId: number | null;
   currentFiscalMonth: string;
@@ -50,6 +53,10 @@ export type ConsumptionApiWorkspace = Readonly<{
   toQuarter: string;
   editablePeriodIds: string[];
   displayQuarterOrder: string[];
+}>;
+export type ConsumptionApiControlTotal = Readonly<{
+  account: string; periodKey: string; controlAmount: number; detailAmount: number | null;
+  matchStatus: "MATCH" | "MISMATCH" | "NO_DETAIL";
 }>;
 export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionRecordsQuery = Readonly<{
@@ -80,6 +87,7 @@ export type ConsumptionAnalysis = Readonly<{
   accounts: readonly ConsumptionAnalysisAccount[];
 }>;
 export type ConsumptionForecastUpdate = Readonly<{ planId: number; periodKey: string; amount: number; versionNo: number }>;
+export type ConsumptionControlForecastUpdate = Readonly<{ account: string; periodKey: string; amount: number | null }>;
 export type ConsumptionImportPreview = Readonly<{ planCount: number; controlTotalCount: number; sourceRowCount: number; sourceSha256: string }>;
 export type ConsumptionImportResult = Readonly<{
   workspace: ConsumptionApiWorkspace;
@@ -138,6 +146,7 @@ const expectedSignalGrade = (amount: number, percent: number | null): Consumptio
     : Math.abs(amount) >= 300 || Math.abs(percent ?? 0) >= 30 ? "HIGH" : "WATCH";
 
 const amountStatuses = new Set<ConsumptionAmountSplit["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE"]);
+const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "NO_DETAIL"]);
 const malformedAnalysis = (): never => { throw new Error("Malformed Consumption analysis response"); };
 const parseAmountSplit = (value: unknown): ConsumptionAmountSplit => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
@@ -240,7 +249,16 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.signals) || !Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption workspace response");
   const etag = headerEtag ?? raw.etag;
   if (!isNonEmptyString(etag) || !(raw.lastBatchId === null || isPositiveInteger(raw.lastBatchId))) throw new Error("Malformed Consumption workspace metadata");
-  if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey))) throw new Error("Malformed Consumption control total response");
+  if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey)
+    || !isFiniteNumber(control?.controlAmount) || !isNullableFiniteNumber(control?.detailAmount)
+    || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"]))) throw new Error("Malformed Consumption control total response");
+  const seenControlKeys = new Set<string>();
+  const controlTotals: ConsumptionApiControlTotal[] = raw.controlTotals.map((control) => {
+    const key = `${control.account}::${control.periodKey}`;
+    if (seenControlKeys.has(key)) throw new Error("Malformed Consumption control total response");
+    seenControlKeys.add(key);
+    return { ...control, matchStatus: control.matchStatus as ConsumptionApiControlTotal["matchStatus"] };
+  });
   const seenPlanIds = new Set<number>();
   const seenStableKeys = new Set<string>();
   const basePlans: ConsumptionPlan[] = raw.plans.map((plan) => {
@@ -345,6 +363,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     etag,
     plans,
     signals,
+    controlTotals,
     controlTotalCount: new Set(raw.controlTotals.map((control) => control.account)).size,
     lastBatchId: raw.lastBatchId,
     currentFiscalMonth,
@@ -408,14 +427,15 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
     return { account: group.account, plans: group.plans };
   });
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
-  const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), controlTotals: [], signals: [] }, response.headers.get("ETag"));
+  if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
+  const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"));
   let planOffset = 0;
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);
     planOffset += group.plans.length;
     return { account: group.account, plans };
   });
-  return { etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans,
+  return { etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
     currentFiscalMonth: workspace.currentFiscalMonth, fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter,
     editablePeriodIds: workspace.editablePeriodIds, displayQuarterOrder: workspace.displayQuarterOrder,
     accountGroups, totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
@@ -446,7 +466,8 @@ export const applyConsumptionImport = async (csv: string): Promise<ConsumptionIm
     insertedCount: result.insertedCount, updatedCount: result.updatedCount, appliedCount: result.appliedCount,
     sourceRowCount: result.planCount + result.controlTotalCount };
 };
-export const saveConsumptionForecasts = async (etag: string, updates: ConsumptionForecastUpdate[]): Promise<ConsumptionApiWorkspace> => {
-  const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates }) });
+export const saveConsumptionForecasts = async (etag: string, updates: ConsumptionForecastUpdate[],
+  controlUpdates: ConsumptionControlForecastUpdate[] = []): Promise<ConsumptionApiWorkspace> => {
+  const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates, controlUpdates }) });
   return parseWorkspace(payload, response.headers.get("ETag"));
 };

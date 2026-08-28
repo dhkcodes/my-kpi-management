@@ -296,6 +296,36 @@ export const filterActiveConsumptionPlans = (
   return plans.filter((plan) => (plan.actuals[previousMonth] ?? 0) !== 0 || (plan.actuals[currentFiscalMonth] ?? 0) !== 0);
 };
 
+export type ConsumptionControlResolution = Readonly<{
+  amount: number | null;
+  detailState: "MISSING" | "ZERO" | "VALUE";
+  editable: boolean;
+  source: "MANUAL" | "DETAIL";
+}>;
+
+/** Resolve a Multiple row without conflating an absent child fact with an explicit zero. */
+export const resolveConsumptionControlTotal = (
+  plans: readonly ConsumptionPlan[],
+  month: string,
+  manualAmount: number | undefined
+): ConsumptionControlResolution => {
+  const childValues = plans.flatMap((plan) => {
+    if (Object.prototype.hasOwnProperty.call(plan.actuals, month)) return [plan.actuals[month]];
+    if (Object.prototype.hasOwnProperty.call(plan.forecasts, month)) return [plan.forecasts[month]];
+    return [];
+  });
+  const hasNonZeroDetail = childValues.some((value) => value !== 0);
+  if (hasNonZeroDetail) {
+    return { amount: childValues.reduce((sum, value) => sum + value, 0), detailState: "VALUE", editable: false, source: "DETAIL" };
+  }
+  return {
+    amount: manualAmount ?? null,
+    detailState: childValues.length === 0 ? "MISSING" : "ZERO",
+    editable: true,
+    source: "MANUAL"
+  };
+};
+
 export const getLatestActualMonth = (plans: readonly ConsumptionPlan[]): string | null => {
   const populatedMonths = new Set(plans.flatMap((plan) => Object.keys(plan.actuals)));
   const orderedMonths = sortConsumptionMonths([...populatedMonths]);

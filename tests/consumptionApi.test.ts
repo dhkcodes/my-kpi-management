@@ -20,8 +20,10 @@ const payload = {
     facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1 },
       { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 999, versionNo: 3 }] }],
   controlTotals: [
-    { account: "A", periodKey: "FY27-AUG" }, { account: "A", periodKey: "FY27-SEP" },
-    { account: "B", periodKey: "FY27-AUG" }, { account: "B", periodKey: "FY27-SEP" }
+    { account: "A", periodKey: "FY27-AUG", controlAmount: 100, detailAmount: 100, matchStatus: "MATCH" },
+    { account: "A", periodKey: "FY27-SEP", controlAmount: 999, detailAmount: null, matchStatus: "NO_DETAIL" },
+    { account: "B", periodKey: "FY27-AUG", controlAmount: 50, detailAmount: 50, matchStatus: "MATCH" },
+    { account: "B", periodKey: "FY27-SEP", controlAmount: 0, detailAmount: 0, matchStatus: "MATCH" }
   ], signals: []
 };
 const changeSignal = {
@@ -59,6 +61,7 @@ void (async () => {
       etag: '\"records-etag\"', lastBatchId: 7,
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
+      controlTotals: payload.controlTotals,
       accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 11, nextOffset: 11, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"records-header\"' } });
   };
@@ -75,6 +78,7 @@ void (async () => {
       etag: '\"default-range\"', lastBatchId: 7,
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
+      controlTotals: payload.controlTotals,
       accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 1, nextOffset: 1, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"default-range\"' } });
   };
@@ -128,8 +132,12 @@ void (async () => {
   const saved = await saveConsumptionForecasts('"header-etag"', [{ planId: 11, periodKey: "FY27-OCT", amount: 1001, versionNo: 3 }]);
   assert.equal(putInit?.method, "PUT");
   assert.equal((putInit?.headers as Record<string, string>)["If-Match"], '"header-etag"');
-  assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [{ planId: 11, periodKey: "FY27-OCT", amount: 1001, versionNo: 3 }] });
+  assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [{ planId: 11, periodKey: "FY27-OCT", amount: 1001, versionNo: 3 }], controlUpdates: [] });
   assert.equal(saved.etag, '"next-etag"');
+  await saveConsumptionForecasts('"next-etag"', [], [{ account: "A", periodKey: "FY27-OCT", amount: 0 }]);
+  assert.deepEqual(JSON.parse(String(putInit?.body)), {
+    updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", amount: 0 }]
+  }, "a numeric zero Control Total remains distinct from a missing/null control");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     workspace: payload, planCount: 1, controlTotalCount: 0, insertedCount: 0, updatedCount: 1, appliedCount: 1
@@ -192,6 +200,16 @@ void (async () => {
   runtime.fetch = async () => new Response(JSON.stringify({ ...payload, lastBatchId: "7" }),
     { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-metadata"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption workspace metadata/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, controlTotals: [{ ...payload.controlTotals[0], matchStatus: "MANUAL_FORECAST" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"invalid-control-status"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption control total response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, controlTotals: [payload.controlTotals[0], { ...payload.controlTotals[0] }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"duplicate-control"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption control total response/);
 
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, nextConsumptionBatchSize, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, filterActiveConsumptionPlans, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -92,5 +92,21 @@ void (async () => {
   assert.equal(shouldRestartConsumptionRecordsPage(true, "\"v1\"", "\"v2\""), true, "append pages cannot cross ETag snapshots");
   assert.equal(shouldRestartConsumptionRecordsPage(true, "\"v1\"", "\"v1\""), false);
   assert.equal(shouldRestartConsumptionRecordsPage(false, "\"v1\"", "\"v2\""), false);
+
+  const plan = (id: string, actuals: Record<string, number>, forecasts: Record<string, number>): ConsumptionPlan => ({
+    id, customer: "Acme", endUser: id, planId: id, dataCenter: "IAD", planType: "OCI", actuals, forecasts
+  });
+  const dormant = plan("dormant", { "FY27-JUL": 0, "FY27-AUG": 0 }, { "FY27-SEP": 900 });
+  const current = plan("current", { "FY27-AUG": 1 }, {});
+  const previous = plan("previous", { "FY27-JUL": -1 }, {});
+  assert.deepEqual(filterActiveConsumptionPlans([dormant, current, previous], "FY27-AUG").map((row) => row.id), ["current", "previous"],
+    "Usage Records retain only plans with non-zero ACTUAL in the current or immediately previous fiscal month");
+
+  assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, {}), plan("b", {}, {})], "FY27-SEP", undefined),
+    { amount: null, detailState: "MISSING", editable: true, source: "MANUAL" });
+  assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 0 }), plan("b", {}, {})], "FY27-SEP", 0),
+    { amount: 0, detailState: "ZERO", editable: true, source: "MANUAL" }, "explicit zero remains distinct from missing");
+  assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 25 }), plan("b", {}, { "FY27-SEP": 0 })], "FY27-SEP", 999),
+    { amount: 25, detailState: "VALUE", editable: false, source: "DETAIL" }, "a non-zero child value immediately owns the Control Total");
   console.log("consumptionAnalysis tests passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
