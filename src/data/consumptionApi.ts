@@ -3,7 +3,9 @@ import {
   ConsumptionSignal,
   ConsumptionAnalysisAccount,
   ConsumptionAnalysisAccountCandidate,
+  ConsumptionActualTrendPoint,
   ConsumptionAmountSplit,
+  ConsumptionOtherContribution,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths
@@ -85,6 +87,8 @@ export type ConsumptionAnalysis = Readonly<{
   }>;
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
+  contextActualTrend: readonly ConsumptionActualTrendPoint[];
+  otherContribution: ConsumptionOtherContribution | null;
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
 }>;
@@ -160,12 +164,9 @@ const parseAmountSplit = (value: unknown): ConsumptionAmountSplit => {
   return { actualAmount: raw.actualAmount, forecastAmount: raw.forecastAmount, totalAmount: raw.totalAmount,
     status: raw.status as ConsumptionAmountSplit["status"] };
 };
-const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string>) => {
-  const split = parseAmountSplit(value);
-  const raw = value as Record<string, unknown>;
-  if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
-    || !isFiniteNumber(raw.percentage) || !Array.isArray(raw.actualTrend)) return malformedAnalysis();
-  const actualTrend = raw.actualTrend.map((point) => {
+const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>): ConsumptionActualTrendPoint[] => {
+  if (!Array.isArray(value)) return malformedAnalysis();
+  const actualTrend = value.map((point) => {
     if (typeof point !== "object" || point === null) return malformedAnalysis();
     const rawPoint = point as Record<string, unknown>;
     if (!isPeriodKey(rawPoint.periodKey) || !isNullableFiniteNumber(rawPoint.actualAmount)
@@ -182,8 +183,15 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
     }
     seenTrendPeriods.add(point.periodKey); priorTrendOrder = order;
   });
+  return actualTrend;
+};
+const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string>) => {
+  const split = parseAmountSplit(value);
+  const raw = value as Record<string, unknown>;
+  if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
+    || !isFiniteNumber(raw.percentage)) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
-    percentage: raw.percentage, actualTrend };
+    percentage: raw.percentage, actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
@@ -191,6 +199,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (!isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
+    || !Array.isArray(raw.contextActualTrend)
+    || !(raw.otherContribution === null || (typeof raw.otherContribution === "object" && raw.otherContribution !== null))
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
@@ -239,6 +249,22 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     return { account: candidate.account, workloads: candidate.workloads as string[], planIds: candidate.planIds as string[] };
   });
   if (new Set(accountCandidates.map((candidate) => candidate.account)).size !== accountCandidates.length) return malformedAnalysis();
+  const contextActualTrend = parseActualTrend(raw.contextActualTrend, allowedTrendYears);
+  const otherContribution: ConsumptionOtherContribution | null = raw.otherContribution === null ? null : (() => {
+    const split = parseAmountSplit(raw.otherContribution);
+    const other = raw.otherContribution as Record<string, unknown>;
+    if (!Array.isArray(other.accountNames) || other.accountNames.length === 0 || other.accountNames.some((account) => !isNonEmptyString(account))
+      || new Set(other.accountNames).size !== other.accountNames.length || !isFiniteNumber(other.percentage) || !Array.isArray(other.plans)) return malformedAnalysis();
+    const accountNames = new Set(other.accountNames as string[]);
+    const plans = other.plans.map((value) => {
+      const plan = parseAnalysisPlan(value, allowedTrendYears);
+      const rawPlan = value as Record<string, unknown>;
+      if (!isNonEmptyString(rawPlan.account) || !accountNames.has(rawPlan.account) || !isNonEmptyString(rawPlan.workload)) return malformedAnalysis();
+      return { ...plan, account: rawPlan.account, workload: rawPlan.workload };
+    });
+    if (new Set(plans.map((plan) => plan.serverPlanId)).size !== plans.length) return malformedAnalysis();
+    return { ...split, accountNames: other.accountNames as string[], percentage: other.percentage, plans };
+  })();
   const seenAnalysisPlanIds = new Set<number>();
   accounts.forEach((account) => account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
     if (seenAnalysisPlanIds.has(plan.serverPlanId)) return malformedAnalysis();
@@ -263,7 +289,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, alerts, accounts };
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, otherContribution, alerts, accounts };
 };
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {

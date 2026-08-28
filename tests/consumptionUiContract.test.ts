@@ -26,16 +26,30 @@ assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
-assert.match(insightsPage, /FY & Quarter totals[\s\S]*Q1[\s\S]*Q2[\s\S]*Q3[\s\S]*Q4/, "FY and all four Quarter stacked totals share one section");
+assert.match(insightsPage, /\{analysis\.fiscalYear\} Quarter totals/, "FY and all four Quarter stacked totals use the selected fiscal-year title");
 assert.match(insightsPage, /Quarter-over-quarter[\s\S]*qoqChangePercent/, "QoQ values render as decision cards");
-assert.match(insightsPage, /Consumption Change Alerts & linked Plan Trend[\s\S]*getAlertActualTrend[\s\S]*actualTrend/, "Alert and six-month ACTUAL Plan Trend are one combined decision section");
+assert.match(insightsPage, /const selectedAlert = analysis\?\.alerts\.find[^\n]+\?\? null/, "alerts start and remain unselected without falling back to the first alert");
+assert.match(insightsPage, /const trendPoints[\s\S]*selectedAlert[\s\S]*getAlertActualTrend[\s\S]*analysis\?\.contextActualTrend/, "unselected Trend uses the backend current-context ACTUAL trend");
+assert.match(insightsPage, /const contextTrendLabel[\s\S]*selectedAlert \?[^:]+: contextTrendLabel/, "unselected Trend displays All Accounts Total in the current filter context");
+assert.match(insightsPage, /setSelectedAlertId\(\(current\) => current === alert\.alertId \? "" : alert\.alertId\)/, "clicking a selected alert toggles it off");
+assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.alertId === alert\.alertId\}/, "native alert buttons expose pressed state for mouse, Enter, and Space activation");
+assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
+assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
+assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
 assert.match(insightsPage, /slice\(-4\)[\s\S]*is-emphasized/, "the latest four points in the six-month ACTUAL trend are emphasized");
 assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoints\.map\([\s\S]*value: point\.actualAmount/, "the trend DataProvider retains all six month groups");
 assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
 assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
-assert.match(insightsPage, /accounts\.slice\(0, 5\)[\s\S]*accounts\.slice\(5\)[\s\S]*>Other</, "Account contribution renders Top 5 plus an actual excluded-account Other sum");
-assert.match(insightsPage, /workloads\.flatMap[\s\S]*consumption-insights-plan-list/, "selected Account plans are flattened into the direct Plan contribution column with Workload metadata");
+assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^\n]+\?\? null/, "account contribution starts unselected without falling back to the first account");
+assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
+assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
+assert.match(insightsPage, /otherContribution = analysis\?\.otherContribution/, "Other Contribution consumes the backend top-level nullable contract");
+assert.match(insightsPage, /<button type="button" class="consumption-insights-account-other"[\s\S]*setOtherSelected/, "Other is an interactive native button");
+assert.match(insightsPage, /otherContribution\?\.plans\.map[\s\S]*percentageContext: "Other Accounts"/, "selecting Other renders all backend group plans with the approved percentage denominator");
+assert.match(insightsPage, /otherContribution\?\.plans\.map\(\(plan\) => \(\{ account: plan\.account[\s\S]*otherSelected &&[\s\S]*<b>\{account\}<\/b>/, "Other plan rows preserve their source Account identity");
+assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
+assert.match(apiSource, /other\.accountNames[\s\S]*accountNames: other\.accountNames/, "Other Contribution decodes the backend accountNames member exactly");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
@@ -43,6 +57,7 @@ assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Anal
 
 // Usage Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /<h1 id="consumptionTitle">Usage Records<\/h1>/, "data-management leaf uses the approved name");
+assert.doesNotMatch(recordsPage, /<span class="kpi-eyebrow">Consumption<\/span>/, "Usage Records removes redundant header copy");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Usage Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains available");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
@@ -53,15 +68,19 @@ assert.match(recordsPage, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "E
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
 assert.match(recordsPage, /onNavigationGuardChange[\s\S]*window\.confirm\(/, "unsaved Forecast changes retain route protection");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "Data keeps its independent Quarter range");
-assert.match(recordsPage, /applyQuarterRange[\s\S]*loadRecordsPage\(false, \{ fromQuarter, toQuarter \}\)/, "quarter changes replace only the Records data region");
-assert.match(recordsPage, /fetchConsumptionRecords[\s\S]*recordsRequestGeneration[\s\S]*window\.setTimeout[\s\S]*300/, "search is debounced and guarded against stale server responses");
-assert.match(recordsPage, /onCompositionStart[\s\S]*setSearchComposing\(true\)[\s\S]*onCompositionEnd/, "search waits for Korean IME composition completion");
+assert.match(recordsPage, /submitRecordsQuery[\s\S]*loadRecordsPage\(false, query\)/, "quarter and search changes replace only the Records data region");
+assert.match(recordsPage, /const \[draftSearch, setDraftSearch\][\s\S]*const \[appliedSearch, setAppliedSearch\]/, "Usage Records separates draft and applied search state");
+assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*search:\s*query\.search/, "only an explicit submitted query reaches the records API");
+assert.doesNotMatch(recordsPage, /debouncedRecordSearch|setTimeout[\s\S]*recordSearch/, "typing does not debounce into a records fetch");
+assert.match(recordsPage, /onCompositionStart[\s\S]*setSearchComposing\(true\)[\s\S]*onCompositionEnd/, "search tracks Korean IME composition without submitting");
+assert.match(recordsPage, /submitRecordsQuery[\s\S]*fromQuarter[\s\S]*toQuarter[\s\S]*draftSearch\.trim\(\)[\s\S]*loadRecordsPage\(false, query\)/, "Apply submits quarter and search atomically");
+assert.match(recordsPage, /event\.key === "Enter"[\s\S]*!event\.isComposing[\s\S]*submitRecordsQuery/, "Enter submits the same atomic records query after IME composition");
 assert.match(recordsPage, /initialConsumptionRecordsBatchSize\(window\.innerHeight\)/, "the initial records request is sized to the viewport");
 assert.match(recordsPage, /if \(append && \(recordsLoadingRef\.current[\s\S]*generation !== recordsRequestGeneration\.current/, "new search or sort requests supersede in-flight replacements while stale results are ignored");
-assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, range\)/, "ETag changes restart paging before snapshots can be mixed");
+assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, query\)/, "ETag changes restart paging with the same applied query before snapshots can be mixed");
 assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:\s*"ACCOUNT"[\s\S]*direction:\s*"ASC"/, "records paging uses a stable server order without user-facing sort controls");
 assert.match(recordsPage, /new Map[\s\S]*page\.accountGroups[\s\S]*setSavedPlans[\s\S]*setDraftPlans/, "loaded account pages append with account and plan deduplication");
-assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*disabled=\{hasDraftChanges\}/, "the stable search input remains focused while records load and is locked only for drafts");
+assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{hasDraftChanges \|\| rangeLoading \|\| recordsLoading\}/, "search preserves its draft and is disabled during replacement loading or Forecast drafts");
 assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-bottom scroll and Load More request the next server page");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
@@ -74,7 +93,7 @@ assert.match(recordsPage, /const expandable = account\.plans\.length > 1[\s\S]*r
 assert.match(recordsPage, /data-control-source=\{resolution\?\.source\}[\s\S]*canEditControl \? "CONTROL" : "PLAN SUM"/, "Multiple rows expose manual Control Total versus derived Plan Sum state");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
-assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*if \(!rangeInitialized[^\n]*hasDraftChanges/, "Control-only drafts block debounced Records replacement and share navigation/range guards");
+assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*submitRecordsQuery[\s\S]*hasDraftChanges/, "Control-only drafts share navigation and explicit query submission guards");
 assert.match(recordsPage, /const updateControlForecast[\s\S]*?recordsRequestGeneration\.current\+\+[\s\S]*?setRecordsLoading\(false\)/, "Control typing invalidates an in-flight Records replacement before it can erase the draft");
 assert.match(recordsPage, /const updateForecast[\s\S]*?recordsRequestGeneration\.current\+\+[\s\S]*?setRecordsLoading\(false\)/, "Plan typing invalidates an in-flight Records replacement before it can erase the draft");
 assert.match(recordsPage, /Multiple Control[\s\S]*controlValue\(error\.current\.controlTotals/, "HTTP 409 comparison includes Control-only saved, draft, and current server values");
@@ -84,7 +103,7 @@ assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never 
 // Redwood table behavior and responsive containment.
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
 assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
-assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*height:\s*max\(18rem, calc\(100dvh - [^)]+\)\)[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table alone owns Quarter\/Month horizontal overflow and the 18rem accessibility minimum");
+assert.match(styles, /\.consumption-table-content\s*\{[^}]*grid-template-rows:\s*minmax\(18rem, 1fr\) 3\.75rem[\s\S]*\.consumption-table-scroll\s*\{[^}]*height:\s*auto[^}]*min-height:\s*18rem[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table fills the card while owning Quarter\/Month overflow and preserving the 18rem accessibility minimum");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
@@ -100,13 +119,16 @@ assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
 assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\{`Severity[^`]+`\}/, "Alert type and severity badges expose explicit accessible labels");
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
-assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of selected Account[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{Math\.max\(0, Math\.min\(100, plan\.percentage\)\)\}%/, "Plan Contribution uses each Plan percentage on a common Account-wide 0–100 track");
-assert.match(styles, /\.consumption-insights-plan-list[^}]*overflow-y:\s*auto/, "Plan Contribution scrolls internally");
+assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{Math\.max\(0, Math\.min\(100, plan\.percentage\)\)\}%/, "Plan Contribution uses each Plan percentage on a common group-wide 0–100 track");
+assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Usage Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-bar oj-button[^}]*height:\s*2\.25rem/, "range, search, and Apply controls share height and padding rhythm");
 assert.doesNotMatch(recordsPage, /setRecordsTotalAccounts\(0\)[\s\S]*setRecordsHasMore\(false\)/, "replacement loading keeps the prior successful rows and Footer context until the latest response succeeds");
 assert.match(styles, /\.consumption-load-more[^}]*(?:^|;)\s*height:\s*3\.75rem/m, "Records footer has a fixed placeholder height during replacement loading");
+assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*min-height:\s*max\(24rem, calc\(100dvh - 15rem\)\)[\s\S]*\.consumption-load-more[^}]*align-self:\s*end[^}]*height:\s*3\.75rem/, "the Records table card fills the remaining viewport and keeps its 60px footer against the card bottom");
+assert.match(styles, /\.consumption-range-bar\s*\{[^}]*padding:\s*\.5rem \.75rem[^}]*row-gap:\s*\.5rem/, "the compact Records range bar has equal vertical padding and row spacing");
+assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-main > span:not\(\.consumption-signal-badges\)[^}]*font-size:\s*\.88rem[\s\S]*\.consumption-insights-linked-trend > div > p[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-contribution-list button > span[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-plan-list article small b[^}]*font-size:\s*\.9rem/, "alert workload, trend context, Account, Workload, and Plan labels use prominent typography");
 assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
 
 console.log("consumptionUiContract tests passed");

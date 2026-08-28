@@ -5,10 +5,15 @@ export type ConsumptionAmountSplit = Readonly<{
   totalAmount: number;
   status: ConsumptionMonthStatus;
 }>;
+export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>;
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
   percentage: number;
-  actualTrend: readonly Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>[];
+  actualTrend: readonly ConsumptionActualTrendPoint[];
+}>;
+export type ConsumptionOtherContributionPlan = ConsumptionAnalysisPlan & Readonly<{ account: string; workload: string }>;
+export type ConsumptionOtherContribution = ConsumptionAmountSplit & Readonly<{
+  accountNames: readonly string[]; percentage: number; plans: readonly ConsumptionOtherContributionPlan[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
   workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];

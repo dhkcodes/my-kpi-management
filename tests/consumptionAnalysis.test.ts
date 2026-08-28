@@ -20,6 +20,20 @@ const analysis = {
     { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
   ],
   accountCandidates: [{ account: "Acme", workloads: ["Database"], planIds: ["P1"] }],
+  contextActualTrend: [
+    { periodKey: "FY26-MAR", actualAmount: 10, alertCalculationMonth: false },
+    { periodKey: "FY26-APR", actualAmount: 20, alertCalculationMonth: false },
+    { periodKey: "FY26-MAY", actualAmount: 30, alertCalculationMonth: true },
+    { periodKey: "FY27-JUN", actualAmount: 40, alertCalculationMonth: true },
+    { periodKey: "FY27-JUL", actualAmount: 50, alertCalculationMonth: true },
+    { periodKey: "FY27-AUG", actualAmount: 60, alertCalculationMonth: true }
+  ],
+  otherContribution: {
+    accountNames: ["Bravo", "Zulu"], actualAmount: 50, forecastAmount: 25, totalAmount: 75, status: "MIXED", percentage: 7.5,
+    plans: [{ serverPlanId: 2, account: "Bravo", workload: "Compute", planId: "P2", endUser: "Bravo EU", dataCenter: "PHX",
+      actualAmount: 50, forecastAmount: 25, totalAmount: 75, status: "MIXED", percentage: 100,
+      actualTrend: [{ periodKey: "FY27-AUG", actualAmount: 50, alertCalculationMonth: true }] }]
+  },
   alerts: [{
     alertId: "alert-1", serverPlanId: 1, account: "Acme", workload: "Database", planId: "P1", periodKey: "FY27-AUG",
     type: "ABOVE_USUAL", grade: "HIGH", actualAmount: 250, baselineMedian: 100, changeAmount: 150,
@@ -55,6 +69,10 @@ void (async () => {
   assert.equal(decoded.quarters[3].coveragePercent, 0);
   assert.deepEqual(decoded.quarters.map((quarter) => quarter.quarter), ["Q1", "Q2", "Q3", "Q4"]);
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
+  assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
+  assert.deepEqual(decoded.otherContribution?.accountNames, ["Bravo", "Zulu"]);
+  assert.equal(decoded.otherContribution?.plans[0].account, "Bravo");
+  assert.equal(decoded.otherContribution?.plans[0].workload, "Compute");
   assert.equal(decoded.accounts[0].workloads[0].plans[0].actualTrend.length, 6);
   assert.deepEqual(getAlertActualTrend(decoded.accounts[0].workloads[0].plans[0].actualTrend, "FY27-AUG").map((point) => point.periodKey),
     ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
@@ -103,6 +121,8 @@ void (async () => {
     { ...analysis, accounts: [analysis.accounts[0], { ...analysis.accounts[0], workloads: [] }] },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [analysis.accounts[0].workloads[0], { ...analysis.accounts[0].workloads[0], plans: [] }] }] },
     { ...analysis, alerts: [analysis.alerts[0], { ...analysis.alerts[0] }] },
+    { ...analysis, otherContribution: { ...analysis.otherContribution, accountNames: ["Bravo", "Bravo"] } },
+    { ...analysis, otherContribution: { ...analysis.otherContribution, accounts: analysis.otherContribution.accountNames, accountNames: undefined } },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], serverPlanId: 9_007_199_254_740_992 }] }] }], alerts: [] },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUN", actualAmount: 1, alertCalculationMonth: true }, { periodKey: "FY27-JUN", actualAmount: 2, alertCalculationMonth: true }] }] }] }] },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [{ ...analysis.accounts[0].workloads[0], plans: [{ ...analysis.accounts[0].workloads[0].plans[0], actualTrend: [{ periodKey: "FY27-JUL", actualAmount: 1, alertCalculationMonth: true }, { periodKey: "FY27-JUN", actualAmount: 2, alertCalculationMonth: true }] }] }] }] },

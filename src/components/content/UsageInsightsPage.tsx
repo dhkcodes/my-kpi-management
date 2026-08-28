@@ -8,7 +8,6 @@ import {
   fetchConsumptionAnalysis
 } from "../../data/consumptionApi";
 import {
-  ConsumptionAnalysisAccount,
   ConsumptionAnalysisAccountCandidate,
   ConsumptionAnalysisPlan,
   getAlertActualTrend
@@ -81,6 +80,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [selectedAlertId, setSelectedAlertId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
+  const [otherSelected, setOtherSelected] = useState(false);
   const requestGeneration = useRef(0);
 
   useEffect(() => {
@@ -89,6 +89,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     setDebouncedCandidateSearch("");
     setSelectedAlertId("");
     setSelectedAccountName("");
+    setOtherSelected(false);
   }, [fiscalYear]);
 
   useEffect(() => {
@@ -107,7 +108,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         if (!active || generation !== requestGeneration.current) return;
         setAnalysis(value);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
-        setSelectedAccountName((current) => value.accounts.some((account) => account.account === current) ? current : value.accounts[0]?.account ?? "");
+        setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
       })
       .catch((reason) => {
         if (active && generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
@@ -125,21 +126,18 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     .filter((candidate) => matchesCandidate(candidate, candidateSearch)), [analysis, candidateSearch]);
   const candidateOptions = useMemo<Array<ConsumptionAnalysisAccountCandidate | null>>(
     () => [null, ...filteredCandidates], [filteredCandidates]);
-  const selectedAlert = analysis?.alerts.find((alert) => alert.alertId === selectedAlertId) ?? analysis?.alerts[0] ?? null;
+  const selectedAlert = analysis?.alerts.find((alert) => alert.alertId === selectedAlertId) ?? null;
   const alertPlan = analysis && selectedAlert ? findAlertPlan(analysis, selectedAlert) : null;
   const trendPoints = useMemo(() => selectedAlert && alertPlan
-    ? getAlertActualTrend(alertPlan.actualTrend, selectedAlert.periodKey) : [], [alertPlan, selectedAlert]);
+    ? getAlertActualTrend(alertPlan.actualTrend, selectedAlert.periodKey)
+    : analysis?.contextActualTrend ?? [], [alertPlan, analysis, selectedAlert]);
   const emphasizedTrendPeriods = useMemo(() => new Set(trendPoints.slice(-4).map((point) => point.periodKey)), [trendPoints]);
-  const selectedAccount = analysis?.accounts.find((account) => account.account === selectedAccountName) ?? analysis?.accounts[0] ?? null;
+  const selectedAccount = analysis?.accounts.find((account) => account.account === selectedAccountName) ?? null;
   const topAccounts = analysis?.accounts.slice(0, 5) ?? [];
-  const otherAccounts = analysis?.accounts.slice(5) ?? [];
-  const otherActual = otherAccounts.reduce((sum, account) => sum + account.actualAmount, 0);
-  const otherForecast = otherAccounts.reduce((sum, account) => sum + account.forecastAmount, 0);
-  const otherTotal = otherActual + otherForecast;
-  const otherPercentage = analysis && analysis.portfolio.totalAmount !== 0
-    ? otherTotal / analysis.portfolio.totalAmount * 100 : null;
-  const otherPercentLabel = otherPercentage === null ? "N/A" : `${otherPercentage.toFixed(1)}%`;
-  const selectedPlans = selectedAccount?.workloads.flatMap((workload) => workload.plans.map((plan) => ({ workload, plan }))) ?? [];
+  const otherContribution = analysis?.otherContribution ?? null;
+  const selectedPlans = otherSelected
+    ? otherContribution?.plans.map((plan) => ({ account: plan.account, workload: plan.workload, plan, percentageContext: "Other Accounts" })) ?? []
+    : selectedAccount?.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: selectedAccount.account, workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
 
   const selectAccountContext = (account: string) => {
     setSelectedAccountContext(account);
@@ -149,6 +147,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     setActiveCandidateIndex(0);
     setSelectedAlertId("");
     setSelectedAccountName("");
+    setOtherSelected(false);
   };
 
   const selectCandidateAt = (index: number) => selectAccountContext(candidateOptions[index]?.account ?? "");
@@ -174,8 +173,8 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   const fiscalTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
     const rows = [
-      { label: analysis.priorFiscalYear, actualAmount: analysis.portfolio.priorActualAmount, forecastAmount: analysis.portfolio.priorForecastAmount },
-      { label: analysis.fiscalYear, actualAmount: analysis.portfolio.actualAmount, forecastAmount: analysis.portfolio.forecastAmount }
+      { label: analysis.fiscalYear, actualAmount: analysis.portfolio.actualAmount, forecastAmount: analysis.portfolio.forecastAmount },
+      { label: analysis.priorFiscalYear, actualAmount: analysis.portfolio.priorActualAmount, forecastAmount: analysis.portfolio.priorForecastAmount }
     ];
     return chart(rows.flatMap((row) => [
       { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmount, color: ACTUAL_COLOR, shortDesc: `${row.label} ACTUAL ${currency.format(row.actualAmount)}` },
@@ -207,10 +206,11 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
   const forecastExposure = analysis.portfolio.totalAmount === 0 ? 0 : analysis.portfolio.forecastAmount / analysis.portfolio.totalAmount * 100;
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
+  const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
 
   return <section class="consumption-insights-page" aria-labelledby="usageInsightsTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
-      <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1><p>Understand fiscal performance, quarterly movement, trends and account composition.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-context" aria-label="Usage Insights filters">
         <label htmlFor="consumptionAccountContext">Account</label>
         <div class="consumption-insights-combobox">
@@ -254,11 +254,11 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
 
     <section class="consumption-insights-performance-grid">
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
-        <div class="consumption-section-heading"><div><span class="kpi-section-label">Actual + Forecast</span><h2 id="fyQuarterTotalsTitle">{"FY & Quarter totals"}</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>ACTUAL <i class="is-forecast"></i>FORECAST</span></div>
+        <div class="consumption-section-heading"><div><span class="kpi-section-label">Actual + Forecast</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>ACTUAL <i class="is-forecast"></i>FORECAST</span></div>
         <div class="consumption-insights-total-regions">
           <div class="consumption-insights-fy-total"><h3>Fiscal year totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} legend={{ rendered: "off" }} aria-label="Fiscal year ACTUAL and patterned FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
-          <div class="consumption-insights-quarter-totals"><h3>Quarter totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} legend={{ rendered: "off" }} aria-label="Q1 Q2 Q3 Q4 ACTUAL and patterned FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-quarter-totals"><h3>{analysis.fiscalYear} Quarter totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} legend={{ rendered: "off" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL and patterned FORECAST stacked totals`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
         </div>
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
@@ -273,13 +273,13 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       <div class="consumption-insights-alert-trend-grid" data-trend-contract="getAlertActualTrend(actualTrend)">
         <div class="consumption-signal-inbox">{analysis.alerts.map((alert) => { const presentation = alertPresentation(alert); return <button type="button" key={alert.alertId}
           class={selectedAlert?.alertId === alert.alertId ? "consumption-signal is-selected" : "consumption-signal"}
-          aria-pressed={selectedAlert?.alertId === alert.alertId} onClick={() => setSelectedAlertId(alert.alertId)}>
-          <span class="consumption-signal-main"><strong>{alert.account} · {alert.planId}</strong><span>{alert.workload} · {alert.periodKey}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>Severity {alert.grade}</span></span></span>
+          aria-pressed={selectedAlert?.alertId === alert.alertId} onClick={() => setSelectedAlertId((current) => current === alert.alertId ? "" : alert.alertId)}>
+          <span class="consumption-signal-main"><strong>{alert.account} · {alert.planId}</strong><span>{alert.workload}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
           <span class="consumption-signal-metrics"><strong>{currency.format(alert.actualAmount)}</strong><small>{signedCurrency(alert.changeAmount)} · {signedPercent(alert.changePercent)}</small></span>
         </button>; })}{analysis.alerts.length === 0 && <p class="consumption-empty-state">No ACTUAL usage change alerts for this context.</p>}</div>
         <div class="consumption-insights-linked-trend">
-          <div><h3>Linked ACTUAL Plan Trend</h3><p>{selectedAlert ? `${selectedAlert.account} · ${selectedAlert.workload} · ${selectedAlert.planId}` : "Select a change alert"}</p></div>
-          {trendPoints.length === 6 ? <><oj-chart class="consumption-insights-actual-chart" type="line" data={trendChart} legend={{ rendered: "off" }} aria-label="Selected Plan six-month ACTUAL Trend"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+          <div><h3>ACTUAL Trend</h3><p>{selectedAlert ? `${selectedAlert.account} · ${selectedAlert.workload} · ${selectedAlert.planId}` : contextTrendLabel}</p></div>
+          {trendPoints.length === 6 ? <><oj-chart class="consumption-insights-actual-chart" type="line" data={trendChart} legend={{ rendered: "off" }} aria-label={`${selectedAlert ? "Selected Plan" : contextTrendLabel} six-month ACTUAL Trend`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
             <ol class="consumption-insights-trend-periods">{trendPoints.map((point) => <li key={point.periodKey} class={emphasizedTrendPeriods.has(point.periodKey) ? "is-emphasized" : ""}><span>{point.periodKey}</span><strong>{point.actualAmount === null ? "N/A" : compactCurrency.format(point.actualAmount)}</strong></li>)}</ol></>
             : <p class="consumption-empty-state">Six contiguous ACTUAL months ending at the alert month are unavailable.</p>}
           {selectedAlert && <p class="consumption-signal-reason"><strong>Why flagged:</strong> {selectedAlert.reason}</p>}
@@ -292,17 +292,19 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       <div class="consumption-insights-contribution-grid">
         <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution</h2><p>{selectedContextLabel}</p></div></div>
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
-            class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
-            onClick={() => setSelectedAccountName(account.account)}>
+            class={!otherSelected && selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={!otherSelected && selectedAccount?.account === account.account}
+            onClick={() => { setSelectedAccountName(account.account); setOtherSelected(false); }}>
             <span>{account.account}</span><strong>{compactCurrency.format(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
           </button>)}
-          {otherAccounts.length > 0 && <div class="consumption-insights-account-other" aria-label={`Other accounts ${otherPercentLabel}`}>
-            <span>Other</span><strong>{compactCurrency.format(otherTotal)}</strong><small>{otherPercentLabel} · ACTUAL {compactCurrency.format(otherActual)} · FORECAST {compactCurrency.format(otherForecast)}</small>
-            <i><b style={`width:${Math.max(0, Math.min(100, otherPercentage ?? 0))}%`}></b></i>
-          </div>}</div>
+          {otherContribution && <button type="button" class="consumption-insights-account-other" aria-pressed={otherSelected}
+            aria-label={`Other Accounts ${otherContribution.percentage.toFixed(1)}%; ${otherContribution.accountNames.join(", ")}`}
+            onClick={() => { setOtherSelected(true); setSelectedAccountName(""); }}>
+            <span>Other Accounts</span><strong>{compactCurrency.format(otherContribution.totalAmount)}</strong><small>{otherContribution.percentage.toFixed(1)}% · {splitLabel(otherContribution)}</small>
+            <i><b style={`width:${Math.max(0, Math.min(100, otherContribution.percentage))}%`}></b></i>
+          </button>}</div>
         </section>
-        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{workload.workload} · {plan.planId} · {plan.dataCenter} · {plan.percentage.toFixed(1)}% of selected Account</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of selected Account; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{otherSelected ? "Other Accounts" : selectedAccount?.account ?? "Select an Account"}</p></div></div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · {plan.dataCenter} · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>
