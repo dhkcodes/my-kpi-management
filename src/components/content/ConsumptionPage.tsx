@@ -266,11 +266,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     recordsLoadingRef.current = true;
     setRecordsLoading(true);
-    if (!append) {
-      setRecordsTotalAccounts(0);
-      setRecordsNextOffset(0);
-      setRecordsHasMore(false);
-    }
     const generation = ++recordsRequestGeneration.current;
     try {
       const page = await fetchConsumptionRecords({
@@ -908,13 +903,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             onCompositionEnd={(event) => { setRecordSearch(event.currentTarget.value); setSearchComposing(false); }}
             onInput={(event) => setRecordSearch(event.currentTarget.value)} />
         </label>
-        <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || hasDraftChanges || dataMode !== "backend"} onojAction={() => void applyQuarterRange()}>
+        <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || dataMode !== "backend"} onojAction={() => void applyQuarterRange()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </oj-button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
       </section>
-
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
       <oj-dialog
         id="consumptionImportDialog"
@@ -1050,10 +1044,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </tbody>
           </table>
         </div>
-        {recordsHasMore && <div class="consumption-load-more">
-          <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>
+        <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
+          <span class="consumption-records-loading" role="status" aria-live="polite" aria-atomic="true">
+            {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Usage Records…</span></>}
+          </span>
+          {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
           <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
-        </div>}
+        </div>
         </div>
       </section>
     </section>

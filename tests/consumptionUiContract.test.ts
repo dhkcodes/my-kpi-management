@@ -84,7 +84,7 @@ assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never 
 // Redwood table behavior and responsive containment.
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
 assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
-assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*height:\s*max\(18rem, calc\(100dvh - [^)]+\)\)[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table alone owns Quarter\/Month horizontal overflow and available-height scrolling");
+assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*height:\s*max\(18rem, calc\(100dvh - [^)]+\)\)[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table alone owns Quarter\/Month horizontal overflow and the 18rem accessibility minimum");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
@@ -92,5 +92,21 @@ assert.match(styles, /\.consumption-account-column\s*\{[^}]*left:\s*0[^}]*positi
 assert.match(styles, /\.consumption-table thead tr:first-child th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/, "first header row remains sticky");
 assert.match(styles, /\.consumption-table thead tr:nth-child\(2\) th\s*\{[^}]*position:\s*sticky[^}]*top:\s*2\.6rem/, "second compact header row remains sticky");
 assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-alert-trend-grid[\s\S]*\.consumption-insights-contribution-list/, "Insights styling is page-scoped");
+
+// Approved Consumption follow-up: clearer visual regions, accessible alerts, stable records and zoom-safe navigation.
+assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
+assert.match(insightsPage, /consumption-signal-badges[\s\S]*consumption-signal-type[\s\S]*aria-hidden="true"[\s\S]*consumption-signal-grade/, "alert type and grade are separate accessible icon and text badges");
+assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*28rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*height:\s*28rem/, "alert and trend panels have equal height with internal alert scrolling");
+assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
+assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\{`Severity[^`]+`\}/, "Alert type and severity badges expose explicit accessible labels");
+assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
+assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of selected Account[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{Math\.max\(0, Math\.min\(100, plan\.percentage\)\)\}%/, "Plan Contribution uses each Plan percentage on a common Account-wide 0–100 track");
+assert.match(styles, /\.consumption-insights-plan-list[^}]*overflow-y:\s*auto/, "Plan Contribution scrolls internally");
+assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Usage Records/, "Records footer exposes a visible polite loading status");
+assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
+assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-bar oj-button[^}]*height:\s*2\.25rem/, "range, search, and Apply controls share height and padding rhythm");
+assert.doesNotMatch(recordsPage, /setRecordsTotalAccounts\(0\)[\s\S]*setRecordsHasMore\(false\)/, "replacement loading keeps the prior successful rows and Footer context until the latest response succeeds");
+assert.match(styles, /\.consumption-load-more[^}]*(?:^|;)\s*height:\s*3\.75rem/m, "Records footer has a fixed placeholder height during replacement loading");
+assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(4\.5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
 
 console.log("consumptionUiContract tests passed");
