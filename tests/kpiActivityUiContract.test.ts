@@ -11,6 +11,8 @@ const content = fs.readFileSync(path.resolve("src/components/content/index.tsx")
 const app = fs.readFileSync(path.resolve("src/components/app.tsx"), "utf8");
 const styles = fs.readFileSync(path.resolve("src/styles/app.css"), "utf8");
 const workspace = fs.readFileSync(path.resolve("src/data/kpiWorkspaceDefinition.ts"), "utf8");
+const calculations = fs.readFileSync(path.resolve("src/data/kpiCalculations.ts"), "utf8");
+const liveDashboard = fs.readFileSync(path.resolve("src/data/kpiLiveDashboard.ts"), "utf8");
 
 assert.match(main, /waitSeconds:\s*(?:[3-9]\d|\d{3,})/, "Tailnet JET loads must tolerate network latency");
 assert.doesNotMatch(page, /ojdatagrid|RowDataGridProvider|MutableArrayDataProvider|oj-data-grid|loadSkeletons|fillViewport/,
@@ -188,6 +190,12 @@ assert.match(app, /buildLiveFiscalYearDataset/,
 assert.match(content, /kpiDatasetLoading[\s\S]*KPI Overview data/, "Home exposes KPI API loading state");
 assert.match(content, /row\.code === "C1\+C2"[\s\S]*C1 \+ C2 combined/,
   "Home KPI Overview identifies the C1 row as the combined C1 and C2 value");
+assert.match(calculations, /export const c1C2OverviewName = "Workshops & PoCs"/,
+  "Home uses the approved short name for the combined C1 Workshops and C2 PoCs KPI");
+assert.match(calculations, /name: definition\.code === "C1" \? c1C2OverviewName : definition\.name/,
+  "the workbook-backed Home dataset uses the shared combined KPI name");
+assert.match(liveDashboard, /name: c1C2OverviewName/,
+  "the live API-backed Home dataset uses the same combined KPI name");
 assert.match(styles, /\.kpi-name-cell__detail\s*\{[^}]*color:\s*var\(--kpi-muted\)[^}]*font-size:/,
   "the combined-value explanation uses restrained secondary text");
 assert.doesNotMatch(content, /showHome[\s\S]{0,7000}dataset\.overviewRows/,

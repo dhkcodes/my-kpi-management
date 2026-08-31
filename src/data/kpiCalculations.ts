@@ -64,6 +64,7 @@ export type FiscalYearDataset = {
 };
 
 export const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
+export const c1C2OverviewName = "Workshops & PoCs";
 
 export const kpiDefinitions: KpiDefinition[] = [
   { code: "A", name: "Market Awareness", unit: "count", quarterlyTargetCount: 1 },
@@ -190,7 +191,7 @@ export function calculateFiscalYearDataset(workbook: ParsedWorkbook): FiscalYear
     return {
       code: definition.code === "C1" ? "C1+C2" as const : definition.code,
       codeBadge: definition.code,
-      name: definition.code === "C1" ? "Show and discover workshops" : definition.name,
+      name: definition.code === "C1" ? c1C2OverviewName : definition.name,
       unit: definition.unit,
       quarters: quarterRows,
       fyActualDisplay: definition.unit === "amount" ? formatAmountK(fyActual) : `${fyActual}`,

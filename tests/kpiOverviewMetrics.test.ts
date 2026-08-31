@@ -8,6 +8,8 @@ import {
 import { KpiActivitySummary } from "../src/data/kpiSpreadsheetApi";
 import { KpiSpreadsheetRow, SpreadsheetKpiCode } from "../src/data/kpiSpreadsheet";
 import { FiscalYear } from "../src/data/kpiExcelParser";
+import { buildLiveFiscalYearDataset } from "../src/data/kpiLiveDashboard";
+import { fiscalYearData } from "../src/data/kpiMockData";
 
 const summaryPolicy = (fiscalYear: FiscalYear): KpiActivitySummary => ({
   fiscalYear,
@@ -70,5 +72,17 @@ const fy27Rows = [
 const metrics27 = buildKpiActivitiesOverview(fy27Rows, "FY27", summaryPolicy("FY27"), "2026-08-23");
 assert.deepEqual(metrics27.quarterlyTargetAchievement, { achieved: 1, total: 24, rate: 4.2 }, "future FY27 quarters stay Not Started even when future-dated rows exist");
 assert.equal(metrics27.dateIntegrity.total, 0);
+
+const liveSummary = summaryPolicy("FY27");
+liveSummary.quarterCounts.C1.Q1 = 4;
+liveSummary.quarterCounts.C2.Q1 = 1;
+const combinedHomeRow = buildLiveFiscalYearDataset(liveSummary, fiscalYearData.FY27).overviewRows
+  .find((item) => item.code === "C1+C2")!;
+assert.equal(combinedHomeRow.name, "Workshops & PoCs");
+assert.deepEqual(
+  { actual: combinedHomeRow.quarters[0].displayActual, target: combinedHomeRow.quarters[0].displayTarget },
+  { actual: "5", target: "6" },
+  "Home keeps the atomic C1=4 and C2=1 summary as one 5 / 6 combined KPI"
+);
 
 console.log("kpiOverviewMetrics tests passed");
