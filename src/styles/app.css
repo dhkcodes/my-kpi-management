@@ -782,7 +782,7 @@ body {
 .accounts-pulse-v2 {
   display: grid;
   gap: 0.85rem;
-  padding: 1.15rem 1.3rem 0.25rem;
+  padding: 1.25rem;
 }
 
 .accounts-pulse-v2__header {
@@ -1081,7 +1081,7 @@ body {
 
 @media (max-width: 720px) {
   .accounts-pulse-v2 {
-    padding-inline: 0.85rem;
+    padding: 1rem 0.85rem;
   }
 
   .accounts-pulse-v2__header {
