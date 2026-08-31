@@ -186,6 +186,10 @@ assert.match(app, /listKpiSummary\(fiscalYear\)/,
 assert.match(app, /buildLiveFiscalYearDataset/,
   "Home adapts the authoritative API summary instead of synthetic KPI actuals");
 assert.match(content, /kpiDatasetLoading[\s\S]*KPI Overview data/, "Home exposes KPI API loading state");
+assert.match(content, /row\.code === "C1\+C2"[\s\S]*C1 \+ C2 combined/,
+  "Home KPI Overview identifies the C1 row as the combined C1 and C2 value");
+assert.match(styles, /\.kpi-name-cell__detail\s*\{[^}]*color:\s*var\(--kpi-muted\)[^}]*font-size:/,
+  "the combined-value explanation uses restrained secondary text");
 assert.doesNotMatch(content, /showHome[\s\S]{0,7000}dataset\.overviewRows/,
   "Home no longer renders synthetic KPI overview actuals");
 assert.match(page, /role="progressbar"/);

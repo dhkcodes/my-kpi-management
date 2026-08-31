@@ -516,6 +516,8 @@ body {
 .kpi-overview-table tr.is-selected td { background: #fff7f5; border-color: rgba(199, 70, 52, 0.32); }
 
 .kpi-name-cell { align-items: center; display: flex; gap: 0.7rem; min-width: 16rem; }
+.kpi-name-cell__label { display: grid; gap: 0.16rem; }
+.kpi-name-cell__detail { color: var(--kpi-muted); font-size: 0.68rem; line-height: 1.2; }
 .kpi-code-badge {
   align-items: center;
   background: #eaf3f8;

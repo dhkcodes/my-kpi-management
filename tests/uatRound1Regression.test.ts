@@ -29,7 +29,6 @@ for (const obsolete of [
   "Live API connected",
   "Quarter status from reflected Delivery Date activity",
   "Use KPI Guide to understand each KPI target, required evidence, and how each activity is measured before updating details.",
-  "C1 + C2 combined",
   "Workshops / POCs"
 ]) assert.ok(!all.includes(obsolete), `obsolete UAT copy returned: ${obsolete}`);
 

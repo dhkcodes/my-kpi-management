@@ -511,7 +511,10 @@ export function Content({
                       <td>
                         <div class="kpi-name-cell">
                           <span class={row.code === "D1" ? "kpi-code-badge kpi-code-badge--priority" : "kpi-code-badge"}>{row.codeBadge}</span>
-                          <span>{row.name}</span>
+                          <span class="kpi-name-cell__label">
+                            <span>{row.name}</span>
+                            {row.code === "C1+C2" && <span class="kpi-name-cell__detail">C1 + C2 combined</span>}
+                          </span>
                         </div>
                       </td>
                       {row.quarters.map((quarter) => {
