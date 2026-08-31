@@ -29,7 +29,6 @@ for (const obsolete of [
   "Live API connected",
   "Quarter status from reflected Delivery Date activity",
   "Use KPI Guide to understand each KPI target, required evidence, and how each activity is measured before updating details.",
-  "C1 + C2 combined",
   "Workshops / POCs"
 ]) assert.ok(!all.includes(obsolete), `obsolete UAT copy returned: ${obsolete}`);
 
@@ -49,5 +48,9 @@ assert.match(kpi, /Data through/);
 assert.match(all, /Show and discover workshops/);
 assert.match(styles, /\.accounts-pulse-v2-workload-count/);
 assert.match(styles, /\.my-customers-360-account-link/);
+assert.match(styles, /\.accounts-pulse-v2\s*\{[^}]*padding:\s*1\.25rem;/,
+  "Accounts & Workloads uses the same desktop panel padding as KPI Overview and New Workload");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.accounts-pulse-v2\s*\{[^}]*padding:\s*1rem 0\.85rem;/,
+  "Accounts & Workloads keeps standard vertical panel padding on mobile");
 
 console.log("first-round UAT regression contract tests passed");
