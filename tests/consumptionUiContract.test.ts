@@ -70,6 +70,8 @@ assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains av
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Usage Records downloads the server-owned import-compatible Export file and releases the object URL");
 assert.match(recordsPage, /oj-ux-ico-download[\s\S]*Export CSV[\s\S]*oj-ux-ico-upload[\s\S]*Import CSV/, "Export and Import are adjacent Redwood actions with clear icons");
+assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*gap: \.75rem;[^}]*justify-content: flex-end;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Usage Records layouts keep the action group visible and naturally wrapped");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
 assert.match(recordsPage, /onDblClick[\s\S]*beginForecastEdit/, "double click enters Forecast cell editing");
 assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
