@@ -79,6 +79,7 @@ liveSummary.quarterCounts.C2.Q1 = 1;
 const combinedHomeRow = buildLiveFiscalYearDataset(liveSummary, fiscalYearData.FY27).overviewRows
   .find((item) => item.code === "C1+C2")!;
 assert.equal(combinedHomeRow.name, "Workshops & PoCs");
+assert.equal(combinedHomeRow.codeBadge, "C", "Home shows the combined C KPI badge without implying C1 only");
 assert.deepEqual(
   { actual: combinedHomeRow.quarters[0].displayActual, target: combinedHomeRow.quarters[0].displayTarget },
   { actual: "5", target: "6" },
