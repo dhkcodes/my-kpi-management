@@ -1,4 +1,33 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
+export type ConsumptionAmountSplit = Readonly<{
+  actualAmount: number;
+  forecastAmount: number;
+  totalAmount: number;
+  status: ConsumptionMonthStatus;
+}>;
+export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>;
+export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
+  serverPlanId: number; planId: string; endUser: string; dataCenter: string;
+  percentage: number;
+  actualTrend: readonly ConsumptionActualTrendPoint[];
+}>;
+export type ConsumptionOtherContributionPlan = ConsumptionAnalysisPlan & Readonly<{ account: string; workload: string }>;
+export type ConsumptionOtherContribution = ConsumptionAmountSplit & Readonly<{
+  accountNames: readonly string[]; percentage: number; plans: readonly ConsumptionOtherContributionPlan[];
+}>;
+export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
+  workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
+}>;
+export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
+  account: string; percentage: number; workloads: readonly ConsumptionAnalysisWorkload[];
+}>;
+export type ConsumptionAnalysisAccountCandidate = Readonly<{
+  account: string;
+  workloads: readonly string[];
+  planIds: readonly string[];
+}>;
+export type ConsumptionAccountSort = "account" | "amount";
+export type ConsumptionSortDirection = "asc" | "desc";
 export type ConsumptionSignalType = "ABOVE_USUAL" | "BELOW_USUAL" | "NEW_USAGE";
 export type ConsumptionPreviousDirection = "INCREASED" | "DECREASED" | "UNCHANGED";
 export type ConsumptionSignalGrade = "CRITICAL" | "HIGH" | "WATCH";
@@ -249,6 +278,15 @@ export const sortConsumptionMonths = (months: readonly string[]) =>
 export const sortConsumptionMonthsNewestFirst = (months: readonly string[]) =>
   [...months].sort((left, right) => fiscalMonthOrder(right) - fiscalMonthOrder(left));
 
+export const initialConsumptionRecordsBatchSize = (viewportHeight: number): number =>
+  Math.min(100, Math.max(10, Math.ceil((Math.max(0, viewportHeight) - 360) / 44)));
+
+export const shouldRestartConsumptionRecordsPage = (
+  append: boolean,
+  currentEtag: string,
+  nextEtag: string
+): boolean => append && currentEtag.length > 0 && currentEtag !== nextEtag;
+
 const previousFiscalMonth = (month: string): string | null => {
   const match = /^FY(\d{2})-([A-Z]{3})$/.exec(month);
   if (!match) return null;
@@ -259,6 +297,23 @@ const previousFiscalMonth = (month: string): string | null => {
   return `FY${String(previousFiscalYear).padStart(2, "0")}-${oracleFiscalMonths[previousIndex]}`;
 };
 
+/** Return the alert month and its previous five contiguous ACTUAL-only monthly slots. */
+export const getAlertActualTrend = (
+  points: readonly Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>[],
+  alertPeriodKey: string
+): ReadonlyArray<Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>> => {
+  const byPeriod = new Map(points.map((point) => [point.periodKey, point]));
+  const periods = [alertPeriodKey];
+  for (let index = 1; index < 6; index += 1) {
+    const previous = previousFiscalMonth(periods[0]);
+    if (!previous) return [];
+    periods.unshift(previous);
+  }
+  return periods.every((period) => byPeriod.has(period))
+    ? periods.map((period) => byPeriod.get(period) as Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>)
+    : [];
+};
+
 export const filterActiveConsumptionPlans = (
   plans: readonly ConsumptionPlan[],
   currentFiscalMonth: string
@@ -266,6 +321,36 @@ export const filterActiveConsumptionPlans = (
   const previousMonth = previousFiscalMonth(currentFiscalMonth);
   if (!previousMonth) return [...plans];
   return plans.filter((plan) => (plan.actuals[previousMonth] ?? 0) !== 0 || (plan.actuals[currentFiscalMonth] ?? 0) !== 0);
+};
+
+export type ConsumptionControlResolution = Readonly<{
+  amount: number | null;
+  detailState: "MISSING" | "ZERO" | "VALUE";
+  editable: boolean;
+  source: "MANUAL" | "DETAIL";
+}>;
+
+/** Resolve a Multiple row without conflating an absent child fact with an explicit zero. */
+export const resolveConsumptionControlTotal = (
+  plans: readonly ConsumptionPlan[],
+  month: string,
+  manualAmount: number | undefined
+): ConsumptionControlResolution => {
+  const childValues = plans.flatMap((plan) => {
+    if (Object.prototype.hasOwnProperty.call(plan.actuals, month)) return [plan.actuals[month]];
+    if (Object.prototype.hasOwnProperty.call(plan.forecasts, month)) return [plan.forecasts[month]];
+    return [];
+  });
+  const hasNonZeroDetail = childValues.some((value) => value !== 0);
+  if (hasNonZeroDetail) {
+    return { amount: childValues.reduce((sum, value) => sum + value, 0), detailState: "VALUE", editable: false, source: "DETAIL" };
+  }
+  return {
+    amount: manualAmount ?? null,
+    detailState: childValues.length === 0 ? "MISSING" : "ZERO",
+    editable: true,
+    source: "MANUAL"
+  };
 };
 
 export const getLatestActualMonth = (plans: readonly ConsumptionPlan[]): string | null => {
@@ -452,3 +537,19 @@ export const detectConsumptionSignals = (plans: readonly ConsumptionPlan[], asOf
     .filter((signal): signal is ConsumptionSignal => signal !== null)
     .sort((left, right) => gradeOrder[left.grade] - gradeOrder[right.grade] || Math.abs(right.changeAmount) - Math.abs(left.changeAmount));
 };
+
+/** Local workspace view transform. The loaded workspace remains authoritative; a server adapter can replace this boundary later. */
+export const sortAndFilterConsumptionAccounts = (
+  accounts: readonly ConsumptionAnalysisAccount[], search: string,
+  sort: ConsumptionAccountSort, direction: ConsumptionSortDirection
+): ConsumptionAnalysisAccount[] => {
+  const query = search.trim().toLocaleLowerCase();
+  const filtered = query ? accounts.filter((account) => account.account.toLocaleLowerCase().includes(query)) : [...accounts];
+  const factor = direction === "asc" ? 1 : -1;
+  return filtered.sort((left, right) => factor * (sort === "amount"
+    ? left.totalAmount - right.totalAmount || left.account.localeCompare(right.account)
+    : left.account.localeCompare(right.account)));
+};
+
+export const nextConsumptionBatchSize = (total: number, current: number, batchSize = 10): number =>
+  Math.min(Math.max(0, total), Math.max(batchSize, current + batchSize));
