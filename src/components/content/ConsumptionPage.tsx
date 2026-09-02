@@ -29,6 +29,7 @@ import {
   ConsumptionConflictError,
   applyConsumptionImport,
   canUseConsumptionFallback,
+  exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
@@ -210,6 +211,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [apiEtag, setApiEtag] = useState("");
   const [dataMode, setDataMode] = useState<"loading" | "backend" | "fallback" | "error">("loading");
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [serverSignals, setServerSignals] = useState<ConsumptionSignal[] | null>(null);
   const [conflictRows, setConflictRows] = useState<ConflictRow[]>([]);
   const [conflictWorkspace, setConflictWorkspace] = useState<ConsumptionApiWorkspace | null>(null);
@@ -241,6 +243,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const exportingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const recordsLoadingRef = useRef(false);
   const hasPlanDraftChanges = JSON.stringify(savedPlans) !== JSON.stringify(draftPlans);
@@ -701,7 +704,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (!file || dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    if (!file || dataMode === "loading" || isSaving || exportingRef.current || importPhase === "previewing" || importPhase === "applying") return;
     setImportError("");
     setImportResult("");
     setPendingImport(null);
@@ -788,6 +791,32 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setImportError(message);
       setImportResult(`Successful rows: 0 · Failed rows: 1 · Loaded plans: 0 · ${message}`);
       setImportPhase("error");
+    }
+  };
+
+  const exportImportCompatibleCsv = async () => {
+    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    exportingRef.current = true;
+    setIsExporting(true);
+    setImportError("");
+    try {
+      const exported = await exportConsumptionImportCompatibleCsv();
+      const url = URL.createObjectURL(exported.blob);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = exported.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Consumption CSV could not be exported.");
+    } finally {
+      exportingRef.current = false;
+      setIsExporting(false);
     }
   };
 
@@ -883,8 +912,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <h1 id="consumptionTitle">Usage Records</h1>
         </div>
         <div class="consumption-import-actions">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
-          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onojAction={() => fileInputRef.current?.click()}>
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
+          <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
+            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            onojAction={() => void exportImportCompatibleCsv()}>
+            <span slot="startIcon" class="oj-ux-ico-download"></span>
+            {isExporting ? "Exporting…" : "Export CSV"}
+          </oj-button>
+          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Import CSV
           </oj-button>
