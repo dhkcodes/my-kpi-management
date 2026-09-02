@@ -57,7 +57,7 @@ export function buildLiveFiscalYearDataset(summary: KpiActivitySummary, base: Fi
     quarter
   ));
   const combined: KpiOverviewRow = {
-    code: "C1+C2", codeBadge: "C1", name: c1C2OverviewName, unit: "count", quarters: c1c2Quarters,
+    code: "C1+C2", codeBadge: "C", name: c1C2OverviewName, unit: "count", quarters: c1c2Quarters,
     fyActualDisplay: `${c1c2Quarters.reduce((sum, item) => sum + item.actual, 0)}`,
     fyTargetDisplay: `${summary.targets.c1C2CombinedPerQuarter * quarters.length}`
   };
