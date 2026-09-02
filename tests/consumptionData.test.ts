@@ -11,6 +11,7 @@ import {
   getLatestActualMonth,
   getConsumptionPlanLabel,
   getNextQuarterMonths,
+  initialConsumptionRecordsBatchSize,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
@@ -40,6 +41,9 @@ assert.equal(getFiscalQuarter("FY27-JUN"), "FY27-Q1");
 assert.deepEqual(getNextQuarterMonths("FY27-JUL"), ["FY27-AUG", "FY27-SEP", "FY27-OCT"], "Forecast starts in the month immediately after the last populated Actual");
 assert.deepEqual(getNextQuarterMonths("FY27-AUG"), ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
 assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY28-AUG"]);
+assert.equal(initialConsumptionRecordsBatchSize(768), 10, "the initial Usage Records request fills a compact viewport");
+assert.equal(initialConsumptionRecordsBatchSize(1240), 20, "the initial Usage Records request expands for a taller viewport");
+assert.equal(initialConsumptionRecordsBatchSize(10000), 100, "the initial server page remains bounded");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
   ["FY27-NOV", "FY27-OCT", "FY27-SEP"],

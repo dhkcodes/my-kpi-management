@@ -8,24 +8,28 @@ import {
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
-  filterActiveConsumptionPlans,
   getConsumptionPlanLabel,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths,
+  initialConsumptionRecordsBatchSize,
+  shouldRestartConsumptionRecordsPage,
   getQuarterMonths,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
+  resolveConsumptionControlTotal,
   restoreForecastEntry,
   sortConsumptionMonths,
   sortConsumptionMonthsNewestFirst
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import {
+  ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
   ConsumptionConflictError,
   applyConsumptionImport,
   canUseConsumptionFallback,
+  fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
   saveConsumptionForecasts
@@ -46,12 +50,25 @@ const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
     versions: plan.versions ? { ...plan.versions } : undefined
   }));
 
+const cloneControlTotals = (controls: readonly ConsumptionApiControlTotal[]): ConsumptionApiControlTotal[] => controls.map((control) => ({ ...control }));
+const controlKey = (control: Pick<ConsumptionApiControlTotal, "account" | "periodKey">) => `${control.account}::${control.periodKey}`;
+const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: readonly ConsumptionApiControlTotal[]) => {
+  if (left.length !== right.length) return false;
+  const rightByKey = new Map(right.map((control) => [controlKey(control), control.controlAmount]));
+  return left.every((control) => rightByKey.get(controlKey(control)) === control.controlAmount);
+};
+const toApiControlTotals = (controls: readonly { customer: string; values: Readonly<Record<string, number>> }[]): ConsumptionApiControlTotal[] =>
+  controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
+    account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
+  })));
+
 const createSeedPlans = (csv: string) => {
   const parsed = parseConsumptionCsv(csv);
   const latestActualMonth = getLatestActualMonth(parsed.plans);
   if (!latestActualMonth) throw new Error("Consumption CSV has no usable month columns.");
   return {
     plans: parsed.plans,
+    controlTotals: toApiControlTotals(parsed.controlTotals),
     importedPlans: parsed.plans.length,
     controls: parsed.controlTotals.length,
     latestActualMonth
@@ -66,6 +83,11 @@ const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackAct
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+const parseForecastDecimal = (raw: string): number | null => {
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 const shortMonth = (month: string) => month.split("-")[1];
 const consumptionSignalPresentation = (signal: ConsumptionSignal) => signal.type === "ABOVE_USUAL"
   ? { label: "ABOVE USUAL", tone: "is-above-usual" }
@@ -139,7 +161,7 @@ const SignalSparkline = ({ signal }: Readonly<{ signal: ConsumptionSignal }>) =>
   );
 };
 
-type EditCell = Readonly<{ planKey: string; month: string }>;
+type EditCell = Readonly<{ planKey: string; month: string; control?: boolean }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
 type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "error";
 type PendingImport = Readonly<{
@@ -177,6 +199,8 @@ type Props = Readonly<{
 export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) {
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
+  const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
+  const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [selectedSignalId, setSelectedSignalId] = useState("");
   const [selectedSeriesId, setSelectedSeriesId] = useState("__all__");
   const [planSearch, setPlanSearch] = useState("");
@@ -201,8 +225,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
   const [activePlanIndex, setActivePlanIndex] = useState(0);
   const [tableScrollState, setTableScrollState] = useState({ left: 0, max: 0 });
+  const [draftSearch, setDraftSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [searchComposing, setSearchComposing] = useState(false);
+  const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
+  const [recordsNextOffset, setRecordsNextOffset] = useState(0);
+  const [recordsHasMore, setRecordsHasMore] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
   const [pulseExpanded, setPulseExpanded] = useState(true);
-  const [tableExpanded, setTableExpanded] = useState(true);
+
   const [importPhase, setImportPhase] = useState<ImportPhase>("idle");
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [importResult, setImportResult] = useState("");
@@ -210,10 +241,17 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const recordsRequestGeneration = useRef(0);
+  const recordsLoadingRef = useRef(false);
+  const hasPlanDraftChanges = JSON.stringify(savedPlans) !== JSON.stringify(draftPlans);
+  const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals);
+  const hasDraftChanges = hasPlanDraftChanges || hasControlDraftChanges;
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
     setSavedPlans(clonePlans(workspace.plans));
     setDraftPlans(clonePlans(workspace.plans));
+    setSavedControlTotals(cloneControlTotals(workspace.controlTotals));
+    setDraftControlTotals(cloneControlTotals(workspace.controlTotals));
     setServerSignals(workspace.signals);
     setApiEtag(workspace.etag);
     setFromQuarter(workspace.fromQuarter);
@@ -229,16 +267,79 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setConflictWorkspace(null);
   };
 
+  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }) => {
+    if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
+    recordsLoadingRef.current = true;
+    setRecordsLoading(true);
+    const generation = ++recordsRequestGeneration.current;
+    try {
+      const page = await fetchConsumptionRecords({
+        fromQuarter: query.fromQuarter, toQuarter: query.toQuarter, search: query.search,
+        offset: append ? recordsNextOffset : 0,
+        limit: append ? 10 : initialConsumptionRecordsBatchSize(window.innerHeight),
+        sort: "ACCOUNT",
+        direction: "ASC"
+      });
+      if (generation !== recordsRequestGeneration.current) return;
+      if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
+        await loadRecordsPage(false, query);
+        return;
+      }
+      const mergePlans = (current: readonly ConsumptionPlan[]) => {
+        const accountPlans = new Map<string, ConsumptionPlan[]>();
+        if (append) current.forEach((plan) => accountPlans.set(plan.customer, [...(accountPlans.get(plan.customer) ?? []), plan]));
+        page.accountGroups.forEach((group) => {
+          const plans = new Map((accountPlans.get(group.account) ?? []).map((plan) => [plan.id, plan]));
+          group.plans.forEach((plan) => plans.set(plan.id, plan));
+          accountPlans.set(group.account, [...plans.values()]);
+        });
+        return [...accountPlans.values()].flat();
+      };
+      setSavedPlans((current) => clonePlans(mergePlans(current)));
+      setDraftPlans((current) => clonePlans(mergePlans(current)));
+      const mergeControls = (current: readonly ConsumptionApiControlTotal[]) => {
+        const keyed = new Map((append ? current : []).map((control) => [`${control.account}::${control.periodKey}`, control]));
+        page.controlTotals.forEach((control) => keyed.set(`${control.account}::${control.periodKey}`, control));
+        return [...keyed.values()];
+      };
+      setSavedControlTotals((current) => cloneControlTotals(mergeControls(current)));
+      setDraftControlTotals((current) => cloneControlTotals(mergeControls(current)));
+      setApiEtag(page.etag);
+      setFromQuarter(page.fromQuarter);
+      setToQuarter(page.toQuarter);
+      setEditablePeriodIds(new Set(page.editablePeriodIds));
+      setDisplayQuarterOrder([...page.displayQuarterOrder]);
+      setAvailableQuarterOptions((current) => [...new Set([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean))].sort());
+      setCurrentFiscalMonth(page.currentFiscalMonth);
+      setRecordsTotalAccounts(page.totalAccounts);
+      setRecordsNextOffset(page.nextOffset);
+      setRecordsHasMore(page.hasMore);
+      setRangeInitialized(true);
+      setRangeTouched(false);
+      setDataMode("backend");
+      setConflictRows([]);
+      setConflictWorkspace(null);
+    } catch (error) {
+      if (generation !== recordsRequestGeneration.current) return;
+      throw error;
+    } finally {
+      if (generation === recordsRequestGeneration.current) {
+        recordsLoadingRef.current = false;
+        setRecordsLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    void fetchConsumptionWorkspace().then((workspace) => {
-      if (active) adoptWorkspace(workspace);
-    }).catch((error) => {
+    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }).catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
         const fallbackPlans = clonePlans(initialSeed.plans);
         setSavedPlans(fallbackPlans);
         setDraftPlans(clonePlans(fallbackPlans));
+        setSavedControlTotals(cloneControlTotals(initialSeed.controlTotals));
+        setDraftControlTotals(cloneControlTotals(initialSeed.controlTotals));
         setServerSignals(null);
         setFromQuarter(fallbackActualQuarters[fallbackActualQuarters.length - 1] ?? fallbackForecastQuarters[0] ?? "");
         setToQuarter(fallbackForecastQuarters[fallbackForecastQuarters.length - 1] ?? fallbackActualQuarters[0] ?? "");
@@ -246,21 +347,25 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
         setAvailableQuarterOptions([...new Set([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters])].sort());
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
+        setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
+        setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);
+        setRecordsHasMore(false);
         setRangeInitialized(true);
         setRangeTouched(false);
         setDataMode("fallback");
-
       } else {
         setDataMode("error");
         setImportError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
       }
     });
-    return () => { active = false; };
+    return () => { active = false; recordsRequestGeneration.current++; };
   }, []);
 
-  const visiblePlans = useMemo(() => filterActiveConsumptionPlans(draftPlans, currentFiscalMonth), [currentFiscalMonth, draftPlans]);
+  const visiblePlans = draftPlans;
   const accounts = useMemo(() => aggregateConsumptionAccounts(visiblePlans), [visiblePlans]);
-  const visibleTableRowCount = accounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
+  const renderedRecordAccounts = accounts;
+  const loadedAccountCount = renderedRecordAccounts.length;
+  const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => aggregateConsumptionActualTotals(draftPlans), [draftPlans]);
@@ -301,6 +406,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       left: Math.round(table.scrollLeft),
       max: Math.max(0, Math.round(table.scrollWidth - table.clientWidth))
     });
+  };
+
+  const handleTableScroll = (event: Event) => {
+    updateTableScrollState();
+    const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
+    if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
+      void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
+    }
   };
 
   const moveTableHorizontally = (direction: -1 | 1) => {
@@ -346,7 +459,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const latestSummary = rangeSummaries[0] ?? null;
   const forecastTotal = rangeSummaries.filter((summary) => summary.status === "FORECAST" || summary.status === "MIXED")
     .reduce((sum, summary) => sum + (summary.total ?? 0), 0);
-  const hasDraftChanges = JSON.stringify(savedPlans) !== JSON.stringify(draftPlans);
 
   useEffect(() => {
     updateTableScrollState();
@@ -355,6 +467,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   }, [accounts.length, displayQuarterOrder]);
 
   useEffect(() => {
+    if (isSaving) {
+      const guard: KpiNavigationGuard = () => window.alert("Consumption forecast save is in progress. Please wait for it to finish.");
+      onNavigationGuardChange(guard, true);
+      return () => onNavigationGuardChange(null, false);
+    }
     if (!hasDraftChanges) {
       onNavigationGuardChange(null, false);
       return;
@@ -366,7 +483,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     };
     onNavigationGuardChange(guard, true);
     return () => onNavigationGuardChange(null, false);
-  }, [hasDraftChanges, onNavigationGuardChange]);
+  }, [hasDraftChanges, isSaving, onNavigationGuardChange]);
 
   const selectSignal = (signal: ConsumptionSignal) => {
     const plan = signal.serverPlanId === undefined
@@ -377,18 +494,18 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (plan) setSelectedSeriesId(plan.id);
   };
 
-  const applyQuarterRange = async () => {
-    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || hasDraftChanges) return;
+  const submitRecordsQuery = async () => {
+    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing) return;
+    const query = { fromQuarter, toQuarter, search: draftSearch.trim() };
     setRangeLoading(true);
     setImportError("");
     try {
-      const workspace = await fetchConsumptionWorkspace({ fromQuarter, toQuarter });
-      adoptWorkspace(workspace);
+      await loadRecordsPage(false, query);
+      setAppliedSearch(query.search);
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
-      setExpandedAccounts(new Set());
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Consumption range could not be loaded.");
+      setImportError(error instanceof Error ? error.message : "Consumption records could not be loaded.");
     } finally {
       setRangeLoading(false);
     }
@@ -404,15 +521,46 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const updateForecast = (planKey: string, month: string, value: number) => {
+    recordsRequestGeneration.current++;
+    setRecordsLoading(false);
     setDraftPlans((current) => current.map((plan) => plan.id === planKey
       ? { ...plan, forecasts: { ...plan.forecasts, [month]: value } }
       : plan));
   };
 
+  const controlValue = (controls: readonly ConsumptionApiControlTotal[], account: string, month: string) =>
+    controls.find((control) => control.account === account && control.periodKey === month)?.controlAmount;
+
+  const updateControlForecast = (account: string, month: string, value: number | null) => {
+    recordsRequestGeneration.current++;
+    setRecordsLoading(false);
+    setDraftControlTotals((current) => {
+      const next = current.filter((control) => !(control.account === account && control.periodKey === month));
+      if (value !== null) next.push({ account, periodKey: month, controlAmount: value, detailAmount: null, matchStatus: "NO_DETAIL" });
+      return next.sort((left, right) => controlKey(left).localeCompare(controlKey(right)));
+    });
+  };
+
   const beginForecastEdit = (plan: ConsumptionPlan, month: string) => {
-    if (isSaving || (dataMode !== "backend" && dataMode !== "fallback")) return;
+    if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = plan.forecasts[month] ?? plan.actuals[month] ?? 0;
     setEditCell({ planKey: plan.id, month });
+  };
+
+  const selectForecastEditor = (key: string) => (input: HTMLInputElement | null) => {
+    if (!input || input.dataset.forecastSelection === key) return;
+    input.dataset.forecastSelection = key;
+    window.requestAnimationFrame(() => {
+      if (!input.isConnected) return;
+      input.focus();
+      input.select();
+    });
+  };
+
+  const beginControlEdit = (account: string, month: string, value: number | null) => {
+    if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
+    editEntryValueRef.current = value;
+    setEditCell({ planKey: account, month, control: true });
   };
 
   const commitForecastEdit = () => {
@@ -422,6 +570,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const cancelForecastEdit = () => {
     if (!editCell) {
+      setEditCell(null);
+      return;
+    }
+    if (editCell.control) {
+      updateControlForecast(editCell.planKey, editCell.month, controlValue(savedControlTotals, editCell.planKey, editCell.month) ?? null);
+      editEntryValueRef.current = null;
       setEditCell(null);
       return;
     }
@@ -448,7 +602,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const saveForecasts = async () => {
-    if (isSaving) return;
+    if (isSaving || recordsLoading) return;
     setEditCell(null);
     editEntryValueRef.current = null;
     setIsSaving(true);
@@ -464,15 +618,34 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         versionNo: saved.versions?.[month] ?? 0
       }]);
     });
+    const controlUpdates = aggregateConsumptionAccounts(draftPlans).filter((account) => account.plans.length > 1).flatMap((account) =>
+      [...editablePeriodIds].flatMap((month) => {
+        const savedValue = controlValue(savedControlTotals, account.customer, month);
+        const draftValue = controlValue(draftControlTotals, account.customer, month);
+        const resolution = resolveConsumptionControlTotal(account.plans, month, draftValue);
+        const desiredValue = resolution.source === "DETAIL" ? null : (draftValue ?? null);
+        if ((savedValue ?? null) === desiredValue) return [];
+        return [{ account: account.customer, periodKey: month, amount: desiredValue }];
+      }));
     try {
       if (dataMode === "fallback") {
         setSavedPlans(clonePlans(draftPlans));
+        setSavedControlTotals(cloneControlTotals(draftControlTotals));
 
       } else if (dataMode !== "backend" || !apiEtag) {
         throw new Error("Authoritative Consumption workspace is not ready; Forecast was not saved.");
       } else {
-        const workspace = await saveConsumptionForecasts(apiEtag, updates);
+        const workspace = await saveConsumptionForecasts(apiEtag, updates, controlUpdates);
         adoptWorkspace(workspace);
+        try {
+          await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter, search: appliedSearch });
+        } catch (refreshError) {
+          adoptWorkspace(workspace);
+          setRecordsTotalAccounts(aggregateConsumptionAccounts(workspace.plans).length);
+          setRecordsNextOffset(aggregateConsumptionAccounts(workspace.plans).length);
+          setRecordsHasMore(false);
+          setImportError(`Forecasts were saved, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        }
       }
       setEditCell(null);
       editEntryValueRef.current = null;
@@ -489,6 +662,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               current: current?.forecasts[month] ?? current?.actuals[month] ?? null });
           });
         });
+        draftControlTotals.forEach((draft) => {
+          const savedValue = controlValue(savedControlTotals, draft.account, draft.periodKey);
+          if ((savedValue ?? null) === draft.controlAmount) return;
+          rows.push({ plan: `${draft.account} · Multiple Control`, month: draft.periodKey,
+            saved: savedValue ?? null, draft: draft.controlAmount,
+            current: controlValue(error.current.controlTotals, draft.account, draft.periodKey) ?? null });
+        });
+        savedControlTotals.forEach((saved) => {
+          if (controlValue(draftControlTotals, saved.account, saved.periodKey) !== undefined) return;
+          rows.push({ plan: `${saved.account} · Multiple Control`, month: saved.periodKey,
+            saved: saved.controlAmount, draft: null,
+            current: controlValue(error.current.controlTotals, saved.account, saved.periodKey) ?? null });
+        });
         setConflictRows(rows);
         setConflictWorkspace(error.current);
         setImportError("Forecast Save conflicted with a newer server version. Compare values below.");
@@ -502,6 +688,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const cancelAllForecasts = () => {
     setDraftPlans(clonePlans(savedPlans));
+    setDraftControlTotals(cloneControlTotals(savedControlTotals));
     setEditCell(null);
     editEntryValueRef.current = null;
   };
@@ -557,6 +744,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         loadedControls = result.controlTotalCount;
         importCountDetail = ` · New plans: ${result.insertedCount} · Overwritten plans: ${result.updatedCount}`;
         adoptWorkspace(result.workspace);
+        try {
+          await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch });
+        } catch (refreshError) {
+          adoptWorkspace(result.workspace);
+          setRecordsTotalAccounts(aggregateConsumptionAccounts(result.workspace.plans).length);
+          setRecordsNextOffset(aggregateConsumptionAccounts(result.workspace.plans).length);
+          setRecordsHasMore(false);
+          setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        }
       } else {
         const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
         const imported = pendingImport.parsed.plans;
@@ -564,6 +760,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         const importedForecastQuarters = [...new Set(importedEditablePeriods.map(getFiscalQuarter))];
         setSavedPlans(clonePlans(imported));
         setDraftPlans(clonePlans(imported));
+        const importedControls = toApiControlTotals(pendingImport.parsed.controlTotals);
+        setSavedControlTotals(cloneControlTotals(importedControls));
+        setDraftControlTotals(cloneControlTotals(importedControls));
         setServerSignals(null);
         setFromQuarter(importedHistoryQuarters[importedHistoryQuarters.length - 1] ?? importedForecastQuarters[0] ?? "");
         setToQuarter(importedForecastQuarters[importedForecastQuarters.length - 1] ?? importedHistoryQuarters[0] ?? "");
@@ -594,53 +793,73 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const closeImportDialog = () => importDialogRef.current?.close();
 
-  const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], readOnly: boolean) =>
-    buildDisplayQuarterSummaries({
+  const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], readOnly: boolean) => {
+    const multiple = "plans" in series && series.plans.length > 1;
+    const multipleResolutions = multiple ? Object.fromEntries(allMonths.map((month) => {
+      const manual = controlValue(draftControlTotals, series.customer, month);
+      return [month, resolveConsumptionControlTotal(series.plans, month, manual)];
+    })) : {};
+    const displaySeries = multiple ? {
       ...series,
-      actuals: Object.fromEntries(Object.entries(series.actuals).filter(([month]) =>
-        !editablePeriodIds.has(month) || !Object.prototype.hasOwnProperty.call(series.forecasts, month)))
+      actuals: Object.fromEntries(allMonths.flatMap((month) => {
+        const resolution = multipleResolutions[month];
+        return !editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
+      })),
+      forecasts: Object.fromEntries(allMonths.flatMap((month) => {
+        const resolution = multipleResolutions[month];
+        return editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
+      }))
+    } : series;
+    return buildDisplayQuarterSummaries({
+      ...displaySeries,
+      actuals: Object.fromEntries(Object.entries(displaySeries.actuals).filter(([month]) =>
+        !editablePeriodIds.has(month) || !Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month)))
     }, displayQuarterOrder).flatMap((summary) => {
       const quarter = summary.quarter;
       const forecastQuarter = summary.months.some((month) => editablePeriodIds.has(month));
       return [
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
-          const actual = Object.prototype.hasOwnProperty.call(series.actuals, month);
-          const forecast = Object.prototype.hasOwnProperty.call(series.forecasts, month);
+          const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
+          const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
           const editable = editablePeriodIds.has(month);
           const value = editable
-            ? series.forecasts[month] ?? series.actuals[month] ?? null
-            : actual ? series.actuals[month] : forecast ? series.forecasts[month] : null;
+            ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
+            : actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
           const key = `${series.id}-${month}`;
+          if (multiple) {
+            const resolution = multipleResolutions[month];
+            const canEditControl = editable && resolution?.editable;
+            const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
+            const savedValue = controlValue(savedControlTotals, series.customer, month);
+            const dirty = savedValue !== controlValue(draftControlTotals, series.customer, month);
+            return <td key={key} data-control-cell={`${series.customer}:${month}`}
+              data-control-source={resolution?.source}
+              class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
+              onDblClick={() => canEditControl && beginControlEdit(series.customer, month, value)}>
+              {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={value === null ? "" : `${value}`}
+                data-forecast-editor={key} ref={selectForecastEditor(key)}
+                aria-label={`${series.customer} ${month} Multiple Control Total`} disabled={isSaving}
+                onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
+                onKeyDown={editorKeyDown} autofocus />
+                : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}
+                  {editable && <small>{canEditControl ? "CONTROL" : "PLAN SUM"}</small>}</span>}
+            </td>;
+          }
           if (!readOnly && editable && "planId" in series && series.planType !== "Aggregate") {
             const editing = editCell?.planKey === series.id && editCell.month === month;
             const savedPlan = savedPlans.find((plan) => plan.id === series.id);
             const savedValue = savedPlan?.forecasts[month] ?? savedPlan?.actuals[month];
             const dirty = savedValue !== value;
             return (
-              <td
-                key={key}
-                data-forecast-cell={`${series.id}:${month}`}
+              <td key={key} data-forecast-cell={`${series.id}:${month}`}
                 class={`consumption-value-cell consumption-forecast-cell${dirty ? " is-draft" : ""}`}
-                onDblClick={(event) => {
-                  if ((event.target as Element).closest("input")) return;
-                  beginForecastEdit(series, month);
-                }}>
-                {editing ? (
-                  <input
-                    class="consumption-forecast-editor"
-                    type="number"
-                    min="0"
-                    value={`${value ?? 0}`}
-                    aria-label={`${series.endUser} ${month} forecast`}
-                    disabled={isSaving}
-                    onFocus={(event) => (event.currentTarget as HTMLInputElement).select()}
-                    onInput={(event) => updateForecast(series.id, month, Math.max(0, Number((event.currentTarget as HTMLInputElement).value) || 0))}
-                    onKeyDown={editorKeyDown}
-                    autofocus
-                  />
-                ) : (
-                  <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}</span>
-                )}
+                onDblClick={(event) => { if (!(event.target as Element).closest("input")) beginForecastEdit(series, month); }}>
+                {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={`${value ?? 0}`}
+                  data-forecast-editor={key} ref={selectForecastEditor(key)}
+                  aria-label={`${series.endUser} ${month} forecast`} disabled={isSaving}
+                  onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? 0 : parseForecastDecimal(raw); if (parsed !== null) updateForecast(series.id, month, Math.max(0, parsed)); }}
+                  onKeyDown={editorKeyDown} autofocus />
+                  : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}</span>}
               </td>
             );
           }
@@ -655,13 +874,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         </td>
       ];
     });
+  };
 
   return (
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
         <div>
-          <span class="kpi-eyebrow">Signal-integrated Pulse</span>
-          <h1 id="consumptionTitle">Consumption</h1>
+          <h1 id="consumptionTitle">Usage Records</h1>
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
@@ -674,22 +893,29 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <label htmlFor="consumptionFromQuarter">From Quarter
-          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || recordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label htmlFor="consumptionToQuarter">To Quarter
-          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || recordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
-        <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || hasDraftChanges || dataMode !== "backend"} onojAction={() => void applyQuarterRange()}>
+        <label class="consumption-record-search" htmlFor="consumptionRecordSearch">Search
+          <input id="consumptionRecordSearch" type="search" value={draftSearch} placeholder="Account, workload, end user, or Plan"
+            disabled={hasDraftChanges || rangeLoading || recordsLoading}
+            onCompositionStart={() => setSearchComposing(true)}
+            onCompositionEnd={(event) => { setDraftSearch(event.currentTarget.value); setSearchComposing(false); }}
+            onInput={(event) => setDraftSearch(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
+        </label>
+        <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onojAction={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </oj-button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
       </section>
-
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
       <oj-dialog
         id="consumptionImportDialog"
@@ -739,121 +965,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         </section>
       )}
 
-      <section class="consumption-summary-cards" aria-label="Consumption range summary">
-        <article class="kpi-panel"><span>Range Total</span><strong>{currency.format(rangeTotal)}</strong><small>{fromQuarter} → {toQuarter}</small></article>
-        <article class="kpi-panel"><span>Latest Quarter</span><strong>{latestSummary?.total === null || !latestSummary ? "N/A" : currency.format(latestSummary.total)}</strong><small>{latestSummary?.quarter ?? "—"} · {latestSummary?.status ?? "—"}</small></article>
-        <article class="kpi-panel"><span>PreQ Change</span><strong>{signedCurrency(latestSummary?.preQGap ?? null)}</strong><small>Chronological predecessor</small></article>
-        <article class="kpi-panel"><span>Change Alerts</span><strong>{signals.length}</strong><small>Previous 3 completed months · Median + MAD</small></article>
-        <article class="kpi-panel"><span>Forecast / Mixed</span><strong>{currency.format(forecastTotal)}</strong><small>Editable after {currentFiscalMonth || "current month"}</small></article>
-      </section>
-
-      <section class="consumption-pulse-group" aria-labelledby="consumptionPulseGroupTitle">
-        <button type="button" class="consumption-disclosure consumption-pulse-toggle" aria-expanded={pulseExpanded}
-          aria-controls="consumptionPulseContent" onClick={() => setPulseExpanded((expanded) => !expanded)}>
-          <span class={pulseExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
-          <span id="consumptionPulseGroupTitle">Consumption Change Alerts & Trend</span>
-        </button>
-      {pulseExpanded && <div id="consumptionPulseContent" class="consumption-pulse-layout">
-        <section class="kpi-panel consumption-signal-panel" aria-labelledby="consumptionSignalTitle">
-          <div class="consumption-section-heading">
-            <div>
-              <span class="kpi-section-label">Usual-level comparison</span>
-              <h2 id="consumptionSignalTitle">Consumption Change Alerts</h2>
-              <p>Previous 3 completed months · <span class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
-                data-tooltip="Median is the middle of the previous three completed monthly ACTUAL values, so one unusually high or low month has less influence.">Median</span> · MAX($50, 5%, <span
-                class="consumption-metric-help consumption-fast-tooltip" tabIndex={0}
-                data-tooltip="MAD is the median absolute deviation from the Median. It measures the Plan's usual month-to-month spread and helps avoid noisy alerts.">MAD</span> × 3)</p>
-            </div>
-            <span class="consumption-count-badge">{signals.length}</span>
-          </div>
-          <div id="consumptionSignalInbox" class="consumption-signal-inbox">
-            {signals.map((signal) => {
-              const presentation = consumptionSignalPresentation(signal);
-              const linkedPlan = draftPlans.find((plan) => signal.serverPlanId !== undefined
-                ? plan.serverPlanId === signal.serverPlanId
-                : plan.customer === signal.customer && plan.planId === signal.planId);
-              return (
-              <button
-                type="button"
-                class={selectedSignal?.id === signal.id ? "consumption-signal is-selected" : "consumption-signal"}
-                aria-pressed={selectedSignal?.id === signal.id}
-                aria-label={consumptionSignalAccessibleLabel(signal)}
-                onClick={() => selectSignal(signal)}>
-                <span class="consumption-signal-main"><strong>{signal.customer}</strong>
-                  <span>Workload: {linkedPlan?.workload || "Not mapped"}</span>
-                  <small>{signal.endUser} · Plan {signal.planId}</small></span>
-                <span class="consumption-signal-metrics"><strong>{shortMonth(signal.month)} Actual</strong><span>{currency.format(signal.latestActual)}</span></span>
-                <span class="consumption-signal-status"><span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-                  <span class={`consumption-signal-grade is-${signal.grade.toLowerCase()}`}>{signal.grade}</span></span>
-              </button>
-              );
-            })}
-            {signals.length === 0 && <p class="consumption-empty-state">No Plans exceeded the three-month median and MAD allowance.</p>}
-          </div>
-        </section>
-
-        <section class="kpi-panel consumption-trend-panel" aria-labelledby="consumptionTrendTitle">
-          <div class="consumption-section-heading">
-            <div>
-              <span class="kpi-section-label">Linked context</span>
-              <h2 id="consumptionTrendTitle">Consumption Trend</h2>
-              <p>{selectedPlanLabel}</p>
-            </div>
-            <div class="consumption-account-selector">
-              <label htmlFor="consumptionAccountSelector">Plan</label>
-              <input id="consumptionAccountSelector" type="search" role="combobox" aria-label="Search or select trend plan"
-                aria-expanded={accountSelectorOpen} aria-controls="consumptionAccountOptions" autocomplete="off"
-                aria-activedescendant={accountSelectorOpen ? `consumptionPlanOption-${activePlanIndex}` : undefined}
-                placeholder={selectedPlanLabel}
-                value={planSearch}
-                onFocus={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
-                onClick={() => { setAccountSelectorOpen(true); setActivePlanIndex(0); }}
-                onBlur={() => setAccountSelectorOpen(false)}
-                onKeyDown={handlePlanSelectorKeyDown}
-                onInput={(event) => { setPlanSearch((event.currentTarget as HTMLInputElement).value); setActivePlanIndex(0); setAccountSelectorOpen(true); }} />
-              {accountSelectorOpen && (
-                <div id="consumptionAccountOptions" class="consumption-account-options" role="listbox" aria-label="Trend plan options">
-                  <button id="consumptionPlanOption-0" type="button" role="option" aria-selected={selectedSeriesId === "__all__"} onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectTrendPlan(null)}>All accounts · Total</button>
-                  {filteredPlans.map((plan, index) => <button id={`consumptionPlanOption-${index + 1}`} key={plan.id} type="button" role="option" aria-selected={selectedSeriesId === plan.id}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectTrendPlan(plan)}>{getConsumptionPlanLabel(plan)}</button>)}
-                </div>
-              )}
-            </div>
-          </div>
-          <oj-chart
-            id="consumptionTrendChart"
-            type="line"
-            data={trendDataProvider}
-            animationOnDisplay="auto"
-            animationOnDataChange="auto"
-            legend={{ rendered: "off" }}
-            aria-label="Linked monthly consumption trend">
-            <template slot="itemTemplate" render={renderConsumptionChartItem}></template>
-          </oj-chart>
-          {selectedSignal && (() => {
-            const presentation = consumptionSignalPresentation(selectedSignal);
-            const previousDirection = consumptionPreviousDirection(selectedSignal);
-            return (
-            <div class="consumption-signal-reason" role="note">
-              <span class={`consumption-signal-type ${presentation.tone}`}>{presentation.label}</span>
-              <div><strong>{selectedSignal.month} · Previous month: {previousDirection.label}</strong><p>{selectedSignal.reason} Allowance: {currency.format(selectedSignal.allowance)}. Plan ID: {selectedSignal.planId}.</p></div>
-            </div>
-            );
-          })()}
-        </section>
-      </div>}
-      </section>
-
       <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
         <div class="consumption-section-heading consumption-table-heading">
-          <button type="button" class="consumption-disclosure consumption-table-toggle" aria-expanded={tableExpanded}
-            aria-controls="consumptionTableContent" onClick={() => setTableExpanded((expanded) => !expanded)}>
-            <span class={tableExpanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span>
+          <div class="consumption-table-toggle">
             <span><span class="kpi-section-label">Actual + Forecast</span>
               <strong id="consumptionTableTitle" class="consumption-table-title">End User / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></span>
-          </button>
+          </div>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
               <span>Draft changes</span>
@@ -862,12 +979,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </div>
           )}
         </div>
-        {tableExpanded && <div id="consumptionTableContent" class="consumption-table-content">
+        <div id="consumptionTableContent" class="consumption-table-content">
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
         </div>
-        <div ref={tableScrollRef} class={visibleTableRowCount > 10 ? "consumption-table-scroll is-scrollable-y" : "consumption-table-scroll"} tabIndex={0} aria-label="Scrollable Consumption table" onScroll={updateTableScrollState} onKeyDown={handleTableKeyDown}>
+        <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Usage Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
               <tr>
@@ -889,7 +1006,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </tr>
             </thead>
             <tbody>
-              {accounts.map((account) => {
+              {renderedRecordAccounts.map((account) => {
                 const expandable = account.plans.length > 1;
                 const expanded = expandable && expandedAccounts.has(account.customer);
                 const singlePlan = account.plans[0];
@@ -934,7 +1051,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </tbody>
           </table>
         </div>
-        </div>}
+        <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
+          <span class="consumption-records-loading" role="status" aria-live="polite" aria-atomic="true">
+            {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Usage Records…</span></>}
+          </span>
+          {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
+          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
+        </div>
+        </div>
       </section>
     </section>
   );

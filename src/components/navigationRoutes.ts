@@ -4,7 +4,8 @@ export type NavigationRouteModule =
   | "myCustomers360"
   | "accountsWorkloads"
   | "weeklyActivities"
-  | "consumption"
+  | "consumptionInsights"
+  | "consumptionRecords"
   | "profile"
   | "users";
 
@@ -27,7 +28,8 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
-  { id: "consumption", module: "consumption", pageTitle: "Consumption" },
+  { id: "usage-insights", module: "consumptionInsights", pageTitle: "Usage Insights" },
+  { id: "usage-records", module: "consumptionRecords", pageTitle: "Usage Records" },
   { id: "profile", module: "profile", pageTitle: "Profile" },
   { id: "users", module: "users", pageTitle: "Users" }
 ];
@@ -45,6 +47,7 @@ export const getNavigationPath = (route: NavigationRouteDefinition): string =>
 
 export const getNavigationRouteFromPath = (pathname: string): NavigationRouteDefinition => {
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
+  if (normalized === "consumption") return getNavigationRoute("usage-insights");
   return getNavigationRoute(normalized || "home");
 };
 

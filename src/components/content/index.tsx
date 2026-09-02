@@ -20,6 +20,7 @@ import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionPage } from "./ConsumptionPage";
+import { UsageInsightsPage } from "./UsageInsightsPage";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
 import type { AuthSession } from "../../auth/authSession";
@@ -418,7 +419,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      {!['profile', 'users', 'consumption'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      {!['profile', 'users', 'consumptionRecords'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -619,9 +620,10 @@ export function Content({
         )
       ) : activeRoute.module === "weeklyActivities" ? (
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
-      ) : activeRoute.module === "consumption" ? (
+      ) : activeRoute.module === "consumptionInsights" ? (
+        <UsageInsightsPage fiscalYear={fiscalYear} />
+      ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionPage
-          key={fiscalYear}
           fiscalYear={fiscalYear}
           onNavigationGuardChange={onKpiNavigationGuardChange}
         />
