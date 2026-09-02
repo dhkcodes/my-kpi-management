@@ -3,6 +3,7 @@ import {
   canUseConsumptionFallback,
   ConsumptionConflictError,
   ConsumptionNetworkError,
+  exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   saveConsumptionForecasts
@@ -71,6 +72,20 @@ void (async () => {
   assert.deepEqual(records.accountGroups.map((group) => group.account), ["A"]);
   assert.equal(records.accountGroups[0].plans[0].workload, "Autonomous Database");
   assert.deepEqual([records.totalAccounts, records.nextOffset, records.hasMore], [11, 11, false]);
+
+  runtime.fetch = async (input, init) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible");
+    assert.equal(init?.method, "GET");
+    return new Response("\uFEFFCustomer,End User,Sold To,Plan ID,Data Center,Plan Type,FY27-AUG,Total\r\nA,EU,,P1,DC,OCI,$100,$100\r\n", {
+      status: 200,
+      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="consumption-actuals-export.csv"' }
+    });
+  };
+  const exported = await exportConsumptionImportCompatibleCsv();
+  assert.equal(exported.fileName, "consumption-actuals-export.csv");
+  const exportedBytes = new Uint8Array(await exported.blob.arrayBuffer());
+  assert.deepEqual([...exportedBytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.match(await exported.blob.text(), /^Customer,End User,Sold To,Plan ID,Data Center,Plan Type,/);
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=&toQuarter=&search=&sort=ACCOUNT&direction=ASC&offset=0&limit=10");

@@ -106,6 +106,7 @@ export type ConsumptionImportResult = Readonly<{
   appliedCount: number;
   sourceRowCount: number;
 }>;
+export type ConsumptionCsvExport = Readonly<{ blob: Blob; fileName: string }>;
 
 export class ConsumptionApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); this.name = "ConsumptionApiError"; }
@@ -512,6 +513,26 @@ export const previewConsumptionImport = async (csv: string): Promise<Consumption
   const raw = payload as { plans?: unknown[]; controlTotals?: unknown[]; sourceRowCount?: number; sourceSha256?: string };
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.controlTotals) || typeof raw.sourceRowCount !== "number" || typeof raw.sourceSha256 !== "string") throw new Error("Malformed Consumption import preview");
   return { planCount: raw.plans.length, controlTotalCount: raw.controlTotals.length, sourceRowCount: raw.sourceRowCount, sourceSha256: raw.sourceSha256 };
+};
+export const exportConsumptionImportCompatibleCsv = async (): Promise<ConsumptionCsvExport> => {
+  let response: Response;
+  try {
+    response = await apiFetch(`${apiBase()}/consumption/exports/import-compatible`, { method: "GET" });
+  } catch (cause) {
+    throw new ConsumptionNetworkError(cause);
+  }
+  if (!response.ok) {
+    let error: { code?: unknown; message?: unknown } = {};
+    try { error = await response.clone().json() as typeof error; } catch { /* sanitized below */ }
+    throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
+      typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const blob = await response.blob();
+  if (!contentType.toLowerCase().startsWith("text/csv") || blob.size === 0) throw new Error("Malformed Consumption CSV export response");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
+  return { blob, fileName: match?.[1] ?? "consumption-actuals-export.csv" };
 };
 export const applyConsumptionImport = async (csv: string): Promise<ConsumptionImportResult> => {
   const { response, payload } = await request("/consumption/imports/apply", { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: csv });
