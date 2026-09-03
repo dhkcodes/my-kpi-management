@@ -75,7 +75,7 @@ assert.match(appSource, /item\.children \? \([\s\S]*kpi-menu-group__label[\s\S]*
 assert.match(appSource, /href=\{getNavigationPath\(route\)\}[\s\S]*onNavigate\(item\.id\)/, "Home and leaf destinations retain real route hrefs and the existing navigation handoff");
 assert.match(appSource, /id="kpiNavigationClose"[\s\S]*onojAction=\{closeNavigation\}/, "the popup has an explicit close action");
 assert.doesNotMatch(appSource, /<aside id="kpiSideNavigation"/, "the former left rail is removed");
-assert.match(cssSource, /\.kpi-shell__body,[\s\S]*display:\s*block/, "removing the rail returns the reserved column to unchanged content");
+assert.match(cssSource, /\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "removing the rail returns its column while preserving the grid height contract for scroll-owning pages");
 assert.match(cssSource, /\.kpi-menu-group\s*\{[\s\S]*grid-template-columns:\s*10\.25rem minmax\(0, 1fr\)/, "the selected Dense Category Matrix layout keeps compact labeled rows");
 assert.match(headerSource, /aria-controls="kpiNavigationPopup"[\s\S]*navigationOpen \? "oj-ux-ico-close" : "oj-ux-ico-menu"/, "the existing first header button controls the popup and exposes distinct open/closed icons");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
