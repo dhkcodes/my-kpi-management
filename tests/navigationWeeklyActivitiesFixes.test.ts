@@ -79,8 +79,12 @@ assert.match(cssSource, /\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-te
 assert.match(cssSource, /\.kpi-menu-group\s*\{[\s\S]*grid-template-columns:\s*10\.25rem minmax\(0, 1fr\)/, "the selected Dense Category Matrix layout keeps compact labeled rows");
 assert.match(cssSource, /\.kpi-menu-link\s*\{[\s\S]*border-radius:\s*999px[\s\S]*font-size:\s*0\.875rem[\s\S]*line-height:\s*1\.35/, "leaf links use readable compact pill geometry");
 assert.match(cssSource, /\.kpi-menu-link:hover\s*\{[\s\S]*background:\s*#fbe9e7[\s\S]*color:\s*#6e251b/, "hover uses high-contrast Redwood warm colors instead of blue");
+assert.match(cssSource, /\.kpi-menu-link:hover\s*\{[^}]*text-decoration:\s*none/, "hover never introduces link underlines");
 assert.match(cssSource, /\.kpi-menu-link:focus-visible\s*\{[\s\S]*outline:\s*3px solid #312d2a[\s\S]*outline-offset:\s*2px/, "keyboard focus has a strong visible outline");
 assert.match(cssSource, /\.kpi-menu-link\.is-selected\s*\{[\s\S]*background:\s*#8b2f22[\s\S]*color:\s*#fff/, "the current selection uses a distinct high-contrast Redwood pill");
+assert.match(cssSource, /\.kpi-menu-matrix\s*\{[\s\S]*width:\s*min\(68\.75rem, calc\(100vw - 2rem\)\)/, "desktop popup widens enough to keep KPI Activities near two rows");
+assert.match(cssSource, /\.kpi-menu-link__label\s*\{[^}]*order:\s*2/, "KPI code badges remain before their labels in visual order");
+assert.match(cssSource, /\.kpi-menu-link \.kpi-navigation-code-badge\s*\{[\s\S]*background:\s*#f7e7e4[\s\S]*border-radius:\s*0\.35rem[\s\S]*font-size:\s*0\.6875rem[\s\S]*order:\s*1/, "KPI codes use compact Redwood tonal badges before labels");
 assert.match(headerSource, /aria-controls="kpiNavigationPopup"[\s\S]*navigationOpen \? "oj-ux-ico-close" : "oj-ux-ico-menu"/, "the existing first header button controls the popup and exposes distinct open/closed icons");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
 assert.match(appSource, /anchor\.closest\("#kpiNavigationPopup"\)/, "the document capture guard does not compete with popup leaf navigation");
