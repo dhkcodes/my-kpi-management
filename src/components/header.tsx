@@ -21,7 +21,7 @@ export function Header({ appName, profile, navigationOpen, onToggleNavigation, o
       <div class="oj-flex-bar oj-sm-align-items-center kpi-header__bar">
         <div class="oj-flex-bar-start oj-sm-align-items-center kpi-header__start">
           <span class="kpi-header__toggle">
-            <oj-button id="navigationToggle" chroming="borderless" display="icons" aria-label={navigationOpen ? "Close navigation" : "Open navigation"} aria-controls="kpiSideNavigation" aria-expanded={navigationOpen ? "true" : "false"} onojAction={onToggleNavigation}>
+            <oj-button id="navigationToggle" chroming="borderless" display="icons" aria-label={navigationOpen ? "Close menu" : "Open menu"} aria-controls="kpiNavigationPopup" aria-expanded={navigationOpen ? "true" : "false"} onojAction={onToggleNavigation}>
               <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
             </oj-button>
           </span>

@@ -56,12 +56,12 @@ import {
   KpiGuideRecord,
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
-import "ojs/ojnavigationlist";
-import ArrayTreeDataProvider = require("ojs/ojarraytreedataprovider");
-import { KeySet, KeySetImpl } from "ojs/ojkeyset";
 import type { AuthSession } from "../auth/authSession";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
 import { subscribeAuthRequired } from "../auth/apiFetch";
+import "ojs/ojbutton";
+import "ojs/ojpopup";
+import type { ojPopup } from "ojs/ojpopup";
 
 type Props = Readonly<{
   appName?: string;
@@ -76,51 +76,23 @@ type AuthenticatedAppProps = Readonly<{
 const defaultAccountWorkloadMetadata = getAccountWorkloadMetadata();
 const UNSAVED_WEEKLY_ACTIVITY_MESSAGE = "Discard the unsaved Weekly Activity changes?";
 
-type NavigationItemTemplateContext = Readonly<{
-  data: NavigationItem;
-  key: string;
-  leaf: boolean;
-}>;
-
-const navigationDataProvider = new ArrayTreeDataProvider<string, NavigationItem>(navItems, {
-  keyAttributes: "id",
-  childrenAttribute: "children"
-});
-
-const navigationItemsById = new Map<string, NavigationItem>();
-const navigationParentByLeafId = new Map<string, string>();
-for (const item of navItems) {
-  navigationItemsById.set(item.id, item);
-  for (const child of item.children ?? []) {
-    navigationItemsById.set(child.id, child);
-    navigationParentByLeafId.set(child.id, item.id);
-  }
-}
-
-const getExpandedNavigationKeys = (navigationId: string): KeySetImpl<string> => {
-  const parentId = navigationParentByLeafId.get(navigationId);
-  return new KeySetImpl(parentId ? [parentId] : []);
-};
-
-const isLeafNavigationId = (navigationId: string): boolean => {
-  const item = navigationItemsById.get(navigationId);
-  return Boolean(item && !item.children);
-};
-
-function renderNavigationItem(context: NavigationItemTemplateContext) {
-  const { data: item, leaf } = context;
+function renderDenseNavigationLink(item: NavigationItem, selectedNavigationId: string, onNavigate: (navigationId: string) => void) {
+  const route = getNavigationRoute(item.id);
   return (
     <a
-      data-app-navigation={leaf ? "true" : undefined}
-      data-navigation-id={leaf ? item.id : undefined}
-      data-navigation-parent-id={leaf ? undefined : item.id}
-      title={item.label}>
-      <span class="kpi-navigation-row">
+      class={selectedNavigationId === item.id ? "kpi-menu-link is-selected" : "kpi-menu-link"}
+      data-app-navigation="true"
+      data-navigation-id={item.id}
+      href={getNavigationPath(route)}
+      aria-current={selectedNavigationId === item.id ? "page" : undefined}
+      onClick={(event) => {
+        event.preventDefault();
+        onNavigate(item.id);
+      }}>
+      <span class="kpi-menu-link__content">
         {item.icon && <span class={`kpi-navigation-icon ${item.icon}`} aria-hidden="true"></span>}
         {item.code && item.codePlacement === "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green kpi-navigation-code-badge--before">{item.code}</span>}
-        <span class="kpi-navigation-label" title={item.label} tabIndex={0}>
-          <span class="kpi-navigation-label__text">{item.label}</span>
-        </span>
+        <span class="kpi-menu-link__label">{item.label}</span>
         {item.code && item.codePlacement !== "before" && <span class="kpi-navigation-code-badge kpi-navigation-code-badge--green">{item.code}</span>}
       </span>
     </a>
@@ -134,14 +106,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const initialRoute = requestedInitialRoute.module === "users" && profile.access !== "Admin"
       ? getNavigationRoute("home")
       : requestedInitialRoute;
-    const [isDesktopNavigation, setIsDesktopNavigation] = useState(() =>
-      typeof window === "undefined" ? true : window.matchMedia("(min-width: 1025px)").matches
-    );
-    const [navigationOpen, setNavigationOpen] = useState(isDesktopNavigation);
+    const [navigationOpen, setNavigationOpen] = useState(false);
+    const navigationPopupRef = useRef<ojPopup | null>(null);
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const fiscalYearRef = useRef(fiscalYear);
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
-    const [expandedNavigationKeys, setExpandedNavigationKeys] = useState<KeySet<string>>(() => getExpandedNavigationKeys(initialRoute.id));
+
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
     const activeRouteRef = useRef(initialRoute);
     const activeRouteModuleRef = useRef(initialRoute.module);
@@ -329,7 +299,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         const anchor = event.target.closest("a[href]") as HTMLAnchorElement | null;
         if (!anchor) return;
         if (isDialogPlaceholderControlAnchor(anchor.getAttribute("href"), Boolean(anchor.closest("[role=\"dialog\"] [role=\"grid\"]")))) return;
-        if (anchor.closest("oj-navigation-list")) return;
+        if (anchor.closest("oj-navigation-list") || anchor.closest("#kpiNavigationPopup")) return;
         if (!isCurrentContextAnchorNavigation(event, {
           href: anchor.href,
           target: anchor.getAttribute("target"),
@@ -405,7 +375,6 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           activeRouteRef.current = route;
           activeRouteModuleRef.current = route.module;
           setSelectedNavigationId(route.id);
-          setExpandedNavigationKeys(getExpandedNavigationKeys(route.id));
           setActiveRoute(route);
         };
         if (!isConfirmedKpiRetry && destinationChanged && kpiNavigationGuardRef.current) {
@@ -448,24 +417,17 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       return () => window.removeEventListener("popstate", handlePopState);
     }, []);
 
-    useEffect(() => {
-      const mediaQuery = window.matchMedia("(min-width: 1025px)");
-      const syncNavigationMode = (event: MediaQueryListEvent | MediaQueryList) => {
-        setIsDesktopNavigation(event.matches);
-        setNavigationOpen(event.matches);
-      };
-
-      syncNavigationMode(mediaQuery);
-      mediaQuery.addEventListener("change", syncNavigationMode);
-      return () => mediaQuery.removeEventListener("change", syncNavigationMode);
-    }, []);
-
     const closeNavigation = () => {
-      if (!isDesktopNavigation) {
-        setNavigationOpen(false);
-      }
+      navigationPopupRef.current?.close();
     };
-    const handleNavigate = (navigationId: string) => {
+    const toggleNavigation = () => {
+      const popup = navigationPopupRef.current;
+      const launcher = document.getElementById("navigationToggle");
+      if (!popup || !launcher) return;
+      if (popup.isOpen()) popup.close();
+      else popup.open(launcher);
+    };
+    const handleNavigate = (navigationId: string, onAccepted?: () => void) => {
       const route = getNavigationRoute(navigationId);
       const destinationHref = new URL(getNavigationPath(route), window.location.href).href;
       const destinationChanged = hasNavigationDestinationChanged(
@@ -474,7 +436,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         activeLocationHrefRef.current,
         destinationHref
       );
-      if (!destinationChanged) return;
+      if (!destinationChanged) {
+        onAccepted?.();
+        return;
+      }
       const navigate = () => {
         if (!confirmWeeklyActivitiesNavigation(route, destinationHref)) return;
         if (route.module !== activeRouteModuleRef.current) {
@@ -484,22 +449,14 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         activeRouteRef.current = route;
         activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(navigationId);
-        setExpandedNavigationKeys(getExpandedNavigationKeys(navigationId));
         setActiveRoute(route);
         historyIndexRef.current += 1;
         window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));
+        onAccepted?.();
       };
       const kpiGuard = kpiNavigationGuardRef.current;
       if (kpiGuard) kpiGuard(route.pageTitle, navigate);
       else navigate();
-    };
-    const handleNavigationSelectionAction = (event: CustomEvent<{ value: unknown }>) => {
-      const navigationId = typeof event.detail.value === "string" ? event.detail.value : "";
-      if (!navigationId || !isLeafNavigationId(navigationId)) return;
-      handleNavigate(navigationId);
-    };
-    const handleExpandedNavigationChanged = (event: CustomEvent<{ value: KeySet<string> }>) => {
-      setExpandedNavigationKeys(event.detail.value);
     };
 
     const handleFiscalYearChange = (nextFiscalYear: FiscalYear) => {
@@ -589,27 +546,57 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           appName={appName}
           profile={profile}
           navigationOpen={navigationOpen}
-          onToggleNavigation={() => setNavigationOpen((value) => !value)}
+          onToggleNavigation={toggleNavigation}
           onNavigate={handleNavigate}
           onLogout={onLogout}
         />
-        <div class={navigationOpen ? "kpi-mobile-scrim is-open" : "kpi-mobile-scrim"} onClick={closeNavigation}></div>
+        <oj-popup
+          ref={navigationPopupRef}
+          id="kpiNavigationPopup"
+          class="kpi-menu-popup"
+          autoDismiss="focusLoss"
+          initialFocus="firstFocusable"
+          modality="modeless"
+          tail="none"
+          position={{
+            my: { horizontal: "start", vertical: "top" },
+            at: { horizontal: "start", vertical: "bottom" },
+            of: "#navigationToggle",
+            collision: "fit"
+          }}
+          onojOpen={() => setNavigationOpen(true)}
+          onojClose={() => setNavigationOpen(false)}>
+          <nav class="kpi-menu-matrix" aria-label="KPI workspace navigation">
+            <div class="kpi-menu-matrix__header">
+              <span class="kpi-menu-matrix__title">Menu</span>
+              <oj-button id="kpiNavigationClose" chroming="borderless" display="icons" aria-label="Close navigation" onojAction={closeNavigation}>
+                <span slot="startIcon" class="oj-ux-ico-close" aria-hidden="true"></span>
+              </oj-button>
+            </div>
+            <div class="kpi-menu-matrix__rows">
+              {navItems.map((item) => item.children ? (
+                <section key={item.id} class="kpi-menu-group" aria-labelledby={`kpi-menu-group-${item.id}`}>
+                  <div id={`kpi-menu-group-${item.id}`} class="kpi-menu-group__label">
+                    {item.icon && <span class={`kpi-menu-group__icon ${item.icon}`} aria-hidden="true"></span>}
+                    <span>{item.label}</span>
+                  </div>
+                  <div class="kpi-menu-group__links">
+                    {item.children.map((child) => renderDenseNavigationLink(child, selectedNavigationId, (navigationId) => {
+                      handleNavigate(navigationId, closeNavigation);
+                    }))}
+                  </div>
+                </section>
+              ) : (
+                <section key={item.id} class="kpi-menu-group kpi-menu-group--home" aria-label="Home">
+                  {renderDenseNavigationLink(item, selectedNavigationId, (navigationId) => {
+                    handleNavigate(navigationId, closeNavigation);
+                  })}
+                </section>
+              ))}
+            </div>
+          </nav>
+        </oj-popup>
         <div class="kpi-shell__body">
-          <aside id="kpiSideNavigation" class={navigationOpen ? "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-open" : "kpi-side-nav oj-bg-neutral-170 oj-color-invert is-closed"} aria-label="KPI workspace navigation">
-            <oj-navigation-list
-              class="kpi-navigation-list"
-              data={navigationDataProvider}
-              drillMode="sliding"
-              expanded={expandedNavigationKeys}
-              item={{ selectable: (context) => !context.data.children }}
-              rootLabel="Home"
-              selection={selectedNavigationId}
-              onexpandedChanged={handleExpandedNavigationChanged}
-              onojSelectionAction={handleNavigationSelectionAction}
-              aria-label="KPI navigation">
-              <template slot="itemTemplate" render={renderNavigationItem}></template>
-            </oj-navigation-list>
-          </aside>
           <Content
             activeRoute={activeRoute}
             profile={profile}
