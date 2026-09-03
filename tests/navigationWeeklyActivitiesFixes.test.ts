@@ -75,7 +75,7 @@ assert.match(appSource, /item\.children \? \([\s\S]*kpi-menu-group__label[\s\S]*
 assert.match(appSource, /href=\{getNavigationPath\(route\)\}[\s\S]*onNavigate\(item\.id\)/, "Home and leaf destinations retain real route hrefs and the existing navigation handoff");
 assert.match(appSource, /id="kpiNavigationClose"[\s\S]*onojAction=\{closeNavigation\}/, "the popup has an explicit close action");
 assert.doesNotMatch(appSource, /<aside id="kpiSideNavigation"/, "the former left rail is removed");
-assert.match(cssSource, /\.kpi-shell__body,[\s\S]*display:\s*block/, "removing the rail returns the reserved column to unchanged content");
+assert.match(cssSource, /\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "removing the rail returns its column while preserving the grid height contract for scroll-owning pages");
 assert.match(cssSource, /\.kpi-menu-group\s*\{[\s\S]*grid-template-columns:\s*10\.25rem minmax\(0, 1fr\)/, "the selected Dense Category Matrix layout keeps compact labeled rows");
 assert.match(cssSource, /\.kpi-menu-link\s*\{[\s\S]*border-radius:\s*999px[\s\S]*font-size:\s*0\.875rem[\s\S]*line-height:\s*1\.35/, "leaf links use readable compact pill geometry");
 assert.match(cssSource, /\.kpi-menu-link:hover\s*\{[\s\S]*background:\s*#fbe9e7[\s\S]*color:\s*#6e251b/, "hover uses high-contrast Redwood warm colors instead of blue");

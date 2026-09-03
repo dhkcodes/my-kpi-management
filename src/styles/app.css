@@ -2771,10 +2771,11 @@ h4.weekly-activity-section-label--next-week,
   color: #6e251b;
 }
 
-/* The popup replaces the former rail; the application content remains unchanged. */
+/* The popup replaces the former rail while preserving the shell's height contract. */
 .kpi-shell__body,
 .kpi-shell__body:has(.kpi-side-nav.is-closed) {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .kpi-content {
