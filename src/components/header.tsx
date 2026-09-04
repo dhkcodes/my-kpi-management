@@ -25,7 +25,7 @@ export function Header({ appName, profile, navigationOpen, onToggleNavigation, o
               <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
             </oj-button>
           </span>
-          <div class="kpi-header__brand" aria-label="My KPI & Account Planner"><span class="demo-oracle-icon" role="img" aria-label="Oracle"></span><span class="kpi-header__divider" aria-hidden="true"></span><span class="kpi-header__title">{appName}</span></div>
+          <div class="kpi-header__brand" aria-label={appName}><span class="demo-oracle-icon" role="img" aria-label="Oracle"></span><span class="kpi-header__divider" aria-hidden="true"></span><span class="kpi-header__title">{appName}</span></div>
         </div>
         <div class="oj-flex-bar-end kpi-header__end">
           <oj-toolbar aria-label="User actions">

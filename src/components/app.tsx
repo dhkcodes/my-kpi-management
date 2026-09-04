@@ -107,6 +107,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       ? getNavigationRoute("home")
       : requestedInitialRoute;
     const [navigationOpen, setNavigationOpen] = useState(false);
+    const navigationIntentOpenRef = useRef(false);
     const navigationPopupRef = useRef<ojPopup | null>(null);
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const fiscalYearRef = useRef(fiscalYear);
@@ -418,14 +419,23 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     }, []);
 
     const closeNavigation = () => {
+      navigationIntentOpenRef.current = false;
+      setNavigationOpen(false);
       navigationPopupRef.current?.close();
     };
     const toggleNavigation = () => {
       const popup = navigationPopupRef.current;
       const launcher = document.getElementById("navigationToggle");
       if (!popup || !launcher) return;
-      if (popup.isOpen()) popup.close();
-      else popup.open(launcher);
+      if (popup.isOpen()) {
+        navigationIntentOpenRef.current = false;
+        setNavigationOpen(false);
+        popup.close();
+      } else {
+        navigationIntentOpenRef.current = true;
+        setNavigationOpen(true);
+        popup.open(launcher);
+      }
     };
     const handleNavigate = (navigationId: string, onAccepted?: () => void) => {
       const route = getNavigationRoute(navigationId);
@@ -564,8 +574,11 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             of: "#navigationToggle",
             collision: "fit"
           }}
-          onojOpen={() => setNavigationOpen(true)}
-          onojClose={() => setNavigationOpen(false)}>
+          onojOpen={() => setNavigationOpen(navigationIntentOpenRef.current)}
+          onojClose={() => {
+            navigationIntentOpenRef.current = false;
+            setNavigationOpen(false);
+          }}>
           <nav class="kpi-menu-matrix" aria-label="KPI workspace navigation">
             <div class="kpi-menu-matrix__header">
               <span class="kpi-menu-matrix__title">Menu</span>
@@ -678,7 +691,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
 export const App = registerCustomElement(
   "app-root",
-  ({ appName = "My KPI & Account Planner" }: Props) => {
+  ({ appName = "My KPIs & Account Planner" }: Props) => {
     const [session, setSession] = useState<AuthSession | null>(null);
     const [authChecking, setAuthChecking] = useState(true);
 
