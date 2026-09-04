@@ -44,6 +44,14 @@ const ALLOWED_COLORS = new Map<string, string>([
 export const WEEKLY_ACTIVITY_SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"] as const;
 const ALLOWED_SIZES = new Set<string>(WEEKLY_ACTIVITY_SIZES);
 
+/**
+ * Quill can serialize ordinary typed spaces as non-breaking spaces. A whole
+ * sentence then becomes one unbreakable token and may wrap inside a Korean
+ * word even while visible space remains in the activity column.
+ */
+export const normalizeWeeklyActivityBreakableSpaces = (html: string): string =>
+  html.replace(/&(?:nbsp|NonBreakingSpace);|&#0*160;|&#[xX]0*[aA]0;|[\u00A0\u202F]/g, " ");
+
 const NODE_TEST_ENTITY_FALLBACK: Readonly<Record<string, string>> = {
   amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: "\u00A0",
   copy: "©", euro: "€", CounterClockwiseContourIntegral: "∳"
@@ -164,9 +172,10 @@ export const deriveWeeklyActivityPlainText = (html: string): string => {
 
 /** Sanitizes API/editor HTML immediately before it reaches an HTML rendering sink. */
 export const sanitizeWeeklyActivityHtml = (html: string): string => {
-  if (typeof DOMParser === "undefined") return escapeHtml(html);
+  const breakableHtml = normalizeWeeklyActivityBreakableSpaces(html);
+  if (typeof DOMParser === "undefined") return escapeHtml(breakableHtml);
   try {
-    const document = new DOMParser().parseFromString(html, "text/html");
+    const document = new DOMParser().parseFromString(breakableHtml, "text/html");
     for (const element of Array.from(document.body.querySelectorAll("*"))) {
       if (!ALLOWED_HTML_TAGS.has(element.tagName)) {
         element.replaceWith(document.createTextNode(element.textContent ?? ""));
