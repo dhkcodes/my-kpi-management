@@ -80,7 +80,7 @@ function renderDenseNavigationLink(item: NavigationItem, selectedNavigationId: s
   const route = getNavigationRoute(item.id);
   return (
     <a
-      class={selectedNavigationId === item.id ? "kpi-menu-link is-selected" : "kpi-menu-link"}
+      class={selectedNavigationId === item.id ? "kpi-menu-link is-selected" : item.isHighlighted ? "kpi-menu-link is-highlighted" : "kpi-menu-link"}
       data-app-navigation="true"
       data-navigation-id={item.id}
       href={getNavigationPath(route)}
