@@ -34,7 +34,7 @@ assert.match(insightsPage, /const contextTrendLabel[\s\S]*selectedAlert \?[^:]+:
 assert.match(insightsPage, /setSelectedAlertId\(\(current\) => current === alert\.alertId \? "" : alert\.alertId\)/, "clicking a selected alert toggles it off");
 assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.alertId === alert\.alertId\}/, "native alert buttons expose pressed state for mouse, Enter, and Space activation");
 assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
-assert.match(insightsPage, /\{alert\.workload\} · Plan \{alert\.planId\} · DC \{plan\?\.dataCenter \?\? "N\/A"\}/, "each alert places Plan ID and Data Center directly beside the Workload name");
+assert.match(insightsPage, /\{alert\.workload\} · Plan \{alert\.planId\}\{plan && <> · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "each alert places Plan ID and scoped Data Center directly beside the Workload name");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
 assert.match(insightsPage, /slice\(-4\)[\s\S]*markerSize:\s*emphasizedTrendPeriods\.has\(point\.periodKey\) \? 9 : 5/, "the latest four points in the six-month ACTUAL trend retain emphasized chart markers");
@@ -62,11 +62,29 @@ assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete du
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
+// PILLAR is an explicit, accessible page context on both Consumption leaves.
+assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Usage Records exposes the shared compact All, DP, OCI/Other selector");
+assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Usage Insights exposes the shared compact All, DP, OCI/Other selector");
+assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Usage Records sends the selected pillar with every records request");
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Usage Insights sends the selected pillar with every analysis request");
+assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Usage Records exports the selected pillar");
+assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*const accessibleLabel = display\.detail \? `Data center count \$\{display\.primary\}; \$\{display\.detail\}`[\s\S]*aria-label=\{accessibleLabel\}/, "plan DC display exposes the summed All breakdown accessibly");
+assert.match(recordsPage, /display\.duplicateWarning[\s\S]*role="note"/, "All records warn when a cross-pillar duplicate is possible");
+assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
+assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC breakdown instead of raw aggregate text");
+
 // Usage Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /<h1 id="consumptionTitle">Usage Records<\/h1>/, "data-management leaf uses the approved name");
 assert.doesNotMatch(recordsPage, /<span class="kpi-eyebrow">Consumption<\/span>/, "Usage Records removes redundant header copy");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Usage Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains available");
+assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleCsvFiles/, "Import accepts multiple CSV files");
+assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
+assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files, preview/, "multipart preview retains the exact selected File objects and lets filenames own pillar detection");
+assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL"\)/, "multipart apply reuses the retained files as one cross-pillar atomic set");
+assert.match(recordsPage, /pendingImport\.preview\.files\.map[\s\S]*detectedPillar[\s\S]*owner[\s\S]*fromPeriod[\s\S]*toPeriod[\s\S]*sourceRowCount/, "preview lists pillar, owner, range, and counts per file");
+assert.match(recordsPage, /sameValueDuplicateCount[\s\S]*conflictCount[\s\S]*pendingImport\.preview\.conflicts/, "preview summarizes same-value duplicates and conflicting keys");
+assert.match(recordsPage, /pendingImport\.preview\.hasConflicts[\s\S]*disabled=\{pendingImport\.preview\.hasConflicts\}/, "conflicts block atomic import apply");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Usage Records downloads the server-owned import-compatible Export file and releases the object URL");
 assert.match(recordsPage, /oj-ux-ico-download[\s\S]*Export CSV[\s\S]*oj-ux-ico-upload[\s\S]*Import CSV/, "Export and Import are adjacent Redwood actions with clear icons");
@@ -108,7 +126,7 @@ assert.match(recordsPage, /displayQuarterOrder\.flatMap/, "Data columns follow b
 assert.match(recordsPage, /const expandable = account\.plans\.length > 1[\s\S]*class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*toggleAccount\(account\.customer\)[\s\S]*expandable && expanded && account\.plans\.map/, "Multiple keeps its disclosure and renders child Plan rows only when expanded");
 assert.doesNotMatch(recordsPage, /if \(!append\) \{[\s\S]{0,240}setExpandedAccounts\(new Set\(\)\)/, "Records query replacement does not discard retained Multiple expansion state");
 assert.match(recordsPage, /const expandable = account\.plans\.length > 1[\s\S]*renderQuarterCells\(singlePlan, false\)[\s\S]*renderQuarterCells\(account, true\)/, "single and multi-plan rows preserve edit/read-only behavior");
-assert.match(recordsPage, /data-control-source=\{resolution\?\.source\}[\s\S]*canEditControl \? "CONTROL" : "PLAN SUM"/, "Multiple rows expose manual Control Total versus derived Plan Sum state");
+assert.match(recordsPage, /const canEditControl = false[\s\S]*data-control-source=\{resolution\?\.source\}[\s\S]*resolution\?\.source === "MANUAL" \? "CONTROL" : "PLAN SUM"/, "Pillar Multiple rows expose Control versus Plan Sum state while imported controls remain read-only");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
 assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*submitRecordsQuery[\s\S]*hasDraftChanges/, "Control-only drafts share navigation and explicit query submission guards");
@@ -145,7 +163,7 @@ assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-in
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Usage Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-bar oj-button[^}]*height:\s*2\.25rem/, "range, search, and Apply controls share height and padding rhythm");
-assert.doesNotMatch(recordsPage, /setRecordsTotalAccounts\(0\)[\s\S]*setRecordsHasMore\(false\)/, "replacement loading keeps the prior successful rows and Footer context until the latest response succeeds");
+assert.match(recordsPage, /if\(viewPillar==="ALL"\)[\s\S]*else\{[\s\S]*setSavedPlans\(\[\]\)[\s\S]*setRecordsTotalAccounts\(0\)[\s\S]*setDataMode\("error"\)/, "a committed import followed by typed refresh failure clears stale rows and marks the view unavailable");
 assert.match(styles, /\.consumption-load-more[^}]*(?:^|;)\s*height:\s*3\.75rem/m, "Records footer has a fixed placeholder height during replacement loading");
 assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*min-height:\s*max\(24rem, calc\(100dvh - 15rem\)\)[\s\S]*\.consumption-load-more[^}]*align-self:\s*end[^}]*height:\s*3\.75rem/, "the Records table card fills the remaining viewport and keeps its 60px footer against the card bottom");
 assert.match(styles, /\.consumption-range-bar\s*\{[^}]*padding:\s*\.5rem \.75rem[^}]*row-gap:\s*\.5rem/, "the compact Records range bar has equal vertical padding and row spacing");

@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import {
   ConsumptionPlan,
+  ConsumptionPillar,
   ConsumptionSignal,
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
+  consumptionPillarOptions,
+  formatConsumptionDataCenter,
   getConsumptionPlanLabel,
   getFiscalQuarter,
   getLatestActualMonth,
@@ -27,6 +30,7 @@ import {
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
   ConsumptionConflictError,
+  ConsumptionImportPreview,
   applyConsumptionImport,
   canUseConsumptionFallback,
   exportConsumptionImportCompatibleCsv,
@@ -164,16 +168,10 @@ const SignalSparkline = ({ signal }: Readonly<{ signal: ConsumptionSignal }>) =>
 
 type EditCell = Readonly<{ planKey: string; month: string; control?: boolean }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
-type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "error";
+type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "warning" | "error";
 type PendingImport = Readonly<{
-  csv: string;
-  fileName: string;
-  latestActualMonth: string;
-  parsed: ReturnType<typeof parseConsumptionCsv>;
-  useFallback: boolean;
-  planCount: number;
-  controlTotalCount: number;
-  sourceRowCount: number;
+  files: readonly File[];
+  preview: ConsumptionImportPreview;
 }>;
 type ConsumptionChartPoint = Readonly<{
   id: string;
@@ -192,12 +190,23 @@ const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPo
   </oj-chart-item>
 );
 
+const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: ConsumptionPlan; selectedPillar: ConsumptionPillar }>) => {
+  const display = formatConsumptionDataCenter(plan, selectedPillar);
+  const accessibleLabel = display.detail ? `Data center count ${display.primary}; ${display.detail}` : `Data center ${display.primary}`;
+  return <span class="consumption-data-center" aria-label={accessibleLabel}>
+    <span>DC {display.primary}</span>
+    {display.detail && <span class="consumption-data-center__detail">{display.detail}</span>}
+    {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
+  </span>;
+};
+
 type Props = Readonly<{
   fiscalYear: FiscalYear;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
 }>;
 
 export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) {
+  const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
   const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
@@ -251,6 +260,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const hasDraftChanges = hasPlanDraftChanges || hasControlDraftChanges;
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
+    setSelectedPillar(workspace.selectedPillar);
     setSavedPlans(clonePlans(workspace.plans));
     setDraftPlans(clonePlans(workspace.plans));
     setSavedControlTotals(cloneControlTotals(workspace.controlTotals));
@@ -270,7 +280,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setConflictWorkspace(null);
   };
 
-  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }) => {
+  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }, pillar: ConsumptionPillar = selectedPillar) => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     recordsLoadingRef.current = true;
     setRecordsLoading(true);
@@ -281,11 +291,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         offset: append ? recordsNextOffset : 0,
         limit: append ? 10 : initialConsumptionRecordsBatchSize(window.innerHeight),
         sort: "ACCOUNT",
-        direction: "ASC"
+        direction: "ASC",
+        pillar
       });
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        await loadRecordsPage(false, query);
+        await loadRecordsPage(false, query, pillar);
         return;
       }
       const mergePlans = (current: readonly ConsumptionPlan[]) => {
@@ -298,6 +309,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         });
         return [...accountPlans.values()].flat();
       };
+      setSelectedPillar(page.selectedPillar);
       setSavedPlans((current) => clonePlans(mergePlans(current)));
       setDraftPlans((current) => clonePlans(mergePlans(current)));
       const mergeControls = (current: readonly ConsumptionApiControlTotal[]) => {
@@ -335,7 +347,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   useEffect(() => {
     let active = true;
-    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }).catch((error) => {
+    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL").catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
         const fallbackPlans = clonePlans(initialSeed.plans);
@@ -497,6 +509,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (plan) setSelectedSeriesId(plan.id);
   };
 
+  const selectPillar = async (pillar: ConsumptionPillar) => {
+    if (pillar === selectedPillar || hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle") return;
+    setImportError("");
+    try {
+      await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
+      setSelectedSignalId("");
+      setSelectedSeriesId("__all__");
+      setExpandedAccounts(new Set());
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Consumption pillar could not be loaded.");
+    }
+  };
+
   const submitRecordsQuery = async () => {
     if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing) return;
     const query = { fromQuarter, toQuarter, search: draftSearch.trim() };
@@ -545,7 +570,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const beginForecastEdit = (plan: ConsumptionPlan, month: string) => {
-    if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
+    if (selectedPillar !== "ALL" || isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = plan.forecasts[month] ?? plan.actuals[month] ?? 0;
     setEditCell({ planKey: plan.id, month });
   };
@@ -561,7 +586,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const beginControlEdit = (account: string, month: string, value: number | null) => {
-    if (isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
+    if (selectedPillar !== "ALL" || isSaving || recordsLoading || (dataMode !== "backend" && dataMode !== "fallback")) return;
     editEntryValueRef.current = value;
     setEditCell({ planKey: account, month, control: true });
   };
@@ -605,7 +630,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const saveForecasts = async () => {
-    if (isSaving || recordsLoading) return;
+    if (selectedPillar !== "ALL" || isSaving || recordsLoading) return;
     setEditCell(null);
     editEntryValueRef.current = null;
     setIsSaving(true);
@@ -700,33 +725,26 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (importPhase !== "idle") importDialogRef.current?.open();
   }, [importPhase]);
 
-  const handleCsvFile = async (event: Event) => {
+  const handleCsvFiles = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
     input.value = "";
-    if (!file || dataMode === "loading" || isSaving || exportingRef.current || importPhase === "previewing" || importPhase === "applying") return;
+    if (files.length < 1) return;
+    if (files.length > 8) {
+      setImportError("Select 1 to 8 CSV files.");
+      return;
+    }
+    if (hasDraftChanges || dataMode === "loading" || isSaving || exportingRef.current || importPhase !== "idle") return;
     setImportError("");
     setImportResult("");
     setPendingImport(null);
     setImportPhase("previewing");
     try {
-      const csv = await file.text();
-      const parsed = parseConsumptionCsv(csv);
-      const latestActualMonth = getLatestActualMonth(parsed.plans);
-      if (!latestActualMonth) throw new Error("The imported CSV has no populated fiscal Actual values.");
-      try {
-        const preview = await previewConsumptionImport(csv);
-        setPendingImport({ csv, fileName: file.name, latestActualMonth, parsed, useFallback: false,
-          planCount: preview.planCount, controlTotalCount: preview.controlTotalCount, sourceRowCount: preview.sourceRowCount });
-      } catch (error) {
-        if (!canUseConsumptionFallback(error)) throw error;
-        setPendingImport({ csv, fileName: file.name, latestActualMonth, parsed, useFallback: true,
-          planCount: parsed.plans.length, controlTotalCount: parsed.controlTotals.length,
-          sourceRowCount: parsed.plans.length + parsed.controlTotals.length });
-      }
+      const preview = await previewConsumptionImport(files, "ALL");
+      setPendingImport({ files, preview });
       setImportPhase("preview");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Consumption CSV could not be previewed.";
+      const message = error instanceof Error ? error.message : "Consumption CSV files could not be previewed.";
       setImportError(message);
       setImportResult(message);
       setImportPhase("error");
@@ -734,62 +752,38 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const applyPendingImport = async () => {
-    if (!pendingImport || importPhase !== "preview") return;
+    if (!pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts) return;
     setImportPhase("applying");
     setImportError("");
     try {
-      let loadedPlans = pendingImport.planCount;
-      let loadedControls = pendingImport.controlTotalCount;
-      let importCountDetail = "";
-      if (!pendingImport.useFallback) {
-        const result = await applyConsumptionImport(pendingImport.csv);
-        loadedPlans = result.planCount;
-        loadedControls = result.controlTotalCount;
-        importCountDetail = ` · New plans: ${result.insertedCount} · Overwritten plans: ${result.updatedCount}`;
-        adoptWorkspace(result.workspace);
-        try {
-          await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch });
-        } catch (refreshError) {
+      const viewPillar=selectedPillar;
+      const result = await applyConsumptionImport(pendingImport.files, "ALL");
+      if(viewPillar==="ALL")adoptWorkspace(result.workspace);
+      let refreshFailed=false;
+      try {
+        await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch }, viewPillar);
+      } catch (refreshError) {
+        refreshFailed=true;
+        if(viewPillar==="ALL"){
           adoptWorkspace(result.workspace);
           setRecordsTotalAccounts(aggregateConsumptionAccounts(result.workspace.plans).length);
           setRecordsNextOffset(aggregateConsumptionAccounts(result.workspace.plans).length);
           setRecordsHasMore(false);
-          setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        }else{
+          setSavedPlans([]);setDraftPlans([]);setSavedControlTotals([]);setDraftControlTotals([]);
+          setRecordsTotalAccounts(0);setRecordsNextOffset(0);setRecordsHasMore(false);setDataMode("error");
         }
-      } else {
-        const importedEditablePeriods = getNextQuarterMonths(pendingImport.latestActualMonth);
-        const imported = pendingImport.parsed.plans;
-        const importedHistoryQuarters = [...new Set(pendingImport.parsed.monthKeys.map(getFiscalQuarter))].reverse();
-        const importedForecastQuarters = [...new Set(importedEditablePeriods.map(getFiscalQuarter))];
-        setSavedPlans(clonePlans(imported));
-        setDraftPlans(clonePlans(imported));
-        const importedControls = toApiControlTotals(pendingImport.parsed.controlTotals);
-        setSavedControlTotals(cloneControlTotals(importedControls));
-        setDraftControlTotals(cloneControlTotals(importedControls));
-        setServerSignals(null);
-        setFromQuarter(importedHistoryQuarters[importedHistoryQuarters.length - 1] ?? importedForecastQuarters[0] ?? "");
-        setToQuarter(importedForecastQuarters[importedForecastQuarters.length - 1] ?? importedHistoryQuarters[0] ?? "");
-        setEditablePeriodIds(new Set(importedEditablePeriods));
-        setDisplayQuarterOrder([...importedForecastQuarters, ...importedHistoryQuarters.filter((quarter) => !importedForecastQuarters.includes(quarter))]);
-        setAvailableQuarterOptions([...new Set([...importedHistoryQuarters, ...importedForecastQuarters])].sort());
-        setCurrentFiscalMonth(pendingImport.latestActualMonth);
-        setRangeInitialized(true);
-        setRangeTouched(false);
-        setApiEtag("");
-        setDataMode("fallback");
-        setConflictRows([]);
-        setConflictWorkspace(null);
-
+        setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
       }
       setSelectedSignalId("");
       setExpandedAccounts(new Set());
       setEditCell(null);
-      setImportResult(`Successful rows: ${loadedPlans + loadedControls} · Failed rows: 0 · Applied plans: ${loadedPlans}${importCountDetail} · Control totals: ${loadedControls}`);
-      setImportPhase("complete");
+      setImportResult(`Physical facts: ${result.physicalFactCount} · Same-value rows: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"} · Plans: ${pendingImport.preview.planCount} · Control totals: ${pendingImport.preview.controlTotalCount}`);
+      setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Consumption CSV could not be imported.";
+      const message = error instanceof Error ? error.message : "Consumption CSV files could not be imported.";
       setImportError(message);
-      setImportResult(`Successful rows: 0 · Failed rows: 1 · Loaded plans: 0 · ${message}`);
+      setImportResult(`Applied: 0 · ${message}`);
       setImportPhase("error");
     }
   };
@@ -800,7 +794,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setIsExporting(true);
     setImportError("");
     try {
-      const exported = await exportConsumptionImportCompatibleCsv();
+      const exported = await exportConsumptionImportCompatibleCsv(selectedPillar);
       const url = URL.createObjectURL(exported.blob);
       try {
         const anchor = document.createElement("a");
@@ -850,14 +844,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
-          const editable = editablePeriodIds.has(month);
+          const editable = selectedPillar === "ALL" && editablePeriodIds.has(month);
           const value = editable
             ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
             : actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
           const key = `${series.id}-${month}`;
           if (multiple) {
             const resolution = multipleResolutions[month];
-            const canEditControl = editable && resolution?.editable;
+            const canEditControl = false; // Imported PILLAR controls are provenance records and remain read-only.
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
             const savedValue = controlValue(savedControlTotals, series.customer, month);
             const dirty = savedValue !== controlValue(draftControlTotals, series.customer, month);
@@ -871,7 +865,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
                 : <span>{value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}
-                  {editable && <small>{canEditControl ? "CONTROL" : "PLAN SUM"}</small>}</span>}
+                  {editable && <small>{resolution?.source === "MANUAL" ? "CONTROL" : "PLAN SUM"}</small>}</span>}
             </td>;
           }
           if (!readOnly && editable && "planId" in series && series.planType !== "Aggregate") {
@@ -910,16 +904,23 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       <header class="consumption-page__header">
         <div>
           <h1 id="consumptionTitle">Usage Records</h1>
+          <div class="consumption-pillar-selector" role="group" aria-label="Usage Records pillar">
+            {consumptionPillarOptions.map((option) => <button key={option.value} type="button"
+              aria-pressed={selectedPillar === option.value}
+              disabled={hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle"}
+              onClick={() => void selectPillar(option.value)}>{option.label}</button>)}
+          </div>
         </div>
         <div class="consumption-import-actions">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" disabled={dataMode === "loading" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"} onChange={(event) => void handleCsvFile(event)} />
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
+            disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
             disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportImportCompatibleCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Export CSV"}
           </oj-button>
-          <oj-button chroming="outlined" disabled={dataMode === "loading" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Import CSV
           </oj-button>
@@ -972,22 +973,41 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           )}
           {importPhase === "preview" && pendingImport && (
             <div class="consumption-import-preview">
-              <p><strong>{pendingImport.fileName}</strong> passed validation.</p>
-              <dl><div><dt>Source rows</dt><dd>{pendingImport.sourceRowCount}</dd></div><div><dt>Plans</dt><dd>{pendingImport.planCount}</dd></div><div><dt>Control totals</dt><dd>{pendingImport.controlTotalCount}</dd></div></dl>
-              <p>{pendingImport.useFallback ? "Local preview mode will replace the current synthetic workspace." : "Apply will replace the authoritative Consumption workspace atomically."}</p>
+              <p><strong>{pendingImport.files.length} CSV file{pendingImport.files.length === 1 ? "" : "s"}</strong> passed filename, pillar, range, and content validation.</p>
+              <div class="consumption-import-file-list" aria-label="Import file preview">
+                {pendingImport.preview.files.map((file) => <article key={file.fileName}>
+                  <strong>{file.fileName}</strong>
+                  <span>Pillar: {file.detectedPillar === "OCI_OTHER" ? "OCI/Other" : file.detectedPillar}</span>
+                  <span>Owner: {file.owner}</span>
+                  <span>Range: {file.fromPeriod} – {file.toPeriod}</span>
+                  <span>Rows: {file.sourceRowCount} · Plans: {file.planCount} · Controls: {file.controlTotalCount}</span>
+                </article>)}
+              </div>
+              <dl>
+                <div><dt>Source rows</dt><dd>{pendingImport.preview.sourceRowCount}</dd></div>
+                <div><dt>Plans</dt><dd>{pendingImport.preview.planCount}</dd></div>
+                <div><dt>Control totals</dt><dd>{pendingImport.preview.controlTotalCount}</dd></div>
+                <div><dt>Same-value duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
+                <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Conflicts</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
+              </dl>
+              {pendingImport.preview.conflicts.length > 0 && <section class="consumption-import-conflicts" role="alert" aria-labelledby="consumptionImportConflictTitle">
+                <strong id="consumptionImportConflictTitle">Resolve conflicting values before import</strong>
+                <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={conflict.key}><code>{conflict.key}</code> · {conflict.files.join(", ")}{conflict.values ? ` · Values: ${conflict.values.join(", ")}` : ""}</li>)}</ul>
+              </section>}
+              <p>{pendingImport.preview.hasConflicts ? "Import is blocked because the same key has conflicting values." : "Apply will update the authoritative Consumption workspace atomically."}</p>
             </div>
           )}
-          {(importPhase === "complete" || importPhase === "error") && (
-            <div class={importPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={importPhase === "error" ? "alert" : "status"}>
-              <span class={importPhase === "complete" ? "oj-ux-ico-check-circle" : "oj-ux-ico-error"} aria-hidden="true"></span>
-              <strong>{importPhase === "complete" ? "Import completed" : "Import failed"}</strong>
+          {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && (
+            <div class={importPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={importPhase === "complete" ? "status" : "alert"}>
+              <span class={importPhase === "complete" ? "oj-ux-ico-check-circle" : importPhase === "warning" ? "oj-ux-ico-warning" : "oj-ux-ico-error"} aria-hidden="true"></span>
+              <strong>{importPhase === "complete" ? "Import completed" : importPhase === "warning" ? "Import applied; refresh required" : "Import failed"}</strong>
               <p>{importResult}</p>
             </div>
           )}
         </div>
         <div slot="footer">
-          {importPhase === "preview" && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction" onojAction={() => void applyPendingImport()}>Import</oj-button></>}
-          {(importPhase === "complete" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
+          {importPhase === "preview" && pendingImport && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction" disabled={pendingImport.preview.hasConflicts} onojAction={() => void applyPendingImport()}>Import</oj-button></>}
+          {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
         </div>
       </oj-dialog>
       {conflictRows.length > 0 && (
@@ -1062,7 +1082,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                           <span class="consumption-leading consumption-account-single">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
                             <span class="consumption-leading-copy"><ConsumptionTruncatedText text={`${singlePlan?.customer ?? ""}${singlePlan?.workload ? ` (${singlePlan.workload})` : ""}`} />
-                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId} · DC {singlePlan?.dataCenter}</small></span>
+                            <small>{singlePlan?.endUser} · Plan {singlePlan?.planId}{singlePlan && <> · <ConsumptionDataCenter plan={singlePlan} selectedPillar={selectedPillar} /></>}</small></span>
                           </span>
                         )}
                       </th>
@@ -1074,7 +1094,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                           <span class="consumption-leading">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
                             <span class="consumption-leading-copy"><ConsumptionTruncatedText className="consumption-end-user" text={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`} />
-                            <small>{plan.endUser} · Plan {plan.planId} · DC {plan.dataCenter}</small></span>
+                            <small>{plan.endUser} · Plan {plan.planId} · <ConsumptionDataCenter plan={plan} selectedPillar={selectedPillar} /></small></span>
                           </span>
                         </th>
                         {renderQuarterCells(plan, false)}

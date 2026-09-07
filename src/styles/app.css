@@ -2351,6 +2351,17 @@ h4.weekly-activity-section-label--next-week,
 .consumption-page__header h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; margin: .2rem 0; }
 .consumption-page__header p, .consumption-section-heading p { color: var(--kpi-muted); line-height: 1.45; margin: .25rem 0 0; }
 .consumption-import-actions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; }
+.consumption-pillar-selector { align-items: center; display: inline-flex; gap: .2rem; margin-top: .4rem; }
+.consumption-pillar-selector button { background: #fff; border: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 750; min-height: 2rem; padding: .3rem .65rem; }
+.consumption-pillar-selector button[aria-pressed="true"] { background: var(--kpi-surface-alt); border-color: var(--kpi-brand); color: var(--kpi-brand); }
+.consumption-pillar-selector button:disabled { cursor: not-allowed; opacity: .55; }
+.consumption-data-center { align-items: center; display: inline-flex; flex-wrap: wrap; gap: .25rem; }
+.consumption-data-center__detail { color: var(--kpi-muted); font-size: .72rem; }
+.consumption-data-center__warning { color: var(--kpi-warning); cursor: help; }
+.consumption-import-file-list { display: grid; gap: .5rem; margin-block: .65rem; max-height: 18rem; overflow: auto; }
+.consumption-import-file-list article { background: #f8f6f4; border: 1px solid var(--kpi-border); display: grid; gap: .2rem; padding: .55rem .65rem; }
+.consumption-import-file-list span { color: var(--kpi-muted); font-size: .75rem; }
+.consumption-import-conflicts { color: var(--kpi-danger); }
 .consumption-range-bar { align-items: end; background: #f8f6f4; border: 1px solid var(--kpi-border); display: flex; flex-wrap: wrap; column-gap: .75rem; padding: .5rem .75rem; row-gap: .5rem; }
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }
