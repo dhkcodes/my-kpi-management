@@ -4,6 +4,7 @@ import QuillClass from "quill";
 import * as QuillModule from "quill";
 import {
   ALLOWED_QUILL_FORMATS,
+  normalizeWeeklyActivityBreakableSpaces,
   sanitizeWeeklyActivityHtml,
   SharedEditorSession,
   WEEKLY_ACTIVITY_COLORS,
@@ -119,7 +120,8 @@ export function SharedWeeklyActivityEditor({
     const adapter = {
       getSemanticHTML: () => normalizeEditorHtml(quill.getSemanticHTML()),
       setSemanticHTML: (html: string) => {
-        const delta = quill.clipboard.convert({ html: html || "<p><br></p>" });
+        const breakableHtml = normalizeWeeklyActivityBreakableSpaces(html);
+        const delta = quill.clipboard.convert({ html: breakableHtml || "<p><br></p>" });
         quill.setContents(delta, "silent");
         quill.history.clear();
         syncWeeklyActivityListMarkerStyles(quill.root);
