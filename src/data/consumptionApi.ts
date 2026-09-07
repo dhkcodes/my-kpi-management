@@ -6,6 +6,8 @@ import {
   ConsumptionActualTrendPoint,
   ConsumptionAmountSplit,
   ConsumptionOtherContribution,
+  ConsumptionPillar,
+  ConsumptionDataCenterBreakdown,
   getFiscalQuarter,
   getLatestActualMonth,
   getNextQuarterMonths
@@ -19,8 +21,8 @@ const apiBase = () => {
   return "/api/v1";
 };
 
-type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number }>;
-type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; workload?: string | null; facts: RawFact[] }>;
+type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number; pillar?: unknown }>;
+type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; dataCenterBreakdown?: unknown; dpDataCenterCount?: unknown; ociOtherDataCenterCount?: unknown; workload?: string | null; facts: RawFact[] }>;
 type RawSignalPoint = Readonly<{ periodKey: string; actualAmount: number }>;
 type RawSignal = Readonly<{
   signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string;
@@ -29,9 +31,10 @@ type RawSignal = Readonly<{
   previousDirection: ConsumptionSignal["previousDirection"]; sparkline: RawSignalPoint[]; reason: string
 }>;
 type RawControlTotal = Readonly<{
-  account: string; periodKey: string; controlAmount: number; detailAmount: number | null; matchStatus: string;
+  account: string; periodKey: string; controlAmount: number; detailAmount: number | null; matchStatus: string; pillar?: unknown;
 }>;
 type RawWorkspace = Readonly<{
+  selectedPillar: unknown;
   etag: string;
   lastBatchId: number | null;
   plans: RawPlan[];
@@ -42,9 +45,12 @@ type RawWorkspace = Readonly<{
   toQuarter?: string | null;
   editablePeriodIds?: string[] | null;
   displayQuarterOrder?: string[] | null;
+  availablePillars?: unknown;
+  aggregationGrain?: unknown;
 }>;
 
 export type ConsumptionApiWorkspace = Readonly<{
+  selectedPillar: ConsumptionPillar;
   etag: string;
   plans: ConsumptionPlan[];
   signals: ConsumptionSignal[];
@@ -64,7 +70,7 @@ export type ConsumptionApiControlTotal = Readonly<{
 export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionRecordsQuery = Readonly<{
   fromQuarter: string; toQuarter: string; search: string; sort: "ACCOUNT" | "AMOUNT";
-  direction: "ASC" | "DESC"; offset: number; limit: number;
+  direction: "ASC" | "DESC"; offset: number; limit: number; pillar?: ConsumptionPillar;
 }>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
   accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[] }>>;
@@ -80,6 +86,7 @@ export type ConsumptionAnalysisAlert = Readonly<{
   actualAmount: number; baselineMedian: number; changeAmount: number; changePercent: number | null; reason: string;
 }>;
 export type ConsumptionAnalysis = Readonly<{
+  selectedPillar: ConsumptionPillar;
   fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
@@ -93,18 +100,37 @@ export type ConsumptionAnalysis = Readonly<{
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
 }>;
-export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string }>;
+export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; pillar?: ConsumptionPillar }>;
 export type ConsumptionForecastUpdate = Readonly<{ planId: number; periodKey: string; amount: number; versionNo: number }>;
 export type ConsumptionControlForecastUpdate = Readonly<{ account: string; periodKey: string; amount: number | null }>;
-export type ConsumptionImportPreview = Readonly<{ planCount: number; controlTotalCount: number; sourceRowCount: number; sourceSha256: string }>;
+export type ConsumptionImportFilePreview = Readonly<{
+  fileName: string; owner: string; fromPeriod: string; toPeriod: string; detectedPillar: Exclude<ConsumptionPillar, "ALL">;
+  sourceSha256: string; planCount: number; controlTotalCount: number; sourceRowCount: number;
+}>;
+export type ConsumptionImportConflict = Readonly<{ key: string; files: readonly string[]; values?: readonly number[] }>;
+export type ConsumptionImportPreview = Readonly<{
+  selectedPillar: ConsumptionPillar; files: readonly ConsumptionImportFilePreview[];
+  planCount: number; controlTotalCount: number; sourceRowCount: number;
+  sameValueDuplicateCount: number; conflictCount: number; conflicts: readonly ConsumptionImportConflict[]; hasConflicts: boolean;
+}>;
 export type ConsumptionImportResult = Readonly<{
   workspace: ConsumptionApiWorkspace;
+  selectedPillar: ConsumptionPillar;
   planCount: number;
   controlTotalCount: number;
   insertedCount: number;
   updatedCount: number;
+  noOpCount: number;
+  conflictCount: number;
   appliedCount: number;
   sourceRowCount: number;
+}>;
+export type ConsumptionMultiImportResult = Readonly<{
+  workspace: ConsumptionApiWorkspace;
+  batchIds: readonly number[];
+  duplicate: boolean;
+  physicalFactCount: number;
+  deduplicatedFactCount: number;
 }>;
 export type ConsumptionCsvExport = Readonly<{ blob: Blob; fileName: string }>;
 
@@ -138,6 +164,25 @@ const isPositiveInteger = (value: unknown): value is number => Number.isSafeInte
 const isPeriodKey = (value: unknown): value is string => typeof value === "string" && fiscalPeriodPattern.test(value);
 const isQuarterKey = (value: unknown): value is string => typeof value === "string" && fiscalQuarterPattern.test(value);
 const isFiscalYear = (value: unknown): value is string => typeof value === "string" && /^FY\d{2}$/.test(value);
+const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI_OTHER"]);
+const isConsumptionPillar = (value: unknown): value is ConsumptionPillar => consumptionPillars.has(value as ConsumptionPillar);
+const sha256Pattern = /^[a-f0-9]{64}$/i;
+const parseDataCenterBreakdown = (value: unknown, dpValue?: unknown, ociValue?: unknown): ConsumptionDataCenterBreakdown | undefined => {
+  if ((value === undefined || value === null) && dpValue === undefined && ociValue === undefined) return undefined;
+  if (value === undefined || value === null) {
+    const valid = (candidate: unknown) => candidate === null || candidate === undefined || isNonNegativeInteger(candidate);
+    if (!valid(dpValue) || !valid(ociValue)) throw new Error("Malformed Consumption plan response");
+    return { dpCount: dpValue == null ? null : dpValue as number, ociOtherCount: ociValue == null ? null : ociValue as number,
+      duplicatePossible: dpValue != null && ociValue != null };
+  }
+  if (typeof value !== "object") throw new Error("Malformed Consumption plan response");
+  const raw = value as Record<string, unknown>;
+  const valid = (candidate: unknown) => candidate === null || isNonNegativeInteger(candidate);
+  if (!valid(raw.dpCount) || !valid(raw.ociOtherCount) || typeof raw.duplicatePossible !== "boolean") {
+    throw new Error("Malformed Consumption plan response");
+  }
+  return { dpCount: raw.dpCount as number | null, ociOtherCount: raw.ociOtherCount as number | null, duplicatePossible: raw.duplicatePossible };
+};
 const nearlyEqual = (left: number, right: number) => Math.abs(left - right) <= 1e-6 * Math.max(1, Math.abs(left), Math.abs(right));
 const fiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
 const fiscalPeriodOrder = (periodKey: string) => {
@@ -193,12 +238,14 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
   if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
     || !isFiniteNumber(raw.percentage)) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
+    dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociOtherDataCenterCount),
     percentage: raw.percentage, actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
-  if (!isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
+  const selectedPillarValue: unknown = raw.selectedPillar;
+  if (!isConsumptionPillar(selectedPillarValue) || !isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
@@ -289,7 +336,9 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const matches = accounts.flatMap((account) => account.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: account.account, workload: workload.workload, plan })))).filter((entry) => entry.account === alert.account && entry.workload === alert.workload && entry.plan.serverPlanId === alert.serverPlanId && entry.plan.planId === alert.planId);
     if (matches.length !== 1) return malformedAnalysis();
   });
-  return { fiscalYear: raw.fiscalYear, priorFiscalYear: raw.priorFiscalYear, selectedAccount: raw.selectedAccount,
+  const selectedPillar = selectedPillarValue;
+  return { selectedPillar,
+    fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
@@ -297,15 +346,24 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     otherContributionUnavailableReason: raw.otherContributionUnavailableReason as string | null, alerts, accounts };
 };
 
-const parseWorkspace = (value: unknown, headerEtag?: string | null): ConsumptionApiWorkspace => {
+const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPillar?: ConsumptionPillar): ConsumptionApiWorkspace => {
   if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption workspace response");
   const raw = value as RawWorkspace;
+  const selectedPillarValue: unknown = raw.selectedPillar;
+  if (!isConsumptionPillar(selectedPillarValue) || (expectedPillar !== undefined && selectedPillarValue !== expectedPillar)) {
+    throw new Error("Malformed Consumption workspace pillar");
+  }
+  const selectedPillar = selectedPillarValue;
+  if(expectedPillar!==undefined&&(!Array.isArray(raw.availablePillars)
+    ||raw.availablePillars.length!==3||raw.availablePillars[0]!=="ALL"||raw.availablePillars[1]!=="DP"||raw.availablePillars[2]!=="OCI_OTHER"
+    ||raw.aggregationGrain!=="PLAN_PERIOD"))throw new Error("Malformed Consumption workspace pillar metadata");
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.signals) || !Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption workspace response");
   const etag = headerEtag ?? raw.etag;
   if (!isNonEmptyString(etag) || !(raw.lastBatchId === null || isPositiveInteger(raw.lastBatchId))) throw new Error("Malformed Consumption workspace metadata");
   if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey)
     || !isFiniteNumber(control?.controlAmount) || !isNullableFiniteNumber(control?.detailAmount)
-    || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"]))) throw new Error("Malformed Consumption control total response");
+    || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"])
+    ||(expectedPillar!==undefined&&control?.pillar!==selectedPillar))) throw new Error("Malformed Consumption control total response");
   const seenControlKeys = new Set<string>();
   const controlTotals: ConsumptionApiControlTotal[] = raw.controlTotals.map((control) => {
     const key = `${control.account}::${control.periodKey}`;
@@ -319,6 +377,10 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     if (!isPositiveInteger(plan?.planId) || !isNonEmptyString(plan?.stableKey) || !isNonEmptyString(plan?.account)
       || !isNonEmptyString(plan?.endUser) || !isNonEmptyString(plan?.planCode) || !isNonEmptyString(plan?.dataCenter)
       || (plan.workload !== null && plan.workload !== undefined && !isNonEmptyString(plan.workload))
+      ||(expectedPillar!==undefined&&(!Object.prototype.hasOwnProperty.call(plan,"dpDataCenterCount")
+        ||!Object.prototype.hasOwnProperty.call(plan,"ociOtherDataCenterCount")
+        ||!(plan.dpDataCenterCount==null||isNonNegativeInteger(plan.dpDataCenterCount))
+        ||!(plan.ociOtherDataCenterCount==null||isNonNegativeInteger(plan.ociOtherDataCenterCount))))
       || !Array.isArray(plan?.facts)) throw new Error("Malformed Consumption plan response");
     if (seenPlanIds.has(plan.planId) || seenStableKeys.has(plan.stableKey)) throw new Error("Malformed Consumption plan response");
     seenPlanIds.add(plan.planId); seenStableKeys.add(plan.stableKey);
@@ -328,14 +390,16 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     plan.facts.forEach((fact) => {
       if (!isPeriodKey(fact?.periodKey) || !isNullableFiniteNumber(fact?.actualAmount)
         || !isNullableFiniteNumber(fact?.forecastAmount) || !isNonNegativeInteger(fact?.versionNo)
-        || (fact.actualAmount !== null && fact.forecastAmount !== null)) throw new Error("Malformed Consumption fact response");
+        || (fact.actualAmount !== null && fact.forecastAmount !== null)
+        ||(expectedPillar!==undefined&&(fact.actualAmount!==null?fact.pillar!==selectedPillar:fact.pillar!=null))) throw new Error("Malformed Consumption fact response");
       if (Object.prototype.hasOwnProperty.call(versions, fact.periodKey)) throw new Error("Malformed Consumption fact response");
       versions[fact.periodKey] = fact.versionNo;
       if (fact.actualAmount !== null) actuals[fact.periodKey] = fact.actualAmount;
       else if (fact.forecastAmount !== null) forecasts[fact.periodKey] = fact.forecastAmount;
     });
+    const dataCenterBreakdown = parseDataCenterBreakdown(plan.dataCenterBreakdown, plan.dpDataCenterCount, plan.ociOtherDataCenterCount);
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
-      dataCenter: plan.dataCenter, workload: plan.workload ?? undefined, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
+      dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
   });
   const metadataMissing = !raw.currentFiscalMonth && !raw.fromQuarter && !raw.toQuarter
     && (!raw.editablePeriodIds || raw.editablePeriodIds.length === 0)
@@ -414,6 +478,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null): Consumption
     };
   });
   return {
+    selectedPillar,
     etag,
     plans,
     signals,
@@ -436,7 +501,7 @@ const request = async (path: string, init?: RequestInit): Promise<{ response: Re
   if (!response.ok) {
     const error = typeof payload === "object" && payload !== null ? payload as { code?: unknown; message?: unknown; current?: unknown } : {};
     if (response.status === 409 && error.code === "VERSION_CONFLICT" && error.current) {
-      throw new ConsumptionConflictError(typeof error.message === "string" ? error.message : "Consumption changed on the server", parseWorkspace(error.current));
+      throw new ConsumptionConflictError(typeof error.message === "string" ? error.message : "Consumption changed on the server", parseWorkspace(error.current, undefined, "ALL"));
     }
     throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
       typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
@@ -444,13 +509,19 @@ const request = async (path: string, init?: RequestInit): Promise<{ response: Re
   return { response, payload };
 };
 
-export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRange): Promise<ConsumptionApiWorkspace> => {
-  const query = range ? `?${new URLSearchParams({ fromQuarter: range.fromQuarter, toQuarter: range.toQuarter })}` : "";
+export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRange, pillar?: ConsumptionPillar): Promise<ConsumptionApiWorkspace> => {
+  const selectedPillar = pillar ?? "ALL";
+  if (!isConsumptionPillar(selectedPillar)) throw new Error("Invalid Consumption pillar");
+  const parameters = new URLSearchParams();
+  if (range) { parameters.set("fromQuarter", range.fromQuarter); parameters.set("toQuarter", range.toQuarter); }
+  if (pillar !== undefined) parameters.set("pillar", pillar);
+  const query = parameters.size > 0 ? `?${parameters}` : "";
   const { response, payload } = await request(`/consumption/workspace${query}`);
-  return parseWorkspace(payload, response.headers.get("ETag"));
+  return parseWorkspace(payload, response.headers.get("ETag"), pillar === undefined ? undefined : selectedPillar);
 };
 export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {
-  if (!((query.fromQuarter === "" || fiscalQuarterPattern.test(query.fromQuarter))
+  const pillar = query.pillar ?? "ALL";
+  if (!isConsumptionPillar(pillar) || !((query.fromQuarter === "" || fiscalQuarterPattern.test(query.fromQuarter))
       && (query.toQuarter === "" || fiscalQuarterPattern.test(query.toQuarter)))
     || !["ACCOUNT", "AMOUNT"].includes(query.sort) || !["ASC", "DESC"].includes(query.direction)
     || !isNonNegativeInteger(query.offset) || !Number.isInteger(query.limit) || query.limit < 1 || query.limit > 100) {
@@ -460,6 +531,7 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
     fromQuarter: query.fromQuarter, toQuarter: query.toQuarter, search: query.search,
     sort: query.sort, direction: query.direction, offset: String(query.offset), limit: String(query.limit)
   });
+  if (query.pillar !== undefined) parameters.set("pillar", pillar);
   const { response, payload } = await request(`/consumption/records?${parameters}`);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption records response");
   const raw = payload as Record<string, unknown>;
@@ -482,42 +554,102 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   });
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
-  const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"));
+  const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"), query.pillar === undefined ? undefined : pillar);
   let planOffset = 0;
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);
     planOffset += group.plans.length;
     return { account: group.account, plans };
   });
-  return { etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
+  return { selectedPillar: workspace.selectedPillar, etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
     currentFiscalMonth: workspace.currentFiscalMonth, fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter,
     editablePeriodIds: workspace.editablePeriodIds, displayQuarterOrder: workspace.displayQuarterOrder,
     accountGroups, totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
 };
 export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery): Promise<ConsumptionAnalysis> => {
-  if (!isFiscalYear(query.fiscalYear) || typeof query.search !== "string" || query.search.length > 160
+  const pillar = query.pillar ?? "ALL";
+  if (!isConsumptionPillar(pillar) || !isFiscalYear(query.fiscalYear) || typeof query.search !== "string" || query.search.length > 160
     || typeof query.account !== "string" || query.account.length > 160) throw new Error("Invalid Consumption analysis query");
   const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account });
+  if (query.pillar !== undefined) parameters.set("pillar", pillar);
   const { payload } = await request(`/consumption/analysis?${parameters}`);
   const decoded = parseConsumptionAnalysis(payload);
   const expectedPriorFiscalYear = `FY${String((Number(query.fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;
-  if (decoded.fiscalYear !== query.fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();
+  if (decoded.selectedPillar !== pillar || decoded.fiscalYear !== query.fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();
   const expectedAccount = query.account.trim() || null;
   if (decoded.selectedAccount !== expectedAccount) return malformedAnalysis();
   if (query.account && (decoded.accounts.some((account) => account.account !== query.account)
     || decoded.alerts.some((alert) => alert.account !== query.account))) return malformedAnalysis();
   return decoded;
 };
-export const previewConsumptionImport = async (csv: string): Promise<ConsumptionImportPreview> => {
-  const { payload } = await request("/consumption/imports/preview", { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: csv });
-  const raw = payload as { plans?: unknown[]; controlTotals?: unknown[]; sourceRowCount?: number; sourceSha256?: string };
-  if (!Array.isArray(raw.plans) || !Array.isArray(raw.controlTotals) || typeof raw.sourceRowCount !== "number" || typeof raw.sourceSha256 !== "string") throw new Error("Malformed Consumption import preview");
-  return { planCount: raw.plans.length, controlTotalCount: raw.controlTotals.length, sourceRowCount: raw.sourceRowCount, sourceSha256: raw.sourceSha256 };
+const multipartFiles = (files: readonly File[]) => {
+  if (files.length < 1 || files.length > 8 || files.some((file) => !(file instanceof File) || !file.name.toLowerCase().endsWith(".csv"))) {
+    throw new Error("Select 1 to 8 CSV files");
+  }
+  const body = new FormData();
+  files.forEach((file) => body.append("files", file, file.name));
+  return body;
 };
-export const exportConsumptionImportCompatibleCsv = async (): Promise<ConsumptionCsvExport> => {
+
+const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, uploaded: readonly File[]): ConsumptionImportPreview => {
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption import preview");
+  const raw = payload as Record<string, unknown>;
+  if (!Array.isArray(raw.files) || !Array.isArray(raw.conflicts)
+    || !isNonNegativeInteger(raw.physicalFactCount) || !isNonNegativeInteger(raw.deduplicatedFactCount)
+    || raw.files.length !== uploaded.length) throw new Error("Malformed Consumption import preview");
+  const files = raw.files.map((value) => {
+    if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
+    const file = value as Record<string, unknown>;
+    if (!isNonEmptyString(file.sourceFileName) || !isNonEmptyString(file.sourceOwner)
+      || !isPeriodKey(file.sourcePeriodFrom) || !isPeriodKey(file.sourcePeriodTo)
+      || !(file.pillar === "DP" || file.pillar === "OCI_OTHER")
+      || typeof file.sourceSha256 !== "string" || !sha256Pattern.test(file.sourceSha256)
+      || !Array.isArray(file.plans) || !Array.isArray(file.controlTotals)
+      || !isNonNegativeInteger(file.sourceRowCount)) throw new Error("Malformed Consumption import preview");
+    return {fileName:file.sourceFileName,owner:file.sourceOwner,fromPeriod:file.sourcePeriodFrom,toPeriod:file.sourcePeriodTo,
+      detectedPillar:file.pillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
+      controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount} as ConsumptionImportFilePreview;
+  });
+  const expectedNames=uploaded.map(file=>file.name).sort();
+  const actualNames=files.map(file=>file.fileName).sort();
+  if(expectedNames.length!==actualNames.length||expectedNames.some((name,index)=>name!==actualNames[index]))
+    throw new Error("Malformed Consumption import preview");
+  const conflicts = raw.conflicts.map((value) => {
+    if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
+    const conflict=value as Record<string,unknown>;
+    if (!(conflict.pillar==="DP"||conflict.pillar==="OCI_OTHER") || !isNonEmptyString(conflict.account)
+      || !isNonEmptyString(conflict.endUser) || !isNonEmptyString(conflict.planCode) || !isPeriodKey(conflict.periodKey)
+      || !isFiniteNumber(conflict.firstValue) || !isFiniteNumber(conflict.conflictingValue)
+      || !isNonEmptyString(conflict.firstFile) || !isNonEmptyString(conflict.conflictingFile))
+      throw new Error("Malformed Consumption import preview");
+    return {key:`${conflict.pillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}`,
+      files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as number[]};
+  });
+  const planCount=files.reduce((sum,file)=>sum+file.planCount,0);
+  const controlTotalCount=files.reduce((sum,file)=>sum+file.controlTotalCount,0);
+  const sourceRowCount=files.reduce((sum,file)=>sum+file.sourceRowCount,0);
+  return {selectedPillar:pillar,files,planCount,controlTotalCount,sourceRowCount,
+    sameValueDuplicateCount:raw.deduplicatedFactCount,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
+};
+
+export const previewConsumptionImport = async (input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportPreview> => {
+  if (typeof input === "string") {
+    const { payload } = await request("/consumption/imports/preview", { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: input });
+    const raw = payload as { plans?: unknown[]; controlTotals?: unknown[]; sourceRowCount?: number; sourceSha256?: string };
+    if (!Array.isArray(raw.plans) || !Array.isArray(raw.controlTotals) || !isNonNegativeInteger(raw.sourceRowCount) || typeof raw.sourceSha256 !== "string") throw new Error("Malformed Consumption import preview");
+    return { selectedPillar: pillar, files: [], planCount: raw.plans.length, controlTotalCount: raw.controlTotals.length,
+      sourceRowCount: raw.sourceRowCount, sameValueDuplicateCount: 0, conflictCount: 0, conflicts: [], hasConflicts: false };
+  }
+  if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+  const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) });
+  return decodeImportPreview(payload, pillar, input);
+};
+export const exportConsumptionImportCompatibleCsv = async (pillar?: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
+  const selectedPillar = pillar ?? "ALL";
+  if (!isConsumptionPillar(selectedPillar)) throw new Error("Invalid Consumption pillar");
   let response: Response;
   try {
-    response = await apiFetch(`${apiBase()}/consumption/exports/import-compatible`, { method: "GET" });
+    response = await apiFetch(`${apiBase()}/consumption/exports/import-compatible${pillar === undefined ? "" : `?pillar=${pillar}`}`, { method: "GET" });
   } catch (cause) {
     throw new ConsumptionNetworkError(cause);
   }
@@ -534,20 +666,41 @@ export const exportConsumptionImportCompatibleCsv = async (): Promise<Consumptio
   const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
   return { blob, fileName: match?.[1] ?? "consumption-actuals-export.csv" };
 };
-export const applyConsumptionImport = async (csv: string): Promise<ConsumptionImportResult> => {
-  const { response, payload } = await request("/consumption/imports/apply", { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: csv });
-  const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown };
-  const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"));
+export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
+export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar): Promise<ConsumptionMultiImportResult>;
+export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
+  if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+  const init: RequestInit = typeof input === "string"
+    ? { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: input }
+    : { method: "POST", body: multipartFiles(input) };
+  const path = typeof input === "string" ? "/consumption/imports/apply" : `/consumption/imports/apply?pillar=${pillar}`;
+  const { response, payload } = await request(path, init);
+  if (typeof input !== "string") {
+    if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption multi-file import result");
+    const raw=payload as Record<string,unknown>;
+    const workspace=parseWorkspace(raw.workspace,response.headers.get("ETag"),"ALL");
+    if (!Array.isArray(raw.batchIds) || raw.batchIds.length !== input.length || raw.batchIds.some((id)=>!isPositiveInteger(id))
+      || typeof raw.duplicate !== "boolean" || !isNonNegativeInteger(raw.physicalFactCount)
+      || !isNonNegativeInteger(raw.deduplicatedFactCount)) throw new Error("Malformed Consumption multi-file import result");
+    return {workspace,batchIds:raw.batchIds as number[],duplicate:raw.duplicate,
+      physicalFactCount:raw.physicalFactCount,deduplicatedFactCount:raw.deduplicatedFactCount};
+  }
+  const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown; selectedPillar?: unknown; noOpCount?: unknown; conflictCount?: unknown };
+  const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"), pillar);
   if (!isNonNegativeInteger(result.planCount) || !isNonNegativeInteger(result.controlTotalCount)
     || !isNonNegativeInteger(result.insertedCount) || !isNonNegativeInteger(result.updatedCount)
     || !isNonNegativeInteger(result.appliedCount) || result.appliedCount !== result.insertedCount + result.updatedCount)
     throw new Error("Malformed Consumption import result");
-  return { workspace, planCount: result.planCount, controlTotalCount: result.controlTotalCount,
-    insertedCount: result.insertedCount, updatedCount: result.updatedCount, appliedCount: result.appliedCount,
-    sourceRowCount: result.planCount + result.controlTotalCount };
-};
+  const selectedPillar = result.selectedPillar ?? workspace.selectedPillar;
+  const noOpCount = result.noOpCount ?? 0;
+  const conflictCount = result.conflictCount ?? 0;
+  if (!isConsumptionPillar(selectedPillar) || selectedPillar !== pillar || !isNonNegativeInteger(noOpCount) || !isNonNegativeInteger(conflictCount)) throw new Error("Malformed Consumption import result");
+  return { workspace, selectedPillar, planCount:result.planCount, controlTotalCount:result.controlTotalCount,
+    insertedCount:result.insertedCount, updatedCount:result.updatedCount, appliedCount:result.appliedCount,
+    noOpCount, conflictCount, sourceRowCount:result.planCount+result.controlTotalCount };
+}
 export const saveConsumptionForecasts = async (etag: string, updates: ConsumptionForecastUpdate[],
   controlUpdates: ConsumptionControlForecastUpdate[] = []): Promise<ConsumptionApiWorkspace> => {
   const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates, controlUpdates }) });
-  return parseWorkspace(payload, response.headers.get("ETag"));
+  return parseWorkspace(payload, response.headers.get("ETag"), "ALL");
 };

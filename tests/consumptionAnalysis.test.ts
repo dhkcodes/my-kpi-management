@@ -6,6 +6,7 @@ const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: strin
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
 
 const analysis = {
+  selectedPillar: "ALL",
   fiscalYear: "FY27",
   priorFiscalYear: "FY26",
   selectedAccount: null,

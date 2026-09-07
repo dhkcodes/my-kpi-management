@@ -10,6 +10,9 @@ import {
 import {
   ConsumptionAnalysisAccountCandidate,
   ConsumptionAnalysisPlan,
+  ConsumptionPillar,
+  consumptionPillarOptions,
+  formatConsumptionDataCenter,
   getAlertActualTrend
 } from "../../data/consumptionData";
 import "ojs/ojprogress-circle";
@@ -69,7 +72,17 @@ const alertPresentation = (alert: ConsumptionAnalysisAlert) => ({
   gradeIcon: alert.grade === "CRITICAL" ? "oj-ux-ico-error" : alert.grade === "HIGH" ? "oj-ux-ico-warning" : "oj-ux-ico-information-s"
 });
 
+const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: ConsumptionAnalysisPlan; selectedPillar: ConsumptionPillar }>) => {
+  const display = formatConsumptionDataCenter(plan, selectedPillar);
+  return <span class="consumption-data-center" aria-label={display.detail ? `Data center count ${display.primary}; ${display.detail}` : `Data center ${display.primary}`}>
+    <span>DC {display.primary}</span>
+    {display.detail && <span class="consumption-data-center__detail">{display.detail}</span>}
+    {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
+  </span>;
+};
+
 export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
+  const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,7 +117,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     const generation = ++requestGeneration.current;
     setLoading(true);
     setError("");
-    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext })
+    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, pillar: selectedPillar })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
         setAnalysis(value);
@@ -112,14 +125,20 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
       })
       .catch((reason) => {
-        if (active && generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
+        if (active && generation === requestGeneration.current) {
+          setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
+          if (analysisResponse?.selectedPillar && analysisResponse.selectedPillar !== selectedPillar) {
+            setSelectedPillar(analysisResponse.selectedPillar);
+          }
+        }
       })
       .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext]);
+  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext, selectedPillar]);
 
   const analysis = analysisResponse
     && analysisResponse.fiscalYear === fiscalYear
+    && analysisResponse.selectedPillar === selectedPillar
     && analysisResponse.selectedAccount === (selectedAccountContext || null)
     ? analysisResponse : null;
 
@@ -212,6 +231,12 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   return <section class="consumption-insights-page" aria-labelledby="usageInsightsTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1></div>
+      <div class="consumption-insights-header-actions">
+        <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
+          {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
+            disabled={loading && !analysis}
+            onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setSelectedAccountContext(""); setCandidateSearch(""); setDebouncedCandidateSearch(""); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+        </div>
       <div class="consumption-insights-context" aria-label="Usage Insights filters">
         <label htmlFor="consumptionAccountContext">Account</label>
         <div class="consumption-insights-combobox">
@@ -240,6 +265,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
           </div>}
         </div>
+      </div>
       </div>
     </header>
 
@@ -275,7 +301,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         <div class="consumption-signal-inbox">{analysis.alerts.map((alert) => { const presentation = alertPresentation(alert); const plan = findAlertPlan(analysis, alert); return <button type="button" key={alert.alertId}
           class={selectedAlert?.alertId === alert.alertId ? "consumption-signal is-selected" : "consumption-signal"}
           aria-pressed={selectedAlert?.alertId === alert.alertId} onClick={() => setSelectedAlertId((current) => current === alert.alertId ? "" : alert.alertId)}>
-          <span class="consumption-signal-main"><strong>{alert.account}</strong><span>{alert.workload} · Plan {alert.planId} · DC {plan?.dataCenter ?? "N/A"}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
+          <span class="consumption-signal-main"><strong>{alert.account}</strong><span>{alert.workload} · Plan {alert.planId}{plan && <> · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /></>}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
           <span class="consumption-signal-metrics"><strong>{currency.format(alert.actualAmount)}</strong><small>{signedCurrency(alert.changeAmount)} · {signedPercent(alert.changePercent)}</small></span>
         </button>; })}{analysis.alerts.length === 0 && <p class="consumption-empty-state">No ACTUAL usage change alerts for this context.</p>}</div>
         <div class="consumption-insights-linked-trend">
@@ -309,7 +335,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
           </div>}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{otherSelected ? "Other Accounts" : selectedAccount?.account ?? "Select an Account"}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · {plan.dataCenter} · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /> · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>

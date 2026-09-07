@@ -1,4 +1,15 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
+export type ConsumptionPillar = "ALL" | "DP" | "OCI_OTHER";
+export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; value: ConsumptionPillar }>> = [
+  { label: "All", value: "ALL" },
+  { label: "DP", value: "DP" },
+  { label: "OCI/Other", value: "OCI_OTHER" }
+];
+export type ConsumptionDataCenterBreakdown = Readonly<{
+  dpCount: number | null;
+  ociOtherCount: number | null;
+  duplicatePossible: boolean;
+}>;
 export type ConsumptionAmountSplit = Readonly<{
   actualAmount: number;
   forecastAmount: number;
@@ -8,6 +19,7 @@ export type ConsumptionAmountSplit = Readonly<{
 export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>;
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
+  dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   percentage: number;
   actualTrend: readonly ConsumptionActualTrendPoint[];
 }>;
@@ -38,6 +50,7 @@ export type ConsumptionPlan = Readonly<{
   endUser: string;
   planId: string;
   dataCenter: string;
+  dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   workload?: string;
   planType: string;
   actuals: Record<string, number>;
@@ -45,6 +58,19 @@ export type ConsumptionPlan = Readonly<{
   serverPlanId?: number;
   versions?: Record<string, number>;
 }>;
+
+export const formatConsumptionDataCenter = (
+  plan: Pick<ConsumptionPlan, "dataCenter" | "dataCenterBreakdown">,
+  pillar: ConsumptionPillar
+): Readonly<{ primary: string; detail: string | null; duplicateWarning: string | null }> => {
+  const breakdown = plan.dataCenterBreakdown;
+  if (pillar !== "ALL" || !breakdown) return { primary: plan.dataCenter, detail: null, duplicateWarning: null };
+  return {
+    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociOtherCount ?? 0)),
+    detail: `DP ${breakdown.dpCount ?? "Missing"} + OCI/Other ${breakdown.ociOtherCount ?? "Missing"}`,
+    duplicateWarning: breakdown.duplicatePossible ? "Duplicate possible across pillars" : null
+  };
+};
 
 export type ConsumptionAccount = Readonly<{
   id: string;
