@@ -25,6 +25,7 @@ const payload = {
   controlTotals: [
     { account: "A", periodKey: "FY27-AUG", controlAmount: 100, detailAmount: 100, matchStatus: "MATCH", pillar: "ALL" },
     { account: "A", periodKey: "FY27-SEP", controlAmount: 999, detailAmount: null, matchStatus: "NO_DETAIL", pillar: "ALL" },
+    { account: "A", periodKey: "FY27-OCT", controlAmount: 777, detailAmount: null, matchStatus: "MANUAL_FORECAST", pillar: "ALL" },
     { account: "B", periodKey: "FY27-AUG", controlAmount: 50, detailAmount: 50, matchStatus: "MATCH", pillar: "ALL" },
     { account: "B", periodKey: "FY27-SEP", controlAmount: 0, detailAmount: 0, matchStatus: "MATCH", pillar: "ALL" }
   ], signals: []
@@ -52,6 +53,7 @@ void (async () => {
   assert.deepEqual(workspace.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
   assert.deepEqual(workspace.displayQuarterOrder, ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"]);
   assert.equal(workspace.controlTotalCount, 2, "monthly control entries must be reported as two source Multiple controls");
+  assert.equal(workspace.controlTotals.find((control) => control.periodKey === "FY27-OCT")?.matchStatus, "MANUAL_FORECAST");
   assert.equal(workspace.plans[0].workload, "Autonomous Database", "Plan Number mapping exposes its Workload without a client-side lookup");
   assert.equal(workspace.plans[0].forecasts["FY27-OCT"], 999, "persisted server forecast must remain authoritative");
   assert.equal(workspace.plans[0].forecasts["FY27-NOV"], undefined, "a missing editable forecast month remains absent");
@@ -219,7 +221,7 @@ void (async () => {
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption workspace metadata/);
 
   runtime.fetch = async () => new Response(JSON.stringify({
-    ...payload, controlTotals: [{ ...payload.controlTotals[0], matchStatus: "MANUAL_FORECAST" }]
+    ...payload, controlTotals: [{ ...payload.controlTotals[0], matchStatus: "USER_EDIT" }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"invalid-control-status"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption control total response/);
 

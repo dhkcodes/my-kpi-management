@@ -29,6 +29,7 @@ import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import {
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
+  ConsumptionRecordsPage,
   ConsumptionConflictError,
   ConsumptionImportPreview,
   applyConsumptionImport,
@@ -66,6 +67,8 @@ const toApiControlTotals = (controls: readonly { customer: string; values: Reado
   controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
     account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
   })));
+const defaultExpandedRecordAccounts = (groups: readonly Readonly<{ account: string; plans: readonly ConsumptionPlan[] }>[]) =>
+  new Set(groups.filter((group) => group.plans.length > 1).map((group) => group.account));
 
 const createSeedPlans = (csv: string) => {
   const parsed = parseConsumptionCsv(csv);
@@ -252,6 +255,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const importDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
   const exportingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const recordsLoadingRef = useRef(false);
@@ -280,7 +284,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setConflictWorkspace(null);
   };
 
-  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }, pillar: ConsumptionPillar = selectedPillar) => {
+  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }, pillar: ConsumptionPillar = selectedPillar): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     recordsLoadingRef.current = true;
     setRecordsLoading(true);
@@ -296,8 +300,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       });
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        await loadRecordsPage(false, query, pillar);
-        return;
+        return loadRecordsPage(false, query, pillar);
       }
       const mergePlans = (current: readonly ConsumptionPlan[]) => {
         const accountPlans = new Map<string, ConsumptionPlan[]>();
@@ -334,6 +337,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setDataMode("backend");
       setConflictRows([]);
       setConflictWorkspace(null);
+      if (append) setExpandedAccounts((current) => {
+        const next = new Set(current);
+        defaultExpandedRecordAccounts(page.accountGroups).forEach((account) => next.add(account));
+        return next;
+      });
+      return page;
     } catch (error) {
       if (generation !== recordsRequestGeneration.current) return;
       throw error;
@@ -347,7 +356,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   useEffect(() => {
     let active = true;
-    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL").catch((error) => {
+    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL")
+      .then((page) => { if (active && page) setExpandedAccounts(defaultExpandedRecordAccounts(page.accountGroups)); })
+      .catch((error) => {
       if (!active) return;
       if (canUseConsumptionFallback(error)) {
         const fallbackPlans = clonePlans(initialSeed.plans);
@@ -431,6 +442,20 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     }
   };
 
+  useEffect(() => {
+    const root = tableScrollRef.current;
+    const sentinel = recordsSentinelRef.current;
+    if (!root || !sentinel || !recordsHasMore || hasDraftChanges) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && !recordsLoadingRef.current) {
+        void loadRecordsPage(true).catch((error) =>
+          setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
+      }
+    }, { root: tableScrollRef.current, rootMargin: "0px 0px 96px 0px", threshold: 0 });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [recordsHasMore, recordsNextOffset, recordsLoading, hasDraftChanges, selectedPillar, fromQuarter, toQuarter, appliedSearch, apiEtag]);
+
   const moveTableHorizontally = (direction: -1 | 1) => {
     const table = tableScrollRef.current;
     if (!table) return;
@@ -513,10 +538,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (pillar === selectedPillar || hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle") return;
     setImportError("");
     try {
-      await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
+      const page = await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
-      setExpandedAccounts(new Set());
+      if (page) setExpandedAccounts(defaultExpandedRecordAccounts(page.accountGroups));
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption pillar could not be loaded.");
     }
@@ -550,21 +575,25 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const updateForecast = (planKey: string, month: string, value: number) => {
     recordsRequestGeneration.current++;
+    recordsLoadingRef.current = false;
     setRecordsLoading(false);
     setDraftPlans((current) => current.map((plan) => plan.id === planKey
       ? { ...plan, forecasts: { ...plan.forecasts, [month]: value } }
       : plan));
   };
 
+  const controlRecord = (controls: readonly ConsumptionApiControlTotal[], account: string, month: string) =>
+    controls.find((control) => control.account === account && control.periodKey === month);
   const controlValue = (controls: readonly ConsumptionApiControlTotal[], account: string, month: string) =>
-    controls.find((control) => control.account === account && control.periodKey === month)?.controlAmount;
+    controlRecord(controls, account, month)?.controlAmount;
 
   const updateControlForecast = (account: string, month: string, value: number | null) => {
     recordsRequestGeneration.current++;
+    recordsLoadingRef.current = false;
     setRecordsLoading(false);
     setDraftControlTotals((current) => {
       const next = current.filter((control) => !(control.account === account && control.periodKey === month));
-      if (value !== null) next.push({ account, periodKey: month, controlAmount: value, detailAmount: null, matchStatus: "NO_DETAIL" });
+      if (value !== null) next.push({ account, periodKey: month, controlAmount: value, detailAmount: null, matchStatus: "MANUAL_FORECAST" });
       return next.sort((left, right) => controlKey(left).localeCompare(controlKey(right)));
     });
   };
@@ -760,8 +789,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       const result = await applyConsumptionImport(pendingImport.files, "ALL");
       if(viewPillar==="ALL")adoptWorkspace(result.workspace);
       let refreshFailed=false;
+      let refreshedPage: Awaited<ReturnType<typeof loadRecordsPage>> | undefined;
       try {
-        await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch }, viewPillar);
+        refreshedPage = await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch }, viewPillar);
       } catch (refreshError) {
         refreshFailed=true;
         if(viewPillar==="ALL"){
@@ -776,7 +806,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
       }
       setSelectedSignalId("");
-      setExpandedAccounts(new Set());
+      if (!refreshFailed && refreshedPage) setExpandedAccounts(defaultExpandedRecordAccounts(refreshedPage.accountGroups));
       setEditCell(null);
       setImportResult(`Physical facts: ${result.physicalFactCount} · Same-value rows: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"} · Plans: ${pendingImport.preview.planCount} · Control totals: ${pendingImport.preview.controlTotalCount}`);
       setImportPhase(refreshFailed?"warning":"complete");
@@ -851,7 +881,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           const key = `${series.id}-${month}`;
           if (multiple) {
             const resolution = multipleResolutions[month];
-            const canEditControl = false; // Imported PILLAR controls are provenance records and remain read-only.
+            const control = controlRecord(draftControlTotals, series.customer, month);
+            const canEditControl = editable && selectedPillar === "ALL" && Boolean(resolution?.editable)
+              && (control === undefined || control.matchStatus === "MANUAL_FORECAST");
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
             const savedValue = controlValue(savedControlTotals, series.customer, month);
             const dirty = savedValue !== controlValue(draftControlTotals, series.customer, month);
@@ -910,6 +942,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               disabled={hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle"}
               onClick={() => void selectPillar(option.value)}>{option.label}</button>)}
           </div>
+          {selectedPillar !== "ALL" && <p class="consumption-pillar-forecast-note">Forecast is shared and editable in All to prevent DP/OCI-Other double counting.</p>}
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
@@ -1105,13 +1138,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               })}
             </tbody>
           </table>
+          <div ref={recordsSentinelRef} class="consumption-records-sentinel" data-records-sentinel aria-hidden="true"></div>
         </div>
         <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
           <span class="consumption-records-loading" role="status" aria-live="polite" aria-atomic="true">
             {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Usage Records…</span></>}
           </span>
           {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
-          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
+          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts · {visiblePlans.length} plans</small>
         </div>
         </div>
       </section>
