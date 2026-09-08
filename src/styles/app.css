@@ -2353,6 +2353,8 @@ h4.weekly-activity-section-label--next-week,
 .consumption-page__header p, .consumption-section-heading p { color: var(--kpi-muted); line-height: 1.45; margin: .25rem 0 0; }
 .consumption-import-actions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; }
 .consumption-pillar-selector { align-items: center; display: inline-flex; gap: .2rem; margin-top: .4rem; }
+.consumption-range-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
+.consumption-range-pillar .consumption-pillar-selector { margin-top: 0; }
 .consumption-pillar-selector button { background: #fff; border: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 750; min-height: 2rem; padding: .3rem .65rem; }
 .consumption-pillar-selector button[aria-pressed="true"] { background: var(--kpi-surface-alt); border-color: var(--kpi-brand); color: var(--kpi-brand); }
 .consumption-pillar-selector button:disabled { cursor: not-allowed; opacity: .55; }
@@ -2546,7 +2548,7 @@ h4.weekly-activity-section-label--next-week,
 /* Consumption Usage Insights and incremental Usage Records. */
 .consumption-load-more { align-items: center; align-self: end; background: var(--oj-core-bg-color-content); box-sizing: border-box; display: flex; gap: .75rem; height: 3.75rem; justify-content: center; min-height: 3.75rem; padding: .65rem; position: sticky; bottom: 0; width: 100%; z-index: 9; }
 .consumption-records-sentinel { height: 1px; width: 100%; }
-.consumption-pillar-forecast-note { color: var(--kpi-muted); font-size: .72rem; margin: .35rem 0 0; }
+.consumption-pillar-forecast-note { color: var(--kpi-muted); flex-basis: 100%; font-size: .72rem; margin: 0; }
 .consumption-load-more.is-placeholder small { color: var(--kpi-muted); }
 .consumption-records-loading { align-items: center; color: var(--kpi-muted); display: flex; font-size: .78rem; gap: .45rem; justify-content: flex-end; min-height: 1.5rem; min-width: 11.5rem; }
 .consumption-load-more button { background: var(--oj-button-outlined-chrome-bg-color); border: 1px solid var(--oj-button-outlined-chrome-border-color); border-radius: var(--oj-core-border-radius-sm); color: var(--oj-button-outlined-chrome-text-color); cursor: pointer; min-height: 2.25rem; padding: .4rem .75rem; }

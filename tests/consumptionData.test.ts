@@ -7,6 +7,7 @@ import {
   buildQuarterSummary,
   detectConsumptionSignals,
   expandConsumptionQuarterOptions,
+  filterVisibleConsumptionPlans,
   getFiscalQuarter,
   getLatestActualMonth,
   getConsumptionPlanLabel,
@@ -47,6 +48,14 @@ assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY2
 assert.equal(initialConsumptionRecordsBatchSize(768), 10, "the initial Usage Records request fills a compact viewport");
 assert.equal(initialConsumptionRecordsBatchSize(1240), 20, "the initial Usage Records request expands for a taller viewport");
 assert.equal(initialConsumptionRecordsBatchSize(10000), 100, "the initial server page remains bounded");
+const visibilityPlans: ConsumptionPlan[] = [
+  { ...parsed.plans[0], id: "zero", planId: "ZERO", actuals: { "FY27-JUL": 0 }, forecasts: {} },
+  { ...parsed.plans[0], id: "active", planId: "ACTIVE", actuals: { "FY27-JUL": -1 }, forecasts: {} },
+  { ...parsed.plans[0], id: "forecast-zero", planId: "FORECAST-ZERO", actuals: {}, forecasts: { "FY27-SEP": 0 } },
+  { ...parsed.plans[0], id: "outside", planId: "OUTSIDE", actuals: { "FY26-MAY": 10 }, forecasts: {} }
+];
+assert.deepEqual(filterVisibleConsumptionPlans(visibilityPlans, "FY27-Q1", "FY27-Q2").map((plan) => plan.planId),
+  ["ACTIVE", "FORECAST-ZERO"], "visibility uses selected-range nonzero Actual or Forecast presence, including zero Forecast");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
   ["FY27-NOV", "FY27-OCT", "FY27-SEP"],
