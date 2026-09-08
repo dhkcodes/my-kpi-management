@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, filterActiveConsumptionPlans, getAlertActualTrend, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, getAlertActualTrend, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -164,11 +164,6 @@ void (async () => {
   const plan = (id: string, actuals: Record<string, number>, forecasts: Record<string, number>): ConsumptionPlan => ({
     id, customer: "Acme", endUser: id, planId: id, dataCenter: "IAD", planType: "OCI", actuals, forecasts
   });
-  const dormant = plan("dormant", { "FY27-JUL": 0, "FY27-AUG": 0 }, { "FY27-SEP": 900 });
-  const current = plan("current", { "FY27-AUG": 1 }, {});
-  const previous = plan("previous", { "FY27-JUL": -1 }, {});
-  assert.deepEqual(filterActiveConsumptionPlans([dormant, current, previous], "FY27-AUG").map((row) => row.id), ["current", "previous"],
-    "Usage Records retain only plans with non-zero ACTUAL in the current or immediately previous fiscal month");
 
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, {}), plan("b", {}, {})], "FY27-SEP", undefined),
     { amount: null, detailState: "MISSING", editable: true, source: "MANUAL" });

@@ -22,13 +22,19 @@ class SpaServerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "index.html").write_text("SPA INDEX", encoding="utf-8")
+            (root / "bundle.js").write_text("BUNDLE", encoding="utf-8")
             handler = module.create_handler(root)
             server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             base = f"http://127.0.0.1:{server.server_port}"
             try:
-                self.assertEqual(urllib.request.urlopen(base + "/accounts-workloads").read(), b"SPA INDEX")
+                route = urllib.request.urlopen(base + "/accounts-workloads")
+                self.assertEqual(route.read(), b"SPA INDEX")
+                self.assertEqual(route.headers["Cache-Control"], "no-cache, max-age=0, must-revalidate")
+                bundle = urllib.request.urlopen(base + "/bundle.js")
+                self.assertEqual(bundle.read(), b"BUNDLE")
+                self.assertEqual(bundle.headers["Cache-Control"], "no-cache, max-age=0, must-revalidate")
                 request = urllib.request.Request(base + "/accounts-workloads", method="HEAD")
                 self.assertEqual(urllib.request.urlopen(request).status, 200)
                 with self.assertRaises(urllib.error.HTTPError) as missing:

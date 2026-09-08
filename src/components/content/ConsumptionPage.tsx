@@ -10,6 +10,7 @@ import {
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
   consumptionPillarOptions,
+  expandConsumptionQuarterOptions,
   formatConsumptionDataCenter,
   getConsumptionPlanLabel,
   getFiscalQuarter,
@@ -275,7 +276,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setToQuarter(workspace.toQuarter);
     setEditablePeriodIds(new Set(workspace.editablePeriodIds));
     setDisplayQuarterOrder([...workspace.displayQuarterOrder]);
-    setAvailableQuarterOptions((current) => [...new Set([...current, ...workspace.displayQuarterOrder, workspace.fromQuarter, workspace.toQuarter].filter(Boolean))].sort());
+    setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...workspace.displayQuarterOrder, workspace.fromQuarter, workspace.toQuarter].filter(Boolean)));
     setCurrentFiscalMonth(workspace.currentFiscalMonth);
     setRangeInitialized(true);
     setRangeTouched(false);
@@ -327,7 +328,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setToQuarter(page.toQuarter);
       setEditablePeriodIds(new Set(page.editablePeriodIds));
       setDisplayQuarterOrder([...page.displayQuarterOrder]);
-      setAvailableQuarterOptions((current) => [...new Set([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean))].sort());
+      setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean)));
       setCurrentFiscalMonth(page.currentFiscalMonth);
       setRecordsTotalAccounts(page.totalAccounts);
       setRecordsNextOffset(page.nextOffset);
@@ -371,7 +372,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         setToQuarter(fallbackForecastQuarters[fallbackForecastQuarters.length - 1] ?? fallbackActualQuarters[0] ?? "");
         setEditablePeriodIds(new Set(fallbackEditablePeriods));
         setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
-        setAvailableQuarterOptions([...new Set([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters])].sort());
+        setAvailableQuarterOptions(expandConsumptionQuarterOptions([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters]));
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
         setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
         setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);

@@ -340,15 +340,6 @@ export const getAlertActualTrend = (
     : [];
 };
 
-export const filterActiveConsumptionPlans = (
-  plans: readonly ConsumptionPlan[],
-  currentFiscalMonth: string
-): ConsumptionPlan[] => {
-  const previousMonth = previousFiscalMonth(currentFiscalMonth);
-  if (!previousMonth) return [...plans];
-  return plans.filter((plan) => (plan.actuals[previousMonth] ?? 0) !== 0 || (plan.actuals[currentFiscalMonth] ?? 0) !== 0);
-};
-
 export type ConsumptionControlResolution = Readonly<{
   amount: number | null;
   detailState: "MISSING" | "ZERO" | "VALUE";
@@ -416,6 +407,15 @@ export const getQuarterMonths = (quarter: string): string[] => {
 const fiscalQuarterOrder = (quarter: string): number => {
   const match = /^FY(\d{2})-Q([1-4])$/.exec(quarter);
   return match ? Number(match[1]) * 4 + Number(match[2]) - 1 : Number.MAX_SAFE_INTEGER;
+};
+
+export const expandConsumptionQuarterOptions = (quarters: readonly string[]): string[] => {
+  const fiscalYears = [...new Set(quarters.flatMap((quarter) => {
+    const match = /^(FY\d{2})-Q[1-4]$/.exec(quarter);
+    return match ? [match[1]] : [];
+  }))];
+  return fiscalYears.flatMap((fiscalYear) => [1, 2, 3, 4].map((quarter) => `${fiscalYear}-Q${quarter}`))
+    .sort((left, right) => fiscalQuarterOrder(left) - fiscalQuarterOrder(right));
 };
 
 export const isConsumptionQuarterRangeValid = (fromQuarter: string, toQuarter: string): boolean =>
