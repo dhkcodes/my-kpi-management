@@ -423,6 +423,26 @@ export const isConsumptionQuarterRangeValid = (fromQuarter: string, toQuarter: s
   && fiscalQuarterOrder(toQuarter) !== Number.MAX_SAFE_INTEGER
   && fiscalQuarterOrder(fromQuarter) <= fiscalQuarterOrder(toQuarter);
 
+export const isConsumptionPeriodInQuarterRange = (periodKey: string, fromQuarter: string, toQuarter: string): boolean => {
+  const period = fiscalQuarterOrder(getFiscalQuarter(periodKey));
+  const from = fiscalQuarterOrder(fromQuarter);
+  const to = fiscalQuarterOrder(toQuarter);
+  return from !== Number.MAX_SAFE_INTEGER && to !== Number.MAX_SAFE_INTEGER && from <= period && period <= to;
+};
+
+export const filterVisibleConsumptionPlans = (
+  plans: readonly ConsumptionPlan[],
+  fromQuarter: string,
+  toQuarter: string
+): ConsumptionPlan[] => {
+  const from = fiscalQuarterOrder(fromQuarter);
+  const to = fiscalQuarterOrder(toQuarter);
+  if (from === Number.MAX_SAFE_INTEGER || to === Number.MAX_SAFE_INTEGER || from > to) return [];
+  const inRange = (periodKey: string) => isConsumptionPeriodInQuarterRange(periodKey, fromQuarter, toQuarter);
+  return plans.filter((plan) => Object.entries(plan.actuals).some(([periodKey, amount]) => inRange(periodKey) && amount !== 0)
+    || Object.keys(plan.forecasts).some(inRange));
+};
+
 const effectiveValue = (series: ConsumptionSeries, month: string): { value: number | null; status: "ACTUAL" | "FORECAST" | "MISSING" } => {
   if (Object.prototype.hasOwnProperty.call(series.actuals, month)) return { value: series.actuals[month], status: "ACTUAL" };
   if (Object.prototype.hasOwnProperty.call(series.forecasts, month)) return { value: series.forecasts[month], status: "FORECAST" };
