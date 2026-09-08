@@ -8,6 +8,7 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
+const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 
 // Navigation and route ownership.
 assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "usage-insights"[\s\S]*label: "Usage Insights"[\s\S]*id: "usage-records"[\s\S]*label: "Usage Records"/, "approved Consumption leaf names exist");
@@ -104,6 +105,9 @@ assert.match(recordsPage, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "E
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
 assert.match(recordsPage, /onNavigationGuardChange[\s\S]*window\.confirm\(/, "unsaved Forecast changes retain route protection");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "Data keeps its independent Quarter range");
+assert.match(recordsPage, /expandConsumptionQuarterOptions[\s\S]*setAvailableQuarterOptions/, "every represented Fiscal Year exposes Q1 through Q4 in the mobile-compatible native selects");
+assert.match(recordsPage, /selectPillar[\s\S]*loadRecordsPage\(false, \{ fromQuarter, toQuarter, search: appliedSearch \}, pillar\)/, "pillar changes retain the applied From and To range");
+assert.doesNotMatch(recordsPage, /filterActiveConsumptionPlans/, "zero-only imported Plans are never removed in the Records render path");
 assert.match(recordsPage, /submitRecordsQuery[\s\S]*loadRecordsPage\(false, query\)/, "quarter and search changes replace only the Records data region");
 assert.match(recordsPage, /const \[draftSearch, setDraftSearch\][\s\S]*const \[appliedSearch, setAppliedSearch\]/, "Usage Records separates draft and applied search state");
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*search:\s*query\.search/, "only an explicit submitted query reaches the records API");
@@ -150,6 +154,8 @@ assert.match(styles, /@media \(min-width:\s*64rem\)[\s\S]*\.kpi-shell:has\(\.con
 assert.match(styles, /\/\* The popup replaces the former rail[^\n]*\*\/[\s\S]*\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "popup navigation preserves the shell grid so Usage Records keeps an internally scrollable viewport and can trigger incremental loading");
 assert.match(styles, /\.consumption-page[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)[^}]*min-height:\s*0[\s\S]*\.consumption-table-panel[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.consumption-table-scroll[^}]*min-height:\s*0[^}]*min-width:\s*0[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "desktop card, table, and Footer share remaining height while only the table data region owns scrolling");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
+assert.match(staticServer, /bundle\.js[\s\S]*Cache-Control[\s\S]*no-cache, max-age=0, must-revalidate/, "SPA routes and the unversioned production bundle revalidate after deployment");
+assert.doesNotMatch(recordsPage + staticServer, /serviceWorker|navigator\.serviceWorker/, "the production path has no Service Worker that can retain an obsolete Records bundle");
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
 assert.match(styles, /\.consumption-account-column\s*\{[^}]*left:\s*0[^}]*position:\s*sticky/, "Account column remains sticky");

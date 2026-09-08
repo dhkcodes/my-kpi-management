@@ -9,6 +9,13 @@ from urllib.parse import urlsplit
 
 
 class SpaRequestHandler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        requested_path = urlsplit(self.path).path
+        if requested_path in {"/", "/index.html", "/bundle.js"} or "." not in Path(requested_path).name:
+            self.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+        super().end_headers()
+
     def send_head(self):
         requested_path = urlsplit(self.path).path
         translated = Path(self.translate_path(requested_path))
