@@ -65,7 +65,7 @@ export type ConsumptionApiWorkspace = Readonly<{
 }>;
 export type ConsumptionApiControlTotal = Readonly<{
   account: string; periodKey: string; controlAmount: number; detailAmount: number | null;
-  matchStatus: "MATCH" | "MISMATCH" | "NO_DETAIL";
+  matchStatus: "MATCH" | "MISMATCH" | "NO_DETAIL" | "MANUAL_FORECAST";
 }>;
 export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionRecordsQuery = Readonly<{
@@ -200,7 +200,7 @@ const expectedSignalGrade = (amount: number, percent: number | null): Consumptio
     : Math.abs(amount) >= 300 || Math.abs(percent ?? 0) >= 30 ? "HIGH" : "WATCH";
 
 const amountStatuses = new Set<ConsumptionAmountSplit["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE"]);
-const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "NO_DETAIL"]);
+const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "NO_DETAIL", "MANUAL_FORECAST"]);
 const malformedAnalysis = (): never => { throw new Error("Malformed Consumption analysis response"); };
 const parseAmountSplit = (value: unknown): ConsumptionAmountSplit => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();

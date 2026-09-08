@@ -118,29 +118,35 @@ assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:
 assert.match(recordsPage, /new Map[\s\S]*page\.accountGroups[\s\S]*setSavedPlans[\s\S]*setDraftPlans/, "loaded account pages append with account and plan deduplication");
 assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{hasDraftChanges \|\| rangeLoading \|\| recordsLoading\}/, "search preserves its draft and is disabled during replacement loading or Forecast drafts");
 assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-bottom scroll and Load More request the next server page");
+assert.match(recordsPage, /IntersectionObserver[\s\S]*root:\s*tableScrollRef\.current[\s\S]*loadRecordsPage\(true\)/, "the actual table scroll root observes a paging sentinel");
+assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
+assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
+assert.match(recordsPage, /defaultExpandedRecordAccounts[\s\S]*group\.plans\.length > 1[\s\S]*if \(append\) setExpandedAccounts/, "initial and appended Multiple accounts reveal their imported Plan rows by default");
 assert.match(recordsPage, /editablePeriodIds\.has\(month\)/, "only backend-declared periods are editable");
 assert.match(recordsPage, /displayQuarterOrder\.flatMap/, "Data columns follow backend display order");
 assert.match(recordsPage, /const expandable = account\.plans\.length > 1[\s\S]*class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*toggleAccount\(account\.customer\)[\s\S]*expandable && expanded && account\.plans\.map/, "Multiple keeps its disclosure and renders child Plan rows only when expanded");
 assert.doesNotMatch(recordsPage, /if \(!append\) \{[\s\S]{0,240}setExpandedAccounts\(new Set\(\)\)/, "Records query replacement does not discard retained Multiple expansion state");
 assert.match(recordsPage, /const expandable = account\.plans\.length > 1[\s\S]*renderQuarterCells\(singlePlan, false\)[\s\S]*renderQuarterCells\(account, true\)/, "single and multi-plan rows preserve edit/read-only behavior");
-assert.match(recordsPage, /const canEditControl = false[\s\S]*data-control-source=\{resolution\?\.source\}[\s\S]*resolution\?\.source === "MANUAL" \? "CONTROL" : "PLAN SUM"/, "Pillar Multiple rows expose Control versus Plan Sum state while imported controls remain read-only");
+assert.match(recordsPage, /const canEditControl = editable && selectedPillar === "ALL" && Boolean\(resolution\?\.editable\)[\s\S]*control\.matchStatus === "MANUAL_FORECAST"[\s\S]*data-control-source=\{resolution\?\.source\}/, "editable All-scope manual Multiple Forecast controls are restored while imported Actual controls remain read-only");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
 assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*submitRecordsQuery[\s\S]*hasDraftChanges/, "Control-only drafts share navigation and explicit query submission guards");
 assert.match(recordsPage, /const updateControlForecast[\s\S]*?recordsRequestGeneration\.current\+\+[\s\S]*?setRecordsLoading\(false\)/, "Control typing invalidates an in-flight Records replacement before it can erase the draft");
+assert.match(recordsPage, /const updateControlForecast[\s\S]*?recordsLoadingRef\.current = false/, "Control typing releases a stale append loading latch");
 assert.match(recordsPage, /const updateForecast[\s\S]*?recordsRequestGeneration\.current\+\+[\s\S]*?setRecordsLoading\(false\)/, "Plan typing invalidates an in-flight Records replacement before it can erase the draft");
+assert.match(recordsPage, /const updateForecast[\s\S]*?recordsLoadingRef\.current = false/, "Plan typing releases a stale append loading latch");
 assert.match(recordsPage, /Multiple Control[\s\S]*controlValue\(error\.current\.controlTotals/, "HTTP 409 comparison includes Control-only saved, draft, and current server values");
-assert.doesNotMatch(recordsPage, /MANUAL_FORECAST/, "the client uses only deployed Control Total match statuses");
+assert.match(apiSource, /MANUAL_FORECAST/, "the client decodes separately persisted manual Multiple Forecast controls");
 assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never manufactures Forecast values");
 
 // Redwood table behavior and responsive containment.
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
 assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
 assert.match(styles, /\.consumption-table-content\s*\{[^}]*grid-template-rows:\s*minmax\(18rem, 1fr\) 3\.75rem[\s\S]*\.consumption-table-scroll\s*\{[^}]*height:\s*auto[^}]*min-height:\s*18rem[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table fills the card while owning Quarter\/Month overflow and preserving the 18rem accessibility minimum");
-assert.match(styles, /@media \(min-width:\s*64rem\) and \(min-height:\s*42rem\)[\s\S]*\.kpi-shell:has\(\.consumption-page\)[^}]*height:\s*100dvh[^}]*overflow:\s*hidden[\s\S]*\.kpi-shell__body:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.kpi-content:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden/, "standard desktop confines Usage Records to the viewport while mobile and high zoom retain document scrolling");
+assert.match(styles, /@media \(min-width:\s*64rem\)[\s\S]*\.kpi-shell:has\(\.consumption-page\)[^}]*height:\s*100dvh[^}]*overflow:\s*hidden[\s\S]*\.kpi-shell__body:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.kpi-content:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden/, "every desktop-height viewport confines Usage Records while narrower mobile/high-zoom layouts retain document scrolling");
 assert.match(styles, /\/\* The popup replaces the former rail[^\n]*\*\/[\s\S]*\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "popup navigation preserves the shell grid so Usage Records keeps an internally scrollable viewport and can trigger incremental loading");
 assert.match(styles, /\.consumption-page[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)[^}]*min-height:\s*0[\s\S]*\.consumption-table-panel[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.consumption-table-scroll[^}]*min-height:\s*0[^}]*min-width:\s*0[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "desktop card, table, and Footer share remaining height while only the table data region owns scrolling");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
