@@ -70,6 +70,13 @@ const toApiControlTotals = (controls: readonly { customer: string; values: Reado
   controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
     account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
   })));
+const planMatchesRecordSearch = (plan: ConsumptionPlan, query: string) =>
+  [plan.customer, plan.workload, plan.endUser, plan.planId]
+    .some((value) => value?.toLowerCase().includes(query));
+const recordGroupMatchesSearch = (group: Readonly<{ account: string; plans: readonly ConsumptionPlan[] }>, search: string) => {
+  const query = search.trim().toLowerCase();
+  return !query || group.account.toLowerCase().includes(query) || group.plans.some((plan) => planMatchesRecordSearch(plan, query));
+};
 const searchExpandedRecordAccounts = (
   groups: readonly Readonly<{ account: string; plans: readonly ConsumptionPlan[] }>[],
   search: string
@@ -77,8 +84,7 @@ const searchExpandedRecordAccounts = (
   const query = search.trim().toLowerCase();
   if (!query) return new Set<string>();
   return new Set(groups.filter((group) => !group.account.toLowerCase().includes(query)
-    && group.plans.some((plan) => [plan.customer, plan.workload, plan.endUser, plan.planId]
-      .some((value) => value?.toLowerCase().includes(query))))
+    && group.plans.some((plan) => planMatchesRecordSearch(plan, query)))
     .map((group) => group.account));
 };
 
@@ -277,9 +283,23 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const hasDraftChanges = hasPlanDraftChanges || hasControlDraftChanges;
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
+    const visiblePlans = filterVisibleConsumptionPlans(workspace.plans, workspace.fromQuarter, workspace.toQuarter);
+    const accountNames = [...new Set([
+      ...visiblePlans.map((plan) => plan.customer),
+      ...workspace.controlTotals.filter((control) => control.matchStatus === "MANUAL_FORECAST"
+        && isConsumptionPeriodInQuarterRange(control.periodKey, workspace.fromQuarter, workspace.toQuarter))
+        .map((control) => control.account)
+    ])];
+    const visibleGroups = accountNames.map((account) => ({
+      account,
+      plans: visiblePlans.filter((plan) => plan.customer === account)
+    })).filter((group) => recordGroupMatchesSearch(group, appliedSearch));
+    const adoptedPlans = visibleGroups.flatMap((group) => group.plans);
+    const adoptedAccountNames = visibleGroups.map((group) => group.account);
     setSelectedPillar(workspace.selectedPillar);
-    setSavedPlans(clonePlans(workspace.plans));
-    setDraftPlans(clonePlans(workspace.plans));
+    setSavedPlans(clonePlans(adoptedPlans));
+    setDraftPlans(clonePlans(adoptedPlans));
+    setRecordAccountNames(adoptedAccountNames);
     setSavedControlTotals(cloneControlTotals(workspace.controlTotals));
     setDraftControlTotals(cloneControlTotals(workspace.controlTotals));
     setServerSignals(workspace.signals);
@@ -293,6 +313,10 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setRangeInitialized(true);
     setRangeTouched(false);
     setDataMode("backend");
+    setRecordsTotalAccounts(adoptedAccountNames.length);
+    setRecordsNextOffset(adoptedAccountNames.length);
+    setRecordsHasMore(false);
+    setExpandedAccounts(searchExpandedRecordAccounts(visibleGroups, appliedSearch));
     setConflictRows([]);
     setConflictWorkspace(null);
   };
@@ -735,9 +759,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter, search: appliedSearch });
         } catch (refreshError) {
           adoptWorkspace(workspace);
-          setRecordsTotalAccounts(aggregateConsumptionAccounts(workspace.plans).length);
-          setRecordsNextOffset(aggregateConsumptionAccounts(workspace.plans).length);
-          setRecordsHasMore(false);
           setImportError(`Forecasts were saved, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
         }
       }
@@ -832,9 +853,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         refreshFailed=true;
         if(viewPillar==="ALL"){
           adoptWorkspace(result.workspace);
-          setRecordsTotalAccounts(aggregateConsumptionAccounts(result.workspace.plans).length);
-          setRecordsNextOffset(aggregateConsumptionAccounts(result.workspace.plans).length);
-          setRecordsHasMore(false);
         }else{
           setSavedPlans([]);setDraftPlans([]);setSavedControlTotals([]);setDraftControlTotals([]);setRecordAccountNames([]);
           setRecordsTotalAccounts(0);setRecordsNextOffset(0);setRecordsHasMore(false);setDataMode("error");
