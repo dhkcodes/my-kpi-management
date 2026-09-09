@@ -247,7 +247,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
           <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
               disabled={loading && !analysis}
-              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Usage Insights filters">
