@@ -861,7 +861,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       }
       setSelectedSignalId("");
       setEditCell(null);
-      setImportResult(`Physical facts: ${result.physicalFactCount} · Same-value rows: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"} · Plans: ${pendingImport.preview.planCount} · Control totals: ${pendingImport.preview.controlTotalCount}`);
+      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Consumption CSV files could not be imported.";
@@ -1077,9 +1077,19 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 <div><dt>Source rows</dt><dd>{pendingImport.preview.sourceRowCount}</dd></div>
                 <div><dt>Plans</dt><dd>{pendingImport.preview.planCount}</dd></div>
                 <div><dt>Control totals</dt><dd>{pendingImport.preview.controlTotalCount}</dd></div>
-                <div><dt>Same-value duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
+                <div><dt>New Actuals to insert</dt><dd>{pendingImport.preview.insertFactCount}</dd></div>
+                <div><dt>Upload duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
+                <div><dt>Existing same values</dt><dd>{pendingImport.preview.existingSameValueCount}</dd></div>
+                <div><dt>Existing Actuals to overwrite</dt><dd>{pendingImport.preview.overwriteCount}</dd></div>
+                <div><dt>Existing Actuals to delete</dt><dd>{pendingImport.preview.deleteFactCount}</dd></div>
                 <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Conflicts</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
               </dl>
+              {pendingImport.preview.overwrites.length > 0 && <section class="consumption-import-overwrites" role="status" aria-labelledby="consumptionImportOverwriteTitle">
+                <strong id="consumptionImportOverwriteTitle">Existing Actuals to overwrite</strong>
+                <p>Scope is limited to the authenticated Owner, detected Pillar, and listed Plan/Period keys. Other Pillars and Forecasts are unchanged.</p>
+                <ul>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => <li key={overwrite.key}><code>{overwrite.key}</code> · {currency.format(overwrite.existingValue)} → {currency.format(overwrite.newValue)}</li>)}</ul>
+                {pendingImport.preview.overwrites.length > 20 && <p>Showing 20 of {pendingImport.preview.overwriteCount} overwrite rows.</p>}
+              </section>}
               {pendingImport.preview.conflicts.length > 0 && <section class="consumption-import-conflicts" role="alert" aria-labelledby="consumptionImportConflictTitle">
                 <strong id="consumptionImportConflictTitle">Resolve conflicting values before import</strong>
                 <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={conflict.key}><code>{conflict.key}</code> · {conflict.files.join(", ")}{conflict.values ? ` · Values: ${conflict.values.join(", ")}` : ""}</li>)}</ul>

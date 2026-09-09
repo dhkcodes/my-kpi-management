@@ -2365,6 +2365,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-import-file-list article { background: #f8f6f4; border: 1px solid var(--kpi-border); display: grid; gap: .2rem; padding: .55rem .65rem; }
 .consumption-import-file-list span { color: var(--kpi-muted); font-size: .75rem; }
 .consumption-import-conflicts { color: var(--kpi-danger); }
+.consumption-import-overwrites { background: var(--kpi-surface-alt); border-left: .25rem solid var(--kpi-warning); color: var(--kpi-ink); max-height: 16rem; overflow: auto; padding: .65rem .8rem; }
+.consumption-import-overwrites p { color: var(--kpi-muted); margin: .3rem 0; }
+.consumption-import-overwrites ul { margin: .45rem 0 0; padding-left: 1.25rem; }
 .consumption-range-bar { align-items: end; background: #f8f6f4; border: 1px solid var(--kpi-border); display: flex; flex-wrap: wrap; column-gap: .75rem; padding: .5rem .75rem; row-gap: .5rem; }
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }

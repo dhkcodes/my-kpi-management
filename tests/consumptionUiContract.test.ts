@@ -85,7 +85,11 @@ assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files,
 assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL"\)/, "multipart apply reuses the retained files as one cross-pillar atomic set");
 assert.match(recordsPage, /pendingImport\.preview\.files\.map[\s\S]*detectedPillar[\s\S]*owner[\s\S]*fromPeriod[\s\S]*toPeriod[\s\S]*sourceRowCount/, "preview lists pillar, owner, range, and counts per file");
 assert.match(recordsPage, /sameValueDuplicateCount[\s\S]*conflictCount[\s\S]*pendingImport\.preview\.conflicts/, "preview summarizes same-value duplicates and conflicting keys");
+assert.match(recordsPage, /existingSameValueCount[\s\S]*overwriteCount[\s\S]*pendingImport\.preview\.overwrites/, "preview separates existing same-value rows from scoped Actual overwrites");
+assert.match(recordsPage, /Existing Actuals to overwrite[\s\S]*existingValue[\s\S]*newValue/, "overwrite preview discloses old and new values for scoped Plan-period keys");
 assert.match(recordsPage, /pendingImport\.preview\.hasConflicts[\s\S]*disabled=\{pendingImport\.preview\.hasConflicts\}/, "conflicts block atomic import apply");
+assert.doesNotMatch(recordsPage, /disabled=\{pendingImport\.preview\.hasConflicts \|\| pendingImport\.preview\.overwriteCount/, "eligible overwrites never disable Import");
+assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Usage Records downloads the server-owned import-compatible Export file and releases the object URL");
 assert.match(recordsPage, /oj-ux-ico-download[\s\S]*Export CSV[\s\S]*oj-ux-ico-upload[\s\S]*Import CSV/, "Export and Import are adjacent Redwood actions with clear icons");
