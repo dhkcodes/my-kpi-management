@@ -2558,6 +2558,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-page { display: grid; gap: .85rem; min-width: 0; }
 .consumption-insights-header { align-items: end; }
 .consumption-insights-header p, .consumption-section-heading p { color: var(--kpi-muted); margin: .2rem 0 0; }
+.consumption-insights-header-actions { align-items: end; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; min-width: 0; }
+.consumption-insights-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
+.consumption-insights-pillar .consumption-pillar-selector { margin-top: 0; }
 .consumption-insights-context { align-items: end; display: grid; gap: .25rem; grid-template-columns: minmax(18rem, 25rem); min-width: 18rem; }
 .consumption-insights-context > label { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .consumption-insights-combobox { position: relative; }
@@ -2639,6 +2642,7 @@ h4.weekly-activity-section-label--next-week,
 }
 @media (max-width: 800px) {
   .consumption-insights-header { align-items: stretch; flex-direction: column; }
+  .consumption-insights-header-actions { justify-content: flex-start; width: 100%; }
   .consumption-insights-context { grid-template-columns: minmax(0, 1fr); min-width: 0; width: 100%; }
   .consumption-insights-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .consumption-insights-total-regions { grid-template-columns: minmax(0, 1fr); }
