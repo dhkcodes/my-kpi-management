@@ -108,8 +108,9 @@ export type ConsumptionImportFilePreview = Readonly<{
   sourceSha256: string; planCount: number; controlTotalCount: number; sourceRowCount: number;
 }>;
 export type ConsumptionImportConflict = Readonly<{
-  key: string; files: readonly string[]; values: readonly (number | null)[];
-  rows: readonly number[]; reason: "DUPLICATE_PLAN_ROW" | "CONFLICTING_UPLOAD_VALUE";
+  key: string; files: readonly string[]; values: readonly (string | null)[];
+  fileOrdinals: readonly number[]; rows: readonly number[];
+  reason: "DUPLICATE_PLAN_ROW" | "CONFLICTING_UPLOAD_VALUE";
 }>;
 export type ConsumptionImportOverwrite = Readonly<{
   key: string; existingValue: number; newValue: number; fileName: string;
@@ -172,6 +173,8 @@ const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const isNullableFiniteNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
+const isDecimalString = (value: unknown): value is string => typeof value === "string" && /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value);
+const isNullableDecimalString = (value: unknown): value is string | null => value === null || isDecimalString(value);
 const isCoveragePercent = (value: unknown): value is number => isFiniteNumber(value) && value >= 0 && value <= 100;
 const isNonNegativeInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 const isPositiveInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
@@ -628,8 +631,8 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
       detectedPillar:file.pillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
       controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount} as ConsumptionImportFilePreview;
   });
-  const expectedNames=uploaded.map(file=>file.name).sort();
-  const actualNames=files.map(file=>file.fileName).sort();
+  const expectedNames=uploaded.map(file=>file.name);
+  const actualNames=files.map(file=>file.fileName);
   if(expectedNames.length!==actualNames.length||expectedNames.some((name,index)=>name!==actualNames[index]))
     throw new Error("Malformed Consumption import preview");
   const conflicts = raw.conflicts.map((value) => {
@@ -637,13 +640,20 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     const conflict=value as Record<string,unknown>;
     if (!(conflict.pillar==="DP"||conflict.pillar==="OCI_OTHER") || !isNonEmptyString(conflict.account)
       || !isNonEmptyString(conflict.endUser) || !isNonEmptyString(conflict.planCode) || !isPeriodKey(conflict.periodKey)
-      || !isNullableFiniteNumber(conflict.firstValue) || !isNullableFiniteNumber(conflict.conflictingValue)
+      || !isNullableDecimalString(conflict.firstValue) || !isNullableDecimalString(conflict.conflictingValue)
       || !isNonEmptyString(conflict.firstFile) || !isNonEmptyString(conflict.conflictingFile)
+      || !isPositiveInteger(conflict.firstFileOrdinal) || !isPositiveInteger(conflict.conflictingFileOrdinal)
       || !isPositiveInteger(conflict.firstRowNumber) || !isPositiveInteger(conflict.conflictingRowNumber)
       || !(conflict.reason==="DUPLICATE_PLAN_ROW"||conflict.reason==="CONFLICTING_UPLOAD_VALUE"))
       throw new Error("Malformed Consumption import preview");
-    return {key:`${conflict.pillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}`,
-      files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as (number|null)[],
+    const firstSource=files[conflict.firstFileOrdinal-1];
+    const conflictingSource=files[conflict.conflictingFileOrdinal-1];
+    if (!firstSource || !conflictingSource || firstSource.fileName!==conflict.firstFile
+      || conflictingSource.fileName!==conflict.conflictingFile || firstSource.detectedPillar!==conflict.pillar
+      || conflictingSource.detectedPillar!==conflict.pillar) throw new Error("Malformed Consumption import preview");
+    return {key:`${conflict.pillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}::${conflict.firstFileOrdinal}::${conflict.firstRowNumber}::${conflict.conflictingFileOrdinal}::${conflict.conflictingRowNumber}`,
+      files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as (string|null)[],
+      fileOrdinals:[conflict.firstFileOrdinal,conflict.conflictingFileOrdinal] as number[],
       rows:[conflict.firstRowNumber,conflict.conflictingRowNumber] as number[],reason:conflict.reason as ConsumptionImportConflict["reason"]};
   });
   const overwrites = raw.overwrites.map((value) => {

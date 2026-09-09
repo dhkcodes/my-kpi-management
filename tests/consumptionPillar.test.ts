@@ -105,20 +105,33 @@ void (async () => {
 
   const hardConflictPayload = { ...previewPayload, physicalFactCount: 1, insertedFactCount: 1,
     unchangedFactCount: 0, skippedFactCount: 0, overwrites: [], conflicts: [{ pillar: "DP", account: "A", endUser: "EU",
-      planCode: "P1", periodKey: "FY27-JUN", firstValue: 10, conflictingValue: 11,
-      firstFile: "dp.csv", conflictingFile: "dp.csv", firstRowNumber: 2, conflictingRowNumber: 3,
+      planCode: "P1", periodKey: "FY27-JUN", firstValue: "10.40", conflictingValue: "10.49",
+      firstFile: "dp.csv", conflictingFile: "dp.csv", firstFileOrdinal: 1, conflictingFileOrdinal: 1,
+      firstRowNumber: 2, conflictingRowNumber: 3,
       reason: "DUPLICATE_PLAN_ROW" }] };
   runtime.fetch = async () => new Response(JSON.stringify(hardConflictPayload), { status: 200, headers: { "Content-Type": "application/json" } });
   const hardConflict = await previewConsumptionImport(files, "ALL");
-  assert.deepEqual(hardConflict.conflicts[0], { key: "DP::A::EU::P1::FY27-JUN", files: ["dp.csv", "dp.csv"],
-    values: [10, 11], rows: [2, 3], reason: "DUPLICATE_PLAN_ROW" });
+  assert.deepEqual(hardConflict.conflicts[0], { key: "DP::A::EU::P1::FY27-JUN::1::2::1::3", files: ["dp.csv", "dp.csv"],
+    values: ["10.40", "10.49"], fileOrdinals: [1, 1], rows: [2, 3], reason: "DUPLICATE_PLAN_ROW" });
   assert.equal(hardConflict.hasConflicts, true);
+
+  const sameNameFiles = [new File(["a"], "same.csv"), new File(["b"], "same.csv")];
+  const sameNamePayload = { ...hardConflictPayload,
+    files: hardConflictPayload.files.map((file) => ({ ...file, sourceFileName: "same.csv", pillar: "DP" })),
+    conflicts: [{ ...hardConflictPayload.conflicts[0], firstFile: "same.csv", conflictingFile: "same.csv",
+      firstFileOrdinal: 1, conflictingFileOrdinal: 2, reason: "CONFLICTING_UPLOAD_VALUE" }] };
+  runtime.fetch = async () => new Response(JSON.stringify(sameNamePayload), { status: 200, headers: { "Content-Type": "application/json" } });
+  const sameNameConflict = await previewConsumptionImport(sameNameFiles, "DP");
+  assert.deepEqual(sameNameConflict.conflicts[0].fileOrdinals, [1, 2]);
 
   for (const malformedPreview of [
     { ...previewPayload, physicalFactCount: 5 },
     { ...previewPayload, exactReplayFileCount: 3 },
+    { ...previewPayload, files: [...previewPayload.files].reverse() },
     { ...previewPayload, overwrites: [previewPayload.overwrites[0], previewPayload.overwrites[0]] },
-    { ...previewPayload, overwrites: [{ ...previewPayload.overwrites[0], sourceFileName: "foreign.csv" }] }
+    { ...previewPayload, overwrites: [{ ...previewPayload.overwrites[0], sourceFileName: "foreign.csv" }] },
+    { ...hardConflictPayload, conflicts: [{ ...hardConflictPayload.conflicts[0], firstFile: "foreign.csv" }] },
+    { ...hardConflictPayload, conflicts: [{ ...hardConflictPayload.conflicts[0], firstFileOrdinal: 2 }] }
   ]) {
     runtime.fetch = async () => new Response(JSON.stringify(malformedPreview), { status: 200, headers: { "Content-Type": "application/json" } });
     await assert.rejects(() => previewConsumptionImport(files, "ALL"), /Malformed Consumption import preview/);
