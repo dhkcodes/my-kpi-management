@@ -120,7 +120,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, pillar: selectedPillar })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
-        if (selectedAccountContext && !value.accountCandidates.some((candidate) =>
+        if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
           candidate.account.toLocaleLowerCase() === selectedAccountContext.toLocaleLowerCase())) {
           setSelectedAccountContext("");
           setCandidateSearch("");

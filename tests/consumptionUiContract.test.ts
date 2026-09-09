@@ -70,7 +70,7 @@ assert.match(insightsPage, /consumption-insights-header-actions[\s\S]*consumptio
 assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items:\s*end[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap[^}]*gap:\s*\.75rem/, "Analysis filter row aligns Pillar and Account with Redwood spacing and natural wrapping");
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.25rem/, "Pillar uses the same labelled filter rhythm as Account");
 assert.doesNotMatch(insightsPage, /setSelectedPillar\(option\.value\);\s*setSelectedAccountContext\(""\)/, "Pillar changes preserve a still-valid selected Account for cross filtering");
-assert.match(insightsPage, /value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "a Pillar response clears the selected Account only when it is absent from the scoped candidates");
+assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[\s\S]*value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while candidate search does not clear context");
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Usage Records sends the selected pillar with every records request");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Usage Insights sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Usage Records exports the selected pillar");
