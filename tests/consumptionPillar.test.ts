@@ -72,10 +72,11 @@ void (async () => {
       { sourceFileName: "dp.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "DP", sourceSha256: "a".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 },
       { sourceFileName: "oci.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "OCI_OTHER", sourceSha256: "b".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 }
     ],
-    physicalFactCount: 1,
+    physicalFactCount: 6,
     deduplicatedFactCount: 1,
     insertedFactCount: 0,
     unchangedFactCount: 5,
+    skippedFactCount: 0,
     deletedFactCount: 0,
     overwrites: [{ pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
       existingValue: 10, newValue: 11, sourceFileName: "dp.csv" }],
@@ -94,10 +95,20 @@ void (async () => {
   assert.equal(preview.sameValueDuplicateCount, 1);
   assert.equal(preview.insertFactCount, 0);
   assert.equal(preview.deleteFactCount, 0);
+  assert.equal(preview.skippedFactCount, 0);
   assert.equal(preview.existingSameValueCount, 5);
   assert.equal(preview.overwriteCount, 1);
   assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
   assert.equal(preview.hasConflicts, false);
+
+  for (const malformedPreview of [
+    { ...previewPayload, physicalFactCount: 5 },
+    { ...previewPayload, overwrites: [previewPayload.overwrites[0], previewPayload.overwrites[0]] },
+    { ...previewPayload, overwrites: [{ ...previewPayload.overwrites[0], sourceFileName: "foreign.csv" }] }
+  ]) {
+    runtime.fetch = async () => new Response(JSON.stringify(malformedPreview), { status: 200, headers: { "Content-Type": "application/json" } });
+    await assert.rejects(() => previewConsumptionImport(files, "ALL"), /Malformed Consumption import preview/);
+  }
 
   await assert.rejects(() => previewConsumptionImport([], "ALL"), /1 to 8 CSV files/);
   await assert.rejects(() => previewConsumptionImport(Array.from({ length: 9 }, (_, index) => new File(["x"], `${index}.csv`)), "ALL"), /1 to 8 CSV files/);
@@ -107,12 +118,12 @@ void (async () => {
     assert.ok(init?.body instanceof FormData);
     return new Response(JSON.stringify({ workspace: { ...workspace, selectedPillar: "ALL", plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts.map((fact) => ({ ...fact, pillar: "ALL" })) }] },
       batchIds: [1, 2], duplicate: false, physicalFactCount: 1, deduplicatedFactCount: 1,
-      insertedFactCount: 0, unchangedFactCount: 5, overwrittenFactCount: 1, deletedFactCount: 0 }),
+      insertedFactCount: 0, unchangedFactCount: 0, overwrittenFactCount: 1, skippedFactCount: 0, deletedFactCount: 0 }),
       { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const applied = await applyConsumptionImport(files, "ALL");
   assert.deepEqual([applied.physicalFactCount, applied.deduplicatedFactCount, applied.duplicate], [1, 1, false]);
-  assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.deletedFactCount], [0, 5, 1, 0]);
+  assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.skippedFactCount, applied.deletedFactCount], [0, 0, 1, 0, 0]);
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=OCI_OTHER");

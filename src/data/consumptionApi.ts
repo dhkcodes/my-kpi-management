@@ -114,7 +114,7 @@ export type ConsumptionImportOverwrite = Readonly<{
 export type ConsumptionImportPreview = Readonly<{
   selectedPillar: ConsumptionPillar; files: readonly ConsumptionImportFilePreview[];
   planCount: number; controlTotalCount: number; sourceRowCount: number;
-  insertFactCount: number; deleteFactCount: number;
+  insertFactCount: number; skippedFactCount: number; deleteFactCount: number;
   sameValueDuplicateCount: number; existingSameValueCount: number;
   overwriteCount: number; overwrites: readonly ConsumptionImportOverwrite[];
   conflictCount: number; conflicts: readonly ConsumptionImportConflict[]; hasConflicts: boolean;
@@ -140,6 +140,7 @@ export type ConsumptionMultiImportResult = Readonly<{
   insertedFactCount: number;
   unchangedFactCount: number;
   overwrittenFactCount: number;
+  skippedFactCount: number;
   deletedFactCount: number;
 }>;
 export type ConsumptionCsvExport = Readonly<{ blob: Blob; fileName: string }>;
@@ -607,6 +608,7 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
   if (!Array.isArray(raw.files) || !Array.isArray(raw.conflicts) || !Array.isArray(raw.overwrites)
     || !isNonNegativeInteger(raw.physicalFactCount) || !isNonNegativeInteger(raw.deduplicatedFactCount)
     || !isNonNegativeInteger(raw.insertedFactCount) || !isNonNegativeInteger(raw.unchangedFactCount)
+    || !isNonNegativeInteger(raw.skippedFactCount)
     || raw.deletedFactCount !== 0
     || raw.files.length !== uploaded.length) throw new Error("Malformed Consumption import preview");
   const files = raw.files.map((value) => {
@@ -647,11 +649,16 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     return {key:`${overwrite.pillar}::${overwrite.account}::${overwrite.endUser}::${overwrite.planCode}::${overwrite.periodKey}`,
       existingValue:overwrite.existingValue,newValue:overwrite.newValue,fileName:overwrite.sourceFileName} as ConsumptionImportOverwrite;
   });
+  const overwriteKeys=new Set(overwrites.map((overwrite)=>overwrite.key));
+  const uploadedNames=new Set(files.map((file)=>file.fileName));
+  if(overwriteKeys.size!==overwrites.length||overwrites.some((overwrite)=>!uploadedNames.has(overwrite.fileName))
+    || raw.insertedFactCount+raw.unchangedFactCount+raw.skippedFactCount+overwrites.length!==raw.physicalFactCount)
+    throw new Error("Malformed Consumption import preview");
   const planCount=files.reduce((sum,file)=>sum+file.planCount,0);
   const controlTotalCount=files.reduce((sum,file)=>sum+file.controlTotalCount,0);
   const sourceRowCount=files.reduce((sum,file)=>sum+file.sourceRowCount,0);
   return {selectedPillar:pillar,files,planCount,controlTotalCount,sourceRowCount,
-    insertFactCount:raw.insertedFactCount,deleteFactCount:raw.deletedFactCount,
+    insertFactCount:raw.insertedFactCount,skippedFactCount:raw.skippedFactCount,deleteFactCount:raw.deletedFactCount,
     sameValueDuplicateCount:raw.deduplicatedFactCount,existingSameValueCount:raw.unchangedFactCount,
     overwriteCount:overwrites.length,overwrites,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
 };
@@ -662,7 +669,7 @@ export const previewConsumptionImport = async (input: string | readonly File[], 
     const raw = payload as { plans?: unknown[]; controlTotals?: unknown[]; sourceRowCount?: number; sourceSha256?: string };
     if (!Array.isArray(raw.plans) || !Array.isArray(raw.controlTotals) || !isNonNegativeInteger(raw.sourceRowCount) || typeof raw.sourceSha256 !== "string") throw new Error("Malformed Consumption import preview");
     return { selectedPillar: pillar, files: [], planCount: raw.plans.length, controlTotalCount: raw.controlTotals.length,
-      sourceRowCount: raw.sourceRowCount, insertFactCount: raw.plans.length, deleteFactCount: 0,
+      sourceRowCount: raw.sourceRowCount, insertFactCount: raw.plans.length, skippedFactCount: 0, deleteFactCount: 0,
       sameValueDuplicateCount: 0, existingSameValueCount: 0,
       overwriteCount: 0, overwrites: [], conflictCount: 0, conflicts: [], hasConflicts: false };
   }
@@ -709,11 +716,14 @@ export async function applyConsumptionImport(input: string | readonly File[], pi
       || typeof raw.duplicate !== "boolean" || !isNonNegativeInteger(raw.physicalFactCount)
       || !isNonNegativeInteger(raw.deduplicatedFactCount) || !isNonNegativeInteger(raw.insertedFactCount)
       || !isNonNegativeInteger(raw.unchangedFactCount) || !isNonNegativeInteger(raw.overwrittenFactCount)
+      || !isNonNegativeInteger(raw.skippedFactCount)
       || raw.deletedFactCount !== 0) throw new Error("Malformed Consumption multi-file import result");
+    if(raw.insertedFactCount+raw.unchangedFactCount+raw.overwrittenFactCount+raw.skippedFactCount!==raw.physicalFactCount)
+      throw new Error("Malformed Consumption multi-file import result");
     return {workspace,batchIds:raw.batchIds as number[],duplicate:raw.duplicate,
       physicalFactCount:raw.physicalFactCount,deduplicatedFactCount:raw.deduplicatedFactCount,
       insertedFactCount:raw.insertedFactCount,unchangedFactCount:raw.unchangedFactCount,
-      overwrittenFactCount:raw.overwrittenFactCount,deletedFactCount:raw.deletedFactCount};
+      overwrittenFactCount:raw.overwrittenFactCount,skippedFactCount:raw.skippedFactCount,deletedFactCount:raw.deletedFactCount};
   }
   const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown; selectedPillar?: unknown; noOpCount?: unknown; conflictCount?: unknown };
   const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"), pillar);
