@@ -74,6 +74,11 @@ void (async () => {
     ],
     physicalFactCount: 1,
     deduplicatedFactCount: 1,
+    insertedFactCount: 0,
+    unchangedFactCount: 5,
+    deletedFactCount: 0,
+    overwrites: [{ pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
+      existingValue: 10, newValue: 11, sourceFileName: "dp.csv" }],
     conflicts: []
   };
   runtime.fetch = async (input, init) => {
@@ -87,6 +92,11 @@ void (async () => {
   const preview = await previewConsumptionImport(files, "ALL");
   assert.equal(preview.files[1].detectedPillar, "OCI_OTHER");
   assert.equal(preview.sameValueDuplicateCount, 1);
+  assert.equal(preview.insertFactCount, 0);
+  assert.equal(preview.deleteFactCount, 0);
+  assert.equal(preview.existingSameValueCount, 5);
+  assert.equal(preview.overwriteCount, 1);
+  assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
   assert.equal(preview.hasConflicts, false);
 
   await assert.rejects(() => previewConsumptionImport([], "ALL"), /1 to 8 CSV files/);
@@ -96,11 +106,13 @@ void (async () => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/imports/apply?pillar=ALL");
     assert.ok(init?.body instanceof FormData);
     return new Response(JSON.stringify({ workspace: { ...workspace, selectedPillar: "ALL", plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts.map((fact) => ({ ...fact, pillar: "ALL" })) }] },
-      batchIds: [1, 2], duplicate: false, physicalFactCount: 1, deduplicatedFactCount: 1 }),
+      batchIds: [1, 2], duplicate: false, physicalFactCount: 1, deduplicatedFactCount: 1,
+      insertedFactCount: 0, unchangedFactCount: 5, overwrittenFactCount: 1, deletedFactCount: 0 }),
       { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const applied = await applyConsumptionImport(files, "ALL");
   assert.deepEqual([applied.physicalFactCount, applied.deduplicatedFactCount, applied.duplicate], [1, 1, false]);
+  assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.deletedFactCount], [0, 5, 1, 0]);
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=OCI_OTHER");

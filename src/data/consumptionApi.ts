@@ -108,10 +108,16 @@ export type ConsumptionImportFilePreview = Readonly<{
   sourceSha256: string; planCount: number; controlTotalCount: number; sourceRowCount: number;
 }>;
 export type ConsumptionImportConflict = Readonly<{ key: string; files: readonly string[]; values?: readonly number[] }>;
+export type ConsumptionImportOverwrite = Readonly<{
+  key: string; existingValue: number; newValue: number; fileName: string;
+}>;
 export type ConsumptionImportPreview = Readonly<{
   selectedPillar: ConsumptionPillar; files: readonly ConsumptionImportFilePreview[];
   planCount: number; controlTotalCount: number; sourceRowCount: number;
-  sameValueDuplicateCount: number; conflictCount: number; conflicts: readonly ConsumptionImportConflict[]; hasConflicts: boolean;
+  insertFactCount: number; deleteFactCount: number;
+  sameValueDuplicateCount: number; existingSameValueCount: number;
+  overwriteCount: number; overwrites: readonly ConsumptionImportOverwrite[];
+  conflictCount: number; conflicts: readonly ConsumptionImportConflict[]; hasConflicts: boolean;
 }>;
 export type ConsumptionImportResult = Readonly<{
   workspace: ConsumptionApiWorkspace;
@@ -131,6 +137,10 @@ export type ConsumptionMultiImportResult = Readonly<{
   duplicate: boolean;
   physicalFactCount: number;
   deduplicatedFactCount: number;
+  insertedFactCount: number;
+  unchangedFactCount: number;
+  overwrittenFactCount: number;
+  deletedFactCount: number;
 }>;
 export type ConsumptionCsvExport = Readonly<{ blob: Blob; fileName: string }>;
 
@@ -594,8 +604,10 @@ const multipartFiles = (files: readonly File[]) => {
 const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, uploaded: readonly File[]): ConsumptionImportPreview => {
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption import preview");
   const raw = payload as Record<string, unknown>;
-  if (!Array.isArray(raw.files) || !Array.isArray(raw.conflicts)
+  if (!Array.isArray(raw.files) || !Array.isArray(raw.conflicts) || !Array.isArray(raw.overwrites)
     || !isNonNegativeInteger(raw.physicalFactCount) || !isNonNegativeInteger(raw.deduplicatedFactCount)
+    || !isNonNegativeInteger(raw.insertedFactCount) || !isNonNegativeInteger(raw.unchangedFactCount)
+    || raw.deletedFactCount !== 0
     || raw.files.length !== uploaded.length) throw new Error("Malformed Consumption import preview");
   const files = raw.files.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
@@ -625,11 +637,23 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     return {key:`${conflict.pillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}`,
       files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as number[]};
   });
+  const overwrites = raw.overwrites.map((value) => {
+    if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
+    const overwrite=value as Record<string,unknown>;
+    if (!(overwrite.pillar==="DP"||overwrite.pillar==="OCI_OTHER") || !isNonEmptyString(overwrite.account)
+      || !isNonEmptyString(overwrite.endUser) || !isNonEmptyString(overwrite.planCode) || !isPeriodKey(overwrite.periodKey)
+      || !isFiniteNumber(overwrite.existingValue) || !isFiniteNumber(overwrite.newValue)
+      || !isNonEmptyString(overwrite.sourceFileName)) throw new Error("Malformed Consumption import preview");
+    return {key:`${overwrite.pillar}::${overwrite.account}::${overwrite.endUser}::${overwrite.planCode}::${overwrite.periodKey}`,
+      existingValue:overwrite.existingValue,newValue:overwrite.newValue,fileName:overwrite.sourceFileName} as ConsumptionImportOverwrite;
+  });
   const planCount=files.reduce((sum,file)=>sum+file.planCount,0);
   const controlTotalCount=files.reduce((sum,file)=>sum+file.controlTotalCount,0);
   const sourceRowCount=files.reduce((sum,file)=>sum+file.sourceRowCount,0);
   return {selectedPillar:pillar,files,planCount,controlTotalCount,sourceRowCount,
-    sameValueDuplicateCount:raw.deduplicatedFactCount,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
+    insertFactCount:raw.insertedFactCount,deleteFactCount:raw.deletedFactCount,
+    sameValueDuplicateCount:raw.deduplicatedFactCount,existingSameValueCount:raw.unchangedFactCount,
+    overwriteCount:overwrites.length,overwrites,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
 };
 
 export const previewConsumptionImport = async (input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportPreview> => {
@@ -638,7 +662,9 @@ export const previewConsumptionImport = async (input: string | readonly File[], 
     const raw = payload as { plans?: unknown[]; controlTotals?: unknown[]; sourceRowCount?: number; sourceSha256?: string };
     if (!Array.isArray(raw.plans) || !Array.isArray(raw.controlTotals) || !isNonNegativeInteger(raw.sourceRowCount) || typeof raw.sourceSha256 !== "string") throw new Error("Malformed Consumption import preview");
     return { selectedPillar: pillar, files: [], planCount: raw.plans.length, controlTotalCount: raw.controlTotals.length,
-      sourceRowCount: raw.sourceRowCount, sameValueDuplicateCount: 0, conflictCount: 0, conflicts: [], hasConflicts: false };
+      sourceRowCount: raw.sourceRowCount, insertFactCount: raw.plans.length, deleteFactCount: 0,
+      sameValueDuplicateCount: 0, existingSameValueCount: 0,
+      overwriteCount: 0, overwrites: [], conflictCount: 0, conflicts: [], hasConflicts: false };
   }
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
   const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) });
@@ -681,9 +707,13 @@ export async function applyConsumptionImport(input: string | readonly File[], pi
     const workspace=parseWorkspace(raw.workspace,response.headers.get("ETag"),"ALL");
     if (!Array.isArray(raw.batchIds) || raw.batchIds.length !== input.length || raw.batchIds.some((id)=>!isPositiveInteger(id))
       || typeof raw.duplicate !== "boolean" || !isNonNegativeInteger(raw.physicalFactCount)
-      || !isNonNegativeInteger(raw.deduplicatedFactCount)) throw new Error("Malformed Consumption multi-file import result");
+      || !isNonNegativeInteger(raw.deduplicatedFactCount) || !isNonNegativeInteger(raw.insertedFactCount)
+      || !isNonNegativeInteger(raw.unchangedFactCount) || !isNonNegativeInteger(raw.overwrittenFactCount)
+      || raw.deletedFactCount !== 0) throw new Error("Malformed Consumption multi-file import result");
     return {workspace,batchIds:raw.batchIds as number[],duplicate:raw.duplicate,
-      physicalFactCount:raw.physicalFactCount,deduplicatedFactCount:raw.deduplicatedFactCount};
+      physicalFactCount:raw.physicalFactCount,deduplicatedFactCount:raw.deduplicatedFactCount,
+      insertedFactCount:raw.insertedFactCount,unchangedFactCount:raw.unchangedFactCount,
+      overwrittenFactCount:raw.overwrittenFactCount,deletedFactCount:raw.deletedFactCount};
   }
   const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown; selectedPillar?: unknown; noOpCount?: unknown; conflictCount?: unknown };
   const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"), pillar);
