@@ -861,7 +861,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       }
       setSelectedSignalId("");
       setEditCell(null);
-      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
+      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Consumption CSV files could not be imported.";
@@ -1080,6 +1080,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 <div><dt>New Actuals to insert</dt><dd>{pendingImport.preview.insertFactCount}</dd></div>
                 <div><dt>Upload duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
                 <div><dt>Existing same values</dt><dd>{pendingImport.preview.existingSameValueCount}</dd></div>
+                <div><dt>Exact replay skipped</dt><dd>{pendingImport.preview.skippedFactCount}</dd></div>
                 <div><dt>Existing Actuals to overwrite</dt><dd>{pendingImport.preview.overwriteCount}</dd></div>
                 <div><dt>Existing Actuals to delete</dt><dd>{pendingImport.preview.deleteFactCount}</dd></div>
                 <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Conflicts</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
