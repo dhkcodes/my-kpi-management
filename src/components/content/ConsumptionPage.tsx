@@ -109,6 +109,10 @@ const fallbackEditablePeriods = getNextQuarterMonths(initialSeed.latestActualMon
 const fallbackForecastQuarters = [...new Set(fallbackEditablePeriods.map(getFiscalQuarter))];
 const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackActualQuarters.filter((quarter) => !fallbackForecastQuarters.includes(quarter))];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const formatConflictCurrency = (value: string) => {
+  const [, sign, integer, fraction = "", exponent = ""] = /^(-?)(\d+)(\.\d+)?([eE][+-]?\d+)?$/.exec(value)!;
+  return `${sign === "-" ? "-$" : "$"}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction}${exponent}`;
+};
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 const parseForecastDecimal = (raw: string): number | null => {
@@ -1106,8 +1110,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               </details>}
               {pendingImport.preview.conflicts.length > 0 && <section class="consumption-import-hard-conflict" role="alert" aria-labelledby="consumptionImportConflictTitle">
                 <strong id="consumptionImportConflictTitle">Import blocked</strong>
-                <p>The upload contains contradictory duplicate keys. Resolve every error before Import.</p>
-                <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={`${conflict.key}-${conflict.rows.join("-")}`}><code>{conflict.key}</code> · {conflict.reason} · {conflict.files[0]} row {conflict.rows[0]}: {conflict.values[0] === null ? "Missing" : currency.format(conflict.values[0])} → {conflict.files[1]} row {conflict.rows[1]}: {conflict.values[1] === null ? "Missing" : currency.format(conflict.values[1])}</li>)}</ul>
+                <p>The upload contains duplicate Plan rows or conflicting uploaded values. Resolve every error before Import.</p>
+                <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={conflict.key}><code>{conflict.key}</code> · {conflict.reason} · #{conflict.fileOrdinals[0]} {conflict.files[0]} row {conflict.rows[0]}: {conflict.values[0] === null ? "Missing" : formatConflictCurrency(conflict.values[0])} → #{conflict.fileOrdinals[1]} {conflict.files[1]} row {conflict.rows[1]}: {conflict.values[1] === null ? "Missing" : formatConflictCurrency(conflict.values[1])}</li>)}</ul>
               </section>}
               <p>{pendingImport.preview.hasConflicts ? "Import is blocked until the upload errors are resolved."
                 : isExactReplayPreview(pendingImport.preview) ? "This exact file set is already reflected in the authoritative workspace."
