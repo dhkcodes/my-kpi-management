@@ -2368,6 +2368,12 @@ h4.weekly-activity-section-label--next-week,
 .consumption-import-overwrites { background: var(--kpi-surface-alt); border-left: .25rem solid var(--kpi-warning); color: var(--kpi-ink); max-height: 16rem; overflow: auto; padding: .65rem .8rem; }
 .consumption-import-overwrites p { color: var(--kpi-muted); margin: .3rem 0; }
 .consumption-import-overwrites ul { margin: .45rem 0 0; padding-left: 1.25rem; }
+.consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.consumption-import-technical-details, .consumption-import-update-details { border-top: 1px solid var(--kpi-border); margin-top: .75rem; padding-top: .6rem; }
+.consumption-import-technical-details > summary, .consumption-import-update-details > summary { color: var(--kpi-brand); cursor: pointer; font-size: .78rem; font-weight: 800; }
+.consumption-import-hard-conflict { background: #fff1ef; border-left: .25rem solid var(--kpi-danger); color: #8f2417; margin-top: .75rem; max-height: 16rem; overflow: auto; padding: .65rem .8rem; }
+.consumption-import-hard-conflict p { margin: .3rem 0; }
+.consumption-import-hard-conflict ul { margin: .45rem 0 0; padding-left: 1.25rem; }
 .consumption-range-bar { align-items: end; background: #f8f6f4; border: 1px solid var(--kpi-border); display: flex; flex-wrap: wrap; column-gap: .75rem; padding: .5rem .75rem; row-gap: .5rem; }
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }
@@ -2546,6 +2552,7 @@ h4.weekly-activity-section-label--next-week,
   .consumption-signal-change { grid-template-columns: auto auto; gap: .5rem; }
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
   .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
+  .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Consumption Usage Insights and incremental Usage Records. */
