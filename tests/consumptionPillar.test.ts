@@ -77,6 +77,7 @@ void (async () => {
     insertedFactCount: 0,
     unchangedFactCount: 5,
     skippedFactCount: 0,
+    exactReplayFileCount: 0,
     deletedFactCount: 0,
     overwrites: [{ pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
       existingValue: 10, newValue: 11, sourceFileName: "dp.csv" }],
@@ -96,13 +97,26 @@ void (async () => {
   assert.equal(preview.insertFactCount, 0);
   assert.equal(preview.deleteFactCount, 0);
   assert.equal(preview.skippedFactCount, 0);
+  assert.equal(preview.exactReplayFileCount, 0);
   assert.equal(preview.existingSameValueCount, 5);
   assert.equal(preview.overwriteCount, 1);
   assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
   assert.equal(preview.hasConflicts, false);
 
+  const hardConflictPayload = { ...previewPayload, physicalFactCount: 1, insertedFactCount: 1,
+    unchangedFactCount: 0, skippedFactCount: 0, overwrites: [], conflicts: [{ pillar: "DP", account: "A", endUser: "EU",
+      planCode: "P1", periodKey: "FY27-JUN", firstValue: 10, conflictingValue: 11,
+      firstFile: "dp.csv", conflictingFile: "dp.csv", firstRowNumber: 2, conflictingRowNumber: 3,
+      reason: "DUPLICATE_PLAN_ROW" }] };
+  runtime.fetch = async () => new Response(JSON.stringify(hardConflictPayload), { status: 200, headers: { "Content-Type": "application/json" } });
+  const hardConflict = await previewConsumptionImport(files, "ALL");
+  assert.deepEqual(hardConflict.conflicts[0], { key: "DP::A::EU::P1::FY27-JUN", files: ["dp.csv", "dp.csv"],
+    values: [10, 11], rows: [2, 3], reason: "DUPLICATE_PLAN_ROW" });
+  assert.equal(hardConflict.hasConflicts, true);
+
   for (const malformedPreview of [
     { ...previewPayload, physicalFactCount: 5 },
+    { ...previewPayload, exactReplayFileCount: 3 },
     { ...previewPayload, overwrites: [previewPayload.overwrites[0], previewPayload.overwrites[0]] },
     { ...previewPayload, overwrites: [{ ...previewPayload.overwrites[0], sourceFileName: "foreign.csv" }] }
   ]) {

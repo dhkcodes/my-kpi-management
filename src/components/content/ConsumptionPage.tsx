@@ -66,6 +66,8 @@ const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: 
   const rightByKey = new Map(right.map((control) => [controlKey(control), control.controlAmount]));
   return left.every((control) => rightByKey.get(controlKey(control)) === control.controlAmount);
 };
+const isExactReplayPreview = (preview: ConsumptionImportPreview) =>
+  preview.files.length > 0 && preview.exactReplayFileCount === preview.files.length;
 const toApiControlTotals = (controls: readonly { customer: string; values: Readonly<Record<string, number>> }[]): ConsumptionApiControlTotal[] =>
   controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
     account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
@@ -839,7 +841,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const applyPendingImport = async () => {
-    if (!pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts) return;
+    if (!pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts
+      || isExactReplayPreview(pendingImport.preview)) return;
     setImportPhase("applying");
     setImportError("");
     try {
@@ -1073,29 +1076,42 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                   <span>Rows: {file.sourceRowCount} · Plans: {file.planCount} · Controls: {file.controlTotalCount}</span>
                 </article>)}
               </div>
-              <dl>
-                <div><dt>Source rows</dt><dd>{pendingImport.preview.sourceRowCount}</dd></div>
-                <div><dt>Plans</dt><dd>{pendingImport.preview.planCount}</dd></div>
-                <div><dt>Control totals</dt><dd>{pendingImport.preview.controlTotalCount}</dd></div>
-                <div><dt>New Actuals to insert</dt><dd>{pendingImport.preview.insertFactCount}</dd></div>
-                <div><dt>Upload duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
-                <div><dt>Existing same values</dt><dd>{pendingImport.preview.existingSameValueCount}</dd></div>
-                <div><dt>Exact replay skipped</dt><dd>{pendingImport.preview.skippedFactCount}</dd></div>
-                <div><dt>Existing Actuals to overwrite</dt><dd>{pendingImport.preview.overwriteCount}</dd></div>
-                <div><dt>Existing Actuals to delete</dt><dd>{pendingImport.preview.deleteFactCount}</dd></div>
-                <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Conflicts</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
+              <dl class="consumption-import-decision-summary">
+                <div><dt>New</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.insertFactCount}</dd></div>
+                <div><dt>Updates</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.overwriteCount}</dd></div>
+                <div><dt>No change</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.existingSameValueCount + pendingImport.preview.skippedFactCount + pendingImport.preview.sameValueDuplicateCount}</dd></div>
+                <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Errors</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
               </dl>
-              {pendingImport.preview.overwrites.length > 0 && <section class="consumption-import-overwrites" role="status" aria-labelledby="consumptionImportOverwriteTitle">
-                <strong id="consumptionImportOverwriteTitle">Existing Actuals to overwrite</strong>
-                <p>Scope is limited to the authenticated Owner, detected Pillar, and listed Plan/Period keys. Other Pillars and Forecasts are unchanged.</p>
-                <ul>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => <li key={overwrite.key}><code>{overwrite.key}</code> · {currency.format(overwrite.existingValue)} → {currency.format(overwrite.newValue)}</li>)}</ul>
-                {pendingImport.preview.overwrites.length > 20 && <p>Showing 20 of {pendingImport.preview.overwriteCount} overwrite rows.</p>}
+              <details class="consumption-import-technical-details">
+                <summary>View technical details</summary>
+                <dl>
+                  <div><dt>Source rows</dt><dd>{pendingImport.preview.sourceRowCount}</dd></div>
+                  <div><dt>Plans</dt><dd>{pendingImport.preview.planCount}</dd></div>
+                  <div><dt>Control totals</dt><dd>{pendingImport.preview.controlTotalCount}</dd></div>
+                  <div><dt>Existing same values</dt><dd>{pendingImport.preview.existingSameValueCount}</dd></div>
+                  <div><dt>Upload duplicates</dt><dd>{pendingImport.preview.sameValueDuplicateCount}</dd></div>
+                  <div><dt>Exact replay skipped</dt><dd>{pendingImport.preview.skippedFactCount}</dd></div>
+                  <div><dt>Existing Actuals to delete</dt><dd>{pendingImport.preview.deleteFactCount}</dd></div>
+                </dl>
+                <p>Rolling files are partial upserts. Existing months omitted from a file are preserved, not deleted.</p>
+              </details>
+              {pendingImport.preview.overwrites.length > 0 && <details class="consumption-import-update-details">
+                <summary>Updates detail ({pendingImport.preview.overwriteCount})</summary>
+                <section class="consumption-import-overwrites" role="status" aria-labelledby="consumptionImportOverwriteTitle">
+                  <strong id="consumptionImportOverwriteTitle">Existing Actuals to overwrite</strong>
+                  <p>Scope is limited to the authenticated Owner, detected Pillar, and listed Plan/Period keys. Other Pillars and Forecasts are unchanged.</p>
+                  <ul>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => <li key={overwrite.key}><code>{overwrite.key}</code> · {currency.format(overwrite.existingValue)} → {currency.format(overwrite.newValue)}</li>)}</ul>
+                  {pendingImport.preview.overwrites.length > 20 && <p>Showing 20 of {pendingImport.preview.overwriteCount} overwrite rows.</p>}
+                </section>
+              </details>}
+              {pendingImport.preview.conflicts.length > 0 && <section class="consumption-import-hard-conflict" role="alert" aria-labelledby="consumptionImportConflictTitle">
+                <strong id="consumptionImportConflictTitle">Import blocked</strong>
+                <p>The upload contains contradictory duplicate keys. Resolve every error before Import.</p>
+                <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={`${conflict.key}-${conflict.rows.join("-")}`}><code>{conflict.key}</code> · {conflict.reason} · {conflict.files[0]} row {conflict.rows[0]}: {conflict.values[0] === null ? "Missing" : currency.format(conflict.values[0])} → {conflict.files[1]} row {conflict.rows[1]}: {conflict.values[1] === null ? "Missing" : currency.format(conflict.values[1])}</li>)}</ul>
               </section>}
-              {pendingImport.preview.conflicts.length > 0 && <section class="consumption-import-conflicts" role="alert" aria-labelledby="consumptionImportConflictTitle">
-                <strong id="consumptionImportConflictTitle">Resolve conflicting values before import</strong>
-                <ul>{pendingImport.preview.conflicts.map((conflict) => <li key={conflict.key}><code>{conflict.key}</code> · {conflict.files.join(", ")}{conflict.values ? ` · Values: ${conflict.values.join(", ")}` : ""}</li>)}</ul>
-              </section>}
-              <p>{pendingImport.preview.hasConflicts ? "Import is blocked because the same key has conflicting values." : "Apply will update the authoritative Consumption workspace atomically."}</p>
+              <p>{pendingImport.preview.hasConflicts ? "Import is blocked until the upload errors are resolved."
+                : isExactReplayPreview(pendingImport.preview) ? "This exact file set is already reflected in the authoritative workspace."
+                  : "Apply will update the authoritative Consumption workspace atomically."}</p>
             </div>
           )}
           {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && (
@@ -1107,7 +1123,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           )}
         </div>
         <div slot="footer">
-          {importPhase === "preview" && pendingImport && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction" disabled={pendingImport.preview.hasConflicts} onojAction={() => void applyPendingImport()}>Import</oj-button></>}
+          {importPhase === "preview" && pendingImport && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
+            disabled={pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
+            onojAction={() => void applyPendingImport()}>{pendingImport.preview.hasConflicts ? "Resolve errors"
+              : isExactReplayPreview(pendingImport.preview) ? "Already imported"
+                : pendingImport.preview.insertFactCount + pendingImport.preview.overwriteCount === 0 ? "Apply metadata refresh"
+                  : `Apply ${pendingImport.preview.insertFactCount} new · ${pendingImport.preview.overwriteCount} updates`}</oj-button></>}
           {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
         </div>
       </oj-dialog>
