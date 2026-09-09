@@ -120,6 +120,16 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, pillar: selectedPillar })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
+        if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
+          candidate.account.toLocaleLowerCase() === selectedAccountContext.toLocaleLowerCase())) {
+          setSelectedAccountContext("");
+          setCandidateSearch("");
+          setDebouncedCandidateSearch("");
+          setSelectedAlertId("");
+          setSelectedAccountName("");
+          setOtherSelected(false);
+          return;
+        }
         setAnalysis(value);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
         setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
@@ -232,14 +242,17 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-        <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
-          {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
-            disabled={loading && !analysis}
-            onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setSelectedAccountContext(""); setCandidateSearch(""); setDebouncedCandidateSearch(""); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+        <div class="consumption-insights-pillar">
+          <span>Pillar</span>
+          <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
+            {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
+              disabled={loading && !analysis}
+              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+          </div>
         </div>
-      <div class="consumption-insights-context" aria-label="Usage Insights filters">
-        <label htmlFor="consumptionAccountContext">Account</label>
-        <div class="consumption-insights-combobox">
+        <div class="consumption-insights-context" aria-label="Usage Insights filters">
+          <label htmlFor="consumptionAccountContext">Account</label>
+          <div class="consumption-insights-combobox">
           <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
@@ -264,8 +277,8 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
             </button>)}
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
           </div>}
+          </div>
         </div>
-      </div>
       </div>
     </header>
 
