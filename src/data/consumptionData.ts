@@ -362,6 +362,9 @@ export const resolveConsumptionControlTotal = (
   if (hasNonZeroDetail) {
     return { amount: childValues.reduce((sum, value) => sum + value, 0), detailState: "VALUE", editable: false, source: "DETAIL" };
   }
+  if (childValues.length > 0 && manualAmount === undefined) {
+    return { amount: 0, detailState: "ZERO", editable: true, source: "DETAIL" };
+  }
   return {
     amount: manualAmount ?? null,
     detailState: childValues.length === 0 ? "MISSING" : "ZERO",

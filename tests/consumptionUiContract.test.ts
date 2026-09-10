@@ -175,6 +175,8 @@ assert.match(recordsPage, /ALL Forecast is read-only: applicable Pillars only[\s
 assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");
 assert.doesNotMatch(recordsPage, />\{summary\.status\}<\//, "quarter status words are not rendered inside money cells");
 assert.match(recordsPage, /missingForecastLabel[\s\S]*consumption-fast-tooltip[\s\S]*data-tooltip=\{missingForecastLabel\}/, "missing Pillars use the keyboard and touch capable tooltip pattern");
+assert.match(recordsPage, />\{value === null \? "—" : currency\.format\(value\)\}\{incomplete && <small aria-hidden="true">⚠<\/small>\}/, "ALL keeps a submitted partial Forecast visible while warning about incomplete membership metadata");
+assert.doesNotMatch(recordsPage, /<small>ACCOUNT · \{selectedPillar === "DP" \? "DP" : "OCI-OTHER"\}<\/small>/, "Account Forecast cells omit redundant Pillar helper text");
 assert.match(recordsPage, /summary\.total === null \? "—"[\s\S]*summary\.preQGap === null \? "—"/, "missing quarter totals and Pre-Q gaps render em dash instead of partial values or N\/A");
 assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");

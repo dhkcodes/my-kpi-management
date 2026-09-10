@@ -998,7 +998,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             const missingForecastLabel = incomplete
               ? variance.completeness.startsWith("REQUIRED_MISSING:")
                 ? `Missing ${variance.completeness.substring("REQUIRED_MISSING:".length).replaceAll("|", ", ").replaceAll("OCI_OTHER", "OCI/Other")} Forecast`
-                : `Forecast unavailable: ${variance.completeness}`
+                : `Forecast membership unavailable: ${variance.completeness}`
               : undefined;
             const canEditControl = editable;
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
@@ -1014,8 +1014,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
                 : <span class={incomplete ? "consumption-fast-tooltip" : undefined} data-tooltip={missingForecastLabel}
-                  aria-label={missingForecastLabel} tabIndex={incomplete ? 0 : undefined}>{incomplete || value === null ? "—" : currency.format(value)}{incomplete && <small aria-hidden="true">⚠</small>}{dirty && <small>draft</small>}
-                  {editable && <small>ACCOUNT · {selectedPillar === "DP" ? "DP" : "OCI-OTHER"}</small>}
+                  aria-label={missingForecastLabel} tabIndex={incomplete ? 0 : undefined}>{value === null ? "—" : currency.format(value)}{incomplete && <small aria-hidden="true">⚠</small>}{dirty && <small>draft</small>}
                   {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
                     Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
                   </small>}</span>}

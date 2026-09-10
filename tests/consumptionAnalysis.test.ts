@@ -169,6 +169,8 @@ void (async () => {
     { amount: null, detailState: "MISSING", editable: true, source: "MANUAL" });
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 0 }), plan("b", {}, {})], "FY27-SEP", 0),
     { amount: 0, detailState: "ZERO", editable: true, source: "MANUAL" }, "explicit zero remains distinct from missing");
+  assert.deepEqual(resolveConsumptionControlTotal([plan("a", { "FY27-AUG": 0 }, {}), plan("b", {}, {})], "FY27-AUG", undefined),
+    { amount: 0, detailState: "ZERO", editable: true, source: "DETAIL" }, "an explicit zero Actual remains visible without a manual Forecast");
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 25 }), plan("b", {}, { "FY27-SEP": 0 })], "FY27-SEP", 999),
     { amount: 25, detailState: "VALUE", editable: false, source: "DETAIL" }, "a non-zero child value immediately owns the Control Total");
   console.log("consumptionAnalysis tests passed");
