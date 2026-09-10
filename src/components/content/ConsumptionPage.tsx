@@ -994,7 +994,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
             const variance = forecastVariances.find((item) => item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
-            const incomplete = selectedPillar === "ALL" && variance?.completeness === "INCOMPLETE";
+            const incomplete = selectedPillar === "ALL" && variance !== undefined && variance.completeness !== "COMPLETE";
+            const missingForecastLabel = incomplete
+              ? variance.completeness.startsWith("REQUIRED_MISSING:")
+                ? `Missing ${variance.completeness.substring("REQUIRED_MISSING:".length).replaceAll("|", ", ").replaceAll("OCI_OTHER", "OCI/Other")} Forecast`
+                : `Forecast unavailable: ${variance.completeness}`
+              : undefined;
             const canEditControl = editable;
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
             const savedValue = controlValue(savedControlTotals, series.customer, month);
@@ -1008,7 +1013,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 aria-label={`${series.customer} ${month} Account Forecast`} disabled={isSaving}
                 onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
-                : <span>{incomplete ? "INCOMPLETE" : value === null ? "—" : currency.format(value)}{dirty && <small>draft</small>}
+                : <span class={incomplete ? "consumption-fast-tooltip" : undefined} data-tooltip={missingForecastLabel}
+                  aria-label={missingForecastLabel} tabIndex={incomplete ? 0 : undefined}>{incomplete || value === null ? "—" : currency.format(value)}{incomplete && <small aria-hidden="true">⚠</small>}{dirty && <small>draft</small>}
                   {editable && <small>ACCOUNT · {selectedPillar === "DP" ? "DP" : "OCI-OTHER"}</small>}
                   {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
                     Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
@@ -1018,11 +1024,12 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>{value === null ? "—" : currency.format(value)}</td>;
         }),
         <td key={`${series.id}-${quarter}-total`} class={`consumption-value-cell consumption-quarter-total${forecastQuarter ? " is-forecast" : ""}`}>
-          {summary.total === null ? "N/A" : currency.format(summary.total)}
-          <small class={`is-${summary.status.toLowerCase()}`}>{summary.status}</small>
+          {summary.total === null ? "—" : currency.format(summary.total)}
+          {summary.status === "INCOMPLETE" && <small class="consumption-fast-tooltip" data-tooltip="Quarter total unavailable because one or more monthly values are missing."
+            aria-label="Quarter total unavailable because one or more monthly values are missing." tabIndex={0}>⚠</small>}
         </td>,
         <td key={`${series.id}-${quarter}-gap`} class={`consumption-value-cell consumption-preq-gap${forecastQuarter ? " is-forecast" : ""}`}>
-          {signedCurrency(summary.preQGap)}
+          {summary.preQGap === null ? "—" : signedCurrency(summary.preQGap)}
         </td>
       ];
     });
@@ -1095,7 +1102,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         </oj-button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
-        {selectedPillar === "ALL" ? <span class="consumption-pillar-forecast-note">ALL Forecast is read-only: DP + OCI-Other. A missing Pillar remains INCOMPLETE.</span>
+        {selectedPillar === "ALL" ? <span class="consumption-pillar-forecast-note">ALL Forecast is read-only: applicable Pillars only; non-applicable Pillars contribute derived zero. Missing required Pillars remain uncalculated.</span>
           : <span class="consumption-pillar-forecast-note">{selectedPillar === "DP" ? "DP" : "OCI-Other"} Forecast is edited once per Account and is never allocated to Plan lines.</span>}
       </section>
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
@@ -1199,6 +1206,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           </div>}
           {forecastImportPhase === "preview" && pendingForecastImport && <div class="consumption-import-preview">
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>
+            <p class="consumption-import-reference-note"><strong>Actual reference only:</strong> Actual values are read-only and are never imported by Forecast Import. {pendingForecastImport.preview.referenceNotice ?? ""}</p>
             <dl class="consumption-import-decision-summary">
               <div><dt>Forecast cells</dt><dd>{pendingForecastImport.preview.forecastCellCount}</dd></div>
               <div><dt>Blank no-op</dt><dd>{pendingForecastImport.preview.blankNoOpCount}</dd></div>

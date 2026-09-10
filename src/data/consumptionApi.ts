@@ -201,6 +201,8 @@ export type ConsumptionForecastWidePreview = Readonly<{
   blankNoOpCount: number;
   explicitZeroCount: number;
   exactReplay: boolean;
+  referenceColumns: readonly string[];
+  referenceNotice: string | null;
   similarAccountResolutionCount: number;
   planUnassignedCount: number;
   changes: readonly ConsumptionForecastWideChange[];
@@ -910,7 +912,9 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast Wide preview");
   const raw = payload as Record<string, unknown>;
   if (!isNonEmptyString(raw.etag) || !Array.isArray(raw.sources) || !Array.isArray(raw.lines)
-    || !isNonNegativeInteger(raw.populatedCellCount) || !Array.isArray(raw.canonicalPeriods)) throw new Error("Malformed Forecast Wide preview");
+    || !isNonNegativeInteger(raw.populatedCellCount) || !Array.isArray(raw.canonicalPeriods)
+    || !(raw.referenceColumns === undefined || (Array.isArray(raw.referenceColumns) && raw.referenceColumns.every((value) => typeof value === "string")))
+    || !(raw.referenceNotice === undefined || raw.referenceNotice === null || typeof raw.referenceNotice === "string")) throw new Error("Malformed Forecast Wide preview");
   const source = raw.sources.length === 1 && typeof raw.sources[0] === "object" && raw.sources[0] !== null
     ? raw.sources[0] as Record<string, unknown> : null;
   if (!source || source.fileName !== uploadedFileName || typeof source.sha256 !== "string" || !sha256Pattern.test(source.sha256)) throw new Error("Malformed Forecast Wide preview");
@@ -927,7 +931,8 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
   const sourceRowCount = new Set(changes.map((change) => change.rowNumber)).size;
   return { etag: raw.etag, sourceFileName: source.fileName as string, sourceSha256: source.sha256 as string,
     sourceRowCount, forecastCellCount: raw.populatedCellCount as number, blankNoOpCount: 0, explicitZeroCount,
-    exactReplay: false, similarAccountResolutionCount: 0, planUnassignedCount: sourceRowCount,
+    exactReplay: false, referenceColumns: (raw.referenceColumns as string[] | undefined) ?? [], referenceNotice: (raw.referenceNotice as string | null | undefined) ?? null,
+    similarAccountResolutionCount: 0, planUnassignedCount: sourceRowCount,
     changes, blockedErrors: [], hasBlockedErrors: false };
 };
 export const previewConsumptionForecastWide = async (file: File): Promise<ConsumptionForecastWidePreview> => {

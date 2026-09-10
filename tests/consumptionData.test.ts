@@ -166,6 +166,16 @@ assert.equal(displaySummaries[2].preQGap, null, "the first chronological quarter
 const offscreenPriorSummaries = buildDisplayQuarterSummaries(displaySeries, ["FY27-Q1", "FY27-Q2"]);
 assert.equal(offscreenPriorSummaries[0].preQGap, 15, "the first displayed quarter uses a supplied offscreen prior quarter for PreQ Gap");
 
+const incompleteQuarter = buildQuarterSummary({ ...displaySeries,
+  actuals: { "FY27-JUN": 10, "FY27-JUL": 20 }, forecasts: {} }, "FY27-Q1", null);
+assert.equal(incompleteQuarter.total, null, "a missing month must not produce a misleading partial quarter total");
+assert.equal(incompleteQuarter.preQGap, null);
+assert.equal(incompleteQuarter.status, "INCOMPLETE");
+const explicitZeroQuarter = buildQuarterSummary({ ...displaySeries,
+  actuals: { "FY27-JUN": 0, "FY27-JUL": 0, "FY27-AUG": 0 }, forecasts: {} }, "FY27-Q1", null);
+assert.equal(explicitZeroQuarter.total, 0, "three explicit zeros are a complete quarter");
+assert.equal(explicitZeroQuarter.status, "ACTUAL");
+
 const signalPlan = (
   id: string,
   actuals: Record<string, number>,

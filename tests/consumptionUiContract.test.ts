@@ -171,7 +171,12 @@ assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPl
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
 assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\)[\s\S]*const canEditControl = editable/, "every backend-declared DP or OCI-Other Forecast cell is editable regardless of an existing value while ALL remains read-only");
-assert.match(recordsPage, /ALL Forecast is read-only: DP \+ OCI-Other[\s\S]*missing Pillar remains INCOMPLETE/, "ALL is calculated and never directly entered");
+assert.match(recordsPage, /ALL Forecast is read-only: applicable Pillars only[\s\S]*non-applicable Pillars contribute derived zero/, "ALL is membership-aware and never directly entered");
+assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");
+assert.doesNotMatch(recordsPage, />\{summary\.status\}<\//, "quarter status words are not rendered inside money cells");
+assert.match(recordsPage, /missingForecastLabel[\s\S]*consumption-fast-tooltip[\s\S]*data-tooltip=\{missingForecastLabel\}/, "missing Pillars use the keyboard and touch capable tooltip pattern");
+assert.match(recordsPage, /summary\.total === null \? "—"[\s\S]*summary\.preQGap === null \? "—"/, "missing quarter totals and Pre-Q gaps render em dash instead of partial values or N\/A");
+assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
 assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*submitRecordsQuery[\s\S]*hasDraftChanges/, "Control-only drafts share navigation and explicit query submission guards");
