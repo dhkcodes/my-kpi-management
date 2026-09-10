@@ -13,8 +13,9 @@ class SpaRequestHandler(SimpleHTTPRequestHandler):
         requested_path = urlsplit(self.path).path
         # index.html, history-routed SPA documents, and the unversioned bundle.js
         # must revalidate so an immutable-release symlink switch is visible immediately.
-        if requested_path == "/bundle.js" or requested_path == "/index.html" or "." not in Path(requested_path).name:
+        if requested_path in {"/", "/index.html", "/bundle.js"} or "." not in Path(requested_path).name:
             self.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
+            self.send_header("Pragma", "no-cache")
         super().end_headers()
 
     def send_head(self):

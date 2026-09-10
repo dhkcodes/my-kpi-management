@@ -807,7 +807,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
 
   const handleForecastCsvFile = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
+    const file = files[0];
     input.value = "";
     if (!file || hasDraftChanges || dataMode !== "backend" || isSaving || forecastImportPhase !== "idle") return;
     setImportError("");

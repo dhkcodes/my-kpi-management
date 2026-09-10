@@ -22,6 +22,7 @@ import {
   deriveWeeklyActivityPlainText,
   hasWeeklyActivityVisibleBase,
   hasWeeklyActivityFormattingParity,
+  normalizeWeeklyActivityBreakableSpaces,
   promoteWeeklyActivityListMarkerStyles,
   sanitizeWeeklyActivityStyle,
   sanitizeWeeklyActivityHtml,
@@ -172,6 +173,21 @@ assert.equal(
   "the added Violet and maximum font size survive canonicalization"
 );
 assert.equal(sanitizeWeeklyActivityStyle("font-size:32px"), "", "sizes outside the 10px to 30px contract remain blocked");
+assert.equal(
+  normalizeWeeklyActivityBreakableSpaces("<li>PoC&nbsp;계정&#160;신청&#xA0;(목적: SmartLink)</li>"),
+  "<li>PoC 계정 신청 (목적: SmartLink)</li>",
+  "editor-produced non-breaking spaces become ordinary wrap opportunities before rendering and saving"
+);
+assert.equal(
+  normalizeWeeklyActivityBreakableSpaces("<p>Oracle\u00A026\u202Fai DB</p>"),
+  "<p>Oracle 26 ai DB</p>",
+  "Unicode no-break spaces cannot turn a whole activity sentence into one unbreakable token"
+);
+assert.equal(
+  normalizeWeeklyActivityBreakableSpaces("<p>&NBSP; remains literal because HTML named entities are case-sensitive</p>"),
+  "<p>&NBSP; remains literal because HTML named entities are case-sensitive</p>",
+  "invalid entity spellings remain visible rather than being silently rewritten"
+);
 assert.equal(
   promoteWeeklyActivityListMarkerStyles('<ol><li><span style="color:#C74634;font-size:18px">First item</span></li></ol>'),
   '<ol><li style="color:#C74634;font-size:18px"><span style="color:#C74634;font-size:18px">First item</span></li></ol>',
