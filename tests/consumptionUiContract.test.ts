@@ -149,6 +149,9 @@ assert.match(recordsPage, /IntersectionObserver[\s\S]*root:\s*tableScrollRef\.cu
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");
+assert.match(recordsPage, /Loading Usage Records…[\s\S]*Load More[\s\S]*All accounts loaded\./, "loading, manual fallback, and final-page states remain explicit");
+assert.match(recordsPage, /No Usage Records match the selected range and filters\./, "empty filtered results remain explicit");
+assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
 assert.doesNotMatch(recordsPage, /defaultExpandedRecordAccounts/, "initial and appended Account groups are never expanded merely because they have child Plans");

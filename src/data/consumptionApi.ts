@@ -680,7 +680,7 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   const rawGroups = raw.accountGroups.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption records response");
     const group = value as { account?: unknown; plans?: unknown };
-    if (!isNonEmptyString(group.account) || !Array.isArray(group.plans) || group.plans.length === 0
+    if (!isNonEmptyString(group.account) || !Array.isArray(group.plans)
       || group.plans.some((plan) => typeof plan !== "object" || plan === null || (plan as Record<string, unknown>).account !== group.account)) {
       throw new Error("Malformed Consumption records response");
     }
@@ -689,6 +689,9 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
   const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"), query.pillar === undefined ? undefined : pillar);
+  if (rawGroups.some((group) => group.plans.length === 0 && !workspace.accountForecasts.some((forecast) => forecast.account === group.account))) {
+    throw new Error("Malformed Consumption forecast-only records group");
+  }
   let planOffset = 0;
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);

@@ -312,6 +312,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     const forecastControls = accountForecastControls(workspace);
     const accountNames = [...new Set([
       ...visiblePlans.map((plan) => plan.customer),
+      ...workspace.accountForecasts.filter((forecast) => isConsumptionPeriodInQuarterRange(forecast.periodKey, workspace.fromQuarter, workspace.toQuarter)).map((forecast) => forecast.account),
       ...forecastControls.filter((control) => isConsumptionPeriodInQuarterRange(control.periodKey, workspace.fromQuarter, workspace.toQuarter))
         .map((control) => control.account)
     ])];
@@ -369,9 +370,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       const visibleGroups = page.accountGroups.map((group) => ({
         ...group,
         plans: filterVisibleConsumptionPlans(group.plans, page.fromQuarter, page.toQuarter)
-      })).filter((group) => group.plans.length > 0 || pageForecastControls.some((control) =>
-        control.account === group.account
-        && isConsumptionPeriodInQuarterRange(control.periodKey, page.fromQuarter, page.toQuarter)));
+      })).filter((group) => group.plans.length > 0
+        || page.accountForecasts.some((forecast) => forecast.account === group.account
+          && isConsumptionPeriodInQuarterRange(forecast.periodKey, page.fromQuarter, page.toQuarter))
+        || pageForecastControls.some((control) => control.account === group.account
+          && isConsumptionPeriodInQuarterRange(control.periodKey, page.fromQuarter, page.toQuarter)));
       const mergePlans = (current: readonly ConsumptionPlan[]) => {
         const accountPlans = new Map<string, ConsumptionPlan[]>();
         if (append) current.forEach((plan) => accountPlans.set(plan.customer, [...(accountPlans.get(plan.customer) ?? []), plan]));
@@ -1288,6 +1291,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Usage Records…</span></>}
           </span>
           {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
+          {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
           <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts · {visiblePlans.length} plans</small>
         </div>
         </div>

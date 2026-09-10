@@ -77,6 +77,22 @@ void (async () => {
   assert.equal(records.accountGroups[0].plans[0].workload, "Autonomous Database");
   assert.deepEqual([records.totalAccounts, records.nextOffset, records.hasMore], [11, 11, false]);
 
+  runtime.fetch = async (input) => {
+    assert.match(String(input), /offset=11&limit=10$/);
+    return new Response(JSON.stringify({
+      selectedPillar: "ALL", etag: '"forecast-only-page"', lastBatchId: 7,
+      currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
+      editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
+      accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP", amount: 25, version: 1, status: "DRAFT", completeness: "COMPLETE" }],
+      forecastVariances: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "ALL", actualAmount: null, forecastAmount: null, varianceAmount: null, variancePercent: null, completeness: "INCOMPLETE" }],
+      accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
+    }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"forecast-only-page"' } });
+  };
+  const forecastOnlyPage = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
+    sort: "ACCOUNT", direction: "ASC", offset: 11, limit: 10 });
+  assert.deepEqual(forecastOnlyPage.accountGroups, [{ account: "Forecast Only", plans: [] }]);
+  assert.deepEqual([forecastOnlyPage.nextOffset, forecastOnlyPage.hasMore], [12, false]);
+
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible");
     assert.equal(init?.method, "GET");
