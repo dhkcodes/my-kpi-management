@@ -627,7 +627,8 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
   };
 };
 
-const request = async (path: string, init?: RequestInit): Promise<{ response: Response; payload: unknown }> => {
+const request = async (path: string, init?: RequestInit,
+  conflictPillar: ConsumptionPillar = "ALL"): Promise<{ response: Response; payload: unknown }> => {
   let response: Response;
   try { response = await apiFetch(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
   let payload: unknown = null;
@@ -635,7 +636,7 @@ const request = async (path: string, init?: RequestInit): Promise<{ response: Re
   if (!response.ok) {
     const error = typeof payload === "object" && payload !== null ? payload as { code?: unknown; message?: unknown; current?: unknown } : {};
     if (response.status === 409 && error.code === "VERSION_CONFLICT" && error.current) {
-      throw new ConsumptionConflictError(typeof error.message === "string" ? error.message : "Consumption changed on the server", parseWorkspace(error.current, undefined, "ALL"));
+      throw new ConsumptionConflictError(typeof error.message === "string" ? error.message : "Consumption changed on the server", parseWorkspace(error.current, undefined, conflictPillar));
     }
     throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
       typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
@@ -944,6 +945,6 @@ export const applyConsumptionForecastWide = async (file: File, etag: string): Pr
 };
 export const saveConsumptionForecasts = async (etag: string,
   controlUpdates: ConsumptionControlForecastUpdate[], selectedPillar: ConsumptionPillar): Promise<ConsumptionApiWorkspace> => {
-  const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates: [], controlUpdates }) });
+  const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates: [], controlUpdates }) }, selectedPillar);
   return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
 };

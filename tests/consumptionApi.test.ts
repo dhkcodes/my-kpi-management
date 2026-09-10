@@ -194,13 +194,19 @@ void (async () => {
   const imported = await applyConsumptionImport("csv");
   assert.deepEqual([imported.insertedCount, imported.updatedCount, imported.appliedCount], [0, 1, 1], "overwrite counts are preserved for the import result UI");
 
-  runtime.fetch = async () => new Response(JSON.stringify({
-    code: "VERSION_CONFLICT", message: "changed", current: { ...payload, etag: '"current-etag"' }
-  }), { status: 409, headers: { "Content-Type": "application/json" } });
-  await assert.rejects(
-    () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1002 }], "DP"),
-    (error: unknown) => error instanceof ConsumptionConflictError && error.current.etag === '"current-etag"'
-  );
+  for (const selectedPillar of ["DP", "OCI_OTHER"] as const) {
+    runtime.fetch = async () => new Response(JSON.stringify({
+      code: "VERSION_CONFLICT", message: "changed",
+      current: { ...payload, selectedPillar, etag: '"current-etag"', plans: [], controlTotals: [], accountForecasts: [] }
+    }), { status: 409, headers: { "Content-Type": "application/json" } });
+    await assert.rejects(
+      () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: selectedPillar, amount: 1002 }], selectedPillar),
+      (error: unknown) => error instanceof ConsumptionConflictError
+        && error.current.etag === '"current-etag"'
+        && error.current.selectedPillar === selectedPillar,
+      `${selectedPillar} conflicts retain the selected pillar for the conflict comparison UI`
+    );
+  }
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload,
