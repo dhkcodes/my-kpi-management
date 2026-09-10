@@ -39,6 +39,7 @@ import {
   applyConsumptionImport,
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
+  exportConsumptionForecastCsv,
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
@@ -751,7 +752,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       } else if (dataMode !== "backend" || !apiEtag) {
         throw new Error("Authoritative Consumption workspace is not ready; Forecast was not saved.");
       } else {
-        const workspace = await saveConsumptionForecasts(apiEtag, controlUpdates);
+        const workspace = await saveConsumptionForecasts(apiEtag, controlUpdates, selectedPillar);
         adoptWorkspace(workspace);
         try {
           await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter, search: appliedSearch });
@@ -930,6 +931,32 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     }
   };
 
+  const exportForecastCsv = async () => {
+    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    exportingRef.current = true;
+    setIsExporting(true);
+    setImportError("");
+    try {
+      const exported = await exportConsumptionForecastCsv(selectedPillar);
+      const url = URL.createObjectURL(exported.blob);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = exported.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Consumption Forecast CSV could not be exported.");
+    } finally {
+      exportingRef.current = false;
+      setIsExporting(false);
+    }
+  };
+
   const closeImportDialog = () => importDialogRef.current?.close();
 
   const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], accountLevel: boolean) => {
@@ -966,11 +993,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           const key = `${series.id}-${month}`;
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
-            const control = controlRecord(draftControlTotals, series.customer, month);
             const variance = forecastVariances.find((item) => item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const incomplete = selectedPillar === "ALL" && variance?.completeness === "INCOMPLETE";
-            const canEditControl = editable && Boolean(resolution?.editable)
-              && (control === undefined || control.matchStatus === "MANUAL_FORECAST");
+            const canEditControl = editable;
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
             const savedValue = controlValue(savedControlTotals, series.customer, month);
             const dirty = savedValue !== controlValue(draftControlTotals, series.customer, month);
@@ -1018,7 +1043,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportImportCompatibleCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Export CSV"}
+            {isExporting ? "Exporting…" : "Actual Export"}
+          </oj-button>
+          <oj-button chroming="outlined" title="Export FORECAST data in the Forecast Import CSV format"
+            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            onojAction={() => void exportForecastCsv()}>
+            <span slot="startIcon" class="oj-ux-ico-download"></span>
+            {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
           <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>

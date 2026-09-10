@@ -4,6 +4,7 @@ import {
   ConsumptionConflictError,
   ConsumptionNetworkError,
   exportConsumptionImportCompatibleCsv,
+  exportConsumptionForecastCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   saveConsumptionForecasts
@@ -107,6 +108,18 @@ void (async () => {
   assert.deepEqual([...exportedBytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
   assert.match(await exported.blob.text(), /^Customer,End User,Sold To,Plan ID,Data Center,Plan Type,/);
 
+  runtime.fetch = async (input, init) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/forecast?pillar=DP");
+    assert.equal(init?.method, "GET");
+    return new Response("\uFEFFaccount_name,pillar,FY27-SEP,FY27-OCT,FY27-NOV\r\nA,DP,,999,\r\n", {
+      status: 200,
+      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="consumption-forecast-dp-export.csv"' }
+    });
+  };
+  const forecastExported = await exportConsumptionForecastCsv("DP");
+  assert.equal(forecastExported.fileName, "consumption-forecast-dp-export.csv");
+  assert.match(await forecastExported.blob.text(), /^account_name,pillar,FY27-SEP,FY27-OCT,FY27-NOV/);
+
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=&toQuarter=&search=&sort=ACCOUNT&direction=ASC&offset=0&limit=10");
     return new Response(JSON.stringify({
@@ -162,14 +175,14 @@ void (async () => {
   let putInit: RequestInit | undefined;
   runtime.fetch = async (_input, init) => {
     putInit = init;
-    return new Response(JSON.stringify({ ...payload, etag: '"next-etag"' }), { status: 200, headers: { ETag: '"next-etag"' } });
+    return new Response(JSON.stringify({ ...payload, selectedPillar: "DP", plans: [], controlTotals: [], etag: '"next-etag"' }), { status: 200, headers: { ETag: '"next-etag"' } });
   };
-  const saved = await saveConsumptionForecasts('"header-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1001 }]);
+  const saved = await saveConsumptionForecasts('"header-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1001 }], "DP");
   assert.equal(putInit?.method, "PUT");
   assert.equal((putInit?.headers as Record<string, string>)["If-Match"], '"header-etag"');
   assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1001 }] });
   assert.equal(saved.etag, '"next-etag"');
-  await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }]);
+  await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }], "DP");
   assert.deepEqual(JSON.parse(String(putInit?.body)), {
     updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }]
   }, "a numeric zero Control Total remains distinct from a missing/null control");
@@ -185,7 +198,7 @@ void (async () => {
     code: "VERSION_CONFLICT", message: "changed", current: { ...payload, etag: '"current-etag"' }
   }), { status: 409, headers: { "Content-Type": "application/json" } });
   await assert.rejects(
-    () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1002 }]),
+    () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1002 }], "DP"),
     (error: unknown) => error instanceof ConsumptionConflictError && error.current.etag === '"current-etag"'
   );
 
