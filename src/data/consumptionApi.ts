@@ -839,6 +839,27 @@ export const exportConsumptionImportCompatibleCsv = async (pillar?: ConsumptionP
   const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
   return { blob, fileName: match?.[1] ?? "consumption-actuals-export.csv" };
 };
+export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
+  if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+  let response: Response;
+  try {
+    response = await apiFetch(`${apiBase()}/consumption/exports/forecast?pillar=${pillar}`, { method: "GET" });
+  } catch (cause) {
+    throw new ConsumptionNetworkError(cause);
+  }
+  if (!response.ok) {
+    let error: { code?: unknown; message?: unknown } = {};
+    try { error = await response.clone().json() as typeof error; } catch { /* sanitized below */ }
+    throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
+      typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const blob = await response.blob();
+  if (!contentType.toLowerCase().startsWith("text/csv") || blob.size === 0) throw new Error("Malformed Consumption Forecast CSV export response");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
+  return { blob, fileName: match?.[1] ?? "consumption-forecast-export.csv" };
+};
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
 export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar): Promise<ConsumptionMultiImportResult>;
 export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
@@ -922,7 +943,7 @@ export const applyConsumptionForecastWide = async (file: File, etag: string): Pr
     noOpCount: 0, explicitZeroCount: 0, planUnassignedCount: 0 };
 };
 export const saveConsumptionForecasts = async (etag: string,
-  controlUpdates: ConsumptionControlForecastUpdate[]): Promise<ConsumptionApiWorkspace> => {
+  controlUpdates: ConsumptionControlForecastUpdate[], selectedPillar: ConsumptionPillar): Promise<ConsumptionApiWorkspace> => {
   const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates: [], controlUpdates }) });
-  return parseWorkspace(payload, response.headers.get("ETag"), "ALL");
+  return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
 };
