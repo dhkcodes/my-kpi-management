@@ -6,7 +6,8 @@ import {
   buildDisplayQuarterSummaries,
   buildQuarterSummary,
   detectConsumptionSignals,
-  filterActiveConsumptionPlans,
+  expandConsumptionQuarterOptions,
+  filterVisibleConsumptionPlans,
   getFiscalQuarter,
   getLatestActualMonth,
   getConsumptionPlanLabel,
@@ -38,12 +39,23 @@ assert.equal("soldTo" in parsed.plans[0], false, "Sold To must be discarded at t
 assert.equal(parsed.plans[0].actuals["FY27-AUG"], 350);
 assert.equal(getFiscalQuarter("FY26-MAY"), "FY26-Q4");
 assert.equal(getFiscalQuarter("FY27-JUN"), "FY27-Q1");
+assert.deepEqual(expandConsumptionQuarterOptions(["FY26-Q2", "FY27-Q2"]), [
+  "FY26-Q1", "FY26-Q2", "FY26-Q3", "FY26-Q4", "FY27-Q1", "FY27-Q2", "FY27-Q3", "FY27-Q4"
+], "every included Fiscal Year exposes Q1 through Q4 even when imported data starts in Q2");
 assert.deepEqual(getNextQuarterMonths("FY27-JUL"), ["FY27-AUG", "FY27-SEP", "FY27-OCT"], "Forecast starts in the month immediately after the last populated Actual");
 assert.deepEqual(getNextQuarterMonths("FY27-AUG"), ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
 assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY28-AUG"]);
 assert.equal(initialConsumptionRecordsBatchSize(768), 10, "the initial Usage Records request fills a compact viewport");
 assert.equal(initialConsumptionRecordsBatchSize(1240), 20, "the initial Usage Records request expands for a taller viewport");
 assert.equal(initialConsumptionRecordsBatchSize(10000), 100, "the initial server page remains bounded");
+const visibilityPlans: ConsumptionPlan[] = [
+  { ...parsed.plans[0], id: "zero", planId: "ZERO", actuals: { "FY27-JUL": 0 }, forecasts: {} },
+  { ...parsed.plans[0], id: "active", planId: "ACTIVE", actuals: { "FY27-JUL": -1 }, forecasts: {} },
+  { ...parsed.plans[0], id: "forecast-zero", planId: "FORECAST-ZERO", actuals: {}, forecasts: { "FY27-SEP": 0 } },
+  { ...parsed.plans[0], id: "outside", planId: "OUTSIDE", actuals: { "FY26-MAY": 10 }, forecasts: {} }
+];
+assert.deepEqual(filterVisibleConsumptionPlans(visibilityPlans, "FY27-Q1", "FY27-Q2").map((plan) => plan.planId),
+  ["ACTIVE", "FORECAST-ZERO"], "visibility uses selected-range nonzero Actual or Forecast presence, including zero Forecast");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
   ["FY27-NOV", "FY27-OCT", "FY27-SEP"],
@@ -191,17 +203,5 @@ const monthBoundarySignals = detectConsumptionSignals([
 assert.equal(monthBoundarySignals[0]?.month, "FY27-JUL", "completed months advance at midnight in the Asia/Seoul business zone");
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
 
-const activityPlans = [
-  signalPlan("ZERO-ACTUALS", { "FY27-JUL": 0, "FY27-AUG": 0 }),
-  { ...signalPlan("FORECAST-ONLY", { "FY27-JUL": 0, "FY27-AUG": 0 }), forecasts: { "FY27-AUG": 999, "FY27-SEP": 999 } },
-  signalPlan("CURRENT-ACTUAL", { "FY27-JUL": 0, "FY27-AUG": 1 }),
-  signalPlan("PREVIOUS-ACTUAL", { "FY27-JUL": 1, "FY27-AUG": 0 }),
-  signalPlan("MISSING-ACTUAL", { "FY27-AUG": 0 })
-];
-assert.deepEqual(
-  filterActiveConsumptionPlans(activityPlans, "FY27-AUG").map((plan) => plan.planId),
-  ["CURRENT-ACTUAL", "PREVIOUS-ACTUAL"],
-  "plans are excluded when previous/current ACTUAL are zero or missing; Forecast values are ignored"
-);
 
 console.log("consumptionData tests passed");

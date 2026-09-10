@@ -1,4 +1,15 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
+export type ConsumptionPillar = "ALL" | "DP" | "OCI_OTHER";
+export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; value: ConsumptionPillar }>> = [
+  { label: "All", value: "ALL" },
+  { label: "DP", value: "DP" },
+  { label: "OCI/Other", value: "OCI_OTHER" }
+];
+export type ConsumptionDataCenterBreakdown = Readonly<{
+  dpCount: number | null;
+  ociOtherCount: number | null;
+  duplicatePossible: boolean;
+}>;
 export type ConsumptionAmountSplit = Readonly<{
   actualAmount: number;
   forecastAmount: number;
@@ -8,6 +19,7 @@ export type ConsumptionAmountSplit = Readonly<{
 export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>;
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
+  dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   percentage: number;
   actualTrend: readonly ConsumptionActualTrendPoint[];
 }>;
@@ -38,6 +50,7 @@ export type ConsumptionPlan = Readonly<{
   endUser: string;
   planId: string;
   dataCenter: string;
+  dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   workload?: string;
   planType: string;
   actuals: Record<string, number>;
@@ -45,6 +58,19 @@ export type ConsumptionPlan = Readonly<{
   serverPlanId?: number;
   versions?: Record<string, number>;
 }>;
+
+export const formatConsumptionDataCenter = (
+  plan: Pick<ConsumptionPlan, "dataCenter" | "dataCenterBreakdown">,
+  pillar: ConsumptionPillar
+): Readonly<{ primary: string; detail: string | null; duplicateWarning: string | null }> => {
+  const breakdown = plan.dataCenterBreakdown;
+  if (pillar !== "ALL" || !breakdown) return { primary: plan.dataCenter, detail: null, duplicateWarning: null };
+  return {
+    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociOtherCount ?? 0)),
+    detail: `DP ${breakdown.dpCount ?? "Missing"} + OCI/Other ${breakdown.ociOtherCount ?? "Missing"}`,
+    duplicateWarning: breakdown.duplicatePossible ? "Duplicate possible across pillars" : null
+  };
+};
 
 export type ConsumptionAccount = Readonly<{
   id: string;
@@ -314,15 +340,6 @@ export const getAlertActualTrend = (
     : [];
 };
 
-export const filterActiveConsumptionPlans = (
-  plans: readonly ConsumptionPlan[],
-  currentFiscalMonth: string
-): ConsumptionPlan[] => {
-  const previousMonth = previousFiscalMonth(currentFiscalMonth);
-  if (!previousMonth) return [...plans];
-  return plans.filter((plan) => (plan.actuals[previousMonth] ?? 0) !== 0 || (plan.actuals[currentFiscalMonth] ?? 0) !== 0);
-};
-
 export type ConsumptionControlResolution = Readonly<{
   amount: number | null;
   detailState: "MISSING" | "ZERO" | "VALUE";
@@ -392,10 +409,39 @@ const fiscalQuarterOrder = (quarter: string): number => {
   return match ? Number(match[1]) * 4 + Number(match[2]) - 1 : Number.MAX_SAFE_INTEGER;
 };
 
+export const expandConsumptionQuarterOptions = (quarters: readonly string[]): string[] => {
+  const fiscalYears = [...new Set(quarters.flatMap((quarter) => {
+    const match = /^(FY\d{2})-Q[1-4]$/.exec(quarter);
+    return match ? [match[1]] : [];
+  }))];
+  return fiscalYears.flatMap((fiscalYear) => [1, 2, 3, 4].map((quarter) => `${fiscalYear}-Q${quarter}`))
+    .sort((left, right) => fiscalQuarterOrder(left) - fiscalQuarterOrder(right));
+};
+
 export const isConsumptionQuarterRangeValid = (fromQuarter: string, toQuarter: string): boolean =>
   fiscalQuarterOrder(fromQuarter) !== Number.MAX_SAFE_INTEGER
   && fiscalQuarterOrder(toQuarter) !== Number.MAX_SAFE_INTEGER
   && fiscalQuarterOrder(fromQuarter) <= fiscalQuarterOrder(toQuarter);
+
+export const isConsumptionPeriodInQuarterRange = (periodKey: string, fromQuarter: string, toQuarter: string): boolean => {
+  const period = fiscalQuarterOrder(getFiscalQuarter(periodKey));
+  const from = fiscalQuarterOrder(fromQuarter);
+  const to = fiscalQuarterOrder(toQuarter);
+  return from !== Number.MAX_SAFE_INTEGER && to !== Number.MAX_SAFE_INTEGER && from <= period && period <= to;
+};
+
+export const filterVisibleConsumptionPlans = (
+  plans: readonly ConsumptionPlan[],
+  fromQuarter: string,
+  toQuarter: string
+): ConsumptionPlan[] => {
+  const from = fiscalQuarterOrder(fromQuarter);
+  const to = fiscalQuarterOrder(toQuarter);
+  if (from === Number.MAX_SAFE_INTEGER || to === Number.MAX_SAFE_INTEGER || from > to) return [];
+  const inRange = (periodKey: string) => isConsumptionPeriodInQuarterRange(periodKey, fromQuarter, toQuarter);
+  return plans.filter((plan) => Object.entries(plan.actuals).some(([periodKey, amount]) => inRange(periodKey) && amount !== 0)
+    || Object.keys(plan.forecasts).some(inRange));
+};
 
 const effectiveValue = (series: ConsumptionSeries, month: string): { value: number | null; status: "ACTUAL" | "FORECAST" | "MISSING" } => {
   if (Object.prototype.hasOwnProperty.call(series.actuals, month)) return { value: series.actuals[month], status: "ACTUAL" };

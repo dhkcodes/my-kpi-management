@@ -11,7 +11,6 @@ export type NavigationItem = {
   icon?: string;
   code?: string;
   codePlacement?: "before" | "after";
-  isHighlighted?: boolean;
   children?: NavigationItem[];
 };
 
@@ -56,21 +55,21 @@ export const getLatestFiscalYear = (): FiscalYear => fiscalYears[fiscalYears.len
 export const kpiNavItems: NavigationItem[] = [
   { id: "kpis-overview", label: "Overview", icon: "oj-ux-ico-dashboard" },
   { id: "activity-a", label: "1 to many market awareness", code: "A", codePlacement: "before" },
-  { id: "activity-b", label: "Early discovery with customer", code: "B", codePlacement: "before", isHighlighted: true },
-  { id: "activity-c1", label: "Show and discover workshops", code: "C1", codePlacement: "before", isHighlighted: true },
-  { id: "activity-c2", label: "POCs in customer tenancy", code: "C2", codePlacement: "before", isHighlighted: true },
-  { id: "activity-d1", label: "New workload", code: "D1", codePlacement: "before", isHighlighted: true },
+  { id: "activity-b", label: "Early discovery with customer", code: "B", codePlacement: "before" },
+  { id: "activity-c1", label: "Show and discover workshops", code: "C1", codePlacement: "before" },
+  { id: "activity-c2", label: "POCs in customer tenancy", code: "C2", codePlacement: "before" },
+  { id: "activity-d1", label: "New workload", code: "D1", codePlacement: "before" },
   { id: "activity-f", label: "Customer references", code: "F", codePlacement: "before" },
   { id: "activity-h", label: "Technical blogs", code: "H", codePlacement: "before" }
 ];
 export const customerNavItems: NavigationItem[] = [
   { id: "customers-overview", label: "Portfolio Overview", icon: "oj-ux-ico-contact-group" },
-  { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud", isHighlighted: true },
-  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock", isHighlighted: true }
+  { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" },
+  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" }
 ];
 export const consumptionNavItems: NavigationItem[] = [
   { id: "usage-insights", label: "Usage Insights", icon: "oj-ux-ico-chart-line" },
-  { id: "usage-records", label: "Usage Records", icon: "oj-ux-ico-tables-basic" }
+  { id: "usage-records", label: "Usage Records", icon: "oj-ux-ico-table" }
 ];
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", icon: "oj-ux-ico-home" },

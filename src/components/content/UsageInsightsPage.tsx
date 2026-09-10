@@ -5,11 +5,15 @@ import {
   ConsumptionAnalysis,
   ConsumptionAnalysisAlert,
   ConsumptionAnalysisQuarter,
+  ConsumptionOrganicGrowthCategory,
   fetchConsumptionAnalysis
 } from "../../data/consumptionApi";
 import {
   ConsumptionAnalysisAccountCandidate,
   ConsumptionAnalysisPlan,
+  ConsumptionPillar,
+  consumptionPillarOptions,
+  formatConsumptionDataCenter,
   getAlertActualTrend
 } from "../../data/consumptionData";
 import "ojs/ojprogress-circle";
@@ -27,6 +31,11 @@ const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurren
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const ALL_ACCOUNTS = "All Accounts Total";
+const ORGANIC_GROWTH_LABELS: Readonly<Record<ConsumptionOrganicGrowthCategory, string>> = {
+  NEW: "New", EXPANSION: "Expansion", RETURNING_REACTIVATED: "Returning/Reactivated",
+  CONTRACTION: "Reduction", STABLE: "Stable", UNCLASSIFIED_INCOMPLETE: "Unclassified/Incomplete"
+};
+const REDUCTION_TOOLTIP = "OCI Consumption decreased versus the previous quarter. Reduction · Partial means 0 < current < previous; Reduction · Stopped means current = 0 and previous > 0. This does not by itself prove cost optimization, contract downsell, or customer churn. Negative values and inseparable credit or adjustment effects remain Unclassified/Incomplete Adjustment.";
 
 type InsightChartPoint = Readonly<{
   id: string;
@@ -37,6 +46,7 @@ type InsightChartPoint = Readonly<{
   shortDesc: string;
   pattern?: "smallDiagonalRight";
   markerSize?: number;
+  dataLabel?: string;
 }>;
 
 const renderInsightChartItem = ({ data }: Readonly<{ data: InsightChartPoint }>) => <oj-chart-item
@@ -69,7 +79,17 @@ const alertPresentation = (alert: ConsumptionAnalysisAlert) => ({
   gradeIcon: alert.grade === "CRITICAL" ? "oj-ux-ico-error" : alert.grade === "HIGH" ? "oj-ux-ico-warning" : "oj-ux-ico-information-s"
 });
 
+const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: ConsumptionAnalysisPlan; selectedPillar: ConsumptionPillar }>) => {
+  const display = formatConsumptionDataCenter(plan, selectedPillar);
+  return <span class="consumption-data-center" aria-label={display.detail ? `Data center count ${display.primary}; ${display.detail}` : `Data center ${display.primary}`}>
+    <span>DC {display.primary}</span>
+    {display.detail && <span class="consumption-data-center__detail">{display.detail}</span>}
+    {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
+  </span>;
+};
+
 export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
+  const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,22 +124,38 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     const generation = ++requestGeneration.current;
     setLoading(true);
     setError("");
-    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext })
+    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, pillar: selectedPillar })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
+        if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
+          candidate.account.toLocaleLowerCase() === selectedAccountContext.toLocaleLowerCase())) {
+          setSelectedAccountContext("");
+          setCandidateSearch("");
+          setDebouncedCandidateSearch("");
+          setSelectedAlertId("");
+          setSelectedAccountName("");
+          setOtherSelected(false);
+          return;
+        }
         setAnalysis(value);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
         setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
       })
       .catch((reason) => {
-        if (active && generation === requestGeneration.current) setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
+        if (active && generation === requestGeneration.current) {
+          setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
+          if (analysisResponse?.selectedPillar && analysisResponse.selectedPillar !== selectedPillar) {
+            setSelectedPillar(analysisResponse.selectedPillar);
+          }
+        }
       })
       .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext]);
+  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext, selectedPillar]);
 
   const analysis = analysisResponse
     && analysisResponse.fiscalYear === fiscalYear
+    && analysisResponse.selectedPillar === selectedPillar
     && analysisResponse.selectedAccount === (selectedAccountContext || null)
     ? analysisResponse : null;
 
@@ -178,8 +214,8 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       { label: analysis.priorFiscalYear, actualAmount: analysis.portfolio.priorActualAmount, forecastAmount: analysis.portfolio.priorForecastAmount }
     ];
     return chart(rows.flatMap((row) => [
-      { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmount, color: ACTUAL_COLOR, shortDesc: `${row.label} ACTUAL ${currency.format(row.actualAmount)}` },
-      { id: `${row.label}-forecast`, seriesId: "FORECAST", groupId: row.label, value: row.forecastAmount, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} FORECAST ${currency.format(row.forecastAmount)}` }
+      { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmount, color: ACTUAL_COLOR, dataLabel: compactCurrency.format(row.actualAmount), shortDesc: `${row.label} ACTUAL ${currency.format(row.actualAmount)}` },
+      { id: `${row.label}-forecast`, seriesId: "FORECAST", groupId: row.label, value: row.forecastAmount, color: FORECAST_COLOR, dataLabel: compactCurrency.format(row.forecastAmount), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} FORECAST ${currency.format(row.forecastAmount)}` }
     ]));
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
@@ -198,6 +234,13 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
+  const organicGrowthChart = useMemo(() => chart((analysis?.organicConsumptionGrowthProxy?.categories ?? []).map((point) => ({
+    id: point.category, seriesId: "Organic consumption growth proxy", groupId: ORGANIC_GROWTH_LABELS[point.category],
+    value: point.amount, color: point.amount < 0 ? "#a3433f" : point.category === "STABLE" ? "#737373" : "#247e69",
+    dataLabel: compactCurrency.format(point.amount),
+    shortDesc: point.category === "CONTRACTION" ? `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}. ${REDUCTION_TOOLTIP}`
+      : `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}`
+  }))), [analysis]);
 
   if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Usage Insights…</section>;
   if (error && !analysis) return <section class="kpi-panel" role="alert"><h1>Consumption Analysis</h1><p>{error}</p></section>;
@@ -212,9 +255,18 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   return <section class="consumption-insights-page" aria-labelledby="usageInsightsTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1></div>
-      <div class="consumption-insights-context" aria-label="Usage Insights filters">
-        <label htmlFor="consumptionAccountContext">Account</label>
-        <div class="consumption-insights-combobox">
+      <div class="consumption-insights-header-actions">
+        <div class="consumption-insights-pillar">
+          <span>Pillar</span>
+          <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
+            {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
+              disabled={loading && !analysis}
+              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+          </div>
+        </div>
+        <div class="consumption-insights-context" aria-label="Usage Insights filters">
+          <label htmlFor="consumptionAccountContext">Account</label>
+          <div class="consumption-insights-combobox">
           <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
@@ -239,6 +291,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
             </button>)}
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
           </div>}
+          </div>
         </div>
       </div>
     </header>
@@ -257,9 +310,9 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">Actual + Forecast</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>ACTUAL <i class="is-forecast"></i>FORECAST</span></div>
         <div class="consumption-insights-total-regions">
-          <div class="consumption-insights-fy-total"><h3>Fiscal year totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} legend={{ rendered: "off" }} aria-label="Fiscal year ACTUAL and patterned FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-fy-total"><h3>Fiscal year totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Fiscal year ACTUAL and patterned FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
-          <div class="consumption-insights-quarter-totals"><h3>{analysis.fiscalYear} Quarter totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} legend={{ rendered: "off" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL and patterned FORECAST stacked totals`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-quarter-totals"><h3>{analysis.fiscalYear} Quarter totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL and patterned FORECAST stacked totals`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
         </div>
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
@@ -269,13 +322,33 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       </section>
     </section>
 
+    <section class="kpi-panel consumption-organic-growth" aria-labelledby="organicGrowthTitle" data-testid="organic-consumption-growth-proxy">
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">quarterly movement attribution</span>
+        <h2 id="organicGrowthTitle">{analysis.organicConsumptionGrowthProxy?.expected ? "Expected " : ""}Organic Consumption Growth Proxy</h2></div></div>
+      {analysis.organicConsumptionGrowthProxy ? <>
+        <p class="consumption-insights-note">{analysis.organicConsumptionGrowthProxy.comparisonQuarter} to {analysis.fiscalYear}-{analysis.organicConsumptionGrowthProxy.quarter}. {analysis.organicConsumptionGrowthProxy.explanation}</p>
+        <oj-chart class="consumption-organic-growth-chart" type="bar" data={organicGrowthChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }}
+          styleDefaults={{ dataLabelPosition: "outsideBarEdge" }} aria-label="Organic consumption growth categories with visible values">
+          <template slot="itemTemplate" render={renderInsightChartItem}></template>
+        </oj-chart>
+        <p class="consumption-insights-note"><strong>Reduction:</strong> <span title={REDUCTION_TOOLTIP}>Partial</span> when usage remains above zero; <span title={REDUCTION_TOOLTIP}>Stopped</span> when current-quarter usage is zero. Neither implies downsell or churn.</p>
+        <dl class="consumption-organic-growth-reconciliation" aria-label="Organic growth reconciliation">
+          <div><dt>Opening consumption</dt><dd>{currency.format(analysis.organicConsumptionGrowthProxy.openingAmount)}</dd></div>
+          <div><dt>Closing consumption</dt><dd>{currency.format(analysis.organicConsumptionGrowthProxy.closingAmount)}</dd></div>
+          <div><dt>Net growth</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.netGrowthAmount)}</dd></div>
+          <div><dt>Classified growth</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.classifiedGrowthAmount)}</dd></div>
+          <div><dt>Reconciliation difference</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.reconciliationAmount)}</dd></div>
+        </dl>
+      </> : <p class="consumption-empty-state">Organic growth attribution is unavailable for this context.</p>}
+    </section>
+
     <section class="kpi-panel consumption-insights-alert-trend" aria-labelledby="alertTrendTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Detect change → verify trend</span><h2 id="alertTrendTitle">{"Consumption Change Alerts & linked Plan Trend"}</h2></div><span class="consumption-insights-status is-actual">ACTUAL ONLY</span></div>
       <div class="consumption-insights-alert-trend-grid" data-trend-contract="getAlertActualTrend(actualTrend)">
         <div class="consumption-signal-inbox">{analysis.alerts.map((alert) => { const presentation = alertPresentation(alert); const plan = findAlertPlan(analysis, alert); return <button type="button" key={alert.alertId}
           class={selectedAlert?.alertId === alert.alertId ? "consumption-signal is-selected" : "consumption-signal"}
           aria-pressed={selectedAlert?.alertId === alert.alertId} onClick={() => setSelectedAlertId((current) => current === alert.alertId ? "" : alert.alertId)}>
-          <span class="consumption-signal-main"><strong>{alert.account}</strong><span>{alert.workload} · Plan {alert.planId} · DC {plan?.dataCenter ?? "N/A"}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
+          <span class="consumption-signal-main"><strong>{alert.account}</strong><span>{alert.workload} · Plan {alert.planId}{plan && <> · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /></>}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
           <span class="consumption-signal-metrics"><strong>{currency.format(alert.actualAmount)}</strong><small>{signedCurrency(alert.changeAmount)} · {signedPercent(alert.changePercent)}</small></span>
         </button>; })}{analysis.alerts.length === 0 && <p class="consumption-empty-state">No ACTUAL usage change alerts for this context.</p>}</div>
         <div class="consumption-insights-linked-trend">
@@ -309,7 +382,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
           </div>}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{otherSelected ? "Other Accounts" : selectedAccount?.account ?? "Select an Account"}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · {plan.dataCenter} · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /> · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>
