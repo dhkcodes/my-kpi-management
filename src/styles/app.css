@@ -2493,9 +2493,6 @@ h4.weekly-activity-section-label--next-week,
 .consumption-account-toggle small, .consumption-account-column > small, .consumption-leading-copy > small { color: var(--kpi-muted); font-size: .7rem; font-weight: 600; line-height: 1.15; }
 .consumption-plan-row .consumption-account-column { padding-left: 1.65rem; }
 .consumption-end-user { display: block; font-size: .98rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.consumption-fast-tooltip { position: relative; }
-.consumption-fast-tooltip::after { background: #252525; border-radius: .25rem; color: #fff; content: attr(data-tooltip); font-size: 1rem; font-weight: 600; left: 0; line-height: 1.35; max-width: min(28rem, 70vw); opacity: 0; padding: .55rem .7rem; pointer-events: none; position: absolute; top: calc(100% + .25rem); transform: translateY(-.15rem); visibility: hidden; white-space: normal; width: max-content; z-index: 40; }
-.consumption-fast-tooltip:hover::after, .consumption-fast-tooltip:focus-visible::after { opacity: 1; transform: translateY(0); visibility: visible; }
 .consumption-clipped-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-clipped-tooltip { background: #252525; border-radius: .25rem; color: #fff; font-size: 1rem; font-weight: 600; line-height: 1.35; max-width: min(28rem, calc(100vw - 1rem)); overflow-wrap: anywhere; padding: .55rem .7rem; pointer-events: none; position: fixed; white-space: normal; z-index: 1000; }
 .consumption-metric-help { border-bottom: 1px dotted currentColor; cursor: help; font-weight: 750; }

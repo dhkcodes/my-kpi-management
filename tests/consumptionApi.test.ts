@@ -162,7 +162,7 @@ void (async () => {
   const summaries = buildDisplayQuarterSummaries(pastRange.plans[0], pastRange.displayQuarterOrder);
   assert.equal(summaries[0].status, "INCOMPLETE");
   assert.deepEqual(summaries[0].months.map((month) => pastRange.plans[0].forecasts[month]), [undefined, undefined, undefined], "missing future months remain absent instead of becoming generated Forecast values");
-  assert.equal(summaries[0].total, null);
+  assert.equal(summaries[0].total, 0, "missing forecast months contribute zero to the quarter total");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     selectedPillar: "ALL", etag: '"legacy-etag"', lastBatchId: null, plans: payload.plans,

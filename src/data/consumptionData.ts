@@ -467,8 +467,8 @@ export const buildQuarterSummary = (
       : available.every((item) => item.status === "FORECAST")
         ? "FORECAST"
         : "MIXED";
-  const total = available.length === months.length ? available.reduce((sum, item) => sum + (item.value ?? 0), 0) : null;
-  const preQGap = total !== null && previous?.total !== null && previous?.total !== undefined ? total - previous.total : null;
+  const total = values.reduce((sum, item) => sum + (item.value ?? 0), 0);
+  const preQGap = previous?.total !== null && previous?.total !== undefined ? total - previous.total : null;
   return { quarter, months, total, status, preQGap };
 };
 

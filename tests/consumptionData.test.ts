@@ -168,9 +168,13 @@ assert.equal(offscreenPriorSummaries[0].preQGap, 15, "the first displayed quarte
 
 const incompleteQuarter = buildQuarterSummary({ ...displaySeries,
   actuals: { "FY27-JUN": 10, "FY27-JUL": 20 }, forecasts: {} }, "FY27-Q1", null);
-assert.equal(incompleteQuarter.total, null, "a missing month must not produce a misleading partial quarter total");
+assert.equal(incompleteQuarter.total, 30, "a missing month contributes zero to the quarter total");
 assert.equal(incompleteQuarter.preQGap, null);
 assert.equal(incompleteQuarter.status, "INCOMPLETE");
+const partialForecastQuarter = buildQuarterSummary({ ...displaySeries,
+  actuals: {}, forecasts: { "FY27-SEP": 20, "FY27-NOV": 30 } }, "FY27-Q2", fy27q1);
+assert.equal(partialForecastQuarter.total, 50, "Forecast Quarter Total sums entered months and treats missing months as zero");
+assert.equal(partialForecastQuarter.preQGap, -2050, "Forecast PreQ Gap uses the same zero-for-missing quarter total");
 const explicitZeroQuarter = buildQuarterSummary({ ...displaySeries,
   actuals: { "FY27-JUN": 0, "FY27-JUL": 0, "FY27-AUG": 0 }, forecasts: {} }, "FY27-Q1", null);
 assert.equal(explicitZeroQuarter.total, 0, "three explicit zeros are a complete quarter");
