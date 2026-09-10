@@ -5,6 +5,10 @@ const recordsPage = readFileSync("src/components/content/ConsumptionPage.tsx", "
 const insightsPage = readFileSync("src/components/content/UsageInsightsPage.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+
+assert.match(recordsPage,
+  /error instanceof ConsumptionConflictError[\s\S]*accountForecastControls\(error\.current\)[\s\S]*setConflictRows\(rows\)[\s\S]*setConflictWorkspace\(error\.current\)[\s\S]*Forecast Save conflicted with a newer server version/,
+  "DP/OCI_OTHER version conflicts reach the comparison UI with the selected-pillar server workspace");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
