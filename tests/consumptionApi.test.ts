@@ -7,6 +7,7 @@ import {
   exportConsumptionForecastCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
+  previewConsumptionForecastWide,
   saveConsumptionForecasts
 } from "../src/data/consumptionApi";
 import { buildDisplayQuarterSummaries } from "../src/data/consumptionData";
@@ -264,6 +265,17 @@ void (async () => {
     ...payload, controlTotals: [payload.controlTotals[0], { ...payload.controlTotals[0] }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"duplicate-control"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption control total response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    etag: "cm-reference", sources: [{ fileName: "forecast.csv", sha256: "a".repeat(64) }],
+    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, sourceRow: 2 }],
+    populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],
+    referenceColumns: ["reference_prior_quarter", "reference_prior_quarter_actual"],
+    referenceNotice: "Prior-quarter Actual columns are read-only references and are never imported."
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const referencePreview = await previewConsumptionForecastWide(new File(["csv"], "forecast.csv"));
+  assert.deepEqual(referencePreview.referenceColumns, ["reference_prior_quarter", "reference_prior_quarter_actual"]);
+  assert.match(referencePreview.referenceNotice ?? "", /read-only.*never imported/i);
 
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });
