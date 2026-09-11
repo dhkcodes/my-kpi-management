@@ -1129,9 +1129,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             onInput={(event) => setDraftSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
         </label>
-        <oj-button class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onojAction={() => void submitRecordsQuery()}>
+        <button type="button" class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
-        </oj-button>
+        </button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
         {selectedPillar === "ALL" ? <span class="consumption-pillar-forecast-note">ALL Forecast is read-only and sums entered Pillar values; missing values count as zero.</span>

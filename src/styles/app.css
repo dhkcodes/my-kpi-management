@@ -2377,10 +2377,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-range-bar { align-items: end; background: #f8f6f4; border: 1px solid var(--kpi-border); display: flex; flex-wrap: wrap; column-gap: .75rem; padding: .5rem .75rem; row-gap: .5rem; }
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }
-.consumption-range-bar oj-button { height: 2.25rem; }
+.consumption-range-apply { background: var(--kpi-brand); border: 1px solid var(--kpi-brand); box-sizing: border-box; color: #fff; cursor: pointer; font: inherit; font-weight: 750; height: 2.25rem; min-height: 2.25rem; padding: .35rem .9rem; }
+.consumption-range-apply:hover, .consumption-range-apply:focus-visible { background: #194f63; border-color: #194f63; }
+.consumption-range-apply:disabled { cursor: not-allowed; opacity: .55; }
 .consumption-range-apply--initializing { visibility: hidden; }
-.consumption-range-bar oj-button::part(button) { height: 2.25rem; padding-block: .35rem; }
-.consumption-range-bar oj-button .oj-button-button { box-sizing: border-box; height: 2.25rem; min-height: 2.25rem; padding-block: .35rem; }
 .consumption-record-search { flex: 1 1 18rem; max-width: 32rem; }
 .consumption-range-error { color: var(--kpi-danger); font-size: .78rem; font-weight: 750; }
 .consumption-range-note { color: var(--kpi-muted); font-size: .78rem; }

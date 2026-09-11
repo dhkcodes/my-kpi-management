@@ -58,8 +58,7 @@ assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Al
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
 assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Chart value labels use the approved compact USD format");
 assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendDataLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendDataLabel\}/, "FY and Quarter totals expose each value through the official JET chart dataLabel callback");
-assert.match(insightsPage, /Organic Consumption Growth Proxy[\s\S]*organicGrowthChart\} dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"outsideBarEdge"/, "Organic Consumption Growth Proxy is a readable JET chart with direct values");
-assert.match(insightsPage, /CONTRACTION: "Reduction"[\s\S]*Reduction · Partial[\s\S]*Reduction · Stopped[\s\S]*does not by itself prove cost optimization, contract downsell, or customer churn/, "CONTRACTION remains internal while Reduction labels and the approved non-causal tooltip are visible");
+assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|organicGrowthChart|movementBridge/, "deferred New/Expansion analysis charts are removed until Usage Records is complete");
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
 assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
@@ -81,7 +80,8 @@ assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Usage Record
 assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*const accessibleLabel = display\.detail \? `Data center count \$\{display\.primary\}; \$\{display\.detail\}`[\s\S]*aria-label=\{accessibleLabel\}/, "plan DC display exposes the summed All breakdown accessibly");
 assert.match(recordsPage, /display\.duplicateWarning[\s\S]*role="note"/, "All records warn when a cross-pillar duplicate is possible");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
-assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC breakdown instead of raw aggregate text");
+assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
+assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Usage Insights omits DP + OCI breakdown and duplicate warnings");
 
 // Usage Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /<h1 id="consumptionTitle">Usage Records<\/h1>/, "data-management leaf uses the approved name");
@@ -113,6 +113,7 @@ assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyCon
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /EXACT_REPLAY[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview exposes exact replay and plan-unassigned semantics");
 assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
+assert.match(recordsPage, /<button type="button" class=\{`consumption-range-apply[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "mobile Apply uses a stable native button instead of a late-upgrading custom element");
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Usage Records layouts keep the action group visible and naturally wrapped");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
@@ -212,8 +213,7 @@ assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-a
 
 // Approved Consumption follow-up: clearer visual regions, accessible alerts, stable records and zoom-safe navigation.
 assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
-assert.match(insightsPage, /Movement Bridge[\s\S]*Quarter New[\s\S]*Expansion[\s\S]*Reduction[\s\S]*Net Movement/, "Usage Insight renders Forecast movement separately from Quarter Consumption Growth");
-assert.match(insightsPage, /movementBridge[\s\S]*unclassifiedAccountCount[\s\S]*unavailableReason/, "Movement Bridge reports unclassified and unavailable coverage instead of silently plotting it");
+assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|movementBridge|organicGrowthChart/, "deferred movement and Organic Growth charts are absent");
 assert.match(insightsPage, /consumption-signal-badges[\s\S]*consumption-signal-type[\s\S]*aria-hidden="true"[\s\S]*consumption-signal-grade/, "alert type and grade are separate accessible icon and text badges");
 assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*24rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto[^}]*height:\s*24rem[\s\S]*\.consumption-insights-actual-chart[^}]*height:\s*100%[^}]*min-height:\s*15rem/, "alert and trend panels compact naturally after duplicate-list removal while preserving equal height and chart space");
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
@@ -223,7 +223,7 @@ assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of \{percentageCon
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Usage Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
-assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-bar oj-button[^}]*height:\s*2\.25rem/, "range, search, and Apply controls share height and padding rhythm");
+assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
 assert.match(recordsPage, /class=\{`consumption-range-apply\$\{dataMode === "loading" \? " consumption-range-apply--initializing" : ""\}`\}/, "Apply stays explicitly hidden while the first Usage Records request initializes");
 assert.match(styles, /\.consumption-range-apply--initializing\s*\{[^}]*visibility:\s*hidden/, "the initializing Apply state preserves its layout slot without flashing");
 assert.match(recordsPage, /if\(viewPillar==="ALL"\)[\s\S]*else\{[\s\S]*setSavedPlans\(\[\]\)[\s\S]*setRecordsTotalAccounts\(0\)[\s\S]*setDataMode\("error"\)/, "a committed import followed by typed refresh failure clears stale rows and marks the view unavailable");

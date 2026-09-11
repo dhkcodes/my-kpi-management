@@ -5,7 +5,6 @@ import {
   ConsumptionAnalysis,
   ConsumptionAnalysisAlert,
   ConsumptionAnalysisQuarter,
-  ConsumptionOrganicGrowthCategory,
   fetchConsumptionAnalysis
 } from "../../data/consumptionApi";
 import {
@@ -31,12 +30,6 @@ const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurren
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const ALL_ACCOUNTS = "All Accounts Total";
-const ORGANIC_GROWTH_LABELS: Readonly<Record<ConsumptionOrganicGrowthCategory, string>> = {
-  NEW: "New", EXPANSION: "Expansion", RETURNING_REACTIVATED: "Returning/Reactivated",
-  CONTRACTION: "Reduction", STABLE: "Stable", UNCLASSIFIED_INCOMPLETE: "Unclassified/Incomplete"
-};
-const REDUCTION_TOOLTIP = "OCI Consumption decreased versus the previous quarter. Reduction · Partial means 0 < current < previous; Reduction · Stopped means current = 0 and previous > 0. This does not by itself prove cost optimization, contract downsell, or customer churn. Negative values and inseparable credit or adjustment effects remain Unclassified/Incomplete Adjustment.";
-
 type InsightChartPoint = Readonly<{
   id: string;
   seriesId: string;
@@ -81,11 +74,7 @@ const alertPresentation = (alert: ConsumptionAnalysisAlert) => ({
 
 const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: ConsumptionAnalysisPlan; selectedPillar: ConsumptionPillar }>) => {
   const display = formatConsumptionDataCenter(plan, selectedPillar);
-  return <span class="consumption-data-center" aria-label={display.detail ? `Data center count ${display.primary}; ${display.detail}` : `Data center ${display.primary}`}>
-    <span>DC {display.primary}</span>
-    {display.detail && <span class="consumption-data-center__detail">{display.detail}</span>}
-    {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
-  </span>;
+  return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}><span>DC {display.primary}</span></span>;
 };
 
 export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
@@ -228,15 +217,6 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  const organicGrowthChart = useMemo(() => chart((analysis?.organicConsumptionGrowthProxy?.categories ?? []).map((point) => ({
-    id: point.category, seriesId: "Organic consumption growth proxy", groupId: ORGANIC_GROWTH_LABELS[point.category],
-    value: point.amount, color: point.amount < 0 ? "#a3433f" : point.category === "STABLE" ? "#737373" : "#247e69",
-    dataLabel: compactCurrency.format(point.amount),
-    shortDesc: point.category === "CONTRACTION" ? `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}. ${REDUCTION_TOOLTIP}`
-      : `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}`
-  }))), [analysis]);
-  const movementBridge = analysis?.movementBridge ?? [];
-
   if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Usage Insights…</section>;
   if (error && !analysis) return <section class="kpi-panel" role="alert"><h1>Consumption Analysis</h1><p>{error}</p></section>;
   if (!analysis) return <section class="kpi-panel" role="alert">Analysis is unavailable.</section>;
@@ -315,47 +295,6 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small>{qoqKind(quarter.status)}</small></article>)}</div>
         <p class="consumption-insights-note">Completed ACTUAL quarters drive the decision metric; MIXED and FORECAST quarters remain visibly labelled projections.</p>
       </section>
-    </section>
-
-    <section class="kpi-panel consumption-movement-bridge" aria-labelledby="movementBridgeTitle" data-testid="consumption-movement-bridge">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast movement composition</span>
-        <h2 id="movementBridgeTitle">Movement Bridge</h2><span class="oj-helper-hidden-accessible">Quarter New Expansion Reduction Net Movement</span></div></div>
-      {movementBridge.length > 0 ? <div class="consumption-movement-bridge__scroll">
-        <table>
-          <thead><tr><th>Quarter</th><th>New</th><th>Expansion</th><th>Reduction</th><th>Net Movement</th><th>Coverage</th></tr></thead>
-          <tbody>{movementBridge.map((point) => <tr key={point.quarter} class={`is-${point.compositionStatus.toLowerCase()}`}>
-            <th scope="row">{point.quarter}</th>
-            <td>{point.newAmount === null ? "N/A" : signedCurrency(point.newAmount)}</td>
-            <td>{point.expansionAmount === null ? "N/A" : signedCurrency(point.expansionAmount)}</td>
-            <td>{point.reductionAmount === null ? "N/A" : signedCurrency(-Math.abs(point.reductionAmount))}</td>
-            <td><strong>{signedCurrency(point.netMovementAmount)}</strong></td>
-            <td>{point.compositionStatus === "CLASSIFIED"
-              ? `${point.classifiedAccountCount} classified`
-              : <span role="status">{point.unclassifiedAccountCount > 0 ? `${point.unclassifiedAccountCount} unclassified. ` : ""}{point.unavailableReason ?? "Movement composition unavailable."}</span>}</td>
-          </tr>)}</tbody>
-        </table>
-      </div> : <p class="consumption-empty-state">Forecast Movement Bridge is unavailable for this context.</p>}
-      <p class="consumption-insights-note">Quarter Consumption Growth measures the total change; Movement Bridge separately attributes available Forecast composition.</p>
-    </section>
-
-    <section class="kpi-panel consumption-organic-growth" aria-labelledby="organicGrowthTitle" data-testid="organic-consumption-growth-proxy">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">quarterly movement attribution</span>
-        <h2 id="organicGrowthTitle">{analysis.organicConsumptionGrowthProxy?.expected ? "Expected " : ""}Organic Consumption Growth Proxy</h2></div></div>
-      {analysis.organicConsumptionGrowthProxy ? <>
-        <p class="consumption-insights-note">{analysis.organicConsumptionGrowthProxy.comparisonQuarter} to {analysis.fiscalYear}-{analysis.organicConsumptionGrowthProxy.quarter}. {analysis.organicConsumptionGrowthProxy.explanation}</p>
-        <oj-chart class="consumption-organic-growth-chart" type="bar" data={organicGrowthChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }}
-          styleDefaults={{ dataLabelPosition: "outsideBarEdge" }} aria-label="Organic consumption growth categories with visible values">
-          <template slot="itemTemplate" render={renderInsightChartItem}></template>
-        </oj-chart>
-        <p class="consumption-insights-note"><strong>Reduction:</strong> <span title={REDUCTION_TOOLTIP}>Partial</span> when usage remains above zero; <span title={REDUCTION_TOOLTIP}>Stopped</span> when current-quarter usage is zero. Neither implies downsell or churn.</p>
-        <dl class="consumption-organic-growth-reconciliation" aria-label="Organic growth reconciliation">
-          <div><dt>Opening consumption</dt><dd>{currency.format(analysis.organicConsumptionGrowthProxy.openingAmount)}</dd></div>
-          <div><dt>Closing consumption</dt><dd>{currency.format(analysis.organicConsumptionGrowthProxy.closingAmount)}</dd></div>
-          <div><dt>Net growth</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.netGrowthAmount)}</dd></div>
-          <div><dt>Classified growth</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.classifiedGrowthAmount)}</dd></div>
-          <div><dt>Reconciliation difference</dt><dd>{signedCurrency(analysis.organicConsumptionGrowthProxy.reconciliationAmount)}</dd></div>
-        </dl>
-      </> : <p class="consumption-empty-state">Organic growth attribution is unavailable for this context.</p>}
     </section>
 
     <section class="kpi-panel consumption-insights-alert-trend" aria-labelledby="alertTrendTitle">
