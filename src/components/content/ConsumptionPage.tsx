@@ -267,10 +267,8 @@ const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPo
 
 const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: ConsumptionPlan; selectedPillar: ConsumptionPillar }>) => {
   const display = formatConsumptionDataCenter(plan, selectedPillar);
-  const accessibleLabel = display.detail ? `Data center count ${display.primary}; ${display.detail}` : `Data center ${display.primary}`;
-  return <span class="consumption-data-center" aria-label={accessibleLabel}>
+  return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}>
     <span>DC {display.primary}</span>
-    {display.detail && <span class="consumption-data-center__detail">{display.detail}</span>}
     {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
   </span>;
 };

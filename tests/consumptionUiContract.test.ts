@@ -77,7 +77,8 @@ assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Usage Re
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Usage Insights sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Usage Records exports Actual for the selected pillar");
 assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Usage Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
-assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*const accessibleLabel = display\.detail \? `Data center count \$\{display\.primary\}; \$\{display\.detail\}`[\s\S]*aria-label=\{accessibleLabel\}/, "plan DC display exposes the summed All breakdown accessibly");
+assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}/, "plan rows keep the scoped Data Center count as the core identifier");
+assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "plan rows omit redundant DP, OCI, and Missing breakdown copy");
 assert.match(recordsPage, /display\.duplicateWarning[\s\S]*role="note"/, "All records warn when a cross-pillar duplicate is possible");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
 assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");

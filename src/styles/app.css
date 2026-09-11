@@ -2359,7 +2359,6 @@ h4.weekly-activity-section-label--next-week,
 .consumption-pillar-selector button[aria-pressed="true"] { background: var(--kpi-surface-alt); border-color: var(--kpi-brand); color: var(--kpi-brand); }
 .consumption-pillar-selector button:disabled { cursor: not-allowed; opacity: .55; }
 .consumption-data-center { align-items: center; display: inline-flex; flex-wrap: wrap; gap: .25rem; }
-.consumption-data-center__detail { color: var(--kpi-muted); font-size: .72rem; }
 .consumption-data-center__warning { color: var(--kpi-warning); cursor: help; }
 .consumption-import-file-list { display: grid; gap: .5rem; margin-block: .65rem; max-height: 18rem; overflow: auto; }
 .consumption-import-file-list article { background: #f8f6f4; border: 1px solid var(--kpi-border); display: grid; gap: .2rem; padding: .55rem .65rem; }

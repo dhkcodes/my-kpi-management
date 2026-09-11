@@ -38,9 +38,9 @@ void (async () => {
     { label: "All", value: "ALL" }, { label: "DP", value: "DP" }, { label: "OCI", value: "OCI" }
   ]);
   assert.deepEqual(formatConsumptionDataCenter(workspace.plans[0], "ALL"), {
-    primary: "5", detail: "DP 3 + OCI 2", duplicateWarning: "Duplicate possible across pillars"
+    primary: "5", duplicateWarning: "Duplicate possible across pillars"
   });
-  assert.deepEqual(formatConsumptionDataCenter(workspace.plans[0], "DP"), { primary: "3", detail: null, duplicateWarning: null });
+  assert.deepEqual(formatConsumptionDataCenter(workspace.plans[0], "DP"), { primary: "3", duplicateWarning: null });
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace?fromQuarter=FY27-Q1&toQuarter=FY27-Q1&pillar=DP");
