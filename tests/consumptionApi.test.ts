@@ -16,12 +16,12 @@ const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: strin
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
 const payload = {
   selectedPillar: "ALL",
-  availablePillars: ["ALL", "DP", "OCI_OTHER"], aggregationGrain: "PLAN_PERIOD",
+  availablePillars: ["ALL", "DP", "OCI"], aggregationGrain: "PLAN_PERIOD",
   etag: '"body-etag"', lastBatchId: 7,
   currentFiscalMonth: "FY27-AUG", fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1",
   editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
   displayQuarterOrder: ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"],
-  plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC", dpDataCenterCount: null, ociOtherDataCenterCount: null, workload: "Autonomous Database",
+  plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC", dpDataCenterCount: null, ociDataCenterCount: null, workload: "Autonomous Database",
     facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "ALL" },
       { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 999, versionNo: 3, pillar: null }] }],
   controlTotals: [
@@ -218,7 +218,7 @@ void (async () => {
   const imported = await applyConsumptionImport("csv");
   assert.deepEqual([imported.insertedCount, imported.updatedCount, imported.appliedCount], [0, 1, 1], "overwrite counts are preserved for the import result UI");
 
-  for (const selectedPillar of ["DP", "OCI_OTHER"] as const) {
+  for (const selectedPillar of ["DP", "OCI"] as const) {
     runtime.fetch = async () => new Response(JSON.stringify({
       code: "VERSION_CONFLICT", message: "changed",
       current: { ...payload, selectedPillar, etag: '"current-etag"', plans: [], controlTotals: [], accountForecasts: [] }

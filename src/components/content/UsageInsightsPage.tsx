@@ -101,7 +101,6 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [selectedAlertId, setSelectedAlertId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
-  const [otherSelected, setOtherSelected] = useState(false);
   const requestGeneration = useRef(0);
 
   useEffect(() => {
@@ -110,7 +109,6 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     setDebouncedCandidateSearch("");
     setSelectedAlertId("");
     setSelectedAccountName("");
-    setOtherSelected(false);
   }, [fiscalYear]);
 
   useEffect(() => {
@@ -134,8 +132,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
           setDebouncedCandidateSearch("");
           setSelectedAlertId("");
           setSelectedAccountName("");
-          setOtherSelected(false);
-          return;
+                return;
         }
         setAnalysis(value);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
@@ -171,10 +168,8 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   const emphasizedTrendPeriods = useMemo(() => new Set(trendPoints.slice(-4).map((point) => point.periodKey)), [trendPoints]);
   const selectedAccount = analysis?.accounts.find((account) => account.account === selectedAccountName) ?? null;
   const topAccounts = analysis?.accounts.slice(0, 5) ?? [];
-  const otherContribution = analysis?.otherContribution ?? null;
-  const selectedPlans = otherSelected
-    ? otherContribution?.plans.map((plan) => ({ account: plan.account, workload: plan.workload, plan, percentageContext: "Other Accounts" })) ?? []
-    : selectedAccount?.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: selectedAccount.account, workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
+  const selectedPlans = selectedAccount?.workloads.flatMap((workload) =>
+    workload.plans.map((plan) => ({ workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
 
   const selectAccountContext = (account: string) => {
     setSelectedAccountContext(account);
@@ -184,7 +179,6 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     setActiveCandidateIndex(0);
     setSelectedAlertId("");
     setSelectedAccountName("");
-    setOtherSelected(false);
   };
 
   const selectCandidateAt = (index: number) => selectAccountContext(candidateOptions[index]?.account ?? "");
@@ -262,7 +256,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
           <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
               disabled={loading && !analysis}
-              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setOtherSelected(false); }}>{option.label}</button>)}
+              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); }}>{option.label}</button>)}
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Usage Insights filters">
@@ -389,22 +383,13 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       <div class="consumption-insights-contribution-grid">
         <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution</h2><p>{selectedContextLabel}</p></div></div>
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
-            class={!otherSelected && selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={!otherSelected && selectedAccount?.account === account.account}
-            onClick={() => { setSelectedAccountName(account.account); setOtherSelected(false); }}>
+            class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
+            onClick={() => setSelectedAccountName(account.account)}>
             <span>{account.account}</span><strong>{compactCurrency.format(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
-          </button>)}
-          {otherContribution && <button type="button" class="consumption-insights-account-other" aria-pressed={otherSelected}
-            aria-label={`Other Accounts ${otherContribution.percentage.toFixed(1)}%; ${otherContribution.accountNames.join(", ")}`}
-            onClick={() => { setOtherSelected(true); setSelectedAccountName(""); }}>
-            <span>Other Accounts</span><strong>{compactCurrency.format(otherContribution.totalAmount)}</strong><small>{otherContribution.percentage.toFixed(1)}% · {splitLabel(otherContribution)}</small>
-            <i><b style={`width:${Math.max(0, Math.min(100, otherContribution.percentage))}%`}></b></i>
-          </button>}
-          {!otherContribution && analysis?.otherContributionUnavailableReason && <div class="consumption-insights-account-unavailable" role="status" aria-label={`Other Accounts N/A. ${analysis.otherContributionUnavailableReason}`}>
-            <span>Other Accounts</span><strong>N/A</strong><small>{analysis.otherContributionUnavailableReason}</small>
-          </div>}</div>
+          </button>)}</div>
         </section>
-        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{otherSelected ? "Other Accounts" : selectedAccount?.account ?? "Select an Account"}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ account, workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{otherSelected && <><b>{account}</b> · </>}<b>{workload}</b> · Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /> · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"}</p></div></div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small><b>{workload}</b> · Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={selectedPillar} /> · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${splitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{splitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>

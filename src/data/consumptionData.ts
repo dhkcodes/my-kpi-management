@@ -1,13 +1,13 @@
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
-export type ConsumptionPillar = "ALL" | "DP" | "OCI_OTHER";
+export type ConsumptionPillar = "ALL" | "DP" | "OCI";
 export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; value: ConsumptionPillar }>> = [
   { label: "All", value: "ALL" },
   { label: "DP", value: "DP" },
-  { label: "OCI/Other", value: "OCI_OTHER" }
+  { label: "OCI", value: "OCI" }
 ];
 export type ConsumptionDataCenterBreakdown = Readonly<{
   dpCount: number | null;
-  ociOtherCount: number | null;
+  ociCount: number | null;
   duplicatePossible: boolean;
 }>;
 export type ConsumptionAmountSplit = Readonly<{
@@ -22,10 +22,6 @@ export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   percentage: number;
   actualTrend: readonly ConsumptionActualTrendPoint[];
-}>;
-export type ConsumptionOtherContributionPlan = ConsumptionAnalysisPlan & Readonly<{ account: string; workload: string }>;
-export type ConsumptionOtherContribution = ConsumptionAmountSplit & Readonly<{
-  accountNames: readonly string[]; percentage: number; plans: readonly ConsumptionOtherContributionPlan[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
   workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
@@ -66,8 +62,8 @@ export const formatConsumptionDataCenter = (
   const breakdown = plan.dataCenterBreakdown;
   if (pillar !== "ALL" || !breakdown) return { primary: plan.dataCenter, detail: null, duplicateWarning: null };
   return {
-    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociOtherCount ?? 0)),
-    detail: `DP ${breakdown.dpCount ?? "Missing"} + OCI/Other ${breakdown.ociOtherCount ?? "Missing"}`,
+    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociCount ?? 0)),
+    detail: `DP ${breakdown.dpCount ?? "Missing"} + OCI ${breakdown.ociCount ?? "Missing"}`,
     duplicateWarning: breakdown.duplicatePossible ? "Duplicate possible across pillars" : null
   };
 };

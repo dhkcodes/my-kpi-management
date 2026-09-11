@@ -8,7 +8,7 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 
 assert.match(recordsPage,
   /error instanceof ConsumptionConflictError[\s\S]*accountForecastControls\(error\.current\)[\s\S]*setConflictRows\(rows\)[\s\S]*setConflictWorkspace\(error\.current\)[\s\S]*Forecast Save conflicted with a newer server version/,
-  "DP/OCI_OTHER version conflicts reach the comparison UI with the selected-pillar server workspace");
+  "DP/OCI version conflicts reach the comparison UI with the selected-pillar server workspace");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
@@ -50,13 +50,9 @@ assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*c
 assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^\n]+\?\? null/, "account contribution starts unselected without falling back to the first account");
 assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
-assert.match(insightsPage, /otherContribution = analysis\?\.otherContribution/, "Other Contribution consumes the backend top-level nullable contract");
-assert.match(insightsPage, /<button type="button" class="consumption-insights-account-other"[\s\S]*setOtherSelected/, "Other is an interactive native button");
-assert.match(insightsPage, /consumption-insights-account-unavailable[\s\S]*Other Accounts[\s\S]*N\/A[\s\S]*otherContributionUnavailableReason/, "undefined signed net-zero Other denominator renders N/A with its server explanation");
-assert.match(insightsPage, /otherContribution\?\.plans\.map[\s\S]*percentageContext: "Other Accounts"/, "selecting Other renders all backend group plans with the approved percentage denominator");
-assert.match(insightsPage, /otherContribution\?\.plans\.map\(\(plan\) => \(\{ account: plan\.account[\s\S]*otherSelected &&[\s\S]*<b>\{account\}<\/b>/, "Other plan rows preserve their source Account identity");
+assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Usage Insights removes the aggregate Other Accounts contract and UI");
 assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
-assert.match(apiSource, /other\.accountNames[\s\S]*accountNames: other\.accountNames/, "Other Contribution decodes the backend accountNames member exactly");
+assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/, "the Consumption API excludes the removed Other Accounts response fields");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
@@ -71,8 +67,8 @@ assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, sear
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
 // PILLAR is an explicit, accessible page context on both Consumption leaves.
-assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Usage Records exposes the shared compact All, DP, OCI/Other selector");
-assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Usage Insights exposes the shared compact All, DP, OCI/Other selector");
+assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Usage Records exposes the shared compact All, DP, OCI selector");
+assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Usage Insights exposes the shared compact All, DP, OCI selector");
 assert.match(insightsPage, /consumption-insights-header-actions[\s\S]*consumption-insights-pillar[\s\S]*>Pillar<[\s\S]*consumption-pillar-selector[\s\S]*consumption-insights-context[\s\S]*>Account</, "Analysis places labelled Pillar before Account inside one filter row");
 assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items:\s*end[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap[^}]*gap:\s*\.75rem/, "Analysis filter row aligns Pillar and Account with Redwood spacing and natural wrapping");
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.25rem/, "Pillar uses the same labelled filter rhythm as Account");
@@ -170,7 +166,7 @@ assert.match(recordsPage, /renderedRecordAccounts\.length === 0[\s\S]*consumptio
 assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPlans\(workspace\.plans, workspace\.fromQuarter, workspace\.toQuarter\)[\s\S]*recordGroupMatchesSearch[\s\S]*setRecordAccountNames\(adoptedAccountNames\)[\s\S]*setRecordsTotalAccounts\(adoptedAccountNames\.length\)[\s\S]*setRecordsHasMore\(false\)/, "workspace adoption rebuilds filtered Account names and Footer metadata instead of retaining stale paged rows");
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
-assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\)[\s\S]*const canEditControl = editable/, "every backend-declared DP or OCI-Other Forecast cell is editable regardless of an existing value while ALL remains read-only");
+assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\)[\s\S]*const canEditControl = editable/, "every backend-declared DP or OCI Forecast cell is editable regardless of an existing value while ALL remains read-only");
 assert.match(recordsPage, /ALL Forecast is read-only and sums entered Pillar values; missing values count as zero/, "ALL is derived from entered Forecast values and never directly entered");
 assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");
 assert.doesNotMatch(recordsPage, />\{summary\.status\}<\//, "quarter status words are not rendered inside money cells");

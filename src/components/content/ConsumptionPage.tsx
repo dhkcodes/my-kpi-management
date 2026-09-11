@@ -1135,7 +1135,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
         {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
         {selectedPillar === "ALL" ? <span class="consumption-pillar-forecast-note">ALL Forecast is read-only and sums entered Pillar values; missing values count as zero.</span>
-          : <span class="consumption-pillar-forecast-note">{selectedPillar === "DP" ? "DP" : "OCI-Other"} Forecast is edited once per Account and is never allocated to Plan lines.</span>}
+          : <span class="consumption-pillar-forecast-note">{selectedPillar === "DP" ? "DP" : "OCI"} Forecast is edited once per Account and is never allocated to Plan lines.</span>}
       </section>
       {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
       <oj-dialog
@@ -1162,7 +1162,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               <div class="consumption-import-file-list" aria-label="Import file preview">
                 {pendingImport.preview.files.map((file) => <article key={file.fileName}>
                   <strong>{file.fileName}</strong>
-                  <span>Pillar: {file.detectedPillar === "OCI_OTHER" ? "OCI/Other" : file.detectedPillar}</span>
+                  <span>Pillar: {file.detectedPillar}</span>
                   <span>Owner: {file.owner}</span>
                   <span>Range: {file.fromPeriod} – {file.toPeriod}</span>
                   <span>Rows: {file.sourceRowCount} · Plans: {file.planCount} · Controls: {file.controlTotalCount}</span>

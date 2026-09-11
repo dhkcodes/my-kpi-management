@@ -14,32 +14,31 @@ runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
 
 const workspace = {
   selectedPillar: "DP",
-  availablePillars: ["ALL", "DP", "OCI_OTHER"], aggregationGrain: "PLAN_PERIOD",
+  availablePillars: ["ALL", "DP", "OCI"], aggregationGrain: "PLAN_PERIOD",
   etag: '"pillar"', lastBatchId: null,
   currentFiscalMonth: "FY27-AUG", fromQuarter: "FY27-Q1", toQuarter: "FY27-Q1",
   editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"], displayQuarterOrder: ["FY27-Q2", "FY27-Q1"],
-  plans: [{ planId: 1, stableKey: "A::P1", account: "A", endUser: "EU", planCode: "P1", dataCenter: "3", dpDataCenterCount: 3, ociOtherDataCenterCount: 2,
-    dataCenterBreakdown: { dpCount: 3, ociOtherCount: 2, duplicatePossible: true },
+  plans: [{ planId: 1, stableKey: "A::P1", account: "A", endUser: "EU", planCode: "P1", dataCenter: "3", dpDataCenterCount: 3, ociDataCenterCount: 2,
+    dataCenterBreakdown: { dpCount: 3, ociCount: 2, duplicatePossible: true },
     facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "DP" }] }],
   controlTotals: [], signals: []
 };
 
 const analysis = {
-  selectedPillar: "OCI_OTHER", fiscalYear: "FY27", priorFiscalYear: "FY26", selectedAccount: null,
+selectedPillar: "OCI", fiscalYear: "FY27", priorFiscalYear: "FY26", selectedAccount: null,
   portfolio: { actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0,
     priorActualAmount: 0, priorForecastAmount: 0, priorTotalAmount: 0, priorStatus: "INCOMPLETE", priorCoveragePercent: 0 },
   quarters: ["Q1", "Q2", "Q3", "Q4"].map((quarter) => ({ quarter, actualAmount: 0, forecastAmount: 0,
     totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: null, qoqChangePercent: null })),
-  accountCandidates: [], contextActualTrend: [], otherContribution: null,
-  otherContributionUnavailableReason: null, alerts: [], accounts: []
+  accountCandidates: [], contextActualTrend: [], alerts: [], accounts: []
 };
 
 void (async () => {
   assert.deepEqual(consumptionPillarOptions, [
-    { label: "All", value: "ALL" }, { label: "DP", value: "DP" }, { label: "OCI/Other", value: "OCI_OTHER" }
+    { label: "All", value: "ALL" }, { label: "DP", value: "DP" }, { label: "OCI", value: "OCI" }
   ]);
   assert.deepEqual(formatConsumptionDataCenter(workspace.plans[0], "ALL"), {
-    primary: "5", detail: "DP 3 + OCI/Other 2", duplicateWarning: "Duplicate possible across pillars"
+    primary: "5", detail: "DP 3 + OCI 2", duplicateWarning: "Duplicate possible across pillars"
   });
   assert.deepEqual(formatConsumptionDataCenter(workspace.plans[0], "DP"), { primary: "3", detail: null, duplicateWarning: null });
 
@@ -60,17 +59,26 @@ void (async () => {
   assert.equal(records.selectedPillar, "DP");
 
   runtime.fetch = async (input) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&pillar=OCI_OTHER");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&pillar=OCI");
     return new Response(JSON.stringify(analysis), { status: 200, headers: { "Content-Type": "application/json" } });
   };
-  const decodedAnalysis = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", pillar: "OCI_OTHER" });
-  assert.equal(decodedAnalysis.selectedPillar, "OCI_OTHER");
+  const decodedAnalysis = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", pillar: "OCI" });
+  assert.equal(decodedAnalysis.selectedPillar, "OCI");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...workspace,
+    selectedPillar: "OCI_OTHER",
+    availablePillars: ["ALL", "DP", "OCI-Other"],
+    plans: workspace.plans.map((plan) => ({ ...plan, facts: plan.facts.map((fact) => ({ ...fact, pillar: "OCI_OTHER" })) }))
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const legacyAliasWorkspace = await fetchConsumptionWorkspace(undefined, "OCI");
+  assert.equal(legacyAliasWorkspace.selectedPillar, "OCI", "legacy inbound OCI_OTHER is decoded to canonical OCI");
 
   const files = [new File(["a"], "dp.csv", { type: "text/csv" }), new File(["b"], "oci.csv", { type: "text/csv" })];
   const previewPayload = {
     files: [
       { sourceFileName: "dp.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "DP", sourceSha256: "a".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 },
-      { sourceFileName: "oci.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "OCI_OTHER", sourceSha256: "b".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 }
+      { sourceFileName: "oci.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "OCI-Other", sourceSha256: "b".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 }
     ],
     physicalFactCount: 6,
     deduplicatedFactCount: 1,
@@ -92,7 +100,7 @@ void (async () => {
     return new Response(JSON.stringify(previewPayload), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const preview = await previewConsumptionImport(files, "ALL");
-  assert.equal(preview.files[1].detectedPillar, "OCI_OTHER");
+  assert.equal(preview.files[1].detectedPillar, "OCI");
   assert.equal(preview.sameValueDuplicateCount, 1);
   assert.equal(preview.insertFactCount, 0);
   assert.equal(preview.deleteFactCount, 0);
@@ -102,6 +110,26 @@ void (async () => {
   assert.equal(preview.overwriteCount, 1);
   assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
   assert.equal(preview.hasConflicts, false);
+
+  const legacyFileName = "OCI Consumption Trend - owner-a - FY27-JUN - FY27-AUG - OCI-Other.csv";
+  const canonicalFileName = "OCI Consumption Trend - owner-a - FY27-JUN - FY27-AUG - OCI.csv";
+  const legacyFiles = [new File(["legacy"], legacyFileName, { type: "text/csv" })];
+  const legacyPreviewPayload = {
+    ...previewPayload,
+    files: [{ ...previewPayload.files[1], sourceFileName: canonicalFileName, pillar: "OCI" }],
+    physicalFactCount: 1,
+    deduplicatedFactCount: 0,
+    insertedFactCount: 1,
+    unchangedFactCount: 0,
+    overwrites: []
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(legacyPreviewPayload), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
+  const legacyPreview = await previewConsumptionImport(legacyFiles, "OCI");
+  assert.equal(legacyPreview.files[0].fileName, canonicalFileName,
+    "legacy uploaded filename is accepted while the preview remains canonical OCI");
 
   const hardConflictPayload = { ...previewPayload, physicalFactCount: 1, insertedFactCount: 1,
     unchangedFactCount: 0, skippedFactCount: 0, overwrites: [], conflicts: [{ pillar: "DP", account: "A", endUser: "EU",
@@ -153,17 +181,17 @@ void (async () => {
   assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.skippedFactCount, applied.deletedFactCount], [0, 0, 1, 0, 0]);
 
   runtime.fetch = async (input) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=OCI_OTHER");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=OCI");
     return new Response("Customer\n", { status: 200, headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="oci.csv"' } });
   };
-  assert.equal((await exportConsumptionImportCompatibleCsv("OCI_OTHER")).fileName, "oci.csv");
+  assert.equal((await exportConsumptionImportCompatibleCsv("OCI")).fileName, "oci.csv");
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...workspace, selectedPillar: "ALL" }), { status: 200, headers: { "Content-Type": "application/json" } });
   await assert.rejects(() => fetchConsumptionWorkspace(undefined, "DP"), /Malformed Consumption workspace pillar/);
-  runtime.fetch = async () => new Response(JSON.stringify({ ...workspace, plans: [{ ...workspace.plans[0], dataCenterBreakdown: { dpCount: -1, ociOtherCount: 2, duplicatePossible: false } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  runtime.fetch = async () => new Response(JSON.stringify({ ...workspace, plans: [{ ...workspace.plans[0], dataCenterBreakdown: { dpCount: -1, ociCount: 2, duplicatePossible: false } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   await assert.rejects(() => fetchConsumptionWorkspace(undefined, "DP"), /Malformed Consumption plan response/);
   runtime.fetch = async () => new Response(JSON.stringify({ ...analysis, selectedPillar: "DP" }), { status: 200, headers: { "Content-Type": "application/json" } });
-  await assert.rejects(() => fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", pillar: "OCI_OTHER" }), /Malformed Consumption analysis/);
+  await assert.rejects(() => fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", pillar: "OCI" }), /Malformed Consumption analysis/);
 
   console.log("consumptionPillar tests passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

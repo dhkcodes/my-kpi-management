@@ -5,7 +5,6 @@ import {
   ConsumptionAnalysisAccountCandidate,
   ConsumptionActualTrendPoint,
   ConsumptionAmountSplit,
-  ConsumptionOtherContribution,
   ConsumptionPillar,
   ConsumptionDataCenterBreakdown,
   getFiscalQuarter,
@@ -22,7 +21,7 @@ const apiBase = () => {
 };
 
 type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number; pillar?: unknown }>;
-type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; dataCenterBreakdown?: unknown; dpDataCenterCount?: unknown; ociOtherDataCenterCount?: unknown; workload?: string | null; facts: RawFact[] }>;
+type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; dataCenterBreakdown?: unknown; dpDataCenterCount?: unknown; ociDataCenterCount?: unknown; workload?: string | null; facts: RawFact[] }>;
 type RawSignalPoint = Readonly<{ periodKey: string; actualAmount: number }>;
 type RawSignal = Readonly<{
   signalId: number; planId: number; account: string; endUser: string; planCode: string; periodKey: string;
@@ -134,8 +133,6 @@ export type ConsumptionAnalysis = Readonly<{
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
-  otherContribution: ConsumptionOtherContribution | null;
-  otherContributionUnavailableReason: string | null;
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
   organicConsumptionGrowthProxy: ConsumptionOrganicGrowthProxy | null;
@@ -270,24 +267,30 @@ const isPositiveInteger = (value: unknown): value is number => Number.isSafeInte
 const isPeriodKey = (value: unknown): value is string => typeof value === "string" && fiscalPeriodPattern.test(value);
 const isQuarterKey = (value: unknown): value is string => typeof value === "string" && fiscalQuarterPattern.test(value);
 const isFiscalYear = (value: unknown): value is string => typeof value === "string" && /^FY\d{2}$/.test(value);
-const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI_OTHER"]);
+const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI"]);
 const isConsumptionPillar = (value: unknown): value is ConsumptionPillar => consumptionPillars.has(value as ConsumptionPillar);
+// Inbound-only compatibility for responses/files produced before OCI became canonical.
+const legacyConsumptionPillarAliases = new Set(["OCI_OTHER", "OCI-Other"]);
+const normalizeConsumptionPillar = (value: unknown): ConsumptionPillar | null =>
+  isConsumptionPillar(value) ? value : legacyConsumptionPillarAliases.has(value as string) ? "OCI" : null;
+const normalizeLegacyConsumptionFileName = (value: string): string =>
+  value.replace(/ - OCI-Other\.csv$/i, " - OCI.csv");
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const parseDataCenterBreakdown = (value: unknown, dpValue?: unknown, ociValue?: unknown): ConsumptionDataCenterBreakdown | undefined => {
   if ((value === undefined || value === null) && dpValue === undefined && ociValue === undefined) return undefined;
   if (value === undefined || value === null) {
     const valid = (candidate: unknown) => candidate === null || candidate === undefined || isNonNegativeInteger(candidate);
     if (!valid(dpValue) || !valid(ociValue)) throw new Error("Malformed Consumption plan response");
-    return { dpCount: dpValue == null ? null : dpValue as number, ociOtherCount: ociValue == null ? null : ociValue as number,
+    return { dpCount: dpValue == null ? null : dpValue as number, ociCount: ociValue == null ? null : ociValue as number,
       duplicatePossible: dpValue != null && ociValue != null };
   }
   if (typeof value !== "object") throw new Error("Malformed Consumption plan response");
   const raw = value as Record<string, unknown>;
   const valid = (candidate: unknown) => candidate === null || isNonNegativeInteger(candidate);
-  if (!valid(raw.dpCount) || !valid(raw.ociOtherCount) || typeof raw.duplicatePossible !== "boolean") {
+  if (!valid(raw.dpCount) || !valid(raw.ociCount) || typeof raw.duplicatePossible !== "boolean") {
     throw new Error("Malformed Consumption plan response");
   }
-  return { dpCount: raw.dpCount as number | null, ociOtherCount: raw.ociOtherCount as number | null, duplicatePossible: raw.duplicatePossible };
+  return { dpCount: raw.dpCount as number | null, ociCount: raw.ociCount as number | null, duplicatePossible: raw.duplicatePossible };
 };
 const nearlyEqual = (left: number, right: number) => Math.abs(left - right) <= 1e-6 * Math.max(1, Math.abs(left), Math.abs(right));
 const fiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"];
@@ -344,7 +347,7 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
   if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
     || !isFiniteNumber(raw.percentage)) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
-    dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociOtherDataCenterCount),
+    dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociDataCenterCount),
     percentage: raw.percentage, actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const organicGrowthCategories: readonly ConsumptionOrganicGrowthCategory[] = [
@@ -398,14 +401,11 @@ const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] =
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
-  const selectedPillarValue: unknown = raw.selectedPillar;
-  if (!isConsumptionPillar(selectedPillarValue) || !isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
+  const selectedPillar = normalizeConsumptionPillar(raw.selectedPillar);
+  if (!selectedPillar || !isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
-    || !(raw.otherContribution === null || (typeof raw.otherContribution === "object" && raw.otherContribution !== null))
-    || !(raw.otherContributionUnavailableReason === null || isNonEmptyString(raw.otherContributionUnavailableReason))
-    || (raw.otherContribution !== null && raw.otherContributionUnavailableReason !== null)
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
@@ -457,21 +457,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const contextActualTrend = parseActualTrend(raw.contextActualTrend, allowedTrendYears);
   const organicConsumptionGrowthProxy = parseOrganicGrowthProxy(raw.organicConsumptionGrowthProxy);
   const movementBridge = parseMovementBridge(raw.movementBridge);
-  const otherContribution: ConsumptionOtherContribution | null = raw.otherContribution === null ? null : (() => {
-    const split = parseAmountSplit(raw.otherContribution);
-    const other = raw.otherContribution as Record<string, unknown>;
-    if (!Array.isArray(other.accountNames) || other.accountNames.length === 0 || other.accountNames.some((account) => !isNonEmptyString(account))
-      || new Set(other.accountNames).size !== other.accountNames.length || !isFiniteNumber(other.percentage) || !Array.isArray(other.plans)) return malformedAnalysis();
-    const accountNames = new Set(other.accountNames as string[]);
-    const plans = other.plans.map((value) => {
-      const plan = parseAnalysisPlan(value, allowedTrendYears);
-      const rawPlan = value as Record<string, unknown>;
-      if (!isNonEmptyString(rawPlan.account) || !accountNames.has(rawPlan.account) || !isNonEmptyString(rawPlan.workload)) return malformedAnalysis();
-      return { ...plan, account: rawPlan.account, workload: rawPlan.workload };
-    });
-    if (new Set(plans.map((plan) => plan.serverPlanId)).size !== plans.length) return malformedAnalysis();
-    return { ...split, accountNames: other.accountNames as string[], percentage: other.percentage, plans };
-  })();
+
   const seenAnalysisPlanIds = new Set<number>();
   accounts.forEach((account) => account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
     if (seenAnalysisPlanIds.has(plan.serverPlanId)) return malformedAnalysis();
@@ -492,27 +478,25 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const matches = accounts.flatMap((account) => account.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: account.account, workload: workload.workload, plan })))).filter((entry) => entry.account === alert.account && entry.workload === alert.workload && entry.plan.serverPlanId === alert.serverPlanId && entry.plan.planId === alert.planId);
     if (matches.length !== 1) return malformedAnalysis();
   });
-  const selectedPillar = selectedPillarValue;
   return { selectedPillar,
     fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, otherContribution,
-    otherContributionUnavailableReason: raw.otherContributionUnavailableReason as string | null, alerts, accounts,
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, alerts, accounts,
     organicConsumptionGrowthProxy, movementBridge };
 };
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPillar?: ConsumptionPillar): ConsumptionApiWorkspace => {
   if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption workspace response");
   const raw = value as RawWorkspace;
-  const selectedPillarValue: unknown = raw.selectedPillar;
-  if (!isConsumptionPillar(selectedPillarValue) || (expectedPillar !== undefined && selectedPillarValue !== expectedPillar)) {
+  const selectedPillar = normalizeConsumptionPillar(raw.selectedPillar);
+  if (!selectedPillar || (expectedPillar !== undefined && selectedPillar !== expectedPillar)) {
     throw new Error("Malformed Consumption workspace pillar");
   }
-  const selectedPillar = selectedPillarValue;
-  if(expectedPillar!==undefined&&(!Array.isArray(raw.availablePillars)
-    ||raw.availablePillars.length!==3||raw.availablePillars[0]!=="ALL"||raw.availablePillars[1]!=="DP"||raw.availablePillars[2]!=="OCI_OTHER"
+  const availablePillars = Array.isArray(raw.availablePillars) ? raw.availablePillars.map(normalizeConsumptionPillar) : null;
+  if(expectedPillar!==undefined&&(!availablePillars
+    ||availablePillars.length!==3||availablePillars[0]!=="ALL"||availablePillars[1]!=="DP"||availablePillars[2]!=="OCI"
     ||raw.aggregationGrain!=="PLAN_PERIOD"))throw new Error("Malformed Consumption workspace pillar metadata");
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.signals) || !Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption workspace response");
   const etag = headerEtag ?? raw.etag;
@@ -520,7 +504,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
   if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey)
     || !isFiniteNumber(control?.controlAmount) || !isNullableFiniteNumber(control?.detailAmount)
     || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"])
-    ||(expectedPillar!==undefined&&control?.pillar!==selectedPillar))) throw new Error("Malformed Consumption control total response");
+    ||(expectedPillar!==undefined&&normalizeConsumptionPillar(control?.pillar)!==selectedPillar))) throw new Error("Malformed Consumption control total response");
   const seenControlKeys = new Set<string>();
   const controlTotals: ConsumptionApiControlTotal[] = raw.controlTotals.map((control) => {
     const key = `${control.account}::${control.periodKey}`;
@@ -529,8 +513,9 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     return { ...control, matchStatus: control.matchStatus as ConsumptionApiControlTotal["matchStatus"] };
   });
   const accountForecasts=(raw.accountForecasts ?? []).map((forecast):ConsumptionAccountForecast=>{
+    const pillar = normalizeConsumptionPillar(forecast?.pillar);
     if(!forecast||!isNonEmptyString(forecast.account)||!isNonEmptyString(forecast.normalizedAccount)||!isPeriodKey(forecast.periodKey)
-      ||!(forecast.pillar==="DP"||forecast.pillar==="OCI_OTHER")||!isFiniteNumber(forecast.amount)||forecast.amount<0
+      ||!(pillar==="DP"||pillar==="OCI")||!isFiniteNumber(forecast.amount)||forecast.amount<0
       ||!isPositiveInteger(forecast.version)||!(forecast.status==="DRAFT"||forecast.status==="FINAL")||!isNonEmptyString(forecast.completeness))
       throw new Error("Malformed Consumption account forecast");
     const record = forecast as unknown as Record<string, unknown>;
@@ -544,7 +529,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     if (!isNonNegativeFiniteNumber(totalAmount)) throw new Error("Malformed Consumption account forecast");
     const compositionStatus = compositionStatuses.has(record.compositionStatus as ConsumptionForecastCompositionStatus)
       ? record.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
-    return { ...forecast, pillar: forecast.pillar as ConsumptionAccountForecast["pillar"],
+    return { ...forecast, pillar,
       status: forecast.status as ConsumptionAccountForecast["status"], amount: totalAmount, totalAmount,
       newAmount: nullableAmount("newAmount"), expansionAmount: nullableAmount("expansionAmount"),
       baseAmount: nullableAmount("baseAmount"), reductionAmount: nullableAmount("reductionAmount"),
@@ -552,11 +537,12 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
       previousStatus: typeof record.previousStatus === "string" ? record.previousStatus : "UNAVAILABLE", compositionStatus };
   });
   const forecastVariances=(raw.forecastVariances ?? []).map((variance):ConsumptionForecastVariance=>{
+    const pillar = normalizeConsumptionPillar(variance?.pillar);
     if(!variance||!isNonEmptyString(variance.account)||!isNonEmptyString(variance.normalizedAccount)||!isPeriodKey(variance.periodKey)
-      ||!isConsumptionPillar(variance.pillar)||!isNullableFiniteNumber(variance.actualAmount)||!isNullableFiniteNumber(variance.forecastAmount)
+      ||!pillar||!isNullableFiniteNumber(variance.actualAmount)||!isNullableFiniteNumber(variance.forecastAmount)
       ||!isNullableFiniteNumber(variance.varianceAmount)||!isNullableFiniteNumber(variance.variancePercent)||!isNonEmptyString(variance.completeness))
       throw new Error("Malformed Consumption forecast variance");
-    return variance as ConsumptionForecastVariance;
+    return { ...variance, pillar } as ConsumptionForecastVariance;
   });
   const seenPlanIds = new Set<number>();
   const seenStableKeys = new Set<string>();
@@ -565,9 +551,9 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
       || !isNonEmptyString(plan?.endUser) || !isNonEmptyString(plan?.planCode) || !isNonEmptyString(plan?.dataCenter)
       || (plan.workload !== null && plan.workload !== undefined && !isNonEmptyString(plan.workload))
       ||(expectedPillar!==undefined&&(!Object.prototype.hasOwnProperty.call(plan,"dpDataCenterCount")
-        ||!Object.prototype.hasOwnProperty.call(plan,"ociOtherDataCenterCount")
+        ||!Object.prototype.hasOwnProperty.call(plan,"ociDataCenterCount")
         ||!(plan.dpDataCenterCount==null||isNonNegativeInteger(plan.dpDataCenterCount))
-        ||!(plan.ociOtherDataCenterCount==null||isNonNegativeInteger(plan.ociOtherDataCenterCount))))
+        ||!(plan.ociDataCenterCount==null||isNonNegativeInteger(plan.ociDataCenterCount))))
       || !Array.isArray(plan?.facts)) throw new Error("Malformed Consumption plan response");
     if (seenPlanIds.has(plan.planId) || seenStableKeys.has(plan.stableKey)) throw new Error("Malformed Consumption plan response");
     seenPlanIds.add(plan.planId); seenStableKeys.add(plan.stableKey);
@@ -577,14 +563,14 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     plan.facts.forEach((fact) => {
       if (!isPeriodKey(fact?.periodKey) || !isNullableFiniteNumber(fact?.actualAmount)
         || !isNullableFiniteNumber(fact?.forecastAmount) || !isNonNegativeInteger(fact?.versionNo)
-        ||(expectedPillar!==undefined&&(fact.actualAmount!==null?fact.pillar!==selectedPillar:fact.pillar!=null))) throw new Error("Malformed Consumption fact response");
+        ||(expectedPillar!==undefined&&(fact.actualAmount!==null?normalizeConsumptionPillar(fact.pillar)!==selectedPillar:fact.pillar!=null))) throw new Error("Malformed Consumption fact response");
       if (Object.prototype.hasOwnProperty.call(versions, fact.periodKey)) throw new Error("Malformed Consumption fact response");
       versions[fact.periodKey] = fact.versionNo;
       // Actual is the visible effective value, but the finalized forecast is retained for audit and exact replay.
       if (fact.actualAmount !== null) actuals[fact.periodKey] = fact.actualAmount;
       if (fact.forecastAmount !== null) forecasts[fact.periodKey] = fact.forecastAmount;
     });
-    const dataCenterBreakdown = parseDataCenterBreakdown(plan.dataCenterBreakdown, plan.dpDataCenterCount, plan.ociOtherDataCenterCount);
+    const dataCenterBreakdown = parseDataCenterBreakdown(plan.dataCenterBreakdown, plan.dpDataCenterCount, plan.ociDataCenterCount);
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
       dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
   });
@@ -798,24 +784,26 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
   const files = raw.files.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
     const file = value as Record<string, unknown>;
+    const detectedPillar = normalizeConsumptionPillar(file.pillar);
     if (!isNonEmptyString(file.sourceFileName) || !isNonEmptyString(file.sourceOwner)
       || !isPeriodKey(file.sourcePeriodFrom) || !isPeriodKey(file.sourcePeriodTo)
-      || !(file.pillar === "DP" || file.pillar === "OCI_OTHER")
+      || !(detectedPillar === "DP" || detectedPillar === "OCI")
       || typeof file.sourceSha256 !== "string" || !sha256Pattern.test(file.sourceSha256)
       || !Array.isArray(file.plans) || !Array.isArray(file.controlTotals)
       || !isNonNegativeInteger(file.sourceRowCount)) throw new Error("Malformed Consumption import preview");
     return {fileName:file.sourceFileName,owner:file.sourceOwner,fromPeriod:file.sourcePeriodFrom,toPeriod:file.sourcePeriodTo,
-      detectedPillar:file.pillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
+      detectedPillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
       controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount} as ConsumptionImportFilePreview;
   });
-  const expectedNames=uploaded.map(file=>file.name);
+  const expectedNames=uploaded.map(file=>normalizeLegacyConsumptionFileName(file.name));
   const actualNames=files.map(file=>file.fileName);
   if(expectedNames.length!==actualNames.length||expectedNames.some((name,index)=>name!==actualNames[index]))
     throw new Error("Malformed Consumption import preview");
   const conflicts = raw.conflicts.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
     const conflict=value as Record<string,unknown>;
-    if (!(conflict.pillar==="DP"||conflict.pillar==="OCI_OTHER") || !isNonEmptyString(conflict.account)
+    const conflictPillar = normalizeConsumptionPillar(conflict.pillar);
+    if (!(conflictPillar==="DP"||conflictPillar==="OCI") || !isNonEmptyString(conflict.account)
       || !isNonEmptyString(conflict.endUser) || !isNonEmptyString(conflict.planCode) || !isPeriodKey(conflict.periodKey)
       || !isNullableDecimalString(conflict.firstValue) || !isNullableDecimalString(conflict.conflictingValue)
       || !isNonEmptyString(conflict.firstFile) || !isNonEmptyString(conflict.conflictingFile)
@@ -826,9 +814,9 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     const firstSource=files[conflict.firstFileOrdinal-1];
     const conflictingSource=files[conflict.conflictingFileOrdinal-1];
     if (!firstSource || !conflictingSource || firstSource.fileName!==conflict.firstFile
-      || conflictingSource.fileName!==conflict.conflictingFile || firstSource.detectedPillar!==conflict.pillar
-      || conflictingSource.detectedPillar!==conflict.pillar) throw new Error("Malformed Consumption import preview");
-    return {key:`${conflict.pillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}::${conflict.firstFileOrdinal}::${conflict.firstRowNumber}::${conflict.conflictingFileOrdinal}::${conflict.conflictingRowNumber}`,
+      || conflictingSource.fileName!==conflict.conflictingFile || firstSource.detectedPillar!==conflictPillar
+      || conflictingSource.detectedPillar!==conflictPillar) throw new Error("Malformed Consumption import preview");
+    return {key:`${conflictPillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}::${conflict.firstFileOrdinal}::${conflict.firstRowNumber}::${conflict.conflictingFileOrdinal}::${conflict.conflictingRowNumber}`,
       files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as (string|null)[],
       fileOrdinals:[conflict.firstFileOrdinal,conflict.conflictingFileOrdinal] as number[],
       rows:[conflict.firstRowNumber,conflict.conflictingRowNumber] as number[],reason:conflict.reason as ConsumptionImportConflict["reason"]};
@@ -836,11 +824,12 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
   const overwrites = raw.overwrites.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
     const overwrite=value as Record<string,unknown>;
-    if (!(overwrite.pillar==="DP"||overwrite.pillar==="OCI_OTHER") || !isNonEmptyString(overwrite.account)
+    const overwritePillar = normalizeConsumptionPillar(overwrite.pillar);
+    if (!(overwritePillar==="DP"||overwritePillar==="OCI") || !isNonEmptyString(overwrite.account)
       || !isNonEmptyString(overwrite.endUser) || !isNonEmptyString(overwrite.planCode) || !isPeriodKey(overwrite.periodKey)
       || !isFiniteNumber(overwrite.existingValue) || !isFiniteNumber(overwrite.newValue)
       || !isNonEmptyString(overwrite.sourceFileName)) throw new Error("Malformed Consumption import preview");
-    return {key:`${overwrite.pillar}::${overwrite.account}::${overwrite.endUser}::${overwrite.planCode}::${overwrite.periodKey}`,
+    return {key:`${overwritePillar}::${overwrite.account}::${overwrite.endUser}::${overwrite.planCode}::${overwrite.periodKey}`,
       existingValue:overwrite.existingValue,newValue:overwrite.newValue,fileName:overwrite.sourceFileName} as ConsumptionImportOverwrite;
   });
   const overwriteKeys=new Set(overwrites.map((overwrite)=>overwrite.key));
