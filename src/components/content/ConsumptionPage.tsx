@@ -269,7 +269,6 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
   const display = formatConsumptionDataCenter(plan, selectedPillar);
   return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}>
     <span>DC {display.primary}</span>
-    {display.duplicateWarning && <span class="consumption-data-center__warning" role="note" title={display.duplicateWarning} aria-label={display.duplicateWarning}>⚠</span>}
   </span>;
 };
 

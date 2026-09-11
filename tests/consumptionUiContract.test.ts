@@ -79,7 +79,7 @@ assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\
 assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Usage Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
 assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}/, "plan rows keep the scoped Data Center count as the core identifier");
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "plan rows omit redundant DP, OCI, and Missing breakdown copy");
-assert.match(recordsPage, /display\.duplicateWarning[\s\S]*role="note"/, "All records warn when a cross-pillar duplicate is possible");
+assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
 assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
 assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Usage Insights omits DP + OCI breakdown and duplicate warnings");

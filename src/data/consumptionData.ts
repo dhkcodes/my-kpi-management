@@ -58,12 +58,11 @@ export type ConsumptionPlan = Readonly<{
 export const formatConsumptionDataCenter = (
   plan: Pick<ConsumptionPlan, "dataCenter" | "dataCenterBreakdown">,
   pillar: ConsumptionPillar
-): Readonly<{ primary: string; duplicateWarning: string | null }> => {
+): Readonly<{ primary: string }> => {
   const breakdown = plan.dataCenterBreakdown;
-  if (pillar !== "ALL" || !breakdown) return { primary: plan.dataCenter, duplicateWarning: null };
+  if (pillar !== "ALL" || !breakdown) return { primary: plan.dataCenter };
   return {
-    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociCount ?? 0)),
-    duplicateWarning: breakdown.duplicatePossible ? "Duplicate possible across pillars" : null
+    primary: String((breakdown.dpCount ?? 0) + (breakdown.ociCount ?? 0))
   };
 };
 
