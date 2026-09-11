@@ -81,12 +81,11 @@ const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: 
 const isExactReplayPreview = (preview: ConsumptionImportPreview) =>
   preview.files.length > 0 && preview.exactReplayFileCount === preview.files.length;
 const forecastCompositionUnavailable = (composition: ConsumptionAccountForecast) =>
-  composition.compositionStatus === "UNCLASSIFIED"
-    ? "Composition unavailable: this legacy scalar Forecast does not include movement components."
-    : composition.compositionStatus === "UNAVAILABLE"
-      ? "Forecast composition unavailable for this period."
-      : null;
+  composition.compositionStatus === "UNAVAILABLE"
+    ? "Forecast composition unavailable for this period."
+    : null;
 const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: ConsumptionAccountForecast }>) => {
+  if (composition.compositionStatus === "UNCLASSIFIED") return null;
   const unavailable = forecastCompositionUnavailable(composition);
   const accessibleText = unavailable ?? [
     `Total ${currency.format(composition.totalAmount)}`,
