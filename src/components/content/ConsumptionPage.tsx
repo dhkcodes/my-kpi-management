@@ -1129,7 +1129,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             onInput={(event) => setDraftSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
         </label>
-        <oj-button chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onojAction={() => void submitRecordsQuery()}>
+        <oj-button class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} chroming="callToAction" disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onojAction={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </oj-button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}

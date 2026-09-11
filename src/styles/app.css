@@ -2378,6 +2378,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }
 .consumption-range-bar oj-button { height: 2.25rem; }
+.consumption-range-apply--initializing { visibility: hidden; }
 .consumption-range-bar oj-button::part(button) { height: 2.25rem; padding-block: .35rem; }
 .consumption-range-bar oj-button .oj-button-button { box-sizing: border-box; height: 2.25rem; min-height: 2.25rem; padding-block: .35rem; }
 .consumption-record-search { flex: 1 1 18rem; max-width: 32rem; }
