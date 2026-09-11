@@ -1369,7 +1369,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                           <span class="consumption-leading">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>
                             <span class="consumption-leading-copy"><ConsumptionTruncatedText className="consumption-end-user" text={`${plan.customer}${plan.workload ? ` (${plan.workload})` : ""}`} />
-                            <small>{plan.endUser} · Plan {plan.planId} · Actual · <ConsumptionDataCenter plan={plan} selectedPillar={selectedPillar} /></small></span>
+                            <small>{plan.endUser} · Plan {plan.planId} · <ConsumptionDataCenter plan={plan} selectedPillar={selectedPillar} /></small></span>
                           </span>
                         </th>
                         {renderQuarterCells(plan, false)}
