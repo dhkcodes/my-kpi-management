@@ -977,7 +977,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setIsExporting(true);
     setImportError("");
     try {
-      const exported = await exportConsumptionForecastCsv(selectedPillar);
+      const exported = await exportConsumptionForecastCsv("ALL");
       const url = URL.createObjectURL(exported.blob);
       try {
         const anchor = document.createElement("a");
@@ -1078,11 +1078,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
             disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
-          <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
-            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
-            onojAction={() => void exportImportCompatibleCsv()}>
-            <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Actual Export"}
+          <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+            <span slot="startIcon" class="oj-ux-ico-upload"></span>
+            Forecast Import
           </oj-button>
           <oj-button chroming="outlined" title="Export FORECAST data in the Forecast Import CSV format"
             disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
@@ -1094,9 +1092,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
-          <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
-            <span slot="startIcon" class="oj-ux-ico-upload"></span>
-            Forecast Import
+          <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
+            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            onojAction={() => void exportImportCompatibleCsv()}>
+            <span slot="startIcon" class="oj-ux-ico-download"></span>
+            {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
         </div>
       </header>

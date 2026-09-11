@@ -269,12 +269,8 @@ const isQuarterKey = (value: unknown): value is string => typeof value === "stri
 const isFiscalYear = (value: unknown): value is string => typeof value === "string" && /^FY\d{2}$/.test(value);
 const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI"]);
 const isConsumptionPillar = (value: unknown): value is ConsumptionPillar => consumptionPillars.has(value as ConsumptionPillar);
-// Inbound-only compatibility for responses/files produced before OCI became canonical.
-const legacyConsumptionPillarAliases = new Set(["OCI_OTHER", "OCI-Other"]);
 const normalizeConsumptionPillar = (value: unknown): ConsumptionPillar | null =>
-  isConsumptionPillar(value) ? value : legacyConsumptionPillarAliases.has(value as string) ? "OCI" : null;
-const normalizeLegacyConsumptionFileName = (value: string): string =>
-  value.replace(/ - OCI-Other\.csv$/i, " - OCI.csv");
+  isConsumptionPillar(value) ? value : null;
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const parseDataCenterBreakdown = (value: unknown, dpValue?: unknown, ociValue?: unknown): ConsumptionDataCenterBreakdown | undefined => {
   if ((value === undefined || value === null) && dpValue === undefined && ociValue === undefined) return undefined;
@@ -795,7 +791,7 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
       detectedPillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
       controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount} as ConsumptionImportFilePreview;
   });
-  const expectedNames=uploaded.map(file=>normalizeLegacyConsumptionFileName(file.name));
+  const expectedNames=uploaded.map(file=>file.name);
   const actualNames=files.map(file=>file.fileName);
   if(expectedNames.length!==actualNames.length||expectedNames.some((name,index)=>name!==actualNames[index]))
     throw new Error("Malformed Consumption import preview");

@@ -71,14 +71,14 @@ void (async () => {
     availablePillars: ["ALL", "DP", "OCI-Other"],
     plans: workspace.plans.map((plan) => ({ ...plan, facts: plan.facts.map((fact) => ({ ...fact, pillar: "OCI_OTHER" })) }))
   }), { status: 200, headers: { "Content-Type": "application/json" } });
-  const legacyAliasWorkspace = await fetchConsumptionWorkspace(undefined, "OCI");
-  assert.equal(legacyAliasWorkspace.selectedPillar, "OCI", "legacy inbound OCI_OTHER is decoded to canonical OCI");
+  await assert.rejects(fetchConsumptionWorkspace(undefined, "OCI"), /Malformed Consumption workspace pillar/,
+    "retired OCI_OTHER values are rejected instead of entering the UI model");
 
   const files = [new File(["a"], "dp.csv", { type: "text/csv" }), new File(["b"], "oci.csv", { type: "text/csv" })];
   const previewPayload = {
     files: [
       { sourceFileName: "dp.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "DP", sourceSha256: "a".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 },
-      { sourceFileName: "oci.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "OCI-Other", sourceSha256: "b".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 }
+      { sourceFileName: "oci.csv", sourceOwner: "owner-a", sourcePeriodFrom: "FY27-JUN", sourcePeriodTo: "FY27-AUG", pillar: "OCI", sourceSha256: "b".repeat(64), plans: [{}], controlTotals: [], sourceRowCount: 1 }
     ],
     physicalFactCount: 6,
     deduplicatedFactCount: 1,
@@ -127,9 +127,8 @@ void (async () => {
     status: 200,
     headers: { "Content-Type": "application/json" }
   });
-  const legacyPreview = await previewConsumptionImport(legacyFiles, "OCI");
-  assert.equal(legacyPreview.files[0].fileName, canonicalFileName,
-    "legacy uploaded filename is accepted while the preview remains canonical OCI");
+  await assert.rejects(previewConsumptionImport(legacyFiles, "OCI"), /Malformed Consumption import preview/,
+    "retired OCI-Other upload names are rejected rather than silently renamed");
 
   const hardConflictPayload = { ...previewPayload, physicalFactCount: 1, insertedFactCount: 1,
     unchangedFactCount: 0, skippedFactCount: 0, overwrites: [], conflicts: [{ pillar: "DP", account: "A", endUser: "EU",
