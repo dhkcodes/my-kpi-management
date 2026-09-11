@@ -7,4 +7,7 @@
  */
 // injector:preactDebugImport
 // endinjector
+import { startReleaseRefreshWatcher } from './app/releaseRefresh';
 import './components/app';
+
+startReleaseRefreshWatcher();
