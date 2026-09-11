@@ -29,6 +29,7 @@ import {
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import {
+  ConsumptionAccountForecast,
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
   ConsumptionRecordsPage,
@@ -79,6 +80,36 @@ const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: 
 };
 const isExactReplayPreview = (preview: ConsumptionImportPreview) =>
   preview.files.length > 0 && preview.exactReplayFileCount === preview.files.length;
+const forecastCompositionUnavailable = (composition: ConsumptionAccountForecast) =>
+  composition.compositionStatus === "UNCLASSIFIED"
+    ? "Composition unavailable: this legacy scalar Forecast does not include movement components."
+    : composition.compositionStatus === "UNAVAILABLE"
+      ? "Forecast composition unavailable for this period."
+      : null;
+const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: ConsumptionAccountForecast }>) => {
+  const unavailable = forecastCompositionUnavailable(composition);
+  const accessibleText = unavailable ?? [
+    `Total ${currency.format(composition.totalAmount)}`,
+    `Base ${composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}`,
+    `New ${composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}`,
+    `Expansion ${composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}`,
+    `Reduction ${composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}`,
+    `Previous source ${composition.previousSource}${composition.previousAmount === null ? "" : ` ${currency.format(composition.previousAmount)}`}`
+  ].join("; ");
+  return <span class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}>
+    <span class="oj-ux-ico-information-s" aria-hidden="true"></span>
+    <span class="consumption-forecast-tooltip__content" role="tooltip">
+      {unavailable ? <>{unavailable}</> : <dl>
+        <div><dt>Total</dt><dd>{currency.format(composition.totalAmount)}</dd></div>
+        <div><dt>Base</dt><dd>{composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}</dd></div>
+        <div><dt>New</dt><dd>{composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}</dd></div>
+        <div><dt>Expansion</dt><dd>{composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}</dd></div>
+        <div><dt>Reduction</dt><dd>{composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}</dd></div>
+        <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmount === null ? "" : ` · ${currency.format(composition.previousAmount)}`}</dd></div>
+      </dl>}
+    </span>
+  </span>;
+};
 const toApiControlTotals = (controls: readonly { customer: string; values: Readonly<Record<string, number>> }[]): ConsumptionApiControlTotal[] =>
   controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
     account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
@@ -120,6 +151,7 @@ const fallbackEditablePeriods = getNextQuarterMonths(initialSeed.latestActualMon
 const fallbackForecastQuarters = [...new Set(fallbackEditablePeriods.map(getFiscalQuarter))];
 const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackActualQuarters.filter((quarter) => !fallbackForecastQuarters.includes(quarter))];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const formatForecastK = (amount: number | null) => amount === null ? "" : (amount / 1000).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 const formatConflictCurrency = (value: string) => {
   const [, sign, integer, fraction = "", exponent = ""] = /^(-?)(\d+)(\.\d+)?([eE][+-]?\d+)?$/.exec(value)!;
   return `${sign === "-" ? "-$" : "$"}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction}${exponent}`;
@@ -254,6 +286,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [forecastVariances, setForecastVariances] = useState<ConsumptionForecastVariance[]>([]);
+  const [accountForecasts, setAccountForecasts] = useState<ConsumptionAccountForecast[]>([]);
   const [selectedSignalId, setSelectedSignalId] = useState("");
   const [selectedSeriesId, setSelectedSeriesId] = useState("__all__");
   const [planSearch, setPlanSearch] = useState("");
@@ -330,6 +363,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setSavedControlTotals(cloneControlTotals(forecastControls));
     setDraftControlTotals(cloneControlTotals(forecastControls));
     setForecastVariances([...workspace.forecastVariances]);
+    setAccountForecasts([...workspace.accountForecasts]);
     setServerSignals(workspace.signals);
     setApiEtag(workspace.etag);
     setFromQuarter(workspace.fromQuarter);
@@ -400,6 +434,11 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setSavedControlTotals((current) => cloneControlTotals(mergeControls(current)));
       setDraftControlTotals((current) => cloneControlTotals(mergeControls(current)));
       setForecastVariances((current) => append ? [...current, ...page.forecastVariances] : [...page.forecastVariances]);
+      setAccountForecasts((current) => {
+        const keyed = new Map((append ? current : []).map((forecast) => [`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast]));
+        page.accountForecasts.forEach((forecast) => keyed.set(`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast));
+        return [...keyed.values()];
+      });
       setApiEtag(page.etag);
       setFromQuarter(page.fromQuarter);
       setToQuarter(page.toQuarter);
@@ -995,6 +1034,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
             const variance = forecastVariances.find((item) => item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
+            const composition = selectedPillar === "ALL" ? undefined : accountForecasts.find((item) =>
+              item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const canEditControl = editable;
             const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
             const savedValue = controlValue(savedControlTotals, series.customer, month);
@@ -1008,7 +1049,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                 aria-label={`${series.customer} ${month} Account Forecast`} disabled={isSaving}
                 onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
                 onKeyDown={editorKeyDown} autofocus />
-                : <span>{value === null ? currency.format(0) : currency.format(value)}{dirty && <small>draft</small>}
+                : <span>{value === null ? currency.format(0) : currency.format(value)}{composition && <ForecastCompositionTooltip composition={composition} />}{dirty && <small>draft</small>}
                   {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
                     Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
                   </small>}</span>}
@@ -1204,9 +1245,23 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
               <div><dt>Explicit zero</dt><dd>{pendingForecastImport.preview.explicitZeroCount}</dd></div>
               <div class={pendingForecastImport.preview.hasBlockedErrors ? "is-conflict" : ""}><dt>Blocked</dt><dd>{pendingForecastImport.preview.blockedErrors.length}</dd></div>
             </dl>
+            <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
             <p>{pendingForecastImport.preview.exactReplay ? "EXACT_REPLAY — Apply is unnecessary and DB mutation remains 0."
               : `Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
-            {pendingForecastImport.preview.blockedErrors.length > 0 && <ul>{pendingForecastImport.preview.blockedErrors.map((error) => <li key={`${error.rowNumber}-${error.column}-${error.code}`}>Row {error.rowNumber} · {error.code}: {error.message}</li>)}</ul>}
+            {pendingForecastImport.preview.changes.length > 0 && <table class="consumption-import-preview-table">
+              <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Base</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>
+              <tbody>{pendingForecastImport.preview.changes.slice(0, 20).map((change) => <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
+                <th>{change.account} · {change.periodKey}</th>
+                <td>{change.rawValue}</td>
+                <td>{[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastK).join(" | ")}</td>
+                <td>{change.baseAmount === null ? "N/A" : formatForecastK(change.baseAmount)}</td>
+                <td>{change.reductionAmount === null ? "N/A" : formatForecastK(change.reductionAmount)}</td>
+                <td>{change.previousSource}</td>
+                <td>{change.compositionStatus}</td>
+              </tr>)}</tbody>
+            </table>}
+            {pendingForecastImport.preview.changes.length > 20 && <p>Showing 20 of {pendingForecastImport.preview.changes.length} changed cells.</p>}
+            {pendingForecastImport.preview.blockedErrors.length > 0 && <ul aria-label="Blocking import errors">{pendingForecastImport.preview.blockedErrors.map((error) => <li key={`${error.rowNumber}-${error.column}-${error.code}`}>Row {error.rowNumber}{error.column ? ` · ${error.column}` : ""} · {error.code}: {error.message}</li>)}</ul>}
           </div>}
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <div class={forecastImportPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={forecastImportPhase === "complete" ? "status" : "alert"}>
             <strong>{forecastImportPhase === "complete" ? "Forecast Import completed" : "Forecast Import failed"}</strong><p>{forecastImportResult}</p>

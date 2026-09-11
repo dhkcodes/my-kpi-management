@@ -20,6 +20,13 @@ const analysis = {
     { quarter: "Q3", actualAmount: 0, forecastAmount: 300, totalAmount: 300, status: "FORECAST", coveragePercent: 100, qoqChangeAmount: -100, qoqChangePercent: -25 },
     { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
   ],
+  movementBridge: [
+    { quarter: "Q1", newAmount: 25, expansionAmount: 15, reductionAmount: 10, netMovementAmount: 30,
+      compositionStatus: "CLASSIFIED", classifiedAccountCount: 2, unclassifiedAccountCount: 0, unavailableReason: null },
+    { quarter: "Q2", newAmount: null, expansionAmount: null, reductionAmount: null, netMovementAmount: null,
+      compositionStatus: "UNAVAILABLE", classifiedAccountCount: 0, unclassifiedAccountCount: 1,
+      unavailableReason: "Movement composition is unavailable for legacy scalar forecasts." }
+  ],
   accountCandidates: [{ account: "Acme", workloads: ["Database"], planIds: ["P1"] }],
   contextActualTrend: [
     { periodKey: "FY26-MAR", actualAmount: 10, alertCalculationMonth: false },
@@ -70,6 +77,8 @@ void (async () => {
   assert.equal(decoded.portfolio.coveragePercent, 75);
   assert.equal(decoded.quarters[3].coveragePercent, 0);
   assert.deepEqual(decoded.quarters.map((quarter) => quarter.quarter), ["Q1", "Q2", "Q3", "Q4"]);
+  assert.deepEqual(decoded.movementBridge, analysis.movementBridge,
+    "movement composition remains separate from quarter consumption growth and preserves unavailable coverage");
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.deepEqual(decoded.otherContribution?.accountNames, ["Bravo", "Zulu"]);

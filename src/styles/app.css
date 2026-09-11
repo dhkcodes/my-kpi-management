@@ -2879,3 +2879,45 @@ h4.weekly-activity-section-label--next-week,
     width: auto;
   }
 }
+.consumption-forecast-tooltip {
+  position: relative;
+  display: inline-flex;
+  margin-inline-start: .35rem;
+  color: var(--oj-core-text-color-secondary);
+  cursor: help;
+  outline-offset: 2px;
+}
+.consumption-forecast-tooltip__content {
+  position: absolute;
+  z-index: 12;
+  inset-block-end: calc(100% + .45rem);
+  inset-inline-start: 50%;
+  display: none;
+  width: max-content;
+  max-width: min(24rem, 75vw);
+  padding: .65rem .75rem;
+  border: 1px solid var(--oj-core-divider-color);
+  border-radius: .35rem;
+  background: var(--oj-core-bg-color-content, #fff);
+  box-shadow: 0 .3rem 1rem rgb(0 0 0 / 20%);
+  color: var(--oj-core-text-color-primary);
+  text-align: start;
+  transform: translateX(-50%);
+  white-space: normal;
+}
+.consumption-forecast-tooltip:hover .consumption-forecast-tooltip__content,
+.consumption-forecast-tooltip:focus .consumption-forecast-tooltip__content,
+.consumption-forecast-tooltip:focus-within .consumption-forecast-tooltip__content { display: block; }
+.consumption-forecast-tooltip__content dl { display: grid; grid-template-columns: auto auto; gap: .2rem .8rem; margin: 0; }
+.consumption-forecast-tooltip__content dl div { display: contents; }
+.consumption-forecast-tooltip__content dt { font-weight: 600; }
+.consumption-forecast-tooltip__content dd { margin: 0; text-align: end; }
+
+.consumption-movement-bridge__scroll { overflow-x: auto; }
+.consumption-movement-bridge table { width: 100%; border-collapse: collapse; }
+.consumption-movement-bridge th,
+.consumption-movement-bridge td { padding: .65rem .75rem; border-block-end: 1px solid var(--oj-core-divider-color); text-align: end; }
+.consumption-movement-bridge th:first-child,
+.consumption-movement-bridge td:last-child { text-align: start; }
+.consumption-movement-bridge tr.is-unclassified td,
+.consumption-movement-bridge tr.is-unavailable td { color: var(--oj-core-text-color-secondary); }

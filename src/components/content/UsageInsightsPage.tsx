@@ -241,6 +241,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     shortDesc: point.category === "CONTRACTION" ? `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}. ${REDUCTION_TOOLTIP}`
       : `${ORGANIC_GROWTH_LABELS[point.category]} ${currency.format(point.amount)}${point.accountCount === null ? "" : `; ${point.accountCount} accounts`}`
   }))), [analysis]);
+  const movementBridge = analysis?.movementBridge ?? [];
 
   if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Usage Insights…</section>;
   if (error && !analysis) return <section class="kpi-panel" role="alert"><h1>Consumption Analysis</h1><p>{error}</p></section>;
@@ -320,6 +321,27 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
         <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small>{qoqKind(quarter.status)}</small></article>)}</div>
         <p class="consumption-insights-note">Completed ACTUAL quarters drive the decision metric; MIXED and FORECAST quarters remain visibly labelled projections.</p>
       </section>
+    </section>
+
+    <section class="kpi-panel consumption-movement-bridge" aria-labelledby="movementBridgeTitle" data-testid="consumption-movement-bridge">
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast movement composition</span>
+        <h2 id="movementBridgeTitle">Movement Bridge</h2><span class="oj-helper-hidden-accessible">Quarter New Expansion Reduction Net Movement</span></div></div>
+      {movementBridge.length > 0 ? <div class="consumption-movement-bridge__scroll">
+        <table>
+          <thead><tr><th>Quarter</th><th>New</th><th>Expansion</th><th>Reduction</th><th>Net Movement</th><th>Coverage</th></tr></thead>
+          <tbody>{movementBridge.map((point) => <tr key={point.quarter} class={`is-${point.compositionStatus.toLowerCase()}`}>
+            <th scope="row">{point.quarter}</th>
+            <td>{point.newAmount === null ? "N/A" : signedCurrency(point.newAmount)}</td>
+            <td>{point.expansionAmount === null ? "N/A" : signedCurrency(point.expansionAmount)}</td>
+            <td>{point.reductionAmount === null ? "N/A" : signedCurrency(-Math.abs(point.reductionAmount))}</td>
+            <td><strong>{signedCurrency(point.netMovementAmount)}</strong></td>
+            <td>{point.compositionStatus === "CLASSIFIED"
+              ? `${point.classifiedAccountCount} classified`
+              : <span role="status">{point.unclassifiedAccountCount > 0 ? `${point.unclassifiedAccountCount} unclassified. ` : ""}{point.unavailableReason ?? "Movement composition unavailable."}</span>}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <p class="consumption-empty-state">Forecast Movement Bridge is unavailable for this context.</p>}
+      <p class="consumption-insights-note">Quarter Consumption Growth measures the total change; Movement Bridge separately attributes available Forecast composition.</p>
     </section>
 
     <section class="kpi-panel consumption-organic-growth" aria-labelledby="organicGrowthTitle" data-testid="organic-consumption-growth-proxy">

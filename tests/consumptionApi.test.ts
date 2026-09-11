@@ -85,7 +85,10 @@ void (async () => {
       selectedPillar: "ALL", etag: '"forecast-only-page"', lastBatchId: 7,
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
-      accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP", amount: 25, version: 1, status: "DRAFT", completeness: "COMPLETE" }],
+      accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
+        amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
+        previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+        compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
       forecastVariances: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "ALL", actualAmount: null, forecastAmount: null, varianceAmount: null, variancePercent: null, completeness: "INCOMPLETE" }],
       accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"forecast-only-page"' } });
@@ -94,6 +97,26 @@ void (async () => {
     sort: "ACCOUNT", direction: "ASC", offset: 11, limit: 10 });
   assert.deepEqual(forecastOnlyPage.accountGroups, [{ account: "Forecast Only", plans: [] }]);
   assert.deepEqual([forecastOnlyPage.nextOffset, forecastOnlyPage.hasMore], [12, false]);
+  assert.deepEqual(forecastOnlyPage.accountForecasts[0], {
+    account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
+    amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
+    previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+    compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE"
+  }, "Usage Records preserves every forecast-composition field supplied by the backend");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    selectedPillar: "ALL", etag: '"negative-composition"', lastBatchId: 7,
+    currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
+    editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
+    accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
+      amount: 25, totalAmount: -1, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
+      previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+      compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
+    forecastVariances: [], accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 1, nextOffset: 1, hasMore: false
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
+    sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 }), /Malformed Consumption account forecast/,
+  "Usage Records rejects a negative composition amount instead of replacing the validated amount");
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible");
@@ -268,7 +291,9 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-reference", sources: [{ fileName: "forecast.csv", sha256: "a".repeat(64) }],
-    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, sourceRow: 2 }],
+    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, totalAmount: 7,
+      newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3, reductionBasis: "PRIOR_QUARTER_ACTUAL",
+      compositionStatus: "CLASSIFIED", sourceFile: "forecast.csv", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],
     referenceColumns: ["reference_prior_quarter", "reference_prior_quarter_actual"],
     referenceNotice: "Prior-quarter Actual columns are read-only references and are never imported."
@@ -276,6 +301,32 @@ void (async () => {
   const referencePreview = await previewConsumptionForecastWide(new File(["csv"], "forecast.csv"));
   assert.deepEqual(referencePreview.referenceColumns, ["reference_prior_quarter", "reference_prior_quarter_actual"]);
   assert.match(referencePreview.referenceNotice ?? "", /read-only.*never imported/i);
+  assert.deepEqual(referencePreview.changes[0], {
+    rowNumber: 2, account: "A", resolvedAccount: "A", endUser: null, planCode: null, periodKey: "FY27-SEP",
+    forecastAmount: 7, totalAmount: 7, newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3,
+    previousSource: "PRIOR_QUARTER_ACTUAL", compositionStatus: "CLASSIFIED", rawValue: "7|1|2",
+    existingForecastAmount: null, resolution: "PLAN_UNASSIGNED"
+  }, "Forecast Preview decodes raw-to-canonical movement composition and its prior basis");
+  assert.deepEqual(referencePreview.canonicalPeriods, ["FY27-SEP"], "allowed periods come from the backend preview contract");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    etag: "cm-negative", sources: [{ fileName: "forecast.csv", sha256: "c".repeat(64) }],
+    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, totalAmount: 7,
+      newAmount: -1, expansionAmount: 2, baseAmount: 6, reductionAmount: 3,
+      compositionStatus: "CLASSIFIED", sourceRow: 2 }],
+    populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"]
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => previewConsumptionForecastWide(new File(["csv"], "forecast.csv")), /Malformed Forecast Wide preview/,
+    "Forecast Preview rejects negative composition amounts");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    etag: "cm-blocked", sources: [{ fileName: "forecast.csv", sha256: "b".repeat(64) }], lines: [], populatedCellCount: 0,
+    canonicalPeriods: ["FY27-SEP", "FY27-OCT"],
+    blockedErrors: [{ sourceRow: 4, column: "FY27-NOV", code: "PERIOD_NOT_EDITABLE", message: "FY27-NOV is outside the editable window." }]
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const blockedPreview = await previewConsumptionForecastWide(new File(["csv"], "forecast.csv"));
+  assert.deepEqual(blockedPreview.blockedErrors, [{ rowNumber: 4, column: "FY27-NOV", code: "PERIOD_NOT_EDITABLE", message: "FY27-NOV is outside the editable window." }]);
+  assert.equal(blockedPreview.hasBlockedErrors, true, "backend blocking errors prevent applying an invalid Forecast import");
 
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });

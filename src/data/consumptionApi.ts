@@ -69,7 +69,14 @@ export type ConsumptionApiWorkspace = Readonly<{
   accountForecasts: ConsumptionAccountForecast[];
   forecastVariances: ConsumptionForecastVariance[];
 }>;
-export type ConsumptionAccountForecast = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">; amount: number; version: number; status: "DRAFT" | "FINAL"; completeness: string }>;
+export type ConsumptionForecastCompositionStatus = "CLASSIFIED" | "UNCLASSIFIED" | "UNAVAILABLE";
+export type ConsumptionAccountForecast = Readonly<{
+  account: string; normalizedAccount: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">;
+  amount: number; totalAmount: number; newAmount: number | null; expansionAmount: number | null;
+  baseAmount: number | null; reductionAmount: number | null; previousAmount: number | null;
+  previousSource: string; previousStatus: string; compositionStatus: ConsumptionForecastCompositionStatus;
+  version: number; status: "DRAFT" | "FINAL"; completeness: string;
+}>;
 export type ConsumptionForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: ConsumptionPillar; actualAmount: number | null; forecastAmount: number | null; varianceAmount: number | null; variancePercent: number | null; completeness: string }>;
 export type ConsumptionApiControlTotal = Readonly<{
   account: string; periodKey: string; controlAmount: number; detailAmount: number | null;
@@ -111,6 +118,12 @@ export type ConsumptionOrganicGrowthProxy = Readonly<{
   explanation: string;
   categories: readonly ConsumptionOrganicGrowthPoint[];
 }>;
+export type ConsumptionMovementBridgePoint = Readonly<{
+  quarter: "Q1" | "Q2" | "Q3" | "Q4";
+  newAmount: number | null; expansionAmount: number | null; reductionAmount: number | null;
+  netMovementAmount: number | null; compositionStatus: ConsumptionForecastCompositionStatus;
+  classifiedAccountCount: number; unclassifiedAccountCount: number; unavailableReason: string | null;
+}>;
 export type ConsumptionAnalysis = Readonly<{
   selectedPillar: ConsumptionPillar;
   fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
@@ -126,6 +139,7 @@ export type ConsumptionAnalysis = Readonly<{
   alerts: readonly ConsumptionAnalysisAlert[];
   accounts: readonly ConsumptionAnalysisAccount[];
   organicConsumptionGrowthProxy: ConsumptionOrganicGrowthProxy | null;
+  movementBridge: readonly ConsumptionMovementBridgePoint[];
 }>;
 export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; pillar?: ConsumptionPillar }>;
 export type ConsumptionControlForecastUpdate = Readonly<{ account: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">; amount: number }>;
@@ -183,6 +197,9 @@ export type ConsumptionForecastWideChange = Readonly<{
   planCode: string | null;
   periodKey: string;
   forecastAmount: number;
+  totalAmount: number; newAmount: number | null; expansionAmount: number | null; baseAmount: number | null;
+  reductionAmount: number | null; previousSource: string; compositionStatus: ConsumptionForecastCompositionStatus;
+  rawValue: string;
   existingForecastAmount: number | null;
   resolution: ConsumptionForecastWideResolution;
 }>;
@@ -203,6 +220,7 @@ export type ConsumptionForecastWidePreview = Readonly<{
   exactReplay: boolean;
   referenceColumns: readonly string[];
   referenceNotice: string | null;
+  canonicalPeriods: readonly string[];
   similarAccountResolutionCount: number;
   planUnassignedCount: number;
   changes: readonly ConsumptionForecastWideChange[];
@@ -242,6 +260,7 @@ const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|N
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const isNonNegativeFiniteNumber = (value: unknown): value is number => isFiniteNumber(value) && value >= 0;
 const isNullableFiniteNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
 const isDecimalString = (value: unknown): value is string => typeof value === "string" && /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value);
 const isNullableDecimalString = (value: unknown): value is string | null => value === null || isDecimalString(value);
@@ -359,6 +378,23 @@ const parseOrganicGrowthProxy = (value: unknown): ConsumptionOrganicGrowthProxy 
     netGrowthAmount: raw.netGrowthAmount, classifiedGrowthAmount: raw.classifiedGrowthAmount,
     reconciliationAmount: raw.reconciliationAmount, explanation: raw.explanation, categories };
 };
+const compositionStatuses = new Set<ConsumptionForecastCompositionStatus>(["CLASSIFIED", "UNCLASSIFIED", "UNAVAILABLE"]);
+const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] => {
+  // This is additive so the UI can continue talking to a rolling, older API.
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return malformedAnalysis();
+  return value.map((entry) => {
+    if (typeof entry !== "object" || entry === null) return malformedAnalysis();
+    const point = entry as Record<string, unknown>;
+    if (!["Q1", "Q2", "Q3", "Q4"].includes(String(point.quarter))
+      || !isNullableFiniteNumber(point.newAmount) || !isNullableFiniteNumber(point.expansionAmount)
+      || !isNullableFiniteNumber(point.reductionAmount) || !isNullableFiniteNumber(point.netMovementAmount)
+      || !compositionStatuses.has(point.compositionStatus as ConsumptionForecastCompositionStatus)
+      || !isNonNegativeInteger(point.classifiedAccountCount) || !isNonNegativeInteger(point.unclassifiedAccountCount)
+      || !(point.unavailableReason === null || isNonEmptyString(point.unavailableReason))) return malformedAnalysis();
+    return point as unknown as ConsumptionMovementBridgePoint;
+  });
+};
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
@@ -420,6 +456,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (new Set(accountCandidates.map((candidate) => candidate.account)).size !== accountCandidates.length) return malformedAnalysis();
   const contextActualTrend = parseActualTrend(raw.contextActualTrend, allowedTrendYears);
   const organicConsumptionGrowthProxy = parseOrganicGrowthProxy(raw.organicConsumptionGrowthProxy);
+  const movementBridge = parseMovementBridge(raw.movementBridge);
   const otherContribution: ConsumptionOtherContribution | null = raw.otherContribution === null ? null : (() => {
     const split = parseAmountSplit(raw.otherContribution);
     const other = raw.otherContribution as Record<string, unknown>;
@@ -463,7 +500,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
       priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, otherContribution,
     otherContributionUnavailableReason: raw.otherContributionUnavailableReason as string | null, alerts, accounts,
-    organicConsumptionGrowthProxy };
+    organicConsumptionGrowthProxy, movementBridge };
 };
 
 const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPillar?: ConsumptionPillar): ConsumptionApiWorkspace => {
@@ -496,7 +533,23 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
       ||!(forecast.pillar==="DP"||forecast.pillar==="OCI_OTHER")||!isFiniteNumber(forecast.amount)||forecast.amount<0
       ||!isPositiveInteger(forecast.version)||!(forecast.status==="DRAFT"||forecast.status==="FINAL")||!isNonEmptyString(forecast.completeness))
       throw new Error("Malformed Consumption account forecast");
-    return forecast as ConsumptionAccountForecast;
+    const record = forecast as unknown as Record<string, unknown>;
+    const totalAmount = record.totalAmount === undefined ? forecast.amount : record.totalAmount;
+    const nullableAmount = (field: string) => {
+      const value = record[field];
+      if (value === undefined || value === null) return null;
+      if (!isNonNegativeFiniteNumber(value)) throw new Error("Malformed Consumption account forecast");
+      return value;
+    };
+    if (!isNonNegativeFiniteNumber(totalAmount)) throw new Error("Malformed Consumption account forecast");
+    const compositionStatus = compositionStatuses.has(record.compositionStatus as ConsumptionForecastCompositionStatus)
+      ? record.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
+    return { ...forecast, pillar: forecast.pillar as ConsumptionAccountForecast["pillar"],
+      status: forecast.status as ConsumptionAccountForecast["status"], amount: totalAmount, totalAmount,
+      newAmount: nullableAmount("newAmount"), expansionAmount: nullableAmount("expansionAmount"),
+      baseAmount: nullableAmount("baseAmount"), reductionAmount: nullableAmount("reductionAmount"),
+      previousAmount: nullableAmount("previousAmount"), previousSource: typeof record.previousSource === "string" ? record.previousSource : "Unavailable",
+      previousStatus: typeof record.previousStatus === "string" ? record.previousStatus : "UNAVAILABLE", compositionStatus };
   });
   const forecastVariances=(raw.forecastVariances ?? []).map((variance):ConsumptionForecastVariance=>{
     if(!variance||!isNonEmptyString(variance.account)||!isNonEmptyString(variance.normalizedAccount)||!isPeriodKey(variance.periodKey)
@@ -913,6 +966,7 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
   const raw = payload as Record<string, unknown>;
   if (!isNonEmptyString(raw.etag) || !Array.isArray(raw.sources) || !Array.isArray(raw.lines)
     || !isNonNegativeInteger(raw.populatedCellCount) || !Array.isArray(raw.canonicalPeriods)
+    || raw.canonicalPeriods.some((period) => !isPeriodKey(period))
     || !(raw.referenceColumns === undefined || (Array.isArray(raw.referenceColumns) && raw.referenceColumns.every((value) => typeof value === "string")))
     || !(raw.referenceNotice === undefined || raw.referenceNotice === null || typeof raw.referenceNotice === "string")) throw new Error("Malformed Forecast Wide preview");
   const source = raw.sources.length === 1 && typeof raw.sources[0] === "object" && raw.sources[0] !== null
@@ -923,17 +977,48 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
     const line = value as Record<string, unknown>;
     if (!isPositiveInteger(line.sourceRow) || !isNonEmptyString(line.accountName) || !isNonEmptyString(line.normalizedAccount)
       || !(isPeriodKey(line.periodKey) || (typeof line.periodKey === "string" && /^FY\d{2}-M(?:0[1-9]|1[0-2])$/.test(line.periodKey))) || !isFiniteNumber(line.amount)) throw new Error("Malformed Forecast Wide preview");
+    const totalAmount = line.totalAmount === undefined ? line.amount : line.totalAmount;
+    const nullableAmount = (field: string) => {
+      const value = line[field];
+      if (value === undefined || value === null) return null;
+      if (!isNonNegativeFiniteNumber(value)) throw new Error("Malformed Forecast Wide preview");
+      return value;
+    };
+    if (!isNonNegativeFiniteNumber(totalAmount)) throw new Error("Malformed Forecast Wide preview");
+    const compositionStatus = compositionStatuses.has(line.compositionStatus as ConsumptionForecastCompositionStatus)
+      ? line.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
+    const newAmount = nullableAmount("newAmount");
+    const expansionAmount = nullableAmount("expansionAmount");
     return { rowNumber: line.sourceRow, account: line.accountName, resolvedAccount: line.accountName,
-      endUser: null, planCode: null, periodKey: line.periodKey, forecastAmount: line.amount,
+      endUser: null, planCode: null, periodKey: line.periodKey, forecastAmount: totalAmount,
+      totalAmount, newAmount, expansionAmount, baseAmount: nullableAmount("baseAmount"),
+      reductionAmount: nullableAmount("reductionAmount"),
+      previousSource: typeof line.previousSource === "string" ? line.previousSource
+        : typeof line.reductionBasis === "string" ? line.reductionBasis : "Unavailable",
+      compositionStatus, rawValue: typeof line.rawValue === "string" ? line.rawValue
+        : [totalAmount, newAmount, expansionAmount].map((amount) => amount ?? "").join("|"),
       existingForecastAmount: null, resolution: "PLAN_UNASSIGNED" };
   });
   const explicitZeroCount = changes.filter((change) => change.forecastAmount === 0).length;
   const sourceRowCount = new Set(changes.map((change) => change.rowNumber)).size;
+  const rawBlockedErrors = raw.blockedErrors ?? raw.errors ?? [];
+  if (!Array.isArray(rawBlockedErrors)) throw new Error("Malformed Forecast Wide preview");
+  const blockedErrors = rawBlockedErrors.map((value): ConsumptionForecastWideBlockedError => {
+    if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast Wide preview");
+    const error = value as Record<string, unknown>;
+    const rowNumber = error.rowNumber ?? error.sourceRow;
+    if (!isPositiveInteger(rowNumber)
+      || !(error.column === null || error.column === undefined || isNonEmptyString(error.column))
+      || !isNonEmptyString(error.code) || !isNonEmptyString(error.message)) throw new Error("Malformed Forecast Wide preview");
+    return { rowNumber, column: (error.column as string | null | undefined) ?? null,
+      code: error.code, message: error.message };
+  });
   return { etag: raw.etag, sourceFileName: source.fileName as string, sourceSha256: source.sha256 as string,
     sourceRowCount, forecastCellCount: raw.populatedCellCount as number, blankNoOpCount: 0, explicitZeroCount,
     exactReplay: false, referenceColumns: (raw.referenceColumns as string[] | undefined) ?? [], referenceNotice: (raw.referenceNotice as string | null | undefined) ?? null,
+    canonicalPeriods: raw.canonicalPeriods as string[],
     similarAccountResolutionCount: 0, planUnassignedCount: sourceRowCount,
-    changes, blockedErrors: [], hasBlockedErrors: false };
+    changes, blockedErrors, hasBlockedErrors: blockedErrors.length > 0 };
 };
 export const previewConsumptionForecastWide = async (file: File): Promise<ConsumptionForecastWidePreview> => {
   const { payload } = await request("/consumption/forecast-imports/preview", { method: "POST", body: forecastWideBody(file) });

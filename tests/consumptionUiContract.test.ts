@@ -178,6 +178,11 @@ assert.doesNotMatch(recordsPage, /missingForecastLabel|Forecast membership unava
 assert.doesNotMatch(recordsPage, /<small>ACCOUNT · \{selectedPillar === "DP" \? "DP" : "OCI-OTHER"\}<\/small>/, "Account Forecast cells omit redundant Pillar helper text");
 assert.match(recordsPage, /currency\.format\(summary\.total \?\? 0\)[\s\S]*summary\.preQGap === null \? "—"/, "quarter totals render zero for missing values while a missing prior quarter keeps Pre-Q Gap unavailable");
 assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
+assert.match(recordsPage, /consumption-forecast-tooltip[\s\S]*Total[\s\S]*Base[\s\S]*New[\s\S]*Expansion[\s\S]*Reduction[\s\S]*Previous source/, "Usage Records Forecast totals expose the complete movement composition on hover and keyboard focus");
+assert.match(recordsPage, /compositionStatus === "UNCLASSIFIED"[\s\S]*Composition unavailable/, "legacy scalar Forecasts explain that their movement composition is unavailable");
+assert.match(recordsPage, /compositionStatus === "UNAVAILABLE"[\s\S]*Forecast composition unavailable/, "missing Forecast composition has an explicit unavailable message");
+assert.match(recordsPage, /Raw[\s\S]*Canonical T \| N \| E[\s\S]*Base[\s\S]*Reduction[\s\S]*Previous source[\s\S]*Status/, "Forecast Import Preview makes raw-to-canonical composition and derivation status auditable");
+assert.match(recordsPage, /preview\.canonicalPeriods/, "Forecast Preview renders backend-provided canonical periods instead of deriving an allowed window from the browser clock");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
 assert.match(recordsPage, /hasControlDraftChanges[\s\S]*hasDraftChanges[\s\S]*submitRecordsQuery[\s\S]*hasDraftChanges/, "Control-only drafts share navigation and explicit query submission guards");
@@ -210,6 +215,8 @@ assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-a
 
 // Approved Consumption follow-up: clearer visual regions, accessible alerts, stable records and zoom-safe navigation.
 assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
+assert.match(insightsPage, /Movement Bridge[\s\S]*Quarter New[\s\S]*Expansion[\s\S]*Reduction[\s\S]*Net Movement/, "Usage Insight renders Forecast movement separately from Quarter Consumption Growth");
+assert.match(insightsPage, /movementBridge[\s\S]*unclassifiedAccountCount[\s\S]*unavailableReason/, "Movement Bridge reports unclassified and unavailable coverage instead of silently plotting it");
 assert.match(insightsPage, /consumption-signal-badges[\s\S]*consumption-signal-type[\s\S]*aria-hidden="true"[\s\S]*consumption-signal-grade/, "alert type and grade are separate accessible icon and text badges");
 assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*24rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto[^}]*height:\s*24rem[\s\S]*\.consumption-insights-actual-chart[^}]*height:\s*100%[^}]*min-height:\s*15rem/, "alert and trend panels compact naturally after duplicate-list removal while preserving equal height and chart space");
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");

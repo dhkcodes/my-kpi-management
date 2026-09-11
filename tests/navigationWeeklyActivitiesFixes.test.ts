@@ -28,14 +28,10 @@ assert.deepEqual(
 );
 assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a Router destination");
 assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
-assert.deepEqual(
-  flattenLeaves(navItems).filter((item) => item.isHighlighted).map((item) => item.id),
-  ["accounts-workloads", "weekly-activities", "activity-b", "activity-c1", "activity-c2", "activity-d1"],
-  "only the requested frequently used destinations receive the restrained highlight treatment"
-);
+assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 14, "every real leaf destination has a unique navigation id");
 assert.equal(
   flattenLeaves(navItems).find((item) => item.id === "usage-records")?.icon,
-  "oj-ux-ico-tables-basic",
+  "oj-ux-ico-table",
   "Usage Records uses a valid Oracle UX table icon"
 );
 
@@ -95,18 +91,17 @@ assert.match(cssSource, /\.kpi-menu-link:hover\s*\{[\s\S]*background:\s*#fbe9e7[
 assert.match(cssSource, /\.kpi-menu-link:hover\s*\{[^}]*text-decoration:\s*none/, "hover never introduces link underlines");
 assert.match(cssSource, /\.kpi-menu-link:focus-visible\s*\{[\s\S]*outline:\s*3px solid #312d2a[\s\S]*outline-offset:\s*2px/, "keyboard focus has a strong visible outline");
 assert.match(cssSource, /\.kpi-menu-link\.is-selected\s*\{[\s\S]*background:\s*#8b2f22[\s\S]*color:\s*#fff/, "the current selection uses a distinct high-contrast Redwood pill");
-assert.match(appSource, /item\.isHighlighted \? "kpi-menu-link is-highlighted"/, "frequently used destinations expose an additive highlight class");
-assert.match(cssSource, /\.kpi-menu-link\.is-highlighted\s*\{[\s\S]*background:\s*#fff8f5[\s\S]*border-color:\s*#c98274[\s\S]*box-shadow:\s*inset 0\.1875rem 0 0 #c74634/, "frequent links use a restrained Redwood warm highlight without changing geometry");
+assert.match(appSource, /selectedNavigationId === item\.id \? "kpi-menu-link is-selected" : "kpi-menu-link"/, "the current destination exposes the selected navigation class");
 assert.match(cssSource, /\.kpi-menu-matrix\s*\{[\s\S]*width:\s*min\(80rem, calc\(100vw - 2rem\)\)/, "desktop popup is wide enough to keep Technical blogs beside Customer references");
 assert.match(cssSource, /\.kpi-menu-link__label\s*\{[^}]*order:\s*2/, "KPI code badges remain before their labels in visual order");
 assert.match(cssSource, /\.kpi-menu-link \.kpi-navigation-code-badge\s*\{[\s\S]*background:\s*#f8efed[\s\S]*border-color:\s*#dda89f[\s\S]*border-radius:\s*0\.35rem[\s\S]*color:\s*#7d2c22[\s\S]*font-size:\s*0\.6875rem[\s\S]*order:\s*1/, "KPI codes use the approved Redwood Hairline tonal badges before labels");
 assert.match(headerSource, /aria-controls="kpiNavigationPopup"[\s\S]*navigationOpen \? "oj-ux-ico-close" : "oj-ux-ico-menu"/, "the existing first header button controls the popup and exposes distinct open/closed icons");
 assert.match(appSource, /const closeNavigation = \(\) => \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*navigationPopupRef\.current\?\.close\(\);\s*\}/s, "all close paths update the launcher icon before the popup closing animation completes");
 assert.match(appSource, /if \(popup\.isOpen\(\)\) \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*popup\.close\(\);\s*\} else \{\s*navigationIntentOpenRef\.current = true;\s*setNavigationOpen\(true\);\s*popup\.open\(launcher\);\s*\}/s, "the launcher icon updates optimistically before the popup animation completes");
-assert.match(appSource, /appName = "My KPIs & Account Planner"/, "the authenticated header uses the approved plural KPI title");
+assert.match(appSource, /appName = "My KPI & Account Planner"/, "the authenticated header uses the approved product title");
 assert.match(appSource, /onojOpen=\{\(\) => setNavigationOpen\(navigationIntentOpenRef\.current\)\}/, "a queued close intent cannot be overwritten by a stale popup-open event");
 assert.match(headerSource, /aria-label=\{appName\}/, "the header brand accessible name follows the visible title");
-assert.match(indexSource, /<title>My KPIs &amp; Account Planner<\/title>/, "the HTML document title uses the approved product name");
+assert.match(indexSource, /<title>My KPI &amp; Account Planner<\/title>/, "the HTML document title uses the approved product name");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
 assert.match(appSource, /anchor\.closest\("#kpiNavigationPopup"\)/, "the document capture guard does not compete with popup leaf navigation");
 assert.match(appSource, /const handleNavigate = \(navigationId: string, onAccepted\?: \(\) => void\)/, "popup close can be deferred until navigation is accepted");

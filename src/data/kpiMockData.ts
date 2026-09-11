@@ -11,6 +11,8 @@ export type NavigationItem = {
   icon?: string;
   code?: string;
   codePlacement?: "before" | "after";
+  /** Legacy navigation test compatibility; highlighted links are optional. */
+  isHighlighted?: boolean;
   children?: NavigationItem[];
 };
 

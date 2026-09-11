@@ -17,7 +17,7 @@ const targetPeriod = read("src/data/targetPeriod.ts");
 
 assert.match(indexHtml, /<title>My KPI &amp; Account Planner<\/title>/, "browser title uses the finalized KAP product name");
 assert.match(app, /appName = "My KPI & Account Planner"/, "app header defaults to the finalized KAP product name");
-assert.match(header, /aria-label="My KPI & Account Planner"/, "header brand landmark uses the finalized accessible product name");
+assert.match(header, /aria-label=\{appName\}/, "header brand landmark uses the app product name");
 assert.match(packageJson, /"description": "My KPI & Account Planner — Goals, Accounts and Next Actions"/, "package metadata uses the finalized KAP product name");
 assert.doesNotMatch(`${indexHtml}\n${app}\n${header}\n${packageJson}`, /KPI Management|Oracle KPI cockpit|KPI operating cockpit/, "legacy product names are removed from product metadata and the app shell");
 
@@ -57,9 +57,9 @@ assert.match(app, /addEventListener\("popstate"/, "Back and Forward update the a
 assert.doesNotMatch(app, /onFiscalYearChange=\{\(year\) => \{[\s\S]*setSelectedNavigationId\("home"\)/, "FY changes retain navigation selection and route");
 assert.match(styles, /@media \(min-width: 1025px\)[\s\S]*?\.kpi-side-nav[\s\S]*?width: 16\.5rem/, "desktop navigation is 16.5rem wide");
 assert.match(styles, /\.kpi-navigation-label[^}]*font-size: 0\.84rem/, "desktop navigation labels use the compact font size");
-assert.match(app, /class="kpi-navigation-label"[^>]*title=\{item\.label\}[^>]*tabIndex=\{0\}/, "every navigation label exposes its full name natively and accepts keyboard focus");
-assert.doesNotMatch(app, /kpi-navigation-full-name/, "JET sliding navigation avoids duplicate hidden label text");
-assert.doesNotMatch(styles, /kpi-navigation-full-name/, "obsolete app-owned navigation tooltip CSS is removed");
+assert.match(app, /class="kpi-menu-link__label">\{item\.label\}<\/span>/, "every navigation link renders its full label");
+assert.match(app, /href=\{getNavigationPath\(route\)\}/, "every navigation link keeps a native keyboard-focusable destination");
+assert.match(styles, /\.kpi-menu-link__content \{[\s\S]*?white-space: normal;/, "navigation links keep long labels readable");
 assert.match(page, /id="accountsWorkloadsSearchInput"[\s\S]*onInput=\{\(event\)[\s\S]*setSearchTerm\(search\)[\s\S]*onKeyDown=\{submitSearchOnEnter\}/, "search typing changes only the local draft and Enter submits");
 assert.match(page, /id="accountsWorkloadsSearchButton"[\s\S]*aria-label="Search accounts and workloads"[\s\S]*onClick=\{submitSearch\}/, "accessible search icon button submits the server query");
 assert.match(styles, /\.accounts-workloads-search__control\s*\{[^}]*display: flex[^}]*flex-wrap: nowrap/, "search input and button stay on one row at every viewport");

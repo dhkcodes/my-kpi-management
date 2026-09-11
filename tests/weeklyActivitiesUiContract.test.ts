@@ -65,13 +65,13 @@ assert.match(app, /getRejectedPopstateDelta\(historyIndexRef\.current, event\.st
 assert.doesNotMatch(app, /restoreOnReject[\s\S]*history\.pushState/, "popstate rejection never duplicates or destroys entries with pushState");
 assert.match(app, /shouldReleaseWeeklyActivityDraft\(previousRoute\.id, route\.id\)[\s\S]*weeklyActivitiesDraftActiveRef\.current = false/, "approval releases ownership only when navigation unmounts WeeklyActivitiesPage");
 assert.match(app, /handleNavigate[\s\S]*confirmWeeklyActivitiesNavigation\(route, destinationHref\)/, "side navigation confirms before discarding a weekly draft");
-assert.match(app, /handleNavigationSelectionAction[\s\S]*isLeafNavigationId\(navigationId\)[\s\S]*handleNavigate\(navigationId\)/, "JET selection action is the single leaf SPA routing entry point");
-assert.doesNotMatch(app, /href=\{leaf \? item\.href|preventLeafNativeNavigation/, "JET owns leaf activation without a competing native anchor load");
-assert.match(app, /if \(anchor\.closest\("oj-navigation-list"\)\) return;/, "the document guard leaves parent drill and leaf selection to JET");
-assert.doesNotMatch(app, /navigateLeafRef|anchor\.dataset\.appNavigation === "true"|onojBeforeSelect/, "capture-phase and beforeSelect synthetic navigation are removed");
+assert.match(app, /renderDenseNavigationLink[\s\S]*href=\{getNavigationPath\(route\)\}[\s\S]*onNavigate\(item\.id\)/, "native menu links are the single leaf SPA routing entry point");
+assert.match(app, /data-app-navigation="true"[\s\S]*href=\{getNavigationPath\(route\)\}/, "menu links retain a native destination with SPA activation");
+assert.match(app, /if \(anchor\.closest\("oj-navigation-list"\) \|\| anchor\.closest\("#kpiNavigationPopup"\)\) return;/, "the document guard leaves popup navigation to its native link handler");
+assert.doesNotMatch(app, /navigateLeafRef|onojBeforeSelect/, "obsolete synthetic JET navigation is removed");
 assert.match(app, /document\.addEventListener\("click", handleDocumentNavigationClick, true\)/, "capture-phase anchor guard still protects unsaved weekly drafts outside navigation");
 assert.match(app, /isDialogPlaceholderControlAnchor\(anchor\.getAttribute\("href"\), Boolean\(anchor\.closest\("\[role=\\"dialog\\"\] \[role=\\"grid\\"\]"\)\)\)/, "only date-grid placeholder controls are excluded before application navigation confirmation");
-assert.match(app, /handleDocumentNavigationClick[\s\S]*anchor\.closest\("oj-navigation-list"\)\) return;/, "navigation-list clicks return before the global anchor guard");
+assert.match(app, /handleDocumentNavigationClick[\s\S]*anchor\.closest\("#kpiNavigationPopup"\)\) return;/, "popup navigation clicks return before the global anchor guard");
 assert.match(app, /handleDocumentNavigationClick[\s\S]*event\.preventDefault\(\)[\s\S]*event\.stopImmediatePropagation\(\)/, "rejected anchor navigation is fully cancelled");
 assert.match(app, /href: anchor\.href/, "anchor navigation uses the browser-resolved full href and therefore respects document base URL semantics");
 assert.match(app, /isSameDocumentNavigation\(window\.location\.href, destinationHref\)[\s\S]*history\.pushState\(withHistoryIndex/, "approved hash navigation creates an indexed entry so rejected Back and Forward can restore without stack mutation");
