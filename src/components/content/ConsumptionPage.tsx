@@ -397,7 +397,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
-    if (!append) recordsQueryRef.current = requestQuery;
     recordsLoadingRef.current = true;
     setRecordsLoadingPhase(loadingPhase);
     const generation = ++recordsRequestGeneration.current;
@@ -453,8 +452,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
         return [...keyed.values()];
       });
       setApiEtag(page.etag);
-      setFromQuarter(page.fromQuarter);
-      setToQuarter(page.toQuarter);
+      if (!append) {
+        recordsQueryRef.current = requestQuery;
+        setFromQuarter(page.fromQuarter);
+        setToQuarter(page.toQuarter);
+        setRangeInitialized(true);
+        setRangeTouched(false);
+      }
       setEditablePeriodIds(new Set(page.editablePeriodIds));
       setDisplayQuarterOrder([...page.displayQuarterOrder]);
       setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean)));
@@ -462,8 +466,6 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setRecordsTotalAccounts(page.totalAccounts);
       setRecordsNextOffset(page.nextOffset);
       setRecordsHasMore(page.hasMore);
-      setRangeInitialized(true);
-      setRangeTouched(false);
       setDataMode("backend");
       setConflictRows([]);
       setConflictWorkspace(null);
