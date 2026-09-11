@@ -239,6 +239,8 @@ const SignalSparkline = ({ signal }: Readonly<{ signal: ConsumptionSignal }>) =>
 type EditCell = Readonly<{ planKey: string; month: string; control?: boolean }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
 type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "warning" | "error";
+type RecordsLoadingPhase = "idle" | "initial" | "query" | "append";
+type RecordsQuery = Readonly<{ fromQuarter: string; toQuarter: string; search: string; pillar: ConsumptionPillar }>;
 type PendingImport = Readonly<{
   files: readonly File[];
   preview: ConsumptionImportPreview;
@@ -318,7 +320,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
-  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("idle");
+  const recordsLoading = recordsLoadingPhase !== "idle";
+  const blockingRecordsLoading = recordsLoadingPhase === "initial" || recordsLoadingPhase === "query";
   const [recordAccountNames, setRecordAccountNames] = useState<string[]>([]);
   const [pulseExpanded, setPulseExpanded] = useState(true);
 
@@ -338,6 +342,8 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const exportingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const recordsLoadingRef = useRef(false);
+  const recordsQueryRef = useRef<RecordsQuery>({ fromQuarter: "", toQuarter: "", search: "", pillar: "ALL" });
+  const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
   const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals);
   const hasDraftChanges = hasControlDraftChanges;
 
@@ -383,23 +389,30 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     setConflictWorkspace(null);
   };
 
-  const loadRecordsPage = async (append: boolean, query = { fromQuarter, toQuarter, search: appliedSearch }, pillar: ConsumptionPillar = selectedPillar): Promise<ConsumptionRecordsPage | undefined> => {
+  const loadRecordsPage = async (
+    append: boolean,
+    query = { fromQuarter, toQuarter, search: appliedSearch },
+    pillar: ConsumptionPillar = selectedPillar,
+    loadingPhase: RecordsLoadingPhase = append ? "append" : "query"
+  ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
+    const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
+    if (!append) recordsQueryRef.current = requestQuery;
     recordsLoadingRef.current = true;
-    setRecordsLoading(true);
+    setRecordsLoadingPhase(loadingPhase);
     const generation = ++recordsRequestGeneration.current;
     try {
       const page = await fetchConsumptionRecords({
-        fromQuarter: query.fromQuarter, toQuarter: query.toQuarter, search: query.search,
+        fromQuarter: requestQuery.fromQuarter, toQuarter: requestQuery.toQuarter, search: requestQuery.search,
         offset: append ? recordsNextOffset : 0,
         limit: append ? 10 : initialConsumptionRecordsBatchSize(window.innerHeight),
         sort: "ACCOUNT",
         direction: "ASC",
-        pillar
+        pillar: requestQuery.pillar
       });
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        return loadRecordsPage(false, query, pillar);
+        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase);
       }
       const pageForecastControls = accountForecastControls(page);
       const visibleGroups = page.accountGroups.map((group) => ({
@@ -454,7 +467,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       setDataMode("backend");
       setConflictRows([]);
       setConflictWorkspace(null);
-      const searchExpanded = searchExpandedRecordAccounts(visibleGroups, query.search);
+      const searchExpanded = searchExpandedRecordAccounts(visibleGroups, requestQuery.search);
       setExpandedAccounts((current) => {
         if (!append) return searchExpanded;
         const next = new Set(current);
@@ -468,14 +481,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     } finally {
       if (generation === recordsRequestGeneration.current) {
         recordsLoadingRef.current = false;
-        setRecordsLoading(false);
+        setRecordsLoadingPhase("idle");
       }
     }
   };
+  loadMoreRecordsRef.current = () => loadRecordsPage(true);
 
   useEffect(() => {
     let active = true;
-    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL")
+    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL", "initial")
       .then(() => undefined)
       .catch((error) => {
       if (!active) return;
@@ -578,13 +592,13 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     if (!root || !sentinel || !recordsHasMore || hasDraftChanges) return undefined;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !recordsLoadingRef.current) {
-        void loadRecordsPage(true).catch((error) =>
+        void loadMoreRecordsRef.current().catch((error) =>
           setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
       }
     }, { root: tableScrollRef.current, rootMargin: "0px 0px 96px 0px", threshold: 0 });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [recordsHasMore, recordsNextOffset, recordsLoading, hasDraftChanges, selectedPillar, fromQuarter, toQuarter, appliedSearch, apiEtag]);
+  }, [recordsHasMore, hasDraftChanges]);
 
   const moveTableHorizontally = (direction: -1 | 1) => {
     const table = tableScrollRef.current;
@@ -665,7 +679,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const selectPillar = async (pillar: ConsumptionPillar) => {
-    if (pillar === selectedPillar || hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle") return;
+    if (pillar === selectedPillar || hasDraftChanges || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle") return;
     setImportError("");
     try {
       await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
@@ -677,7 +691,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   };
 
   const submitRecordsQuery = async () => {
-    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing) return;
+    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing) return;
     const query = { fromQuarter, toQuarter, search: draftSearch.trim() };
     setRangeLoading(true);
     setImportError("");
@@ -711,7 +725,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
   const updateControlForecast = (account: string, month: string, value: number | null) => {
     recordsRequestGeneration.current++;
     recordsLoadingRef.current = false;
-    setRecordsLoading(false);
+    setRecordsLoadingPhase("idle");
     setDraftControlTotals((current) => {
       const next = current.filter((control) => !(control.account === account && control.periodKey === month));
       if (value !== null) next.push({ account, periodKey: month, controlAmount: value, detailAmount: null, matchStatus: "MANUAL_FORECAST" });
@@ -1107,29 +1121,29 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <div class="consumption-pillar-selector" role="group" aria-label="Usage Records pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button"
               aria-pressed={selectedPillar === option.value}
-              disabled={hasDraftChanges || isSaving || recordsLoading || rangeLoading || importPhase !== "idle"}
+              disabled={hasDraftChanges || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle"}
               onClick={() => void selectPillar(option.value)}>{option.label}</button>)}
           </div>
         </div>
         <label htmlFor="consumptionFromQuarter">From Quarter
-          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || recordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label htmlFor="consumptionToQuarter">To Quarter
-          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || recordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label class="consumption-record-search" htmlFor="consumptionRecordSearch">Search
           <input id="consumptionRecordSearch" type="search" value={draftSearch} placeholder="Account, workload, end user, or Plan"
-            disabled={hasDraftChanges || rangeLoading || recordsLoading}
+            disabled={hasDraftChanges || rangeLoading || blockingRecordsLoading}
             onCompositionStart={() => setSearchComposing(true)}
             onCompositionEnd={(event) => { setDraftSearch(event.currentTarget.value); setSearchComposing(false); }}
             onInput={(event) => setDraftSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
         </label>
-        <button type="button" class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || recordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
+        <button type="button" class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </button>
         {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
