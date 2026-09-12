@@ -5,6 +5,7 @@ export type NavigationRouteModule =
   | "accountsWorkloads"
   | "weeklyActivities"
   | "consumptionInsights"
+  | "attainment"
   | "consumptionRecords"
   | "profile"
   | "users";
@@ -28,8 +29,9 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
-  { id: "usage-insights", module: "consumptionInsights", pageTitle: "Usage Insights" },
-  { id: "usage-records", module: "consumptionRecords", pageTitle: "Usage Records" },
+  { id: "usage-insights", module: "consumptionInsights", pageTitle: "Consumption Insight" },
+  { id: "attainment", module: "attainment", pageTitle: "Attainment" },
+  { id: "usage-records", module: "consumptionRecords", pageTitle: "Consumption Records" },
   { id: "profile", module: "profile", pageTitle: "Profile" },
   { id: "users", module: "users", pageTitle: "Users" }
 ];
