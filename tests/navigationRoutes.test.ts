@@ -28,6 +28,8 @@ assert.equal(getNavigationRouteFromPath("/consumption/records").id, "records");
 assert.equal(getCanonicalNavigationPath("/usage-insights"), "/consumption/analysis");
 assert.equal(getCanonicalNavigationPath("/attainment"), "/consumption/attainment");
 assert.equal(getCanonicalNavigationPath("/usage-records"), "/consumption/records");
+assert.equal(getCanonicalNavigationPath("/consumption/usage-insights"), "/consumption/analysis");
+assert.equal(getCanonicalNavigationPath("/consumption/usage-records"), "/consumption/records");
 assert.equal(getCanonicalNavigationPath("/consumption"), "/consumption/analysis");
 
 for (const routeId of ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]) {
