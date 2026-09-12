@@ -41,7 +41,8 @@ assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.
 assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
 assert.match(insightsPage, /<strong>\{alert\.account\}<\/strong>/, "alerts always show the actual account name");
 assert.match(insightsPage, /\{alert\.workloadMapped && <>\{alert\.workload\} · <\/?>\}Plan \{alert\.planId\}/, "mapped workload names remain separate from Plan ID");
-assert.match(insightsPage, /!alert\.workloadMapped[\s\S]*UNMAPPED/, "mapping status is shown independently from the account name");
+assert.doesNotMatch(insightsPage, /UNMAPPED/, "alerts and the linked Plan Trend omit the visible UNMAPPED indicator");
+assert.doesNotMatch(insightsPage, /!alert\.workloadMapped/, "alerts do not render any unmapped-only badge or copy");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
 assert.match(insightsPage, /slice\(-4\)[\s\S]*markerSize:\s*emphasizedTrendPeriods\.has\(point\.periodKey\) \? 9 : 5/, "the latest four points in the six-month ACTUAL trend retain emphasized chart markers");
