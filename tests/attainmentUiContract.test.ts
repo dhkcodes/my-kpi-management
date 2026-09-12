@@ -17,6 +17,11 @@ assert.doesNotMatch(pageSource, /Pillar|Quarter filter/i, "Attainment is FY-only
 assert.match(pageSource, /Budget/);
 assert.match(pageSource, /oj-dialog/);
 assert.match(pageSource, /oj-chart/);
+assert.match(pageSource, /seriesId: "Budget Target"/, "Quarter chart includes each quarter's budget target");
+assert.match(pageSource, /seriesId: "Actual"/);
+assert.match(pageSource, /seriesId: "Forecast"/);
+assert.match(pageSource, /value\.toFixed\(0\).*K/, "Chart values are labeled in K without an additional unit conversion");
+assert.doesNotMatch(pageSource, /referenceObjects: budgetReference/, "Quarter-varying budgets are data points, not one axis line");
 assert.match(pageSource, /Actual Attainment/);
 assert.match(pageSource, /Forecast Attainment/);
 assert.match(pageSource, /Actual variance to budget/i);

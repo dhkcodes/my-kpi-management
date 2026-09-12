@@ -37,7 +37,7 @@ const analysis = {
     { periodKey: "FY27-AUG", actualAmount: 60, alertCalculationMonth: true }
   ],
   alerts: [{
-    alertId: "alert-1", serverPlanId: 1, account: "Acme", workload: "Database", planId: "P1", periodKey: "FY27-AUG",
+    alertId: "alert-1", serverPlanId: 1, account: "Acme", workload: "Database", workloadMapped: true, planId: "P1", periodKey: "FY27-AUG",
     type: "ABOVE_USUAL", grade: "HIGH", actualAmount: 250, baselineMedian: 100, changeAmount: 150,
     changePercent: 150, reason: "Actual usage exceeded its recent baseline."
   }],

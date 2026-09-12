@@ -95,7 +95,7 @@ export type ConsumptionAnalysisQuarter = ConsumptionAmountSplit & Readonly<{
   qoqChangeAmount: number | null; qoqChangePercent: number | null;
 }>;
 export type ConsumptionAnalysisAlert = Readonly<{
-  alertId: string; serverPlanId: number; account: string; workload: string; planId: string; periodKey: string;
+  alertId: string; serverPlanId: number; account: string; workload: string; workloadMapped: boolean; planId: string; periodKey: string;
   type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"];
   actualAmount: number; baselineMedian: number; changeAmount: number; changePercent: number | null; reason: string;
 }>;
@@ -463,6 +463,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     if (typeof value !== "object" || value === null) return malformedAnalysis();
     const alert = value as Record<string, unknown>;
     if (!isNonEmptyString(alert.alertId) || !isPositiveInteger(alert.serverPlanId) || !isNonEmptyString(alert.account) || !isNonEmptyString(alert.workload)
+      || typeof alert.workloadMapped !== "boolean"
       || !isNonEmptyString(alert.planId) || !isPeriodKey(alert.periodKey) || !signalTypes.has(alert.type as ConsumptionSignal["type"])
       || !signalGrades.has(alert.grade as ConsumptionSignal["grade"]) || !isFiniteNumber(alert.actualAmount)
       || !isFiniteNumber(alert.baselineMedian) || !isFiniteNumber(alert.changeAmount)

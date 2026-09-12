@@ -39,7 +39,9 @@ assert.match(insightsPage, /const contextTrendLabel[\s\S]*selectedAlert \?[^:]+:
 assert.match(insightsPage, /setSelectedAlertId\(\(current\) => current === alert\.alertId \? "" : alert\.alertId\)/, "clicking a selected alert toggles it off");
 assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.alertId === alert\.alertId\}/, "native alert buttons expose pressed state for mouse, Enter, and Space activation");
 assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
-assert.match(insightsPage, /\{alert\.workload\} · Plan \{alert\.planId\}\{plan && <> · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "each alert places Plan ID and scoped Data Center directly beside the Workload name");
+assert.match(insightsPage, /<strong>\{alert\.account\}<\/strong>/, "alerts always show the actual account name");
+assert.match(insightsPage, /\{alert\.workloadMapped && <>\{alert\.workload\} · <\/?>\}Plan \{alert\.planId\}/, "mapped workload names remain separate from Plan ID");
+assert.match(insightsPage, /!alert\.workloadMapped[\s\S]*UNMAPPED/, "mapping status is shown independently from the account name");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
 assert.match(insightsPage, /slice\(-4\)[\s\S]*markerSize:\s*emphasizedTrendPeriods\.has\(point\.periodKey\) \? 9 : 5/, "the latest four points in the six-month ACTUAL trend retain emphasized chart markers");

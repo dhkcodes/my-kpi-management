@@ -22,9 +22,10 @@ import "ojs/ojprogress-circle";
 const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
 type BudgetDraft = Record<BudgetKey, string>;
-type ChartPoint = Readonly<{ id: string; seriesId: "Actual" | "Forecast"; groupId: string; value: number; shortDesc: string }>;
+type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual" | "Forecast"; groupId: string; value: number; shortDesc: string }>;
 
 const amountAxisConverter = new IntlNumberConverter({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const chartDataLabel = ({ value }: Readonly<{ value: number }>) => `${value.toFixed(0)}K`;
 
 const renderChartItem = ({ data }: Readonly<{ data: ChartPoint }>) => <oj-chart-item
   value={data.value}
@@ -113,21 +114,12 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   };
 
   const chartPoints = useMemo<ChartPoint[]>(() => dashboard ? dashboard.quarters.flatMap((quarter) => [
+    ...(quarter.budget === null ? [] : [{ id: `${quarter.quarter}-budget`, seriesId: "Budget Target", groupId: quarter.quarter, value: quarter.budget,
+      shortDesc: `${quarter.quarter} Budget Target ${formatBudget(quarter.budget)}` } as const]),
     { id: `${quarter.quarter}-actual`, seriesId: "Actual", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
     { id: `${quarter.quarter}-forecast`, seriesId: "Forecast", groupId: quarter.quarter, value: quarter.forecast, shortDesc: `${quarter.quarter} Forecast ${formatAttainmentAmount(quarter.forecast)}` } as const
   ]) : [], [dashboard]);
   const chartData = useMemo(() => new ArrayDataProvider(chartPoints, { keyAttributes: "id" }), [chartPoints]);
-  const budgetReference = useMemo(() => dashboard ? [{
-    id: "quarter-budget-target",
-    type: "line" as const,
-    text: "Budget target",
-    color: "#6f695f",
-    lineStyle: "dashed" as const,
-    lineWidth: 2,
-    displayInLegend: "on" as const,
-    items: dashboard.quarters.flatMap((quarter) => quarter.budget === null ? [] : [{ x: quarter.quarter, value: quarter.budget,
-      shortDesc: `${quarter.quarter} Budget ${formatBudget(quarter.budget)}` }])
-  }] : [], [dashboard]);
 
   if (loading && !dashboard) return <section class="kpi-panel attainment-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Attainment…</section>;
   if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
@@ -176,9 +168,10 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Actual and forecast by quarter</h2><p>Budget target is shown as a reference line. Amounts in K.</p></div></div>
-      <oj-chart type="bar" data={chartData} yAxis={{ title: "Amount (K)", referenceObjects: budgetReference,
-        tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} animationOnDisplay="auto" class="attainment-chart">
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Actual and forecast by quarter</h2><p>Actual, forecast and each quarter's budget target. Amounts in K.</p></div></div>
+      <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)",
+        tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }}
+        styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart">
         <template slot="itemTemplate" render={renderChartItem}></template>
       </oj-chart>
     </section>
