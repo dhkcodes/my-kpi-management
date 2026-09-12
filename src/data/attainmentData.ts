@@ -76,6 +76,6 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0
 });
 
-export const formatBudget = (budget: AttainmentAmount): string => budget === null ? "—" : currency.format(budget);
+export const formatBudget = (budget: AttainmentAmount): string => budget === null ? "—" : `${currency.format(budget)} K`;
 export const formatAttainment = (value: number | null): string => value === null ? "—" : `${value.toFixed(1)}%`;
-export const formatAttainmentAmount = (value: number): string => currency.format(value);
+export const formatAttainmentAmount = (value: number): string => `${currency.format(value)} K`;

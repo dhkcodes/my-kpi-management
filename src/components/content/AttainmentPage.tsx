@@ -1,6 +1,7 @@
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
+import { IntlNumberConverter } from "ojs/ojconverter-number";
 import type { DialogElement } from "ojs/ojdialog";
 import { FiscalYear } from "../../data/kpiMockData";
 import { fetchAttainment, updateAttainmentBudget } from "../../data/attainmentApi";
@@ -22,6 +23,8 @@ const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
 type BudgetDraft = Record<BudgetKey, string>;
 type ChartPoint = Readonly<{ id: string; seriesId: "Actual" | "Forecast"; groupId: string; value: number; shortDesc: string }>;
+
+const amountAxisConverter = new IntlNumberConverter({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const renderChartItem = ({ data }: Readonly<{ data: ChartPoint }>) => <oj-chart-item
   value={data.value}
@@ -122,7 +125,8 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     lineStyle: "dashed" as const,
     lineWidth: 2,
     displayInLegend: "on" as const,
-    items: dashboard.quarters.flatMap((quarter) => quarter.budget === null ? [] : [{ x: quarter.quarter, value: quarter.budget }])
+    items: dashboard.quarters.flatMap((quarter) => quarter.budget === null ? [] : [{ x: quarter.quarter, value: quarter.budget,
+      shortDesc: `${quarter.quarter} Budget ${formatBudget(quarter.budget)}` }])
   }] : [], [dashboard]);
 
   if (loading && !dashboard) return <section class="kpi-panel attainment-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Attainment…</section>;
@@ -146,7 +150,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Attainment</h1><p>Fiscal-year performance against quarterly budget.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Attainment</h1><p>Fiscal-year performance against quarterly budget. Amounts in K.</p></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
 
@@ -172,17 +176,18 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Actual and forecast by quarter</h2><p>Budget target is shown as a reference line.</p></div></div>
-      <oj-chart type="bar" data={chartData} yAxis={{ referenceObjects: budgetReference, tickLabel: { scaling: "auto" } }} legend={{ position: "bottom" }} animationOnDisplay="auto" class="attainment-chart">
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Actual and forecast by quarter</h2><p>Budget target is shown as a reference line. Amounts in K.</p></div></div>
+      <oj-chart type="bar" data={chartData} yAxis={{ title: "Amount (K)", referenceObjects: budgetReference,
+        tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} animationOnDisplay="auto" class="attainment-chart">
         <template slot="itemTemplate" render={renderChartItem}></template>
       </oj-chart>
     </section>
 
     <oj-dialog ref={dialogRef} dialogTitle={`Budget · ${fiscalYear}`} cancelBehavior={saving ? "none" : "icon"} class="attainment-budget-dialog">
       <div slot="body" class="attainment-budget-form">
-        <p>Enter a single budget for each quarter. Blank means no budget; zero remains an explicit zero budget.</p>
+        <p>Enter each budget in K. Values are stored as entered; blank means no budget and zero remains an explicit zero budget.</p>
         <div class="attainment-budget-fields">
-          {quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving}
+          {quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving}
             onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}
         </div>
         <div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>
