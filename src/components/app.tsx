@@ -365,6 +365,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           return;
         }
         const route = getNavigationRouteFromPath(window.location.pathname);
+        const canonicalPath = getCanonicalNavigationPath(window.location.pathname);
+        if (canonicalPath !== window.location.pathname) {
+          const canonicalUrl = new URL(window.location.href);
+          canonicalUrl.pathname = canonicalPath;
+          window.history.replaceState(event.state, "", canonicalUrl);
+        }
         const destinationHref = window.location.href;
         const destinationIndex = getHistoryIndex(event.state);
         const confirmedRetry = confirmedKpiPopstateRetryRef.current;

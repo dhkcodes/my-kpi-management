@@ -6,7 +6,7 @@ import { navItems, NavigationItem } from "../src/data/kpiMockData";
 const flattenLeaves = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => item.children ? flattenLeaves(item.children) : [item]);
 
-assert.equal(flattenLeaves(navItems).length, 14, "the provider exposes Home plus thirteen real leaf destinations");
+assert.equal(flattenLeaves(navItems).length, 15, "the provider exposes Home plus fourteen real leaf destinations");
 
 assert.deepEqual(
   navItems.map(({ id, label, children }) => ({ id, label, childIds: children?.map((child) => child.id) })),
@@ -28,7 +28,7 @@ assert.deepEqual(
 );
 assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a Router destination");
 assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
-assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 14, "every real leaf destination has a unique navigation id");
+assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 15, "every real leaf destination has a unique navigation id");
 assert.equal(
   flattenLeaves(navItems).find((item) => item.id === "records")?.icon,
   "oj-ux-ico-table",
@@ -43,6 +43,8 @@ const appSource = readFileSync("src/components/app.tsx", "utf8");
 const headerSource = readFileSync("src/components/header.tsx", "utf8");
 const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
 const indexSource = readFileSync("src/index.html", "utf8");
+
+assert.match(appSource, /const canonicalPath = getCanonicalNavigationPath\(window\.location\.pathname\)[\s\S]*window\.history\.replaceState\(event\.state, "", canonicalUrl\)/, "popstate canonicalizes legacy Consumption history entries");
 
 assert.match(pageSource, /const \[expanded, setExpanded\] = useState<Set<number>>\(\(\) => new Set\(\)\)/);
 assert.match(pageSource, /const isCollapsed = !expanded\.has\(record\.activityId\)/);
