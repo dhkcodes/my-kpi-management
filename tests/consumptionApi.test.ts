@@ -102,7 +102,7 @@ void (async () => {
     amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
     previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
     compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE"
-  }, "Usage Records preserves every forecast-composition field supplied by the backend");
+  }, "Consumption Records preserves every forecast-composition field supplied by the backend");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     selectedPillar: "ALL", etag: '"negative-composition"', lastBatchId: 7,
@@ -116,7 +116,7 @@ void (async () => {
   }), { status: 200, headers: { "Content-Type": "application/json" } });
   await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
     sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 }), /Malformed Consumption account forecast/,
-  "Usage Records rejects a negative composition amount instead of replacing the validated amount");
+  "Consumption Records rejects a negative composition amount instead of replacing the validated amount");
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible");

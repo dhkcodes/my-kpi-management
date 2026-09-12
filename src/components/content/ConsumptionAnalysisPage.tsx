@@ -77,7 +77,7 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
   return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}><span>DC {display.primary}</span></span>;
 };
 
-export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
+export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
       })
       .catch((reason) => {
         if (active && generation === requestGeneration.current) {
-          setError(reason instanceof Error ? reason.message : "Usage Insights could not be loaded.");
+          setError(reason instanceof Error ? reason.message : "Consumption Analysis could not be loaded.");
           if (analysisResponse?.selectedPillar && analysisResponse.selectedPillar !== selectedPillar) {
             setSelectedPillar(analysisResponse.selectedPillar);
           }
@@ -217,7 +217,7 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Usage Insights…</section>;
+  if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Consumption Analysis…</section>;
   if (error && !analysis) return <section class="kpi-panel" role="alert"><h1>Consumption Analysis</h1><p>{error}</p></section>;
   if (!analysis) return <section class="kpi-panel" role="alert">Analysis is unavailable.</section>;
 
@@ -227,19 +227,19 @@ export function UsageInsightsPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalY
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
 
-  return <section class="consumption-insights-page" aria-labelledby="usageInsightsTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
+  return <section class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
-      <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="usageInsightsTitle">Consumption Analysis</h1></div>
+      <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
-          <div class="consumption-pillar-selector" role="group" aria-label="Usage Insights pillar">
+          <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
               disabled={loading && !analysis}
               onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); }}>{option.label}</button>)}
           </div>
         </div>
-        <div class="consumption-insights-context" aria-label="Usage Insights filters">
+        <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
           <label htmlFor="consumptionAccountContext">Account</label>
           <div class="consumption-insights-combobox">
           <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"

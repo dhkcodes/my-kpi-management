@@ -2555,7 +2555,7 @@ h4.weekly-activity-section-label--next-week,
   .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Consumption Usage Insights and incremental Usage Records. */
+/* Consumption Analysis and incremental Consumption Records. */
 .consumption-load-more { align-items: center; align-self: end; background: var(--oj-core-bg-color-content); box-sizing: border-box; display: flex; gap: .75rem; height: 3.75rem; justify-content: center; min-height: 3.75rem; padding: .65rem; position: sticky; bottom: 0; width: 100%; z-index: 9; }
 .consumption-records-sentinel { height: 1px; width: 100%; }
 .consumption-pillar-forecast-note { color: var(--kpi-muted); flex-basis: 100%; font-size: .72rem; margin: 0; }

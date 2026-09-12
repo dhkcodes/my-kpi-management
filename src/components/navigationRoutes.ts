@@ -4,8 +4,8 @@ export type NavigationRouteModule =
   | "myCustomers360"
   | "accountsWorkloads"
   | "weeklyActivities"
-  | "consumptionInsights"
-  | "attainment"
+  | "consumptionAnalysis"
+  | "consumptionAttainment"
   | "consumptionRecords"
   | "profile"
   | "users";
@@ -14,6 +14,7 @@ export type NavigationRouteDefinition = Readonly<{
   id: string;
   module: NavigationRouteModule;
   pageTitle: string;
+  path?: string;
 }>;
 
 export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
@@ -29,9 +30,9 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
-  { id: "usage-insights", module: "consumptionInsights", pageTitle: "Consumption Insight" },
-  { id: "attainment", module: "attainment", pageTitle: "Attainment" },
-  { id: "usage-records", module: "consumptionRecords", pageTitle: "Consumption Records" },
+  { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },
+  { id: "attainment", module: "consumptionAttainment", pageTitle: "Consumption Attainment", path: "/consumption/attainment" },
+  { id: "records", module: "consumptionRecords", pageTitle: "Consumption Records", path: "/consumption/records" },
   { id: "profile", module: "profile", pageTitle: "Profile" },
   { id: "users", module: "users", pageTitle: "Users" }
 ];
@@ -41,17 +42,36 @@ const navigationRoutesById = navigationRouteDefinitions.reduce((routes, route) =
   return routes;
 }, {} as Record<string, NavigationRouteDefinition>);
 
+const legacyRouteIds: Record<string, string> = {
+  "usage-insights": "analysis",
+  "usage-records": "records"
+};
+
+const routeIdsByPath: Record<string, string> = {
+  "consumption": "analysis",
+  "consumption/analysis": "analysis",
+  "consumption/attainment": "attainment",
+  "consumption/records": "records",
+  "consumption/usage-insights": "analysis",
+  "consumption/usage-records": "records",
+  "usage-insights": "analysis",
+  "attainment": "attainment",
+  "usage-records": "records"
+};
+
 export const getNavigationRoute = (id: string): NavigationRouteDefinition =>
-  navigationRoutesById[id] ?? navigationRoutesById.home;
+  navigationRoutesById[legacyRouteIds[id] ?? id] ?? navigationRoutesById.home;
 
 export const getNavigationPath = (route: NavigationRouteDefinition): string =>
-  route.id === "home" ? "/" : `/${route.id}`;
+  route.path ?? (route.id === "home" ? "/" : `/${route.id}`);
 
 export const getNavigationRouteFromPath = (pathname: string): NavigationRouteDefinition => {
   const normalized = pathname.replace(/^\/+|\/+$/g, "");
-  if (normalized === "consumption") return getNavigationRoute("usage-insights");
-  return getNavigationRoute(normalized || "home");
+  return getNavigationRoute(routeIdsByPath[normalized] ?? (normalized || "home"));
 };
+
+export const getCanonicalNavigationPath = (pathname: string): string =>
+  getNavigationPath(getNavigationRouteFromPath(pathname));
 
 export const isKpiActivitiesRoute = (route: NavigationRouteDefinition): boolean =>
   route.module === "kpiPage";

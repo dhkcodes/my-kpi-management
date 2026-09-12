@@ -4,6 +4,7 @@ import {
   getNavigationPath,
   getNavigationRoute,
   getNavigationRouteFromPath,
+  getCanonicalNavigationPath,
   isKpiActivitiesRoute
 } from "../src/components/navigationRoutes";
 
@@ -18,6 +19,16 @@ assert.equal(getNavigationRouteFromPath("/accounts-workloads/").id, "accounts-wo
 assert.equal(getNavigationRouteFromPath("/unknown").id, "home");
 assert.equal(getNavigationPath(getNavigationRoute("accounts-workloads")), "/accounts-workloads");
 assert.equal(getNavigationPath(getNavigationRoute("home")), "/");
+assert.equal(getNavigationPath(getNavigationRoute("analysis")), "/consumption/analysis");
+assert.equal(getNavigationPath(getNavigationRoute("attainment")), "/consumption/attainment");
+assert.equal(getNavigationPath(getNavigationRoute("records")), "/consumption/records");
+assert.equal(getNavigationRouteFromPath("/consumption/analysis").id, "analysis");
+assert.equal(getNavigationRouteFromPath("/consumption/attainment").id, "attainment");
+assert.equal(getNavigationRouteFromPath("/consumption/records").id, "records");
+assert.equal(getCanonicalNavigationPath("/usage-insights"), "/consumption/analysis");
+assert.equal(getCanonicalNavigationPath("/attainment"), "/consumption/attainment");
+assert.equal(getCanonicalNavigationPath("/usage-records"), "/consumption/records");
+assert.equal(getCanonicalNavigationPath("/consumption"), "/consumption/analysis");
 
 for (const routeId of ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]) {
   assert.equal(isKpiActivitiesRoute(getNavigationRoute(routeId)), true, `${routeId} must show KPI Guide`);

@@ -279,7 +279,7 @@ type Props = Readonly<{
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
 }>;
 
-export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) {
+export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -582,7 +582,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     updateTableScrollState();
     const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
     if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
-      void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
+      void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
     }
   };
 
@@ -593,7 +593,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !recordsLoadingRef.current) {
         void loadMoreRecordsRef.current().catch((error) =>
-          setImportError(error instanceof Error ? error.message : "More Usage Records could not be loaded."));
+          setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
       }
     }, { root: tableScrollRef.current, rootMargin: "0px 0px 96px 0px", threshold: 0 });
     observer.observe(sentinel);
@@ -811,7 +811,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           await loadRecordsPage(false, { fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter, search: appliedSearch });
         } catch (refreshError) {
           adoptWorkspace(workspace);
-          setImportError(`Forecasts were saved, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+          setImportError(`Forecasts were saved, but Consumption Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
         }
       }
       setEditCell(null);
@@ -945,7 +945,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           setSavedPlans([]);setDraftPlans([]);setSavedControlTotals([]);setDraftControlTotals([]);setRecordAccountNames([]);
           setRecordsTotalAccounts(0);setRecordsNextOffset(0);setRecordsHasMore(false);setDataMode("error");
         }
-        setImportError(`Import succeeded, but Usage Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        setImportError(`Import succeeded, but Consumption Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
       }
       setSelectedSignalId("");
       setEditCell(null);
@@ -1085,7 +1085,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
         <div>
-          <h1 id="consumptionTitle">Usage Records</h1>
+          <h1 id="consumptionTitle">Consumption Records</h1>
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
@@ -1118,7 +1118,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">
           <span>Pillar</span>
-          <div class="consumption-pillar-selector" role="group" aria-label="Usage Records pillar">
+          <div class="consumption-pillar-selector" role="group" aria-label="Consumption Records pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button"
               aria-pressed={selectedPillar === option.value}
               disabled={hasDraftChanges || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle"}
@@ -1317,7 +1317,7 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
         </div>
-        <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Usage Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
+        <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
               <tr>
@@ -1388,14 +1388,14 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                   </>
                 );
               })}
-              {renderedRecordAccounts.length === 0 && <tr><td class="consumption-empty-state" colSpan={1 + quarters.length * 5}>No Usage Records match the selected range and filters.</td></tr>}
+              {renderedRecordAccounts.length === 0 && <tr><td class="consumption-empty-state" colSpan={1 + quarters.length * 5}>No Consumption Records match the selected range and filters.</td></tr>}
             </tbody>
           </table>
           <div ref={recordsSentinelRef} class="consumption-records-sentinel" data-records-sentinel aria-hidden="true"></div>
         </div>
         <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
           <span class="consumption-records-loading" role="status" aria-live="polite" aria-atomic="true">
-            {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Usage Records…</span></>}
+            {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Consumption Records…</span></>}
           </span>
           {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
           {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}

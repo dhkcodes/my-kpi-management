@@ -18,6 +18,7 @@ import {
   getNavigationPath,
   getNavigationRoute,
   getNavigationRouteFromPath,
+  getCanonicalNavigationPath,
   isKpiActivitiesRoute,
   NavigationRouteDefinition
 } from "./navigationRoutes";
@@ -123,6 +124,17 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const kpiUnsavedChangesRef = useRef(false);
     const pendingKpiPopstatePromptRef = useRef<null | { label: string; retry: () => void }>(null);
     const confirmedKpiPopstateRetryRef = useRef<null | { historyIndex: number | null; href: string }>(null);
+
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const canonicalPath = getCanonicalNavigationPath(window.location.pathname);
+      const currentPath = window.location.pathname === "/" ? "/" : window.location.pathname.replace(/\/$/, "");
+      if (canonicalPath !== currentPath) {
+        const canonicalUrl = `${canonicalPath}${window.location.search}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", canonicalUrl);
+        activeLocationHrefRef.current = window.location.href;
+      }
+    }, []);
     const [guideOpen, setGuideOpen] = useState(false);
     const [kpiGuides, setKpiGuides] = useState<KpiGuideRecord[]>([]);
     const [guideDataFiscalYear, setGuideDataFiscalYear] = useState<FiscalYear | null>(null);
