@@ -41,7 +41,7 @@ assert.match(insightsPage, /type="button"[\s\S]*aria-pressed=\{selectedAlert\?\.
 assert.match(insightsPage, /aria-label=\{`Severity \$\{alert\.grade\}`\}[\s\S]*\{alert\.grade\}/, "grade badges retain Severity accessibility while showing only the grade");
 assert.match(insightsPage, /<strong>\{alert\.account\}<\/strong>/, "alerts always show the actual account name");
 assert.match(insightsPage, /\{alert\.workloadMapped && <>\{alert\.workload\} · <\/?>\}Plan \{alert\.planId\}/, "mapped workload names remain separate from Plan ID");
-assert.doesNotMatch(insightsPage, /UNMAPPED/, "alerts and the linked Plan Trend omit the visible UNMAPPED indicator");
+assert.doesNotMatch(insightsPage, /selectedAlert\.workloadMapped\s*\?[^:]+:\s*"UNMAPPED"|Workload mapping Unmapped/, "alerts and the linked Plan Trend omit visible unmapped fallback copy");
 assert.doesNotMatch(insightsPage, /!alert\.workloadMapped/, "alerts do not render any unmapped-only badge or copy");
 assert.doesNotMatch(insightsPage, />Severity \{alert\.grade\}</, "the visible word Severity is removed");
 assert.doesNotMatch(insightsPage, /\{alert\.workload\} · \{alert\.periodKey\}/, "alert rows omit the period");
@@ -55,6 +55,8 @@ assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*ana
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
 assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Consumption Analysis removes the aggregate Other Accounts contract and UI");
 assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
+assert.match(insightsPage, /\{workload !== "UNMAPPED" && <>\s*<b>\{workload\}<\/b> · <\/?>\}Plan \{plan\.planId\}/, "Plan Contribution keeps actual workload names while omitting the UNMAPPED label");
+assert.doesNotMatch(insightsPage, /<b>\{workload\}<\/b> · Plan \{plan\.planId\}/, "Plan Contribution does not render the workload label unconditionally");
 assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/, "the Consumption API excludes the removed Other Accounts response fields");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
