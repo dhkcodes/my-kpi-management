@@ -9,6 +9,7 @@ import {
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
+  countUniqueConsumptionPlans,
   consumptionPillarOptions,
   expandConsumptionQuarterOptions,
   filterVisibleConsumptionPlans,
@@ -126,7 +127,8 @@ const searchExpandedRecordAccounts = (
 ) => {
   const query = search.trim().toLowerCase();
   if (!query) return new Set<string>();
-  return new Set(groups.filter((group) => !group.account.toLowerCase().includes(query)
+  return new Set(groups.filter((group) => countUniqueConsumptionPlans(group.plans) > 1
+    && !group.account.toLowerCase().includes(query)
     && group.plans.some((plan) => planMatchesRecordSearch(plan, query)))
     .map((group) => group.account));
 };
@@ -1338,7 +1340,9 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
             </thead>
             <tbody>
               {renderedRecordAccounts.map((account) => {
-                const expandable = account.plans.length > 0;
+                const visiblePlanCount = countUniqueConsumptionPlans(account.plans);
+                const singlePlan = visiblePlanCount === 1 ? account.plans[0] : null;
+                const expandable = visiblePlanCount > 1;
                 const expanded = expandable && expandedAccounts.has(account.customer);
                 return (
                   <>
@@ -1350,9 +1354,15 @@ export function ConsumptionPage({ fiscalYear, onNavigationGuardChange }: Props) 
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /><small>Account Forecast · {account.plans.length} visible Plan{account.plans.length === 1 ? "" : "s"}</small></span>
+                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /><small>Account Forecast · {visiblePlanCount} visible Plans</small></span>
                             </span>
                           </button>
+                        ) : singlePlan ? (
+                          <span class="consumption-leading consumption-account-single">
+                            <span class="consumption-disclosure-slot" aria-hidden="true"></span>
+                            <span class="consumption-leading-copy"><ConsumptionTruncatedText text={`${account.customer}${singlePlan.workload ? ` (${singlePlan.workload})` : ""}`} />
+                            <small>{singlePlan.endUser} · Plan {singlePlan.planId} · <ConsumptionDataCenter plan={singlePlan} selectedPillar={selectedPillar} /></small></span>
+                          </span>
                         ) : (
                           <span class="consumption-leading consumption-account-single">
                             <span class="consumption-disclosure-slot" aria-hidden="true"></span>

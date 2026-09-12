@@ -77,8 +77,8 @@ assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Usage Re
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Usage Insights sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Usage Records exports Actual for the selected pillar");
 assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Usage Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
-assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}/, "plan rows keep the scoped Data Center count as the core identifier");
-assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "plan rows omit redundant DP, OCI, and Missing breakdown copy");
+assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}[\s\S]*DC \{display\.primary\}/, "all Plan presentations keep one scoped Data Center total for the current query");
+assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
 assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
@@ -169,11 +169,11 @@ assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
 assert.doesNotMatch(recordsPage, /defaultExpandedRecordAccounts/, "initial and appended Account groups are never expanded merely because they have child Plans");
-assert.match(recordsPage, /searchExpandedRecordAccounts[\s\S]*!query[\s\S]*!group\.account\.toLowerCase\(\)\.includes\(query\)[\s\S]*group\.plans\.some/, "only a Plan-level search match auto-expands the necessary Account");
+assert.match(recordsPage, /searchExpandedRecordAccounts[\s\S]*!query[\s\S]*countUniqueConsumptionPlans\(group\.plans\) > 1[\s\S]*!group\.account\.toLowerCase\(\)\.includes\(query\)[\s\S]*group\.plans\.some/, "only a Plan-level search match auto-expands the necessary multi-Plan Account");
 assert.match(recordsPage, /if \(!append\) return searchExpanded[\s\S]*const next = new Set\(current\)[\s\S]*searchExpanded\.forEach/, "new queries reset expansion while appended pages preserve user toggles and expand only required Plan-search matches");
 assert.match(recordsPage, /editablePeriodIds\.has\(month\)/, "only backend-declared periods are editable");
 assert.match(recordsPage, /displayQuarterOrder\.flatMap/, "Data columns follow backend display order");
-assert.match(recordsPage, /const expandable = account\.plans\.length > 0[\s\S]*class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*toggleAccount\(account\.customer\)[\s\S]*expandable && expanded && account\.plans\.map/, "every Account with Plans discloses read-only Plan Actual detail rows");
+assert.match(recordsPage, /const visiblePlanCount = countUniqueConsumptionPlans\(account\.plans\)[\s\S]*const singlePlan = visiblePlanCount === 1 \? account\.plans\[0\] : null[\s\S]*const expandable = visiblePlanCount > 1[\s\S]*class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*toggleAccount\(account\.customer\)[\s\S]*singlePlan \?[\s\S]*ConsumptionDataCenter plan=\{singlePlan\}[\s\S]*Forecast-only \/ Plan unassigned[\s\S]*expandable && expanded && account\.plans\.map/, "zero, one, and multiple unique visible Plans render as Forecast-only, inline identity, and disclosure detail respectively");
 assert.match(recordsPage, /renderQuarterCells\(account, true\)[\s\S]*renderQuarterCells\(plan, false\)/, "all Account rows own Forecast editing while Plan rows remain read-only Actual detail");
 assert.doesNotMatch(recordsPage, /· Actual ·/, "Plan metadata omits the redundant Actual label while month headers retain Actual and Forecast status");
 assert.match(recordsPage, /renderedRecordAccounts\.length === 0[\s\S]*consumption-empty-state[\s\S]*No Usage Records match/, "a fully filtered or unmatched query uses the existing Consumption empty-state treatment");

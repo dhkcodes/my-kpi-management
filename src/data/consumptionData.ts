@@ -66,6 +66,12 @@ export const formatConsumptionDataCenter = (
   };
 };
 
+export const countUniqueConsumptionPlans = (
+  plans: readonly Pick<ConsumptionPlan, "id" | "planId" | "serverPlanId">[]
+): number => new Set(plans.map((plan) => plan.serverPlanId !== undefined
+  ? `server:${plan.serverPlanId}`
+  : `plan:${plan.planId || plan.id}`)).size;
+
 export type ConsumptionAccount = Readonly<{
   id: string;
   customer: string;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   ConsumptionPlan,
   aggregateConsumptionAccounts,
+  countUniqueConsumptionPlans,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
   buildQuarterSummary,
@@ -56,6 +57,10 @@ const visibilityPlans: ConsumptionPlan[] = [
 ];
 assert.deepEqual(filterVisibleConsumptionPlans(visibilityPlans, "FY27-Q1", "FY27-Q2").map((plan) => plan.planId),
   ["ACTIVE", "FORECAST-ZERO"], "visibility uses selected-range nonzero Actual or Forecast presence, including zero Forecast");
+assert.equal(countUniqueConsumptionPlans([
+  { id: "dp-row", planId: visibilityPlans[1].planId },
+  { id: "oci-row", planId: visibilityPlans[1].planId }
+]), 1, "All counts the same Plan ID once when DP and OCI membership coexist");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
   ["FY27-NOV", "FY27-OCT", "FY27-SEP"],
