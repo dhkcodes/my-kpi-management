@@ -20,6 +20,9 @@ assert.match(pageSource, /Actual Attainment/);
 assert.match(pageSource, /Forecast Attainment/);
 assert.match(pageSource, /Actual variance to budget/i);
 assert.match(pageSource, /Forecast variance to budget/i);
+assert.match(pageSource, /Amounts in K/i, "Attainment communicates the K display unit");
+assert.match(pageSource, /budget \(K\)/i, "Budget inputs explicitly use K units");
+assert.doesNotMatch(pageSource, /scaling: "auto"/, "Chart must not compact already-K amounts into another unit");
 assert.match(contentSource, /activeRoute\.module === "attainment"[\s\S]*AttainmentPage/);
 
 console.log("attainment UI contract tests passed");

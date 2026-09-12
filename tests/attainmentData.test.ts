@@ -3,8 +3,13 @@ import {
   calculateAttainment,
   calculateFiscalYearSummary,
   formatAttainment,
+  formatAttainmentAmount,
   formatBudget
 } from "../src/data/attainmentData";
+
+assert.equal(formatAttainmentAmount(1234.49), "$1,234 K", "amounts are displayed as rounded integer K");
+assert.equal(formatAttainmentAmount(1234.5), "$1,235 K", "amount display rounds only at the presentation boundary");
+assert.equal(formatBudget(610.125), "$610 K", "budget is already K and is not converted again");
 
 assert.equal(calculateAttainment(125, 100), 125);
 assert.equal(calculateAttainment(0, 100), 0);
