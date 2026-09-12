@@ -22,7 +22,7 @@ assert.deepEqual(
       label: "KPI Activities",
       childIds: ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
     },
-    { id: "consumption", label: "Consumption", childIds: ["usage-insights", "usage-records"] }
+    { id: "consumption", label: "Consumption", childIds: ["analysis", "attainment", "records"] }
   ],
   "TreeDataProvider owns hierarchy and labels without duplicating Router href data"
 );
@@ -30,9 +30,9 @@ assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a R
 assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
 assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 14, "every real leaf destination has a unique navigation id");
 assert.equal(
-  flattenLeaves(navItems).find((item) => item.id === "usage-records")?.icon,
+  flattenLeaves(navItems).find((item) => item.id === "records")?.icon,
   "oj-ux-ico-table",
-  "Usage Records uses a valid Oracle UX table icon"
+  "Records uses a valid Oracle UX table icon"
 );
 
 const pageSource = readFileSync("src/components/content/WeeklyActivitiesPage.tsx", "utf8");

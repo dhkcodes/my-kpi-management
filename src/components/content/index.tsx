@@ -19,8 +19,8 @@ import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSou
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
-import { ConsumptionPage } from "./ConsumptionPage";
-import { UsageInsightsPage } from "./UsageInsightsPage";
+import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
+import { ConsumptionAnalysisPage } from "./ConsumptionAnalysisPage";
 import { AttainmentPage } from "./AttainmentPage";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
@@ -621,12 +621,12 @@ export function Content({
         )
       ) : activeRoute.module === "weeklyActivities" ? (
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
-      ) : activeRoute.module === "consumptionInsights" ? (
-        <UsageInsightsPage fiscalYear={fiscalYear} />
-      ) : activeRoute.module === "attainment" ? (
+      ) : activeRoute.module === "consumptionAnalysis" ? (
+        <ConsumptionAnalysisPage fiscalYear={fiscalYear} />
+      ) : activeRoute.module === "consumptionAttainment" ? (
         <AttainmentPage fiscalYear={fiscalYear} />
       ) : activeRoute.module === "consumptionRecords" ? (
-        <ConsumptionPage
+        <ConsumptionRecordsPage
           fiscalYear={fiscalYear}
           onNavigationGuardChange={onKpiNavigationGuardChange}
         />

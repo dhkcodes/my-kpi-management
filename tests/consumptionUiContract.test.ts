@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const recordsPage = readFileSync("src/components/content/ConsumptionPage.tsx", "utf8");
-const insightsPage = readFileSync("src/components/content/UsageInsightsPage.tsx", "utf8");
+const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.tsx", "utf8");
+const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 
@@ -15,16 +15,16 @@ const styles = readFileSync("src/styles/app.css", "utf8");
 const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 
 // Navigation and route ownership.
-assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "usage-insights"[\s\S]*label: "Usage Insights"[\s\S]*id: "usage-records"[\s\S]*label: "Usage Records"/, "approved Consumption leaf names exist");
+assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "attainment"[\s\S]*label: "Attainment"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved Consumption leaf names exist");
 assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/, "Consumption is the parent of the approved leaves");
-assert.match(routes, /id: "usage-insights"[\s\S]*module: "consumptionInsights"[\s\S]*id: "usage-records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
-assert.match(routes, /normalized === "consumption"[\s\S]*usage-insights/, "/consumption remains a compatibility alias to Usage Insights");
-assert.match(content, /activeRoute\.module === "consumptionInsights"[\s\S]*<UsageInsightsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Usage Insights receives the selected fiscal year");
-assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Usage Records renders the preserved editable workspace");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords'\]\.includes\(activeRoute\.module\)/, "global FY is visible for Usage Insights and hidden for Usage Records");
+assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*id: "records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
+assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
+assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
+assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
+assert.match(content, /!\['profile', 'users', 'consumptionRecords'\]\.includes\(activeRoute\.module\)/, "global FY is visible for Consumption Analysis and hidden for Consumption Records");
 
-// Usage Insights: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
-assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Usage Insights loads one server-owned FY/account analysis context");
+// Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
 assert.match(insightsPage, /analysisResponse\.fiscalYear === fiscalYear[\s\S]*analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "Analysis renders only when the response FY and Account match the requested context");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
@@ -50,7 +50,7 @@ assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*c
 assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^\n]+\?\? null/, "account contribution starts unselected without falling back to the first account");
 assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
-assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Usage Insights removes the aggregate Other Accounts contract and UI");
+assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Consumption Analysis removes the aggregate Other Accounts contract and UI");
 assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
 assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/, "the Consumption API excludes the removed Other Accounts response fields");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
@@ -58,7 +58,7 @@ assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Al
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
 assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Chart value labels use the approved compact USD format");
 assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendDataLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendDataLabel\}/, "FY and Quarter totals expose each value through the official JET chart dataLabel callback");
-assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|organicGrowthChart|movementBridge/, "deferred New/Expansion analysis charts are removed until Usage Records is complete");
+assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|organicGrowthChart|movementBridge/, "deferred New/Expansion analysis charts are removed until Consumption Records is complete");
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
 assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
@@ -66,28 +66,28 @@ assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, sear
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
 
 // PILLAR is an explicit, accessible page context on both Consumption leaves.
-assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Usage Records exposes the shared compact All, DP, OCI selector");
-assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Usage Insights exposes the shared compact All, DP, OCI selector");
+assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Consumption Records exposes the shared compact All, DP, OCI selector");
+assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Consumption Analysis exposes the shared compact All, DP, OCI selector");
 assert.match(insightsPage, /consumption-insights-header-actions[\s\S]*consumption-insights-pillar[\s\S]*>Pillar<[\s\S]*consumption-pillar-selector[\s\S]*consumption-insights-context[\s\S]*>Account</, "Analysis places labelled Pillar before Account inside one filter row");
 assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items:\s*end[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap[^}]*gap:\s*\.75rem/, "Analysis filter row aligns Pillar and Account with Redwood spacing and natural wrapping");
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.25rem/, "Pillar uses the same labelled filter rhythm as Account");
 assert.doesNotMatch(insightsPage, /setSelectedPillar\(option\.value\);\s*setSelectedAccountContext\(""\)/, "Pillar changes preserve a still-valid selected Account for cross filtering");
 assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[\s\S]*value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while candidate search does not clear context");
-assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Usage Records sends the selected pillar with every records request");
-assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Usage Insights sends the selected pillar with every analysis request");
-assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Usage Records exports Actual for the selected pillar");
-assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Usage Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
+assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Consumption Records sends the selected pillar with every records request");
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Consumption Analysis sends the selected pillar with every analysis request");
+assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar\)/, "Consumption Records exports Actual for the selected pillar");
+assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Consumption Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
 assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}[\s\S]*DC \{display\.primary\}/, "all Plan presentations keep one scoped Data Center total for the current query");
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
 assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
-assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Usage Insights omits DP + OCI breakdown and duplicate warnings");
+assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Consumption Analysis omits DP + OCI breakdown and duplicate warnings");
 
-// Usage Records remains the mutable Data workspace and excludes analysis duplication.
-assert.match(recordsPage, /<h1 id="consumptionTitle">Usage Records<\/h1>/, "data-management leaf uses the approved name");
-assert.doesNotMatch(recordsPage, /<span class="kpi-eyebrow">Consumption<\/span>/, "Usage Records removes redundant header copy");
-assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Usage Records does not duplicate the Insights charts");
+// Consumption Records remains the mutable Data workspace and excludes analysis duplication.
+assert.match(recordsPage, /<h1 id="consumptionTitle">Consumption Records<\/h1>/, "data-management leaf uses the approved name");
+assert.doesNotMatch(recordsPage, /<span class="kpi-eyebrow">Consumption<\/span>/, "Consumption Records removes redundant header copy");
+assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains available");
 assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleCsvFiles/, "Import accepts multiple CSV files");
 assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
@@ -107,7 +107,7 @@ assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinal
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
 assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
-assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Usage Records downloads both server-owned Export files and releases object URLs");
+assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.match(recordsPage, /oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "actions are ordered Forecast Import, Forecast Export, Actual Import, Actual Export with matching upload/download icons");
 assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*onojAction=\{\(\) => void exportForecastCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*onojAction=\{\(\) => fileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*onojAction=\{\(\) => void exportImportCompatibleCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "each ordered action remains connected to its matching Forecast/Actual import/export handler");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
@@ -116,9 +116,9 @@ assert.match(recordsPage, /EXACT_REPLAY[\s\S]*Forecast-only \/ Plan unassigned/,
 assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
 assert.match(recordsPage, /<button type="button" class=\{`consumption-range-apply[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "mobile Apply uses a stable native button instead of a late-upgrading custom element");
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");
-assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Usage Records layouts keep the action group visible and naturally wrapped");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Consumption Records layouts keep the action group visible and naturally wrapped");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
-assert.doesNotMatch(recordsPage, /beginForecastEdit|updateForecast/, "Usage Records expose no Plan-level Forecast editor");
+assert.doesNotMatch(recordsPage, /beginForecastEdit|updateForecast/, "Consumption Records expose no Plan-level Forecast editor");
 assert.match(recordsPage, /onDblClick[\s\S]*beginControlEdit/, "double click enters Account-level Forecast editing");
 assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
 assert.match(recordsPage, /data-forecast-editor=\{key\}[\s\S]*ref=\{selectForecastEditor\(key\)\}/, "each editable Forecast input binds whole-value selection to its stable cell key");
@@ -136,7 +136,7 @@ assert.match(recordsPage, /selectPillar[\s\S]*loadRecordsPage\(false, \{ fromQua
 assert.match(recordsPage, /consumption-range-bar[\s\S]*consumption-range-pillar[\s\S]*consumption-pillar-selector[\s\S]*consumptionFromQuarter/, "Pillar is immediately before the From Quarter control in the compact range bar");
 assert.match(recordsPage, /filterVisibleConsumptionPlans\(group\.plans, page\.fromQuarter, page\.toQuarter\)/, "the client defensively applies the same selected-range nonzero Actual or Forecast-presence rule as the backend");
 assert.match(recordsPage, /submitRecordsQuery[\s\S]*loadRecordsPage\(false, query\)/, "quarter and search changes replace only the Records data region");
-assert.match(recordsPage, /const \[draftSearch, setDraftSearch\][\s\S]*const \[appliedSearch, setAppliedSearch\]/, "Usage Records separates draft and applied search state");
+assert.match(recordsPage, /const \[draftSearch, setDraftSearch\][\s\S]*const \[appliedSearch, setAppliedSearch\]/, "Consumption Records separates draft and applied search state");
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*search:\s*requestQuery\.search/, "only the captured applied query reaches the records API");
 assert.doesNotMatch(recordsPage, /debouncedRecordSearch|setTimeout[\s\S]*recordSearch/, "typing does not debounce into a records fetch");
 assert.match(recordsPage, /onCompositionStart[\s\S]*setSearchComposing\(true\)[\s\S]*onCompositionEnd/, "search tracks Korean IME composition without submitting");
@@ -163,8 +163,8 @@ assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.curren
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");
-assert.match(recordsPage, /Loading Usage Records…[\s\S]*Load More[\s\S]*All accounts loaded\./, "loading, manual fallback, and final-page states remain explicit");
-assert.match(recordsPage, /No Usage Records match the selected range and filters\./, "empty filtered results remain explicit");
+assert.match(recordsPage, /Loading Consumption Records…[\s\S]*Load More[\s\S]*All accounts loaded\./, "loading, manual fallback, and final-page states remain explicit");
+assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
@@ -176,7 +176,7 @@ assert.match(recordsPage, /displayQuarterOrder\.flatMap/, "Data columns follow b
 assert.match(recordsPage, /const visiblePlanCount = countUniqueConsumptionPlans\(account\.plans\)[\s\S]*const singlePlan = visiblePlanCount === 1 \? account\.plans\[0\] : null[\s\S]*const expandable = visiblePlanCount > 1[\s\S]*class="consumption-account-toggle"[\s\S]*aria-expanded=\{expanded\}[\s\S]*toggleAccount\(account\.customer\)[\s\S]*singlePlan \?[\s\S]*ConsumptionDataCenter plan=\{singlePlan\}[\s\S]*Forecast-only \/ Plan unassigned[\s\S]*expandable && expanded && account\.plans\.map/, "zero, one, and multiple unique visible Plans render as Forecast-only, inline identity, and disclosure detail respectively");
 assert.match(recordsPage, /renderQuarterCells\(account, true\)[\s\S]*renderQuarterCells\(plan, false\)/, "all Account rows own Forecast editing while Plan rows remain read-only Actual detail");
 assert.doesNotMatch(recordsPage, /· Actual ·/, "Plan metadata omits the redundant Actual label while month headers retain Actual and Forecast status");
-assert.match(recordsPage, /renderedRecordAccounts\.length === 0[\s\S]*consumption-empty-state[\s\S]*No Usage Records match/, "a fully filtered or unmatched query uses the existing Consumption empty-state treatment");
+assert.match(recordsPage, /renderedRecordAccounts\.length === 0[\s\S]*consumption-empty-state[\s\S]*No Consumption Records match/, "a fully filtered or unmatched query uses the existing Consumption empty-state treatment");
 assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPlans\(workspace\.plans, workspace\.fromQuarter, workspace\.toQuarter\)[\s\S]*recordGroupMatchesSearch[\s\S]*setRecordAccountNames\(adoptedAccountNames\)[\s\S]*setRecordsTotalAccounts\(adoptedAccountNames\.length\)[\s\S]*setRecordsHasMore\(false\)/, "workspace adoption rebuilds filtered Account names and Footer metadata instead of retaining stale paged rows");
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
@@ -188,9 +188,9 @@ assert.doesNotMatch(recordsPage, /missingForecastLabel|Forecast membership unava
 assert.doesNotMatch(recordsPage, /<small>ACCOUNT · \{selectedPillar === "DP" \? "DP" : "OCI-OTHER"\}<\/small>/, "Account Forecast cells omit redundant Pillar helper text");
 assert.match(recordsPage, /currency\.format\(summary\.total \?\? 0\)[\s\S]*summary\.preQGap === null \? "—"/, "quarter totals render zero for missing values while a missing prior quarter keeps Pre-Q Gap unavailable");
 assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
-assert.match(recordsPage, /consumption-forecast-tooltip[\s\S]*Total[\s\S]*Base[\s\S]*New[\s\S]*Expansion[\s\S]*Reduction[\s\S]*Previous source/, "Usage Records Forecast totals expose the complete movement composition on hover and keyboard focus");
-assert.doesNotMatch(recordsPage, /this legacy scalar Forecast does not include movement components/, "normal legacy scalar Forecasts do not emit a repeated Usage Records warning");
-assert.match(recordsPage, /composition\.compositionStatus === "UNCLASSIFIED"[\s\S]*return null/, "legacy scalar Forecast composition is intentionally omitted from Usage Records");
+assert.match(recordsPage, /consumption-forecast-tooltip[\s\S]*Total[\s\S]*Base[\s\S]*New[\s\S]*Expansion[\s\S]*Reduction[\s\S]*Previous source/, "Consumption Records Forecast totals expose the complete movement composition on hover and keyboard focus");
+assert.doesNotMatch(recordsPage, /this legacy scalar Forecast does not include movement components/, "normal legacy scalar Forecasts do not emit a repeated Consumption Records warning");
+assert.match(recordsPage, /composition\.compositionStatus === "UNCLASSIFIED"[\s\S]*return null/, "legacy scalar Forecast composition is intentionally omitted from Consumption Records");
 assert.match(recordsPage, /compositionStatus === "UNAVAILABLE"[\s\S]*Forecast composition unavailable/, "actual missing Forecast composition still has an explicit unavailable message");
 assert.match(recordsPage, /Raw[\s\S]*Canonical T \| N \| E[\s\S]*Base[\s\S]*Reduction[\s\S]*Previous source[\s\S]*Status/, "Forecast Import Preview makes raw-to-canonical composition and derivation status auditable");
 assert.match(recordsPage, /preview\.canonicalPeriods/, "Forecast Preview renders backend-provided canonical periods instead of deriving an allowed window from the browser clock");
@@ -207,10 +207,10 @@ assert.doesNotMatch(apiSource, /seedForecastMonths\s*\(/, "the API client never 
 
 // Redwood table behavior and responsive containment.
 assert.doesNotMatch(recordsPage, /recordSort|recordDirection|consumption-record-controls|tableExpanded/, "sort, direction, helper controls, and table collapse are removed");
-assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Usage Records removes page-level horizontal overflow");
+assert.match(styles, /\.consumption-page\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*clip/, "Consumption Records removes page-level horizontal overflow");
 assert.match(styles, /\.consumption-table-content\s*\{[^}]*grid-template-rows:\s*minmax\(18rem, 1fr\) 3\.75rem[\s\S]*\.consumption-table-scroll\s*\{[^}]*height:\s*auto[^}]*min-height:\s*18rem[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "the table fills the card while owning Quarter\/Month overflow and preserving the 18rem accessibility minimum");
-assert.match(styles, /@media \(min-width:\s*64rem\)[\s\S]*\.kpi-shell:has\(\.consumption-page\)[^}]*height:\s*100dvh[^}]*overflow:\s*hidden[\s\S]*\.kpi-shell__body:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.kpi-content:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden/, "every desktop-height viewport confines Usage Records while narrower mobile/high-zoom layouts retain document scrolling");
-assert.match(styles, /\/\* The popup replaces the former rail[^\n]*\*\/[\s\S]*\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "popup navigation preserves the shell grid so Usage Records keeps an internally scrollable viewport and can trigger incremental loading");
+assert.match(styles, /@media \(min-width:\s*64rem\)[\s\S]*\.kpi-shell:has\(\.consumption-page\)[^}]*height:\s*100dvh[^}]*overflow:\s*hidden[\s\S]*\.kpi-shell__body:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.kpi-content:has\(\.consumption-page\)[^}]*min-height:\s*0[^}]*overflow:\s*hidden/, "every desktop-height viewport confines Consumption Records while narrower mobile/high-zoom layouts retain document scrolling");
+assert.match(styles, /\/\* The popup replaces the former rail[^\n]*\*\/[\s\S]*\.kpi-shell__body,[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/, "popup navigation preserves the shell grid so Consumption Records keeps an internally scrollable viewport and can trigger incremental loading");
 assert.match(styles, /\.consumption-page[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)[^}]*min-height:\s*0[\s\S]*\.consumption-table-panel[^}]*min-height:\s*0[^}]*overflow:\s*hidden[\s\S]*\.consumption-table-scroll[^}]*min-height:\s*0[^}]*min-width:\s*0[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/, "desktop card, table, and Footer share remaining height while only the table data region owns scrolling");
 assert.match(styles, /\.consumption-load-more\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/, "the Records footer remains visible at the table end");
 assert.match(staticServer, /bundle\.js[\s\S]*Cache-Control[\s\S]*no-cache, max-age=0, must-revalidate/, "SPA routes and the unversioned production bundle revalidate after deployment");
@@ -232,10 +232,10 @@ assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
 assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{Math\.max\(0, Math\.min\(100, plan\.percentage\)\)\}%/, "Plan Contribution uses each Plan percentage on a common group-wide 0–100 track");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
-assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Usage Records/, "Records footer exposes a visible polite loading status");
+assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
-assert.match(recordsPage, /class=\{`consumption-range-apply\$\{dataMode === "loading" \? " consumption-range-apply--initializing" : ""\}`\}/, "Apply stays explicitly hidden while the first Usage Records request initializes");
+assert.match(recordsPage, /class=\{`consumption-range-apply\$\{dataMode === "loading" \? " consumption-range-apply--initializing" : ""\}`\}/, "Apply stays explicitly hidden while the first Consumption Records request initializes");
 assert.match(styles, /\.consumption-range-apply--initializing\s*\{[^}]*visibility:\s*hidden/, "the initializing Apply state preserves its layout slot without flashing");
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
 assert.match(styles, /\.consumption-range-apply:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--oj-core-focus-border-color, #0572ce\)[^}]*outline-offset:\s*2px/, "Apply retains a distinct accessible focus ring without replacing its fill color");

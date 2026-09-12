@@ -8,7 +8,39 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 
+LEGACY_REDIRECTS = {
+    "/consumption": "/consumption/analysis",
+    "/usage-insights": "/consumption/analysis",
+    "/attainment": "/consumption/attainment",
+    "/usage-records": "/consumption/records",
+    "/consumption/usage-insights": "/consumption/analysis",
+    "/consumption/usage-records": "/consumption/records",
+}
+
+
 class SpaRequestHandler(SimpleHTTPRequestHandler):
+    def redirect_legacy_path(self):
+        parsed = urlsplit(self.path)
+        destination = LEGACY_REDIRECTS.get(parsed.path.rstrip("/") or "/")
+        if not destination:
+            return False
+        if parsed.query:
+            destination = f"{destination}?{parsed.query}"
+        self.send_response(308)
+        self.send_header("Location", destination)
+        self.end_headers()
+        return True
+
+    def do_GET(self):
+        if self.redirect_legacy_path():
+            return
+        super().do_GET()
+
+    def do_HEAD(self):
+        if self.redirect_legacy_path():
+            return
+        super().do_HEAD()
+
     def end_headers(self):
         requested_path = urlsplit(self.path).path
         # index.html, history-routed SPA documents, and the unversioned bundle.js

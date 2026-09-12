@@ -130,7 +130,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   }] : [], [dashboard]);
 
   if (loading && !dashboard) return <section class="kpi-panel attainment-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Attainment…</section>;
-  if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Attainment</h1><p>{error}</p></section>;
+  if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
   if (!dashboard) return <section class="kpi-panel" role="alert">Attainment is unavailable.</section>;
 
   const values = [...dashboard.quarters, dashboard.summary];
@@ -150,7 +150,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Attainment</h1><p>Fiscal-year performance against quarterly budget. Amounts in K.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Fiscal-year performance against quarterly budget. Amounts in K.</p></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
 

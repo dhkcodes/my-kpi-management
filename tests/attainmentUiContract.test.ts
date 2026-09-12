@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import { consumptionNavItems } from "../src/data/kpiMockData";
 import { getNavigationRoute, getNavigationRouteFromPath } from "../src/components/navigationRoutes";
 
-assert.deepEqual(consumptionNavItems.map((item) => item.label), ["Consumption Insight", "Attainment", "Consumption Records"]);
-assert.equal(consumptionNavItems[1].id, "attainment", "Attainment immediately follows Consumption Insight");
-assert.equal(getNavigationRoute("usage-insights").pageTitle, "Consumption Insight");
-assert.equal(getNavigationRoute("usage-records").pageTitle, "Consumption Records");
-assert.equal(getNavigationRoute("attainment").module, "attainment");
+assert.deepEqual(consumptionNavItems.map((item) => item.label), ["Analysis", "Attainment", "Records"]);
+assert.equal(consumptionNavItems[1].id, "attainment", "Attainment immediately follows Analysis");
+assert.equal(getNavigationRoute("analysis").pageTitle, "Consumption Analysis");
+assert.equal(getNavigationRoute("records").pageTitle, "Consumption Records");
+assert.equal(getNavigationRoute("attainment").pageTitle, "Consumption Attainment");
+assert.equal(getNavigationRoute("attainment").module, "consumptionAttainment");
 assert.equal(getNavigationRouteFromPath("/attainment").id, "attainment");
 
 const pageSource = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
@@ -23,6 +24,6 @@ assert.match(pageSource, /Forecast variance to budget/i);
 assert.match(pageSource, /Amounts in K/i, "Attainment communicates the K display unit");
 assert.match(pageSource, /budget \(K\)/i, "Budget inputs explicitly use K units");
 assert.doesNotMatch(pageSource, /scaling: "auto"/, "Chart must not compact already-K amounts into another unit");
-assert.match(contentSource, /activeRoute\.module === "attainment"[\s\S]*AttainmentPage/);
+assert.match(contentSource, /activeRoute\.module === "consumptionAttainment"[\s\S]*AttainmentPage/);
 
 console.log("attainment UI contract tests passed");
