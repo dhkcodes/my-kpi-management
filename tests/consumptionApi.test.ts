@@ -121,15 +121,14 @@ void (async () => {
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=ALL&fromQuarter=FY27-Q1&toQuarter=FY27-Q4");
     assert.equal(init?.method, "GET");
-    return new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+    return new Response("\uFEFFDP\r\nPlan Type,Account\r\n\r\nOCI\r\nPlan Type,Account\r\n", {
       status: 200,
-      headers: { "Content-Type": "application/zip", "Content-Disposition": 'attachment; filename="consumption-actuals-export.zip"' }
+      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="OCI Consumption Actual - Jun-2026-May-2027.csv"' }
     });
   };
   const exported = await exportConsumptionImportCompatibleCsv("ALL", "FY27-Q1", "FY27-Q4");
-  assert.equal(exported.fileName, "consumption-actuals-export.zip");
-  const exportedBytes = new Uint8Array(await exported.blob.arrayBuffer());
-  assert.deepEqual([...exportedBytes], [0x50, 0x4b, 0x03, 0x04]);
+  assert.equal(exported.fileName, "OCI Consumption Actual - Jun-2026-May-2027.csv");
+  assert.match(await exported.blob.text(), /^DP\r?\nPlan Type,Account[\s\S]*OCI\r?\nPlan Type,Account/);
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/forecast?pillar=DP");
@@ -290,7 +289,7 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-reference", sources: [{ fileName: "forecast.csv", sha256: "a".repeat(64) }],
-    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, totalAmount: 7,
+    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", totalAmount: 7,
       newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3, reductionBasis: "PRIOR_QUARTER_ACTUAL",
       compositionStatus: "CLASSIFIED", sourceFile: "forecast.csv", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],

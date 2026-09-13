@@ -118,7 +118,7 @@ assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Ch
 assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.match(insightsPage, /category: "All" \| "New" \| "Expansion" \| "Reduction"/, "Forecast composition supports All and each classified drill category");
-assert.match(insightsPage, /seriesId: "All"[\s\S]*value: point\.totalForecastAmount/, "All displays total Forecast rather than Renewal or net movement");
+assert.match(insightsPage, /seriesId: "All"[\s\S]*value: toK\(point\.totalForecastAmount\)/, "All displays total Forecast in explicit K units rather than Renewal or net movement");
 assert.match(insightsPage, /selectedMovement\?\.category === "All"[\s\S]*account\.totalForecastAmount/, "All drill-down lists each Account's total Forecast");
 assert.match(insightsPage, /Forecast composition by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
@@ -244,7 +244,7 @@ assert.match(insightsPage, /analysis\.movementBridge\.flatMap/, "Forecast moveme
 assert.match(insightsPage, /seriesId: "New"/);
 assert.match(insightsPage, /seriesId: "Expansion"/);
 assert.match(insightsPage, /seriesId: "Reduction"/);
-assert.match(insightsPage, /value: -point\.reductionAmount/, "Reduction is rendered below zero exactly once at the visual boundary");
+assert.match(insightsPage, /value: -toK\(point\.reductionAmount\)/, "Reduction is converted to K and rendered below zero exactly once at the visual boundary");
 assert.match(insightsPage, /point\.compositionStatus !== "CLASSIFIED"[\s\S]*return \[all\]/, "unavailable composition still exposes its total Forecast All drill without inventing component values");
 assert.match(insightsPage, /point\.includedForecastPeriods\.join/, "movement labels expose only included Forecast periods");
 assert.doesNotMatch(insightsPage, /run[- ]?rate/i, "movement labels do not invent run-rate periods");

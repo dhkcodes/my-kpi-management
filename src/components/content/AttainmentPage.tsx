@@ -22,8 +22,8 @@ import "ojs/ojprogress-circle";
 const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
 type BudgetDraft = Record<BudgetKey, string>;
-type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual to date" | "Outlook (Actual + Forecast)"; groupId: string; value: number; shortDesc: string }>;
-type CompositionPoint = Readonly<{ id: string; seriesId: "DP Actual" | "DP Outlook" | "OCI Actual" | "OCI Outlook"; groupId: "Actual" | "Outlook"; value: number; shortDesc: string }>;
+type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual" | "Forecast" | "Total"; groupId: string; value: number; shortDesc: string }>;
+type CompositionPoint = Readonly<{ id: string; seriesId: "DP Actual" | "DP Total" | "OCI Actual" | "OCI Total"; groupId: "Actual" | "Total"; value: number; shortDesc: string }>;
 
 const amountAxisConverter = new IntlNumberConverter({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const chartDataLabel = ({ value }: Readonly<{ value: number }>) => `${value.toFixed(0)}K`;
@@ -46,12 +46,15 @@ const draftTotal = (draft: BudgetDraft): number | null => {
   return values.every(Number.isFinite) ? values.reduce((total, value) => total + value, 0) : null;
 };
 const signedAmount = (value: number | null): string => value === null ? "—" : `${value > 0 ? "+" : ""}${formatAttainmentAmount(value)}`;
+const includedForecast = (quarter: AttainmentQuarterRecord): number | null => quarter.outlook === null
+  ? null : Math.max(0, quarter.outlook - quarter.actual);
 function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>) {
   return <div class="attainment-quarter-card">
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
     <span class="attainment-quarter-card__metric"><small>Budget</small><strong>{formatBudget(quarter.budget)}</strong></span>
-    <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Outlook (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(quarter.outlook)}</strong></span>
-    <span class="attainment-quarter-card__actual">Actual to date {formatAttainmentAmount(quarter.actual)}</span>
+    <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Total (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(quarter.outlook)}</strong></span>
+    <span class="attainment-quarter-card__actual">Actual {formatAttainmentAmount(quarter.actual)} · Forecast {formatOptionalAttainmentAmount(includedForecast(quarter))}</span>
+    <span class="attainment-quarter-card__basis">Attainment = Total / Budget</span>
     <span class="attainment-quarter-card__pillars">DP {formatOptionalAttainmentAmount(quarter.dpOutlook)} · OCI {formatOptionalAttainmentAmount(quarter.ociOutlook)}</span>
   </div>;
 }
@@ -98,15 +101,16 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
 
   const chartPoints = useMemo<ChartPoint[]>(() => dashboard ? dashboard.quarters.flatMap((quarter) => [
     ...(quarter.budget === null ? [] : [{ id: `${quarter.quarter}-budget`, seriesId: "Budget Target", groupId: quarter.quarter, value: quarter.budget, shortDesc: `${quarter.quarter} Budget ${formatBudget(quarter.budget)}` } as const]),
-    { id: `${quarter.quarter}-actual`, seriesId: "Actual to date", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
-    ...(quarter.outlook === null ? [] : [{ id: `${quarter.quarter}-outlook`, seriesId: "Outlook (Actual + Forecast)", groupId: quarter.quarter, value: quarter.outlook, shortDesc: `${quarter.quarter} Outlook ${formatAttainmentAmount(quarter.outlook)}` } as const])
+    { id: `${quarter.quarter}-actual`, seriesId: "Actual", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
+    ...(includedForecast(quarter) === null ? [] : [{ id: `${quarter.quarter}-forecast`, seriesId: "Forecast", groupId: quarter.quarter, value: includedForecast(quarter)!, shortDesc: `${quarter.quarter} selected-month Forecast ${formatOptionalAttainmentAmount(includedForecast(quarter))}` } as const]),
+    ...(quarter.outlook === null ? [] : [{ id: `${quarter.quarter}-total`, seriesId: "Total", groupId: quarter.quarter, value: quarter.outlook, shortDesc: `${quarter.quarter} Total ${formatAttainmentAmount(quarter.outlook)}` } as const])
   ]) : [], [dashboard]);
   const chartData = useMemo(() => new ArrayDataProvider(chartPoints, { keyAttributes: "id" }), [chartPoints]);
   const compositionPoints = useMemo<CompositionPoint[]>(() => dashboard ? [
     { id: "dp-actual", seriesId: "DP Actual", groupId: "Actual", value: dashboard.summary.dpActual, shortDesc: `DP Actual ${formatAttainmentAmount(dashboard.summary.dpActual)}` },
     { id: "oci-actual", seriesId: "OCI Actual", groupId: "Actual", value: dashboard.summary.ociActual, shortDesc: `OCI Actual ${formatAttainmentAmount(dashboard.summary.ociActual)}` },
-    ...(dashboard.summary.dpOutlook === null ? [] : [{ id: "dp-outlook", seriesId: "DP Outlook", groupId: "Outlook", value: dashboard.summary.dpOutlook, shortDesc: `DP Outlook ${formatAttainmentAmount(dashboard.summary.dpOutlook)}` } as const]),
-    ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-outlook", seriesId: "OCI Outlook", groupId: "Outlook", value: dashboard.summary.ociOutlook, shortDesc: `OCI Outlook ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
+    ...(dashboard.summary.dpOutlook === null ? [] : [{ id: "dp-total", seriesId: "DP Total", groupId: "Total", value: dashboard.summary.dpOutlook, shortDesc: `DP Total ${formatAttainmentAmount(dashboard.summary.dpOutlook)}` } as const]),
+    ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-total", seriesId: "OCI Total", groupId: "Total", value: dashboard.summary.ociOutlook, shortDesc: `OCI Total ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
 
@@ -117,7 +121,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; the current and remaining months use Forecast. Amounts in K.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; current and remaining months use Forecast. Each month is counted once. Amounts in K.</p></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
     {error && <div class="attainment-inline-error" role="alert">{error}</div>}
@@ -126,8 +130,8 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
       <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>FY Total</strong></div>
       <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
       <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
-      <div class="attainment-fy-hero__primary"><small>Outlook (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
-      <div><small>Outlook attainment</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
+      <div class="attainment-fy-hero__primary"><small>Total (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
+      <div><small>Attainment · Total / Budget</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
     </section>
 
     <section aria-labelledby="quarterlyAttainmentTitle">
@@ -136,12 +140,12 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly outlook against budget</h2><p>Outlook combines closed-month Actual with current and remaining-month Forecast; Actual is not added twice.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly attainment against budget</h2><p>Budget, closed-month Actual, selected remaining-month Forecast, and their Total are shown separately.</p></div></div>
       <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderChartItem}></template></oj-chart>
     </section>
 
     <section class="kpi-panel attainment-chart-card attainment-supporting-card" aria-labelledby="attainmentCompositionTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>FY Actual and Outlook split by Pillar. Labels and values supplement color.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>FY Actual and Total split by Pillar. Labels and values supplement color.</p></div></div>
       <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" }, referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderCompositionItem}></template></oj-chart>
     </section>
 

@@ -2956,7 +2956,7 @@ h4.weekly-activity-section-label--next-week,
 .attainment-fy-hero { display: grid; grid-template-columns: minmax(7rem, .7fr) repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--oj-core-divider-color); border-radius: .85rem; background: var(--oj-core-divider-color); box-shadow: var(--oj-core-box-shadow-sm); }
 .attainment-fy-hero > div { display: grid; align-content: center; gap: .35rem; min-height: 6.75rem; padding: 1rem 1.15rem; background: var(--oj-core-bg-color-content); }
 .attainment-fy-hero small { color: var(--oj-core-text-color-secondary); font-weight: 600; }
-.attainment-fy-hero strong { font-size: clamp(1.25rem, 2vw, 1.75rem); }
+.attainment-fy-hero strong { color: var(--oj-core-text-color-primary); font-size: clamp(1.35rem, 2.2vw, 1.9rem); font-weight: 750; }
 .attainment-fy-hero__title { background: color-mix(in srgb, var(--oj-core-bg-color-content) 82%, var(--oj-palette-brand-rgb-50)) !important; }
 .attainment-fy-hero__title span { color: var(--oj-core-text-color-secondary); font-size: .82rem; font-weight: 700; }
 .attainment-fy-hero__primary { border-block-start: .25rem solid var(--oj-core-focus-border-color); }
@@ -2965,13 +2965,16 @@ h4.weekly-activity-section-label--next-week,
 .attainment-quarter-card { display: grid; gap: .65rem; min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); box-shadow: var(--oj-core-box-shadow-sm); }
 .attainment-quarter-card__heading { display: flex; align-items: center; justify-content: space-between; }
 .attainment-quarter-card__heading strong { font-size: 1.05rem; }
-.attainment-quarter-card__heading b { padding: .25rem .55rem; border-radius: 999px; background: color-mix(in srgb, var(--oj-core-success-1) 80%, transparent); color: var(--oj-core-success-3); font-size: .85rem; }
+.attainment-quarter-card__heading b { padding: .3rem .65rem; border: 1px solid #5b9f72; border-radius: 999px; background: #dff4e5; color: #174f2b; font-size: 1rem; font-weight: 800; letter-spacing: .01em; }
 .attainment-quarter-card__metric { display: grid; gap: .18rem; }
 .attainment-quarter-card__metric small,
 .attainment-quarter-card__actual,
-.attainment-quarter-card__pillars { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
-.attainment-quarter-card__metric strong { font-size: 1.05rem; }
-.attainment-quarter-card__metric--primary strong { font-size: 1.35rem; }
+.attainment-quarter-card__pillars,
+.attainment-quarter-card__basis { color: var(--oj-core-text-color-secondary); font-size: .82rem; }
+.attainment-quarter-card__metric strong { color: var(--oj-core-text-color-primary); font-size: 1.15rem; font-weight: 700; }
+.attainment-quarter-card__metric--primary strong { font-size: 1.5rem; font-weight: 800; }
+.attainment-quarter-card__actual { color: var(--oj-core-text-color-primary); font-weight: 650; }
+.attainment-quarter-card__basis { font-weight: 650; }
 .attainment-quarter-card__pillars { padding-block-start: .55rem; border-block-start: 1px solid var(--oj-core-divider-color); }
 .attainment-chart-card { min-width: 0; }
 .attainment-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-block-end: .8rem; }
