@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, getAlertActualTrend, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -60,6 +60,10 @@ const analysis = {
 };
 
 void (async () => {
+  assert.equal(isUnmappedConsumptionLabel("Unmapped"), true, "the production fallback label is hidden");
+  assert.equal(isUnmappedConsumptionLabel("  uNmApPeD  "), true, "unmapped matching ignores case and surrounding whitespace");
+  assert.equal(isUnmappedConsumptionLabel("Database"), false, "actual workload names remain visible");
+
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=");
     assert.equal(init?.method, undefined);

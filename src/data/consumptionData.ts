@@ -5,6 +5,7 @@ export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; v
   { label: "DP", value: "DP" },
   { label: "OCI", value: "OCI" }
 ];
+export const isUnmappedConsumptionLabel = (value: string): boolean => value.trim().toUpperCase() === "UNMAPPED";
 export type ConsumptionDataCenterBreakdown = Readonly<{
   dpCount: number | null;
   ociCount: number | null;
