@@ -32,14 +32,19 @@ assert.deepEqual(summary, {
   budget: 400,
   actual: 300,
   forecast: 400,
+  outlook: 400,
   dpActual: 128,
   dpForecast: 170,
+  dpOutlook: 170,
   ociActual: 172,
   ociForecast: 230,
+  ociOutlook: 230,
   actualAttainment: 75,
   forecastAttainment: 100,
+  outlookAttainment: 100,
   actualVarianceToBudget: -100,
-  forecastVarianceToBudget: 0
+  forecastVarianceToBudget: 0,
+  outlookVarianceToBudget: 0
 });
 assert.notEqual(summary.actualAttainment, (50 + 90) / 2, "FY attainment is not an average of quarter percentages");
 
