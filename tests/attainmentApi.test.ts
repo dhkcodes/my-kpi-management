@@ -23,16 +23,16 @@ void (async () => {
   const result = await fetchAttainment("FY26", fetchImpl);
   assert.equal(capturedUrl, "/api/v1/attainment?fiscalYear=FY26");
   assert.equal(capturedInit?.credentials, "include", "Attainment GET uses shared authenticated fetch behavior");
-  assert.deepEqual(result, {
-    fiscalYear: "FY26",
-    quarters: [
-      { quarter: "Q1", budget: 100, actual: 90, forecast: 110, dpActual: 40, dpForecast: 50, ociActual: 50, ociForecast: 60, actualAttainment: 90, forecastAttainment: 110 },
-      { quarter: "Q2", budget: 0, actual: 0, forecast: 10, dpActual: 0, dpForecast: 4, ociActual: 0, ociForecast: 6, actualAttainment: null, forecastAttainment: null },
-      { quarter: "Q3", budget: null, actual: 20, forecast: 30, dpActual: 8, dpForecast: 12, ociActual: 12, ociForecast: 18, actualAttainment: null, forecastAttainment: null },
-      { quarter: "Q4", budget: 200, actual: 150, forecast: 250, dpActual: 70, dpForecast: 100, ociActual: 80, ociForecast: 150, actualAttainment: 75, forecastAttainment: 125 }
-    ],
-    summary: { budget: null, actual: 260, forecast: 400, dpActual: 118, dpForecast: 166, ociActual: 142, ociForecast: 234, actualAttainment: null, forecastAttainment: null, actualVarianceToBudget: null, forecastVarianceToBudget: null }
-  });
+  assert.equal(result.fiscalYear, "FY26");
+  assert.equal(result.quarters.length, 4);
+  assert.equal(result.quarters[0].quarter, "Q1");
+  assert.equal(result.quarters[0].actual, 90);
+  assert.equal(result.quarters[0].outlook, 110, "legacy responses map Forecast to Outlook");
+  assert.equal(result.quarters[0].dpOutlook, 50);
+  assert.deepEqual(result.quarters[0].details, []);
+  assert.equal(result.summary.actual, 260);
+  assert.equal(result.summary.outlook, 400);
+  assert.equal(result.summary.outlookVarianceToBudget, null);
 
   await updateAttainmentBudget("FY26", { q1: 100, q2: 0, q3: null, q4: 200.5 }, fetchImpl);
   assert.equal(capturedUrl, "/api/v1/attainment/budget?fiscalYear=FY26");

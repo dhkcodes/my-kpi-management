@@ -2953,6 +2953,29 @@ h4.weekly-activity-section-label--next-week,
 .attainment-summary article { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); box-shadow: var(--oj-core-box-shadow-sm); }
 .attainment-summary span { color: var(--oj-core-text-color-secondary); font-size: .82rem; }
 .attainment-summary strong { font-size: 1.35rem; }
+.attainment-fy-hero { display: grid; grid-template-columns: minmax(7rem, .7fr) repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--oj-core-divider-color); border-radius: .85rem; background: var(--oj-core-divider-color); box-shadow: var(--oj-core-box-shadow-sm); }
+.attainment-fy-hero > div { display: grid; align-content: center; gap: .35rem; min-height: 6.75rem; padding: 1rem 1.15rem; background: var(--oj-core-bg-color-content); }
+.attainment-fy-hero small { color: var(--oj-core-text-color-secondary); font-weight: 600; }
+.attainment-fy-hero strong { font-size: clamp(1.25rem, 2vw, 1.75rem); }
+.attainment-fy-hero__title { background: color-mix(in srgb, var(--oj-core-bg-color-content) 82%, var(--oj-palette-brand-rgb-50)) !important; }
+.attainment-fy-hero__title span { color: var(--oj-core-text-color-secondary); font-size: .82rem; font-weight: 700; }
+.attainment-fy-hero__primary { border-block-start: .25rem solid var(--oj-core-focus-border-color); }
+.attainment-fy-hero__primary span { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
+.attainment-quarter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
+.attainment-quarter-card { display: grid; gap: .65rem; min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); font: inherit; text-align: start; cursor: pointer; box-shadow: var(--oj-core-box-shadow-sm); }
+.attainment-quarter-card:hover { border-color: var(--oj-core-focus-border-color); }
+.attainment-quarter-card:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 2px; }
+.attainment-quarter-card.is-selected { border-color: var(--oj-core-focus-border-color); box-shadow: inset 0 .25rem 0 var(--oj-core-focus-border-color), var(--oj-core-box-shadow-sm); }
+.attainment-quarter-card__heading { display: flex; align-items: center; justify-content: space-between; }
+.attainment-quarter-card__heading strong { font-size: 1.05rem; }
+.attainment-quarter-card__heading b { padding: .25rem .55rem; border-radius: 999px; background: color-mix(in srgb, var(--oj-core-success-1) 80%, transparent); color: var(--oj-core-success-3); font-size: .85rem; }
+.attainment-quarter-card__metric { display: grid; gap: .18rem; }
+.attainment-quarter-card__metric small,
+.attainment-quarter-card__actual,
+.attainment-quarter-card__pillars { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
+.attainment-quarter-card__metric strong { font-size: 1.05rem; }
+.attainment-quarter-card__metric--primary strong { font-size: 1.35rem; }
+.attainment-quarter-card__pillars { padding-block-start: .55rem; border-block-start: 1px solid var(--oj-core-divider-color); }
 .attainment-table-card,
 .attainment-chart-card { min-width: 0; }
 .attainment-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-block-end: .8rem; }
@@ -2968,15 +2991,42 @@ h4.weekly-activity-section-label--next-week,
 .attainment-table td:last-child { background: color-mix(in srgb, var(--oj-core-bg-color-content) 92%, var(--oj-palette-brand-rgb-50)); font-weight: 700; }
 .attainment-detail-divider th { position: static; padding-block: .85rem .45rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-secondary); font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; }
 .attainment-detail-row { color: var(--oj-core-text-color-secondary); font-size: .86rem; }
+.attainment-monthly-table { min-width: 940px; }
+.attainment-monthly-table th:first-child { min-width: 12rem; }
+.attainment-monthly-table tbody th { text-align: start; }
+.attainment-monthly-table tbody td { vertical-align: top; }
+.attainment-monthly-table tbody td > strong,
+.attainment-monthly-table tbody td > small { display: block; }
+.attainment-monthly-table tbody td > small:last-child { margin-block-start: .25rem; color: var(--oj-core-text-color-secondary); font-size: .72rem; }
+.attainment-pillar-label { display: inline-block; margin-inline-start: .5rem; padding: .12rem .4rem; border: 1px solid var(--oj-core-divider-color); border-radius: 999px; color: var(--oj-core-text-color-secondary); font-size: .7rem; }
+.attainment-source { margin-block-start: .2rem; font-size: .72rem; font-weight: 700; }
+.attainment-source--actual { color: var(--oj-core-success-3); }
+.attainment-source--forecast { color: var(--oj-core-focus-border-color); }
+.attainment-source--none { color: var(--oj-core-text-color-secondary); }
+.attainment-empty-detail { padding: 2rem !important; text-align: center !important; color: var(--oj-core-text-color-secondary); }
+.attainment-detail-card { min-width: 0; }
 .attainment-chart { width: 100%; height: 22rem; }
+.attainment-chart-card p,
+.attainment-section-heading p { margin: .25rem 0 0; color: var(--oj-core-text-color-secondary); }
+.attainment-chart-card p { font-size: .85rem; }
+.attainment-section-heading p { font-size: .82rem; }
+.attainment-chart-card.attainment-chart-card { border-inline-start: .25rem solid color-mix(in srgb, var(--oj-core-focus-border-color) 55%, transparent); }
+.attainment-chart-card.attainment-chart-card.attainment-chart-card + .attainment-chart-card { border-inline-start-color: var(--oj-core-divider-color); }
 .attainment-budget-form { display: grid; gap: 1rem; min-width: min(30rem, 75vw); }
 .attainment-budget-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
 .attainment-budget-fields label { display: grid; gap: .35rem; color: var(--oj-core-text-color-secondary); font-size: .82rem; font-weight: 600; }
 .attainment-budget-fields input { box-sizing: border-box; width: 100%; min-height: 2.5rem; padding: .45rem .6rem; border: 1px solid var(--oj-core-divider-color); border-radius: .35rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); font: inherit; }
 .attainment-budget-fields input:focus { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 1px; }
 .attainment-budget-total { display: flex; justify-content: space-between; padding-block-start: .75rem; border-block-start: 1px solid var(--oj-core-divider-color); }
+@media (max-width: 900px) {
+  .attainment-fy-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attainment-fy-hero__title { grid-column: 1 / -1; min-height: 4rem !important; }
+  .attainment-quarter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 700px) {
   .attainment-summary { grid-template-columns: 1fr; }
+  .attainment-fy-hero,
+  .attainment-quarter-grid { grid-template-columns: 1fr; }
   .attainment-budget-fields { grid-template-columns: 1fr; }
   .attainment-budget-form { min-width: 0; }
 }

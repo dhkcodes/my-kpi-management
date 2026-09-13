@@ -8,14 +8,11 @@ import { fetchAttainment, updateAttainmentBudget } from "../../data/attainmentAp
 import {
   AttainmentBudgetUpdate,
   AttainmentDashboard,
+  AttainmentQuarter,
   AttainmentQuarterRecord,
-  calculateAttainment,
-  calculateRemainingTarget,
-  calculateRequiredMonthlyAverage,
   formatAttainment,
   formatAttainmentAmount,
-  formatBudget,
-  remainingFiscalMonths
+  formatBudget
 } from "../../data/attainmentData";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -25,25 +22,13 @@ import "ojs/ojprogress-circle";
 const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
 type BudgetDraft = Record<BudgetKey, string>;
-type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual" | "Forecast"; groupId: string; value: number; shortDesc: string }>;
-type CompositionPoint = Readonly<{ id: string; seriesId: "DP Actual" | "DP Forecast" | "OCI Actual" | "OCI Forecast"; groupId: "Actual" | "Forecast"; value: number; shortDesc: string }>;
+type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual to date" | "Outlook (Actual + Forecast)"; groupId: string; value: number; shortDesc: string }>;
+type CompositionPoint = Readonly<{ id: string; seriesId: "DP Actual" | "DP Outlook" | "OCI Actual" | "OCI Outlook"; groupId: "Actual" | "Outlook"; value: number; shortDesc: string }>;
 
 const amountAxisConverter = new IntlNumberConverter({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const chartDataLabel = ({ value }: Readonly<{ value: number }>) => `${value.toFixed(0)}K`;
-
-const renderChartItem = ({ data }: Readonly<{ data: ChartPoint }>) => <oj-chart-item
-  value={data.value}
-  seriesId={data.seriesId}
-  groupId={[data.groupId]}
-  shortDesc={data.shortDesc}>
-</oj-chart-item>;
-
-const renderCompositionItem = ({ data }: Readonly<{ data: CompositionPoint }>) => <oj-chart-item
-  value={data.value}
-  seriesId={data.seriesId}
-  groupId={[data.groupId]}
-  shortDesc={data.shortDesc}>
-</oj-chart-item>;
+const renderChartItem = ({ data }: Readonly<{ data: ChartPoint }>) => <oj-chart-item value={data.value} seriesId={data.seriesId} groupId={[data.groupId]} shortDesc={data.shortDesc}></oj-chart-item>;
+const renderCompositionItem = ({ data }: Readonly<{ data: CompositionPoint }>) => <oj-chart-item value={data.value} seriesId={data.seriesId} groupId={[data.groupId]} shortDesc={data.shortDesc}></oj-chart-item>;
 
 const draftFromDashboard = (dashboard: AttainmentDashboard): BudgetDraft => ({
   q1: dashboard.quarters[0].budget === null ? "" : String(dashboard.quarters[0].budget),
@@ -51,21 +36,28 @@ const draftFromDashboard = (dashboard: AttainmentDashboard): BudgetDraft => ({
   q3: dashboard.quarters[2].budget === null ? "" : String(dashboard.quarters[2].budget),
   q4: dashboard.quarters[3].budget === null ? "" : String(dashboard.quarters[3].budget)
 });
-
 const budgetPayload = (draft: BudgetDraft): AttainmentBudgetUpdate => ({
-  q1: draft.q1 === "" ? null : Number(draft.q1),
-  q2: draft.q2 === "" ? null : Number(draft.q2),
-  q3: draft.q3 === "" ? null : Number(draft.q3),
-  q4: draft.q4 === "" ? null : Number(draft.q4)
+  q1: draft.q1 === "" ? null : Number(draft.q1), q2: draft.q2 === "" ? null : Number(draft.q2),
+  q3: draft.q3 === "" ? null : Number(draft.q3), q4: draft.q4 === "" ? null : Number(draft.q4)
 });
-
 const draftTotal = (draft: BudgetDraft): number | null => {
   if (quarterKeys.some((key) => draft[key] === "")) return null;
   const values = quarterKeys.map((key) => Number(draft[key]));
   return values.every(Number.isFinite) ? values.reduce((total, value) => total + value, 0) : null;
 };
-
 const signedAmount = (value: number | null): string => value === null ? "—" : `${value > 0 ? "+" : ""}${formatAttainmentAmount(value)}`;
+const sourceLabel = (source: string): string => source === "ACTUAL" ? "Actual" : source === "FORECAST" ? "Forecast" : "Not entered";
+const detailAmount = (value: number | null): string => value === null ? "—" : formatAttainmentAmount(value);
+
+function QuarterCard({ quarter, selected, onSelect }: Readonly<{ quarter: AttainmentQuarterRecord; selected: boolean; onSelect: () => void }>) {
+  return <button type="button" class={`attainment-quarter-card${selected ? " is-selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
+    <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
+    <span class="attainment-quarter-card__metric"><small>Budget</small><strong>{formatBudget(quarter.budget)}</strong></span>
+    <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Outlook (Actual + Forecast)</small><strong>{formatAttainmentAmount(quarter.outlook)}</strong></span>
+    <span class="attainment-quarter-card__actual">Actual to date {formatAttainmentAmount(quarter.actual)}</span>
+    <span class="attainment-quarter-card__pillars">DP {formatAttainmentAmount(quarter.dpOutlook)} · OCI {formatAttainmentAmount(quarter.ociOutlook)}</span>
+  </button>;
+}
 
 export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
   const [dashboard, setDashboard] = useState<AttainmentDashboard | null>(null);
@@ -74,68 +66,54 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [draft, setDraft] = useState<BudgetDraft>({ q1: "", q2: "", q3: "", q4: "" });
+  const [selectedQuarter, setSelectedQuarter] = useState<AttainmentQuarter>("Q1");
   const dialogRef = useRef<DialogElement>(null);
   const requestVersion = useRef(0);
 
   useEffect(() => {
     const version = ++requestVersion.current;
-    setDashboard(null);
-    setLoading(true);
-    setSaving(false);
-    setError("");
-    setSaveError("");
-    dialogRef.current?.close();
+    setDashboard(null); setLoading(true); setSaving(false); setError(""); setSaveError(""); dialogRef.current?.close();
     fetchAttainment(fiscalYear)
-      .then((value) => { if (version === requestVersion.current) setDashboard(value); })
-      .catch((reason) => {
-        if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : "Attainment could not be loaded.");
+      .then((value) => {
+        if (version !== requestVersion.current) return;
+        setDashboard(value);
+        setSelectedQuarter(value.quarters.find((quarter) => quarter.details.some((detail) => detail.months.some((month) => month.appliedSource === "FORECAST")))?.quarter ?? "Q1");
       })
+      .catch((reason) => { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : "Attainment could not be loaded."); })
       .finally(() => { if (version === requestVersion.current) setLoading(false); });
     return () => { requestVersion.current += 1; };
   }, [fiscalYear]);
 
   const openBudgetDialog = () => {
     if (!dashboard) return;
-    setDraft(draftFromDashboard(dashboard));
-    setSaveError("");
-    dialogRef.current?.open();
+    setDraft(draftFromDashboard(dashboard)); setSaveError(""); dialogRef.current?.open();
   };
-
   const saveBudget = async () => {
     const payload = budgetPayload(draft);
     if (Object.values(payload).some((value) => value !== null && (!Number.isFinite(value) || value < 0))) {
-      setSaveError("Enter nonnegative amounts or leave a quarter blank.");
-      return;
+      setSaveError("Enter nonnegative amounts or leave a quarter blank."); return;
     }
-    const version = requestVersion.current;
-    setSaving(true);
-    setSaveError("");
+    const version = requestVersion.current; setSaving(true); setSaveError("");
     try {
       const updated = await updateAttainmentBudget(fiscalYear, payload);
       if (version !== requestVersion.current) return;
-      setDashboard(updated);
-      dialogRef.current?.close();
+      setDashboard(updated); dialogRef.current?.close();
     } catch (reason) {
-      if (version === requestVersion.current) {
-        setSaveError(reason instanceof Error ? reason.message : "Budget could not be saved.");
-      }
-    } finally {
-      if (version === requestVersion.current) setSaving(false);
-    }
+      if (version === requestVersion.current) setSaveError(reason instanceof Error ? reason.message : "Budget could not be saved.");
+    } finally { if (version === requestVersion.current) setSaving(false); }
   };
 
   const chartPoints = useMemo<ChartPoint[]>(() => dashboard ? dashboard.quarters.flatMap((quarter) => [
-    ...(quarter.budget === null ? [] : [{ id: `${quarter.quarter}-budget`, seriesId: "Budget Target", groupId: quarter.quarter, value: quarter.budget,
-      shortDesc: `${quarter.quarter} Budget Target ${formatBudget(quarter.budget)}` } as const]),
-    { id: `${quarter.quarter}-actual`, seriesId: "Actual", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
-    { id: `${quarter.quarter}-forecast`, seriesId: "Forecast", groupId: quarter.quarter, value: quarter.forecast, shortDesc: `${quarter.quarter} Forecast ${formatAttainmentAmount(quarter.forecast)}` } as const
+    ...(quarter.budget === null ? [] : [{ id: `${quarter.quarter}-budget`, seriesId: "Budget Target", groupId: quarter.quarter, value: quarter.budget, shortDesc: `${quarter.quarter} Budget ${formatBudget(quarter.budget)}` } as const]),
+    { id: `${quarter.quarter}-actual`, seriesId: "Actual to date", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
+    { id: `${quarter.quarter}-outlook`, seriesId: "Outlook (Actual + Forecast)", groupId: quarter.quarter, value: quarter.outlook, shortDesc: `${quarter.quarter} Outlook ${formatAttainmentAmount(quarter.outlook)}` } as const
   ]) : [], [dashboard]);
   const chartData = useMemo(() => new ArrayDataProvider(chartPoints, { keyAttributes: "id" }), [chartPoints]);
   const compositionPoints = useMemo<CompositionPoint[]>(() => dashboard ? [
     { id: "dp-actual", seriesId: "DP Actual", groupId: "Actual", value: dashboard.summary.dpActual, shortDesc: `DP Actual ${formatAttainmentAmount(dashboard.summary.dpActual)}` },
     { id: "oci-actual", seriesId: "OCI Actual", groupId: "Actual", value: dashboard.summary.ociActual, shortDesc: `OCI Actual ${formatAttainmentAmount(dashboard.summary.ociActual)}` },
-    { id: "dp-forecast", seriesId: "DP Forecast", groupId: "Forecast", value: dashboard.summary.dpForecast, shortDesc: `DP Forecast ${formatAttainmentAmount(dashboard.summary.dpForecast)}` },
-    { id: "oci-forecast", seriesId: "OCI Forecast", groupId: "Forecast", value: dashboard.summary.ociForecast, shortDesc: `OCI Forecast ${formatAttainmentAmount(dashboard.summary.ociForecast)}` }
+    { id: "dp-outlook", seriesId: "DP Outlook", groupId: "Outlook", value: dashboard.summary.dpOutlook, shortDesc: `DP Outlook ${formatAttainmentAmount(dashboard.summary.dpOutlook)}` },
+    { id: "oci-outlook", seriesId: "OCI Outlook", groupId: "Outlook", value: dashboard.summary.ociOutlook, shortDesc: `OCI Outlook ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` }
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
 
@@ -143,90 +121,56 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
   if (!dashboard) return <section class="kpi-panel" role="alert">Attainment is unavailable.</section>;
 
-  const now = new Date();
-  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthsRemaining = remainingFiscalMonths(fiscalYear, currentPeriod);
-  const remainingTarget = calculateRemainingTarget(dashboard.summary.budget, dashboard.summary.actual);
-  const requiredMonthlyAverage = calculateRequiredMonthlyAverage(remainingTarget, monthsRemaining);
-  const requiredMonthlyDisplay = monthsRemaining === 0 ? "FY Complete" : requiredMonthlyAverage === null ? "—" : formatAttainmentAmount(requiredMonthlyAverage);
-
-  const values = [...dashboard.quarters, dashboard.summary];
-  const metricRows = [
-    { label: "Budget", values: values.map((value) => formatBudget(value.budget)) },
-    { label: "Actual", values: values.map((value) => formatAttainmentAmount(value.actual)) },
-    { label: "Forecast", values: values.map((value) => formatAttainmentAmount(value.forecast)) },
-    { label: "Actual Attainment", values: values.map((value) => formatAttainment(calculateAttainment(value.actual, value.budget))) },
-    { label: "Forecast Attainment", values: values.map((value) => formatAttainment(calculateAttainment(value.forecast, value.budget))) }
-  ];
-  const detailRows = [
-    { label: "DP Actual", values: values.map((value) => formatAttainmentAmount(value.dpActual)) },
-    { label: "DP Forecast", values: values.map((value) => formatAttainmentAmount(value.dpForecast)) },
-    { label: "OCI Actual", values: values.map((value) => formatAttainmentAmount(value.ociActual)) },
-    { label: "OCI Forecast", values: values.map((value) => formatAttainmentAmount(value.ociForecast)) }
-  ];
+  const selected = dashboard.quarters.find((quarter) => quarter.quarter === selectedQuarter) ?? dashboard.quarters[0];
+  const months = selected.details[0]?.months ?? [];
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Fiscal-year performance against quarterly budget. Amounts in K.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; the current and remaining months use Forecast. Amounts in K.</p></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
-
     {error && <div class="attainment-inline-error" role="alert">{error}</div>}
-    <section class="attainment-summary" aria-label={`${fiscalYear} summary`}>
-      <article><span>FY Budget</span><strong>{formatBudget(dashboard.summary.budget)}</strong></article>
-      <article><span>Actual variance to budget</span><strong>{signedAmount(dashboard.summary.actualVarianceToBudget)}</strong></article>
-      <article><span>Forecast variance to budget</span><strong>{signedAmount(dashboard.summary.forecastVarianceToBudget)}</strong></article>
-      <article><span>Remaining Target</span><strong>{remainingTarget === null ? "—" : formatAttainmentAmount(remainingTarget)}</strong><small>Budget less Actual-to-date</small></article>
-      <article><span>Required Monthly Average</span><strong>{requiredMonthlyDisplay}</strong><small>{monthsRemaining > 0 ? `${monthsRemaining} FY month${monthsRemaining === 1 ? "" : "s"} remaining; current month is included` : "Fiscal year period has ended"}</small></article>
+
+    <section class="attainment-fy-hero" aria-label={`${fiscalYear} total`}>
+      <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>FY Total</strong></div>
+      <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
+      <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
+      <div class="attainment-fy-hero__primary"><small>Outlook (Actual + Forecast)</small><strong>{formatAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
+      <div><small>Outlook attainment</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
     </section>
 
-    <section class="kpi-panel attainment-table-card" aria-labelledby="attainmentTableTitle">
-      <div class="attainment-section-heading"><h2 id="attainmentTableTitle">Quarterly attainment</h2><span>{fiscalYear}</span></div>
+    <section aria-labelledby="quarterlyAttainmentTitle">
+      <div class="attainment-section-heading"><div><h2 id="quarterlyAttainmentTitle">Quarterly attainment</h2><p>Select a quarter to inspect Account and Pillar monthly detail.</p></div></div>
+      <div class="attainment-quarter-grid">{dashboard.quarters.map((quarter) => <QuarterCard key={quarter.quarter} quarter={quarter} selected={quarter.quarter === selected.quarter} onSelect={() => setSelectedQuarter(quarter.quarter)} />)}</div>
+    </section>
+
+    <section class="kpi-panel attainment-detail-card" aria-labelledby="attainmentDetailTitle">
+      <div class="attainment-section-heading"><div><h2 id="attainmentDetailTitle">{selected.quarter} monthly detail</h2><p>Applied amount identifies the Actual or Forecast used in Outlook. Zero is shown as $0 K; missing values as —.</p></div><span>{formatAttainmentAmount(selected.outlook)} · {formatAttainment(selected.outlookAttainment)}</span></div>
       <div class="attainment-table-scroll">
-        <table class="attainment-table">
-          <thead><tr><th scope="col">Metric</th>{dashboard.quarters.map((quarter) => <th key={quarter.quarter} scope="col">{quarter.quarter}</th>)}<th scope="col">FY Total</th></tr></thead>
-          <tbody>
-            {metricRows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th>{row.values.map((value, index) => <td key={`${row.label}-${index}`}>{value}</td>)}</tr>)}
-            <tr class="attainment-detail-divider"><th colSpan={6} scope="rowgroup">Detail · amounts only</th></tr>
-            {detailRows.map((row) => <tr key={row.label} class="attainment-detail-row"><th scope="row">{row.label}</th>{row.values.map((value, index) => <td key={`${row.label}-${index}`}>{value}</td>)}</tr>)}
-          </tbody>
+        <table class="attainment-table attainment-monthly-table">
+          <thead><tr><th scope="col">Account / Pillar</th>{months.map((month) => <th key={month.periodKey} scope="col">{month.month}</th>)}<th scope="col">Quarter total</th></tr></thead>
+          <tbody>{selected.details.length === 0 ? <tr><td colSpan={5} class="attainment-empty-detail">No Actual or Forecast has been entered for this quarter.</td></tr> : selected.details.map((detail) => <tr key={`${detail.account}-${detail.pillar}`}>
+            <th scope="row"><strong>{detail.account}</strong><span class="attainment-pillar-label">{detail.pillar}</span></th>
+            {detail.months.map((month) => <td key={month.periodKey}><strong>{detailAmount(month.appliedAmount)}</strong><small class={`attainment-source attainment-source--${month.appliedSource.toLowerCase()}`}>{sourceLabel(month.appliedSource)}</small><small>Actual {detailAmount(month.actual)} · Forecast {detailAmount(month.forecast)}</small></td>)}
+            <td><strong>{formatAttainmentAmount(detail.quarterTotal)}</strong></td>
+          </tr>)}</tbody>
         </table>
       </div>
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Actual and forecast by quarter</h2><p>Actual, forecast and each quarter's budget target. Amounts in K.</p></div></div>
-      <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)",
-        tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }}
-        styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart">
-        <template slot="itemTemplate" render={renderChartItem}></template>
-      </oj-chart>
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly outlook against budget</h2><p>Outlook combines closed-month Actual with current and remaining-month Forecast; Actual is not added twice.</p></div></div>
+      <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderChartItem}></template></oj-chart>
     </section>
 
-    <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentCompositionTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">DP / OCI Actual and Forecast composition</h2><p>FY Actual and Forecast composition with Budget marker. Amounts in K.</p></div></div>
-      <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel}
-        yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" },
-          referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget marker", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }}
-        styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart">
-        <template slot="itemTemplate" render={renderCompositionItem}></template>
-      </oj-chart>
+    <section class="kpi-panel attainment-chart-card attainment-supporting-card" aria-labelledby="attainmentCompositionTitle">
+      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>FY Actual and Outlook split by Pillar. Labels and values supplement color.</p></div></div>
+      <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" }, referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderCompositionItem}></template></oj-chart>
     </section>
 
     <oj-dialog ref={dialogRef} dialogTitle={`Budget · ${fiscalYear}`} cancelBehavior={saving ? "none" : "icon"} class="attainment-budget-dialog">
-      <div slot="body" class="attainment-budget-form">
-        <p>Enter each budget in K. Values are stored as entered; blank means no budget and zero remains an explicit zero budget.</p>
-        <div class="attainment-budget-fields">
-          {quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving}
-            onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}
-        </div>
-        <div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>
-        {saveError && <div role="alert" class="attainment-inline-error">{saveError}</div>}
-      </div>
-      <div slot="footer">
-        <oj-button disabled={saving} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button>
-        <oj-button chroming="callToAction" disabled={saving} onojAction={() => void saveBudget()}>{saving ? "Saving…" : "Save budget"}</oj-button>
-      </div>
+      <div slot="body" class="attainment-budget-form"><p>Enter each budget in K. Values are stored as entered; blank means no budget and zero remains explicit.</p><div class="attainment-budget-fields">{quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving} onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}</div><div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>{saveError && <div role="alert" class="attainment-inline-error">{saveError}</div>}</div>
+      <div slot="footer"><oj-button disabled={saving} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void saveBudget()}>{saving ? "Saving…" : "Save budget"}</oj-button></div>
     </oj-dialog>
   </section>;
 }
