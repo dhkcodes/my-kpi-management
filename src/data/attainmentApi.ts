@@ -37,11 +37,11 @@ const nullableFinite = (value: unknown): value is number | null => value === nul
 const quarterName = (value: unknown): value is AttainmentQuarter => attainmentQuarters.includes(value as AttainmentQuarter);
 const sourceName = (value: unknown): value is AttainmentAppliedSource => ["ACTUAL", "FORECAST", "NONE"].includes(value as string);
 
-const parsePillarAmounts = (value: unknown): { actual: number; forecast: number; outlook: number } | null => {
+const parsePillarAmounts = (value: unknown): { actual: number; forecast: number; outlook: number | null } | null => {
   if (!isObject(value) || !finite(value.actual) || !finite(value.forecast) ||
-      (value.outlook !== undefined && !finite(value.outlook))) return null;
+      (value.outlook !== undefined && !nullableFinite(value.outlook))) return null;
   return { actual: value.actual, forecast: value.forecast,
-    outlook: finite(value.outlook) ? value.outlook : value.forecast };
+    outlook: value.outlook === null ? null : finite(value.outlook) ? value.outlook : value.forecast };
 };
 
 const parseMonth = (value: unknown): AttainmentMonthDetail | null => {
@@ -54,7 +54,7 @@ const parseMonth = (value: unknown): AttainmentMonthDetail | null => {
 
 const parseDetail = (value: unknown): AttainmentDetail | null => {
   if (!isObject(value) || typeof value.account !== "string" || !["DP", "OCI"].includes(value.pillar as string) ||
-      !Array.isArray(value.months) || !finite(value.quarterTotal)) return null;
+      !Array.isArray(value.months) || !nullableFinite(value.quarterTotal)) return null;
   const months = value.months.map(parseMonth);
   if (months.some((month) => month === null)) return null;
   return { account: value.account, pillar: value.pillar as "DP" | "OCI",
@@ -63,7 +63,7 @@ const parseDetail = (value: unknown): AttainmentDetail | null => {
 
 const parseSummary = (value: unknown): AttainmentSummary | null => {
   if (!isObject(value) || !nullableFinite(value.budget) || !finite(value.actual) || !finite(value.forecast) ||
-      (value.outlook !== undefined && !finite(value.outlook)) || !nullableFinite(value.actualAttainment) ||
+      (value.outlook !== undefined && !nullableFinite(value.outlook)) || !nullableFinite(value.actualAttainment) ||
       !nullableFinite(value.forecastAttainment) || (value.outlookAttainment !== undefined && !nullableFinite(value.outlookAttainment)) ||
       !nullableFinite(value.actualVarianceToBudget) || !nullableFinite(value.forecastVarianceToBudget) ||
       (value.outlookVarianceToBudget !== undefined && !nullableFinite(value.outlookVarianceToBudget))) return null;
@@ -72,7 +72,7 @@ const parseSummary = (value: unknown): AttainmentSummary | null => {
   if (!dp || !oci) return null;
   return {
     budget: value.budget, actual: value.actual, forecast: value.forecast,
-    outlook: finite(value.outlook) ? value.outlook : value.forecast,
+    outlook: value.outlook === null ? null : finite(value.outlook) ? value.outlook : value.forecast,
     actualAttainment: value.actualAttainment, forecastAttainment: value.forecastAttainment,
     outlookAttainment: (value.outlookAttainment === undefined ? value.forecastAttainment : value.outlookAttainment) as number | null,
     dpActual: dp.actual, dpForecast: dp.forecast, dpOutlook: dp.outlook,
@@ -85,7 +85,7 @@ const parseSummary = (value: unknown): AttainmentSummary | null => {
 
 const parseQuarter = (value: unknown): AttainmentQuarterRecord | null => {
   if (!isObject(value) || !quarterName(value.quarter) || !nullableFinite(value.budget) ||
-      !finite(value.actual) || !finite(value.forecast) || (value.outlook !== undefined && !finite(value.outlook)) ||
+      !finite(value.actual) || !finite(value.forecast) || (value.outlook !== undefined && !nullableFinite(value.outlook)) ||
       !nullableFinite(value.actualAttainment) || !nullableFinite(value.forecastAttainment) ||
       (value.outlookAttainment !== undefined && !nullableFinite(value.outlookAttainment)) ||
       (value.details !== undefined && !Array.isArray(value.details))) return null;
@@ -95,7 +95,7 @@ const parseQuarter = (value: unknown): AttainmentQuarterRecord | null => {
   if (!dp || !oci || details.some((detail) => detail === null)) return null;
   return {
     quarter: value.quarter, budget: value.budget, actual: value.actual, forecast: value.forecast,
-    outlook: finite(value.outlook) ? value.outlook : value.forecast,
+    outlook: value.outlook === null ? null : finite(value.outlook) ? value.outlook : value.forecast,
     actualAttainment: value.actualAttainment, forecastAttainment: value.forecastAttainment,
     outlookAttainment: (value.outlookAttainment === undefined ? value.forecastAttainment : value.outlookAttainment) as number | null,
     dpActual: dp.actual, dpForecast: dp.forecast, dpOutlook: dp.outlook,

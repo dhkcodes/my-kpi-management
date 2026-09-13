@@ -12,7 +12,8 @@ import {
   AttainmentQuarterRecord,
   formatAttainment,
   formatAttainmentAmount,
-  formatBudget
+  formatBudget,
+  formatOptionalAttainmentAmount
 } from "../../data/attainmentData";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -53,9 +54,9 @@ function QuarterCard({ quarter, selected, onSelect }: Readonly<{ quarter: Attain
   return <button type="button" class={`attainment-quarter-card${selected ? " is-selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
     <span class="attainment-quarter-card__metric"><small>Budget</small><strong>{formatBudget(quarter.budget)}</strong></span>
-    <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Outlook (Actual + Forecast)</small><strong>{formatAttainmentAmount(quarter.outlook)}</strong></span>
+    <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Outlook (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(quarter.outlook)}</strong></span>
     <span class="attainment-quarter-card__actual">Actual to date {formatAttainmentAmount(quarter.actual)}</span>
-    <span class="attainment-quarter-card__pillars">DP {formatAttainmentAmount(quarter.dpOutlook)} · OCI {formatAttainmentAmount(quarter.ociOutlook)}</span>
+    <span class="attainment-quarter-card__pillars">DP {formatOptionalAttainmentAmount(quarter.dpOutlook)} · OCI {formatOptionalAttainmentAmount(quarter.ociOutlook)}</span>
   </button>;
 }
 
@@ -106,14 +107,14 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   const chartPoints = useMemo<ChartPoint[]>(() => dashboard ? dashboard.quarters.flatMap((quarter) => [
     ...(quarter.budget === null ? [] : [{ id: `${quarter.quarter}-budget`, seriesId: "Budget Target", groupId: quarter.quarter, value: quarter.budget, shortDesc: `${quarter.quarter} Budget ${formatBudget(quarter.budget)}` } as const]),
     { id: `${quarter.quarter}-actual`, seriesId: "Actual to date", groupId: quarter.quarter, value: quarter.actual, shortDesc: `${quarter.quarter} Actual ${formatAttainmentAmount(quarter.actual)}` } as const,
-    { id: `${quarter.quarter}-outlook`, seriesId: "Outlook (Actual + Forecast)", groupId: quarter.quarter, value: quarter.outlook, shortDesc: `${quarter.quarter} Outlook ${formatAttainmentAmount(quarter.outlook)}` } as const
+    ...(quarter.outlook === null ? [] : [{ id: `${quarter.quarter}-outlook`, seriesId: "Outlook (Actual + Forecast)", groupId: quarter.quarter, value: quarter.outlook, shortDesc: `${quarter.quarter} Outlook ${formatAttainmentAmount(quarter.outlook)}` } as const])
   ]) : [], [dashboard]);
   const chartData = useMemo(() => new ArrayDataProvider(chartPoints, { keyAttributes: "id" }), [chartPoints]);
   const compositionPoints = useMemo<CompositionPoint[]>(() => dashboard ? [
     { id: "dp-actual", seriesId: "DP Actual", groupId: "Actual", value: dashboard.summary.dpActual, shortDesc: `DP Actual ${formatAttainmentAmount(dashboard.summary.dpActual)}` },
     { id: "oci-actual", seriesId: "OCI Actual", groupId: "Actual", value: dashboard.summary.ociActual, shortDesc: `OCI Actual ${formatAttainmentAmount(dashboard.summary.ociActual)}` },
-    { id: "dp-outlook", seriesId: "DP Outlook", groupId: "Outlook", value: dashboard.summary.dpOutlook, shortDesc: `DP Outlook ${formatAttainmentAmount(dashboard.summary.dpOutlook)}` },
-    { id: "oci-outlook", seriesId: "OCI Outlook", groupId: "Outlook", value: dashboard.summary.ociOutlook, shortDesc: `OCI Outlook ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` }
+    ...(dashboard.summary.dpOutlook === null ? [] : [{ id: "dp-outlook", seriesId: "DP Outlook", groupId: "Outlook", value: dashboard.summary.dpOutlook, shortDesc: `DP Outlook ${formatAttainmentAmount(dashboard.summary.dpOutlook)}` } as const]),
+    ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-outlook", seriesId: "OCI Outlook", groupId: "Outlook", value: dashboard.summary.ociOutlook, shortDesc: `OCI Outlook ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
 
@@ -135,7 +136,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
       <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>FY Total</strong></div>
       <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
       <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
-      <div class="attainment-fy-hero__primary"><small>Outlook (Actual + Forecast)</small><strong>{formatAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
+      <div class="attainment-fy-hero__primary"><small>Outlook (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
       <div><small>Outlook attainment</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
     </section>
 
@@ -145,14 +146,14 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section class="kpi-panel attainment-detail-card" aria-labelledby="attainmentDetailTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentDetailTitle">{selected.quarter} monthly detail</h2><p>Applied amount identifies the Actual or Forecast used in Outlook. Zero is shown as $0 K; missing values as —.</p></div><span>{formatAttainmentAmount(selected.outlook)} · {formatAttainment(selected.outlookAttainment)}</span></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentDetailTitle">{selected.quarter} monthly detail</h2><p>Applied amount identifies the Actual or Forecast used in Outlook. Zero is shown as $0 K; missing values as —.</p></div><span>{formatOptionalAttainmentAmount(selected.outlook)} · {formatAttainment(selected.outlookAttainment)}</span></div>
       <div class="attainment-table-scroll">
         <table class="attainment-table attainment-monthly-table">
           <thead><tr><th scope="col">Account / Pillar</th>{months.map((month) => <th key={month.periodKey} scope="col">{month.month}</th>)}<th scope="col">Quarter total</th></tr></thead>
           <tbody>{selected.details.length === 0 ? <tr><td colSpan={5} class="attainment-empty-detail">No Actual or Forecast has been entered for this quarter.</td></tr> : selected.details.map((detail) => <tr key={`${detail.account}-${detail.pillar}`}>
             <th scope="row"><strong>{detail.account}</strong><span class="attainment-pillar-label">{detail.pillar}</span></th>
             {detail.months.map((month) => <td key={month.periodKey}><strong>{detailAmount(month.appliedAmount)}</strong><small class={`attainment-source attainment-source--${month.appliedSource.toLowerCase()}`}>{sourceLabel(month.appliedSource)}</small><small>Actual {detailAmount(month.actual)} · Forecast {detailAmount(month.forecast)}</small></td>)}
-            <td><strong>{formatAttainmentAmount(detail.quarterTotal)}</strong></td>
+            <td><strong>{formatOptionalAttainmentAmount(detail.quarterTotal)}</strong></td>
           </tr>)}</tbody>
         </table>
       </div>
