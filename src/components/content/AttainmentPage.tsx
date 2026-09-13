@@ -8,7 +8,6 @@ import { fetchAttainment, updateAttainmentBudget } from "../../data/attainmentAp
 import {
   AttainmentBudgetUpdate,
   AttainmentDashboard,
-  AttainmentQuarter,
   AttainmentQuarterRecord,
   formatAttainment,
   formatAttainmentAmount,
@@ -47,17 +46,14 @@ const draftTotal = (draft: BudgetDraft): number | null => {
   return values.every(Number.isFinite) ? values.reduce((total, value) => total + value, 0) : null;
 };
 const signedAmount = (value: number | null): string => value === null ? "—" : `${value > 0 ? "+" : ""}${formatAttainmentAmount(value)}`;
-const sourceLabel = (source: string): string => source === "ACTUAL" ? "Actual" : source === "FORECAST" ? "Forecast" : "Not entered";
-const detailAmount = (value: number | null): string => value === null ? "—" : formatAttainmentAmount(value);
-
-function QuarterCard({ quarter, selected, onSelect }: Readonly<{ quarter: AttainmentQuarterRecord; selected: boolean; onSelect: () => void }>) {
-  return <button type="button" class={`attainment-quarter-card${selected ? " is-selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
+function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>) {
+  return <div class="attainment-quarter-card">
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
     <span class="attainment-quarter-card__metric"><small>Budget</small><strong>{formatBudget(quarter.budget)}</strong></span>
     <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Outlook (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(quarter.outlook)}</strong></span>
     <span class="attainment-quarter-card__actual">Actual to date {formatAttainmentAmount(quarter.actual)}</span>
     <span class="attainment-quarter-card__pillars">DP {formatOptionalAttainmentAmount(quarter.dpOutlook)} · OCI {formatOptionalAttainmentAmount(quarter.ociOutlook)}</span>
-  </button>;
+  </div>;
 }
 
 export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
@@ -67,7 +63,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [draft, setDraft] = useState<BudgetDraft>({ q1: "", q2: "", q3: "", q4: "" });
-  const [selectedQuarter, setSelectedQuarter] = useState<AttainmentQuarter>("Q1");
+
   const dialogRef = useRef<DialogElement>(null);
   const requestVersion = useRef(0);
 
@@ -75,11 +71,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     const version = ++requestVersion.current;
     setDashboard(null); setLoading(true); setSaving(false); setError(""); setSaveError(""); dialogRef.current?.close();
     fetchAttainment(fiscalYear)
-      .then((value) => {
-        if (version !== requestVersion.current) return;
-        setDashboard(value);
-        setSelectedQuarter(value.quarters.find((quarter) => quarter.details.some((detail) => detail.months.some((month) => month.appliedSource === "FORECAST")))?.quarter ?? "Q1");
-      })
+      .then((value) => { if (version === requestVersion.current) setDashboard(value); })
       .catch((reason) => { if (version === requestVersion.current) setError(reason instanceof Error ? reason.message : "Attainment could not be loaded."); })
       .finally(() => { if (version === requestVersion.current) setLoading(false); });
     return () => { requestVersion.current += 1; };
@@ -122,8 +114,6 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
   if (!dashboard) return <section class="kpi-panel" role="alert">Attainment is unavailable.</section>;
 
-  const selected = dashboard.quarters.find((quarter) => quarter.quarter === selectedQuarter) ?? dashboard.quarters[0];
-  const months = selected.details[0]?.months ?? [];
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
@@ -141,22 +131,8 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section aria-labelledby="quarterlyAttainmentTitle">
-      <div class="attainment-section-heading"><div><h2 id="quarterlyAttainmentTitle">Quarterly attainment</h2><p>Select a quarter to inspect Account and Pillar monthly detail.</p></div></div>
-      <div class="attainment-quarter-grid">{dashboard.quarters.map((quarter) => <QuarterCard key={quarter.quarter} quarter={quarter} selected={quarter.quarter === selected.quarter} onSelect={() => setSelectedQuarter(quarter.quarter)} />)}</div>
-    </section>
-
-    <section class="kpi-panel attainment-detail-card" aria-labelledby="attainmentDetailTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentDetailTitle">{selected.quarter} monthly detail</h2><p>Applied amount identifies the Actual or Forecast used in Outlook. Zero is shown as $0 K; missing values as —.</p></div><span>{formatOptionalAttainmentAmount(selected.outlook)} · {formatAttainment(selected.outlookAttainment)}</span></div>
-      <div class="attainment-table-scroll">
-        <table class="attainment-table attainment-monthly-table">
-          <thead><tr><th scope="col">Account / Pillar</th>{months.map((month) => <th key={month.periodKey} scope="col">{month.month}</th>)}<th scope="col">Quarter total</th></tr></thead>
-          <tbody>{selected.details.length === 0 ? <tr><td colSpan={5} class="attainment-empty-detail">No Actual or Forecast has been entered for this quarter.</td></tr> : selected.details.map((detail) => <tr key={`${detail.account}-${detail.pillar}`}>
-            <th scope="row"><strong>{detail.account}</strong><span class="attainment-pillar-label">{detail.pillar}</span></th>
-            {detail.months.map((month) => <td key={month.periodKey}><strong>{detailAmount(month.appliedAmount)}</strong><small class={`attainment-source attainment-source--${month.appliedSource.toLowerCase()}`}>{sourceLabel(month.appliedSource)}</small><small>Actual {detailAmount(month.actual)} · Forecast {detailAmount(month.forecast)}</small></td>)}
-            <td><strong>{formatOptionalAttainmentAmount(detail.quarterTotal)}</strong></td>
-          </tr>)}</tbody>
-        </table>
-      </div>
+      <div class="attainment-section-heading"><div><h2 id="quarterlyAttainmentTitle">Quarterly attainment</h2><p>Quarter totals combine each month's policy-selected Actual or Forecast without duplicate counting.</p></div></div>
+      <div class="attainment-quarter-grid">{dashboard.quarters.map((quarter) => <QuarterCard key={quarter.quarter} quarter={quarter} />)}</div>
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">

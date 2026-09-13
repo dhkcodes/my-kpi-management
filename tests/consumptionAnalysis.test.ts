@@ -21,9 +21,9 @@ const analysis = {
     { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
   ],
   movementBridge: [
-    { quarter: "Q1", newAmount: 25, expansionAmount: 15, reductionAmount: 10, netMovementAmount: 30,
+    { quarter: "Q1", totalForecastAmount: 100, newAmount: 25, expansionAmount: 15, reductionAmount: 10, netMovementAmount: 30,
       compositionStatus: "CLASSIFIED", classifiedAccountCount: 2, unclassifiedAccountCount: 0, unavailableReason: null },
-    { quarter: "Q2", newAmount: null, expansionAmount: null, reductionAmount: null, netMovementAmount: null,
+    { quarter: "Q2", totalForecastAmount: 75, newAmount: null, expansionAmount: null, reductionAmount: null, netMovementAmount: null,
       compositionStatus: "UNAVAILABLE", classifiedAccountCount: 0, unclassifiedAccountCount: 1,
       unavailableReason: "Movement composition is unavailable for legacy scalar forecasts." }
   ],
