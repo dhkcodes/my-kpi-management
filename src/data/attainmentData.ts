@@ -17,7 +17,7 @@ export type AttainmentDetail = Readonly<{
   account: string;
   pillar: "DP" | "OCI";
   months: AttainmentMonthDetail[];
-  quarterTotal: number;
+  quarterTotal: AttainmentAmount;
 }>;
 
 export type AttainmentQuarterRecord = Readonly<{
@@ -25,16 +25,16 @@ export type AttainmentQuarterRecord = Readonly<{
   budget: AttainmentAmount;
   actual: number;
   forecast: number;
-  outlook: number;
+  outlook: AttainmentAmount;
   actualAttainment: number | null;
   forecastAttainment: number | null;
   outlookAttainment: number | null;
   dpActual: number;
   dpForecast: number;
-  dpOutlook: number;
+  dpOutlook: AttainmentAmount;
   ociActual: number;
   ociForecast: number;
-  ociOutlook: number;
+  ociOutlook: AttainmentAmount;
   details: AttainmentDetail[];
 }>;
 
@@ -42,16 +42,16 @@ export type AttainmentSummary = Readonly<{
   budget: AttainmentAmount;
   actual: number;
   forecast: number;
-  outlook: number;
+  outlook: AttainmentAmount;
   actualAttainment: number | null;
   forecastAttainment: number | null;
   outlookAttainment: number | null;
   dpActual: number;
   dpForecast: number;
-  dpOutlook: number;
+  dpOutlook: AttainmentAmount;
   ociActual: number;
   ociForecast: number;
-  ociOutlook: number;
+  ociOutlook: AttainmentAmount;
   actualVarianceToBudget: number | null;
   forecastVarianceToBudget: number | null;
   outlookVarianceToBudget: number | null;
@@ -73,8 +73,8 @@ export type AttainmentBudgetUpdate = Readonly<{
 export const calculateAttainment = (amount: number, budget: AttainmentAmount): number | null =>
   budget === null || budget === 0 ? null : amount * 100 / budget;
 
-export const calculateRemainingTarget = (budget: AttainmentAmount, outlook: number): number | null =>
-  budget === null ? null : Math.max(0, budget - outlook);
+export const calculateRemainingTarget = (budget: AttainmentAmount, outlook: AttainmentAmount): number | null =>
+  budget === null || outlook === null ? null : Math.max(0, budget - outlook);
 
 export const calculateRequiredMonthlyAverage = (remainingTarget: number | null, remainingMonths: number): number | null =>
   remainingTarget === null || remainingMonths <= 0 ? null : remainingTarget / remainingMonths;

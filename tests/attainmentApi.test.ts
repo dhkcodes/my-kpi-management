@@ -34,6 +34,36 @@ void (async () => {
   assert.equal(result.summary.outlook, 400);
   assert.equal(result.summary.outlookVarianceToBudget, null);
 
+  const incompletePayload = {
+    ...payload,
+    quarters: payload.quarters.map((quarter, index) => index === 0 ? {
+      ...quarter,
+      outlook: null,
+      outlookAttainment: null,
+      dp: { ...quarter.dp, outlook: null },
+      oci: { ...quarter.oci, outlook: null },
+      details: [{
+        account: "Missing Actual Account",
+        pillar: "DP",
+        months: [{ periodKey: "FY26-JUN", month: "JUN", actual: null, forecast: 10, appliedAmount: null, appliedSource: "NONE" }],
+        quarterTotal: null
+      }]
+    } : quarter),
+    fiscalYearSummary: {
+      ...payload.fiscalYearSummary,
+      outlook: null,
+      outlookAttainment: null,
+      outlookVarianceToBudget: null,
+      dp: { ...payload.fiscalYearSummary.dp, outlook: null },
+      oci: { ...payload.fiscalYearSummary.oci, outlook: null }
+    }
+  };
+  const incompleteFetch = async () => new Response(JSON.stringify(incompletePayload), { status: 200 });
+  const incomplete = await fetchAttainment("FY26", incompleteFetch);
+  assert.equal(incomplete.quarters[0].outlook, null, "missing closed-period Actual remains unknown");
+  assert.equal(incomplete.quarters[0].details[0].quarterTotal, null);
+  assert.equal(incomplete.summary.outlook, null);
+
   await updateAttainmentBudget("FY26", { q1: 100, q2: 0, q3: null, q4: 200.5 }, fetchImpl);
   assert.equal(capturedUrl, "/api/v1/attainment/budget?fiscalYear=FY26");
   assert.equal(capturedInit?.method, "PUT");
