@@ -929,8 +929,9 @@ export const exportConsumptionImportCompatibleCsv = async (
     throw new Error("Malformed Consumption export response");
   }
   const disposition = response.headers.get("Content-Disposition") ?? "";
-  const match = /filename="([A-Za-z0-9._-]+\.(?:csv|zip))"/i.exec(disposition);
-  return { blob, fileName: match?.[1] ?? (normalizedContentType.startsWith("application/zip") ? "consumption-actuals-export.zip" : "consumption-actuals-export.csv") };
+  const match = /filename="([^"\r\n]+\.(?:csv|zip))"/i.exec(disposition);
+  const safeFileName = match ? match[1].split(/[\\/]/).pop() : undefined;
+  return { blob, fileName: safeFileName ?? (normalizedContentType.startsWith("application/zip") ? "consumption-actuals-export.zip" : "consumption-actuals-export.csv") };
 };
 export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
@@ -999,11 +1000,13 @@ const forecastWideBody = (file: File) => {
   return body;
 };
 const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): ConsumptionForecastWidePreview => {
+  const isForecastPeriodKey = (value: unknown): value is string => isPeriodKey(value)
+    || (typeof value === "string" && /^FY\d{2}-M(?:0[1-9]|1[0-2])$/.test(value));
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast Wide preview");
   const raw = payload as Record<string, unknown>;
   if (!isNonEmptyString(raw.etag) || !Array.isArray(raw.sources) || !Array.isArray(raw.lines)
     || !isNonNegativeInteger(raw.populatedCellCount) || !Array.isArray(raw.canonicalPeriods)
-    || raw.canonicalPeriods.some((period) => !isPeriodKey(period))
+    || raw.canonicalPeriods.some((period) => !isForecastPeriodKey(period))
     || !(raw.referenceColumns === undefined || (Array.isArray(raw.referenceColumns) && raw.referenceColumns.every((value) => typeof value === "string")))
     || !(raw.referenceNotice === undefined || raw.referenceNotice === null || typeof raw.referenceNotice === "string")) throw new Error("Malformed Forecast Wide preview");
   const source = raw.sources.length === 1 && typeof raw.sources[0] === "object" && raw.sources[0] !== null
@@ -1013,7 +1016,8 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
     if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast Wide preview");
     const line = value as Record<string, unknown>;
     if (!isPositiveInteger(line.sourceRow) || !isNonEmptyString(line.accountName) || !isNonEmptyString(line.normalizedAccount)
-      || !(isPeriodKey(line.periodKey) || (typeof line.periodKey === "string" && /^FY\d{2}-M(?:0[1-9]|1[0-2])$/.test(line.periodKey))) || !isFiniteNumber(line.amount)) throw new Error("Malformed Forecast Wide preview");
+      || !isForecastPeriodKey(line.periodKey)
+      || !(line.amount === undefined || isFiniteNumber(line.amount))) throw new Error("Malformed Forecast Wide preview");
     const totalAmount = line.totalAmount === undefined ? line.amount : line.totalAmount;
     const nullableAmount = (field: string) => {
       const value = line[field];

@@ -23,12 +23,19 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const compactCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
+const currencyK = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const toK = (amount: number): number => amount / 1_000;
 const signedCurrency = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${currency.format(amount)}`;
 const signedPercent = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${amount.toFixed(1)}%`;
 const qoqKind = (status: ConsumptionAnalysisQuarter["status"]) => status === "ACTUAL" ? "ACTUAL"
   : status === "FORECAST" ? "FORECAST · projection" : status === "MIXED" ? "MIXED · projection" : "INCOMPLETE";
 const splitLabel = (value: { actualAmount: number; forecastAmount: number }) => `ACTUAL ${currency.format(value.actualAmount)} · FORECAST ${currency.format(value.forecastAmount)}`;
 const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurrency.format(value);
+const movementDataLabel = ({ value }: Readonly<{ value: number }>) => `${currencyK.format(value)} K`;
+const movementAxisConverter = {
+  format: (value: string | number) => `${currencyK.format(Number(value))} K`,
+  parse: (value: string) => Number(value.replace(/[^0-9.-]/g, ""))
+};
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
@@ -218,14 +225,14 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     if (!analysis) return chart([]);
     return chart(analysis.movementBridge.flatMap((point) => {
       if (point.totalForecastAmount === null) return [];
-      const all = { id: `${point.quarter}-All`, seriesId: "All", groupId: point.quarter, value: point.totalForecastAmount, color: "#4b5563", shortDesc: `${point.quarter} All Forecast ${compactCurrency.format(point.totalForecastAmount)} · ${point.includedForecastPeriods.join(", ")}` };
+      const all = { id: `${point.quarter}-All`, seriesId: "All", groupId: point.quarter, value: toK(point.totalForecastAmount), color: "#4b5563", shortDesc: `${point.quarter} All Forecast ${currencyK.format(toK(point.totalForecastAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` };
       if (point.compositionStatus !== "CLASSIFIED"
         || point.newAmount === null || point.expansionAmount === null || point.reductionAmount === null) return [all];
       return [
         all,
-        { id: `${point.quarter}-New`, seriesId: "New", groupId: point.quarter, value: point.newAmount, color: MOVEMENT_COLORS.New, shortDesc: `${point.quarter} New ${compactCurrency.format(point.newAmount)} · ${point.includedForecastPeriods.join(", ")}` },
-        { id: `${point.quarter}-Expansion`, seriesId: "Expansion", groupId: point.quarter, value: point.expansionAmount, color: MOVEMENT_COLORS.Expansion, shortDesc: `${point.quarter} Expansion ${compactCurrency.format(point.expansionAmount)} · ${point.includedForecastPeriods.join(", ")}` },
-        { id: `${point.quarter}-Reduction`, seriesId: "Reduction", groupId: point.quarter, value: -point.reductionAmount, color: MOVEMENT_COLORS.Reduction, shortDesc: `${point.quarter} Reduction ${compactCurrency.format(-point.reductionAmount)} · ${point.includedForecastPeriods.join(", ")}` }
+        { id: `${point.quarter}-New`, seriesId: "New", groupId: point.quarter, value: toK(point.newAmount), color: MOVEMENT_COLORS.New, shortDesc: `${point.quarter} New ${currencyK.format(toK(point.newAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` },
+        { id: `${point.quarter}-Expansion`, seriesId: "Expansion", groupId: point.quarter, value: toK(point.expansionAmount), color: MOVEMENT_COLORS.Expansion, shortDesc: `${point.quarter} Expansion ${currencyK.format(toK(point.expansionAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` },
+        { id: `${point.quarter}-Reduction`, seriesId: "Reduction", groupId: point.quarter, value: -toK(point.reductionAmount), color: MOVEMENT_COLORS.Reduction, shortDesc: `${point.quarter} Reduction ${currencyK.format(-toK(point.reductionAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` }
       ];
     }));
   }, [analysis]);
@@ -322,7 +329,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
             <h3>{analysis.fiscalYear} Mixed quarter consumption</h3>
             <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL-first and FORECAST fallback consumption in K`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
             <h3>Forecast composition by quarter</h3>
-            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={trendDataLabel} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
             <p class="consumption-insights-note">Stored Forecast composition only · {analysis.movementBridge.map((point) => `${point.quarter}: ${point.includedForecastPeriods.join(", ") || point.compositionStatus}`).join(" · ")}</p>
           </div>
         </div>
@@ -330,8 +337,8 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div><button type="button" onClick={() => setSelectedMovement(null)}>Close</button></div>
           <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
           <table><thead><tr><th>Account</th><th>{selectedMovement.category} (K)</th></tr></thead><tbody>
-            {selectedMovementPoint.accounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{compactCurrency.format(movementValue(account))}</td></tr>)}
-          </tbody><tfoot><tr><th>Total</th><th>{compactCurrency.format(selectedMovementPoint.accounts.reduce((sum, account) => sum + movementValue(account), 0))}</th></tr></tfoot></table>
+            {selectedMovementPoint.accounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{currencyK.format(toK(movementValue(account)))} K</td></tr>)}
+          </tbody><tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementPoint.accounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot></table>
         </section>}
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
