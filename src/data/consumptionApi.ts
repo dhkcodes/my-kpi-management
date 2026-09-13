@@ -122,6 +122,11 @@ export type ConsumptionMovementBridgePoint = Readonly<{
   newAmount: number | null; expansionAmount: number | null; reductionAmount: number | null;
   netMovementAmount: number | null; compositionStatus: ConsumptionForecastCompositionStatus;
   classifiedAccountCount: number; unclassifiedAccountCount: number; unavailableReason: string | null;
+  includedForecastPeriods: readonly string[];
+  accounts: readonly ConsumptionMovementAccountDetail[];
+}>;
+export type ConsumptionMovementAccountDetail = Readonly<{
+  account: string; newAmount: number; expansionAmount: number; reductionAmount: number; netMovementAmount: number;
 }>;
 export type ConsumptionAnalysis = Readonly<{
   selectedPillar: ConsumptionPillar;
@@ -152,12 +157,20 @@ export type ConsumptionImportConflict = Readonly<{
 export type ConsumptionImportOverwrite = Readonly<{
   key: string; existingValue: number; newValue: number; fileName: string;
 }>;
+export type ConsumptionSalesRepChange = Readonly<{
+  normalizedAccount: string;
+  account: string;
+  beforeSalesRep: string | null;
+  afterSalesRep: string;
+  changed: boolean;
+}>;
 export type ConsumptionImportPreview = Readonly<{
   selectedPillar: ConsumptionPillar; files: readonly ConsumptionImportFilePreview[];
   planCount: number; controlTotalCount: number; sourceRowCount: number; physicalFactCount: number;
   insertFactCount: number; skippedFactCount: number; exactReplayFileCount: number; deleteFactCount: number;
   sameValueDuplicateCount: number; existingSameValueCount: number;
   overwriteCount: number; overwrites: readonly ConsumptionImportOverwrite[];
+  salesRepChanges: readonly ConsumptionSalesRepChange[];
   conflictCount: number; conflicts: readonly ConsumptionImportConflict[]; hasConflicts: boolean;
 }>;
 export type ConsumptionImportResult = Readonly<{
@@ -221,6 +234,7 @@ export type ConsumptionForecastWidePreview = Readonly<{
   similarAccountResolutionCount: number;
   planUnassignedCount: number;
   changes: readonly ConsumptionForecastWideChange[];
+  salesRepChanges: readonly ConsumptionSalesRepChange[];
   blockedErrors: readonly ConsumptionForecastWideBlockedError[];
   hasBlockedErrors: boolean;
 }>;
@@ -267,6 +281,19 @@ const isPositiveInteger = (value: unknown): value is number => Number.isSafeInte
 const isPeriodKey = (value: unknown): value is string => typeof value === "string" && fiscalPeriodPattern.test(value);
 const isQuarterKey = (value: unknown): value is string => typeof value === "string" && fiscalQuarterPattern.test(value);
 const isFiscalYear = (value: unknown): value is string => typeof value === "string" && /^FY\d{2}$/.test(value);
+const decodeSalesRepChanges = (value: unknown, malformedMessage: string): readonly ConsumptionSalesRepChange[] => {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error(malformedMessage);
+  return value.map((entry) => {
+    if (typeof entry !== "object" || entry === null) throw new Error(malformedMessage);
+    const raw = entry as Record<string, unknown>;
+    if (!isNonEmptyString(raw.normalizedAccount) || !isNonEmptyString(raw.account)
+      || !(raw.beforeSalesRep === null || isNonEmptyString(raw.beforeSalesRep))
+      || !isNonEmptyString(raw.afterSalesRep) || typeof raw.changed !== "boolean") throw new Error(malformedMessage);
+    return { normalizedAccount: raw.normalizedAccount, account: raw.account,
+      beforeSalesRep: raw.beforeSalesRep, afterSalesRep: raw.afterSalesRep, changed: raw.changed };
+  });
+};
 const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI"]);
 const isConsumptionPillar = (value: unknown): value is ConsumptionPillar => consumptionPillars.has(value as ConsumptionPillar);
 const normalizeConsumptionPillar = (value: unknown): ConsumptionPillar | null =>
@@ -385,13 +412,22 @@ const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] =
   return value.map((entry) => {
     if (typeof entry !== "object" || entry === null) return malformedAnalysis();
     const point = entry as Record<string, unknown>;
+    const includedForecastPeriods = point.includedForecastPeriods === undefined ? [] : point.includedForecastPeriods;
+    const accounts = point.accounts === undefined ? [] : point.accounts;
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(point.quarter))
       || !isNullableFiniteNumber(point.newAmount) || !isNullableFiniteNumber(point.expansionAmount)
       || !isNullableFiniteNumber(point.reductionAmount) || !isNullableFiniteNumber(point.netMovementAmount)
       || !compositionStatuses.has(point.compositionStatus as ConsumptionForecastCompositionStatus)
       || !isNonNegativeInteger(point.classifiedAccountCount) || !isNonNegativeInteger(point.unclassifiedAccountCount)
-      || !(point.unavailableReason === null || isNonEmptyString(point.unavailableReason))) return malformedAnalysis();
-    return point as unknown as ConsumptionMovementBridgePoint;
+      || !(point.unavailableReason === null || isNonEmptyString(point.unavailableReason))
+      || !Array.isArray(includedForecastPeriods) || !includedForecastPeriods.every(isPeriodKey)
+      || !Array.isArray(accounts) || !accounts.every((detail) => {
+        if (typeof detail !== "object" || detail === null) return false;
+        const row = detail as Record<string, unknown>;
+        return isNonEmptyString(row.account) && isFiniteNumber(row.newAmount) && isFiniteNumber(row.expansionAmount)
+          && isFiniteNumber(row.reductionAmount) && isFiniteNumber(row.netMovementAmount);
+      })) return malformedAnalysis();
+    return { ...point, includedForecastPeriods, accounts } as unknown as ConsumptionMovementBridgePoint;
   });
 };
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
@@ -837,11 +873,12 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
   const planCount=files.reduce((sum,file)=>sum+file.planCount,0);
   const controlTotalCount=files.reduce((sum,file)=>sum+file.controlTotalCount,0);
   const sourceRowCount=files.reduce((sum,file)=>sum+file.sourceRowCount,0);
+  const salesRepChanges=decodeSalesRepChanges(raw.salesRepChanges,"Malformed Consumption import preview");
   return {selectedPillar:pillar,files,planCount,controlTotalCount,sourceRowCount,physicalFactCount:raw.physicalFactCount,
     insertFactCount:raw.insertedFactCount,skippedFactCount:raw.skippedFactCount,exactReplayFileCount:raw.exactReplayFileCount,
     deleteFactCount:raw.deletedFactCount,
     sameValueDuplicateCount:raw.deduplicatedFactCount,existingSameValueCount:raw.unchangedFactCount,
-    overwriteCount:overwrites.length,overwrites,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
+    overwriteCount:overwrites.length,overwrites,salesRepChanges,conflictCount:conflicts.length,conflicts,hasConflicts:conflicts.length>0};
 };
 
 export const previewConsumptionImport = async (input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportPreview> => {
@@ -853,7 +890,7 @@ export const previewConsumptionImport = async (input: string | readonly File[], 
       sourceRowCount: raw.sourceRowCount, physicalFactCount: raw.plans.length, insertFactCount: raw.plans.length,
       skippedFactCount: 0, exactReplayFileCount: 0, deleteFactCount: 0,
       sameValueDuplicateCount: 0, existingSameValueCount: 0,
-      overwriteCount: 0, overwrites: [], conflictCount: 0, conflicts: [], hasConflicts: false };
+      overwriteCount: 0, overwrites: [], salesRepChanges: [], conflictCount: 0, conflicts: [], hasConflicts: false };
   }
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
   const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) });
@@ -987,6 +1024,7 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
   });
   const explicitZeroCount = changes.filter((change) => change.forecastAmount === 0).length;
   const sourceRowCount = new Set(changes.map((change) => change.rowNumber)).size;
+  const salesRepChanges = decodeSalesRepChanges(raw.salesRepChanges, "Malformed Forecast Wide preview");
   const rawBlockedErrors = raw.blockedErrors ?? raw.errors ?? [];
   if (!Array.isArray(rawBlockedErrors)) throw new Error("Malformed Forecast Wide preview");
   const blockedErrors = rawBlockedErrors.map((value): ConsumptionForecastWideBlockedError => {
@@ -1004,7 +1042,7 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
     exactReplay: false, referenceColumns: (raw.referenceColumns as string[] | undefined) ?? [], referenceNotice: (raw.referenceNotice as string | null | undefined) ?? null,
     canonicalPeriods: raw.canonicalPeriods as string[],
     similarAccountResolutionCount: 0, planUnassignedCount: sourceRowCount,
-    changes, blockedErrors, hasBlockedErrors: blockedErrors.length > 0 };
+    changes, salesRepChanges, blockedErrors, hasBlockedErrors: blockedErrors.length > 0 };
 };
 export const previewConsumptionForecastWide = async (file: File): Promise<ConsumptionForecastWidePreview> => {
   const { payload } = await request("/consumption/forecast-imports/preview", { method: "POST", body: forecastWideBody(file) });

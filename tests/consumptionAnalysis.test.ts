@@ -74,8 +74,9 @@ void (async () => {
   assert.equal(decoded.portfolio.coveragePercent, 75);
   assert.equal(decoded.quarters[3].coveragePercent, 0);
   assert.deepEqual(decoded.quarters.map((quarter) => quarter.quarter), ["Q1", "Q2", "Q3", "Q4"]);
-  assert.deepEqual(decoded.movementBridge, analysis.movementBridge,
-    "movement composition remains separate from quarter consumption growth and preserves unavailable coverage");
+  assert.deepEqual(decoded.movementBridge, analysis.movementBridge.map((point) => ({
+    ...point, includedForecastPeriods: [], accounts: []
+  })), "legacy movement responses gain empty drill fields without turning unavailable coverage into zero");
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.equal(Object.prototype.hasOwnProperty.call(decoded, "otherContribution"), false,

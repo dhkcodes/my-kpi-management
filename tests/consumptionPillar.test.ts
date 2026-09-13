@@ -89,6 +89,10 @@ void (async () => {
     deletedFactCount: 0,
     overwrites: [{ pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
       existingValue: 10, newValue: 11, sourceFileName: "dp.csv" }],
+    salesRepChanges: [
+      { normalizedAccount: "ACME", account: "Acme", beforeSalesRep: null, afterSalesRep: "Ada", changed: true },
+      { normalizedAccount: "BETA", account: "Beta", beforeSalesRep: "Bob", afterSalesRep: "Bob", changed: false }
+    ],
     conflicts: []
   };
   runtime.fetch = async (input, init) => {
@@ -109,7 +113,16 @@ void (async () => {
   assert.equal(preview.existingSameValueCount, 5);
   assert.equal(preview.overwriteCount, 1);
   assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
+  assert.deepEqual(preview.salesRepChanges, [
+    { normalizedAccount: "ACME", account: "Acme", beforeSalesRep: null, afterSalesRep: "Ada", changed: true },
+    { normalizedAccount: "BETA", account: "Beta", beforeSalesRep: "Bob", afterSalesRep: "Bob", changed: false }
+  ], "Actual preview preserves Sales Rep before/after and changed semantics");
   assert.equal(preview.hasConflicts, false);
+
+  const { salesRepChanges: _omittedSalesRepChanges, ...legacyPreviewWithoutSalesReps } = previewPayload;
+  runtime.fetch = async () => new Response(JSON.stringify(legacyPreviewWithoutSalesReps), { status: 200, headers: { "Content-Type": "application/json" } });
+  assert.deepEqual((await previewConsumptionImport(files, "ALL")).salesRepChanges, [],
+    "legacy Actual preview responses without salesRepChanges remain compatible");
 
   const legacyFileName = "OCI Consumption Trend - owner-a - FY27-JUN - FY27-AUG - OCI-Other.csv";
   const canonicalFileName = "OCI Consumption Trend - owner-a - FY27-JUN - FY27-AUG - OCI.csv";
@@ -157,6 +170,7 @@ void (async () => {
     { ...previewPayload, files: [...previewPayload.files].reverse() },
     { ...previewPayload, overwrites: [previewPayload.overwrites[0], previewPayload.overwrites[0]] },
     { ...previewPayload, overwrites: [{ ...previewPayload.overwrites[0], sourceFileName: "foreign.csv" }] },
+    { ...previewPayload, salesRepChanges: [{ ...previewPayload.salesRepChanges[0], changed: "yes" }] },
     { ...hardConflictPayload, conflicts: [{ ...hardConflictPayload.conflicts[0], firstFile: "foreign.csv" }] },
     { ...hardConflictPayload, conflicts: [{ ...hardConflictPayload.conflicts[0], firstFileOrdinal: 2 }] }
   ]) {

@@ -46,6 +46,28 @@ export type AttainmentBudgetUpdate = Readonly<{
 export const calculateAttainment = (amount: number, budget: AttainmentAmount): number | null =>
   budget === null || budget === 0 ? null : amount * 100 / budget;
 
+export const calculateRemainingTarget = (budget: AttainmentAmount, actualToDate: number): number | null =>
+  budget === null ? null : Math.max(0, budget - actualToDate);
+
+export const calculateRequiredMonthlyAverage = (remainingTarget: number | null, remainingMonths: number): number | null =>
+  remainingTarget === null || remainingMonths <= 0 ? null : remainingTarget / remainingMonths;
+
+/** Oracle fiscal years run June through May; the current month is part of the remaining period. */
+export const remainingFiscalMonths = (fiscalYear: string, currentPeriod: string): number => {
+  const fiscalYearMatch = /^FY(\d{2})$/.exec(fiscalYear);
+  const periodMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(currentPeriod);
+  if (!fiscalYearMatch || !periodMatch) return 0;
+  const fiscalEndYear = 2000 + Number(fiscalYearMatch[1]);
+  const currentYear = Number(periodMatch[1]);
+  const currentMonth = Number(periodMatch[2]);
+  const fiscalStart = (fiscalEndYear - 1) * 12 + 6;
+  const fiscalEnd = fiscalEndYear * 12 + 5;
+  const current = currentYear * 12 + currentMonth;
+  if (current < fiscalStart) return 12;
+  if (current > fiscalEnd) return 0;
+  return fiscalEnd - current + 1;
+};
+
 const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);
 
 export const calculateFiscalYearSummary = (

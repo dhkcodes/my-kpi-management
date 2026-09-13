@@ -295,6 +295,7 @@ void (async () => {
       newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3, reductionBasis: "PRIOR_QUARTER_ACTUAL",
       compositionStatus: "CLASSIFIED", sourceFile: "forecast.csv", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],
+    salesRepChanges: [{ normalizedAccount: "A", account: "Account A", beforeSalesRep: "Old Rep", afterSalesRep: "New Rep", changed: true }],
     referenceColumns: ["reference_prior_quarter", "reference_prior_quarter_actual"],
     referenceNotice: "Prior-quarter Actual columns are read-only references and are never imported."
   }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -308,6 +309,9 @@ void (async () => {
     existingForecastAmount: null, resolution: "PLAN_UNASSIGNED"
   }, "Forecast Preview decodes raw-to-canonical movement composition and its prior basis");
   assert.deepEqual(referencePreview.canonicalPeriods, ["FY27-SEP"], "allowed periods come from the backend preview contract");
+  assert.deepEqual(referencePreview.salesRepChanges, [
+    { normalizedAccount: "A", account: "Account A", beforeSalesRep: "Old Rep", afterSalesRep: "New Rep", changed: true }
+  ], "Forecast Preview decodes Sales Rep before/after changes");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-negative", sources: [{ fileName: "forecast.csv", sha256: "c".repeat(64) }],
@@ -326,6 +330,7 @@ void (async () => {
   }), { status: 200, headers: { "Content-Type": "application/json" } });
   const blockedPreview = await previewConsumptionForecastWide(new File(["csv"], "forecast.csv"));
   assert.deepEqual(blockedPreview.blockedErrors, [{ rowNumber: 4, column: "FY27-NOV", code: "PERIOD_NOT_EDITABLE", message: "FY27-NOV is outside the editable window." }]);
+  assert.deepEqual(blockedPreview.salesRepChanges, [], "legacy Forecast previews without salesRepChanges remain compatible");
   assert.equal(blockedPreview.hasBlockedErrors, true, "backend blocking errors prevent applying an invalid Forecast import");
 
   delete runtime.__KPI_API_BASE_URL__;

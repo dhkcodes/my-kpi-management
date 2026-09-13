@@ -18,6 +18,7 @@ import {
 } from "../../data/consumptionData";
 import "ojs/ojprogress-circle";
 import "ojs/ojchart";
+import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -30,6 +31,7 @@ const splitLabel = (value: { actualAmount: number; forecastAmount: number }) => 
 const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurrency.format(value);
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
+const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
 const ALL_ACCOUNTS = "All Accounts Total";
 type InsightChartPoint = Readonly<{
   id: string;
@@ -91,6 +93,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [selectedAlertId, setSelectedAlertId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
+  const [selectedMovement, setSelectedMovement] = useState<{ quarter: string; category: "New" | "Expansion" | "Reduction" } | null>(null);
   const requestGeneration = useRef(0);
 
   useEffect(() => {
@@ -99,6 +102,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     setDebouncedCandidateSearch("");
     setSelectedAlertId("");
     setSelectedAccountName("");
+    setSelectedMovement(null);
   }, [fiscalYear]);
 
   useEffect(() => {
@@ -169,6 +173,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     setActiveCandidateIndex(0);
     setSelectedAlertId("");
     setSelectedAccountName("");
+    setSelectedMovement(null);
   };
 
   const selectCandidateAt = (index: number) => selectAccountContext(candidateOptions[index]?.account ?? "");
@@ -209,6 +214,18 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmount, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${currency.format(quarter.forecastAmount)}` }
     ]));
   }, [analysis]);
+  const movementChart = useMemo(() => {
+    if (!analysis) return chart([]);
+    return chart(analysis.movementBridge.flatMap((point) => {
+      if (point.compositionStatus !== "CLASSIFIED"
+        || point.newAmount === null || point.expansionAmount === null || point.reductionAmount === null) return [];
+      return [
+        { id: `${point.quarter}-New`, seriesId: "New", groupId: point.quarter, value: point.newAmount, color: MOVEMENT_COLORS.New, shortDesc: `${point.quarter} New ${compactCurrency.format(point.newAmount)} · ${point.includedForecastPeriods.join(", ")}` },
+        { id: `${point.quarter}-Expansion`, seriesId: "Expansion", groupId: point.quarter, value: point.expansionAmount, color: MOVEMENT_COLORS.Expansion, shortDesc: `${point.quarter} Expansion ${compactCurrency.format(point.expansionAmount)} · ${point.includedForecastPeriods.join(", ")}` },
+        { id: `${point.quarter}-Reduction`, seriesId: "Reduction", groupId: point.quarter, value: -point.reductionAmount, color: MOVEMENT_COLORS.Reduction, shortDesc: `${point.quarter} Reduction ${compactCurrency.format(-point.reductionAmount)} · ${point.includedForecastPeriods.join(", ")}` }
+      ];
+    }));
+  }, [analysis]);
   const trendChart = useMemo(() => chart(trendPoints.map((point) => ({
     id: point.periodKey,
     seriesId: "ACTUAL",
@@ -227,6 +244,15 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const forecastExposure = analysis.portfolio.totalAmount === 0 ? 0 : analysis.portfolio.forecastAmount / analysis.portfolio.totalAmount * 100;
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
+  const selectedMovementPoint = selectedMovement ? analysis.movementBridge.find((point) => point.quarter === selectedMovement.quarter) ?? null : null;
+  const movementValue = (account: ConsumptionAnalysis["movementBridge"][number]["accounts"][number]) => selectedMovement?.category === "New"
+    ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
+  const selectMovement = (event: ojChart.ojItemDrill<string, InsightChartPoint, null>) => {
+    const { detail } = event;
+    const category = detail.series;
+    const quarter = Array.isArray(detail.group) ? detail.group[0] : detail.group;
+    if ((category === "New" || category === "Expansion" || category === "Reduction") && quarter) setSelectedMovement({ quarter, category });
+  };
 
   return <section class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
@@ -237,7 +263,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
               disabled={loading && !analysis}
-              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); }}>{option.label}</button>)}
+              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setSelectedMovement(null); }}>{option.label}</button>)}
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
@@ -288,8 +314,21 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
         <div class="consumption-insights-total-regions">
           <div class="consumption-insights-fy-total"><h3>Fiscal year totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Fiscal year ACTUAL and patterned FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
-          <div class="consumption-insights-quarter-totals"><h3>{analysis.fiscalYear} Quarter totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL and patterned FORECAST stacked totals`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-quarter-totals">
+            <h3>{analysis.fiscalYear} Mixed quarter consumption</h3>
+            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL-first and FORECAST fallback consumption in K`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+            <h3>Forecast movement by quarter</h3>
+            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={trendDataLabel} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly Forecast New Expansion and Reduction as separate K amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+            <p class="consumption-insights-note">Stored Forecast movement only · {analysis.movementBridge.map((point) => `${point.quarter}: ${point.includedForecastPeriods.join(", ") || point.compositionStatus}`).join(" · ")}</p>
+          </div>
         </div>
+        {selectedMovement && selectedMovementPoint && <section class="consumption-insights-movement-detail" aria-label={`${selectedMovement.quarter} ${selectedMovement.category} Account detail`}>
+          <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast movement detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div><button type="button" onClick={() => setSelectedMovement(null)}>Close</button></div>
+          <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
+          <table><thead><tr><th>Account</th><th>{selectedMovement.category} (K)</th></tr></thead><tbody>
+            {selectedMovementPoint.accounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{compactCurrency.format(movementValue(account))}</td></tr>)}
+          </tbody><tfoot><tr><th>Total</th><th>{compactCurrency.format(selectedMovementPoint.accounts.reduce((sum, account) => sum + movementValue(account), 0))}</th></tr></tfoot></table>
+        </section>}
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">Quarter-over-quarter</h2></div></div>

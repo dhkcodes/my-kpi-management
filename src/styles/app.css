@@ -2529,6 +2529,21 @@ h4.weekly-activity-section-label--next-week,
 .consumption-import-preview dl > div { background: #f7f5f2; border-radius: .25rem; padding: .7rem; }
 .consumption-import-preview dt { color: var(--kpi-muted); font-size: .72rem; }
 .consumption-import-preview dd { font-size: 1.1rem; font-weight: 800; margin: .2rem 0 0; }
+.consumption-sales-rep-preview { border-top: 1px solid var(--kpi-border); margin-top: .8rem; padding-top: .75rem; }
+.consumption-sales-rep-heading { align-items: baseline; display: flex; flex-wrap: wrap; gap: .4rem 1rem; justify-content: space-between; }
+.consumption-sales-rep-heading span { color: var(--kpi-muted); font-size: .75rem; font-weight: 700; }
+.consumption-sales-rep-table-wrap { margin-top: .6rem; max-height: 14rem; overflow: auto; }
+.consumption-sales-rep-table { border-collapse: collapse; min-width: 32rem; width: 100%; }
+.consumption-sales-rep-table th, .consumption-sales-rep-table td { border-bottom: 1px solid var(--kpi-border); padding: .55rem .65rem; text-align: left; }
+.consumption-sales-rep-table thead th { background: #f7f5f2; color: var(--kpi-muted); font-size: .72rem; position: sticky; top: 0; }
+.consumption-sales-rep-table tbody th { font-size: .82rem; }
+.consumption-sales-rep-table tbody td { font-size: .8rem; }
+.consumption-sales-rep-arrow { color: var(--kpi-muted); padding: 0 .45rem; }
+.consumption-sales-rep-status { border-radius: 1rem; display: inline-block; font-size: .7rem; font-weight: 800; padding: .15rem .5rem; }
+.consumption-sales-rep-table .is-changed .consumption-sales-rep-status { background: #e9f4e7; color: var(--oj-palette-success-120, #315c2d); }
+.consumption-sales-rep-table .is-unchanged { color: var(--kpi-muted); }
+.consumption-sales-rep-table .is-unchanged .consumption-sales-rep-status { background: #f0efed; color: var(--kpi-muted); }
+.consumption-import-preview .consumption-sales-rep-empty { background: #f7f5f2; border-left: .2rem solid var(--kpi-border); margin-top: .55rem; padding: .5rem .65rem; }
 .consumption-import-result { display: grid; gap: .45rem; justify-items: start; padding: .65rem 0; }
 .consumption-import-result > span { font-size: 1.5rem; }
 .consumption-import-result.is-success > span { color: var(--oj-palette-success-90, #3b6f36); }

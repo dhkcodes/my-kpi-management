@@ -10,9 +10,12 @@ import {
   AttainmentDashboard,
   AttainmentQuarterRecord,
   calculateAttainment,
+  calculateRemainingTarget,
+  calculateRequiredMonthlyAverage,
   formatAttainment,
   formatAttainmentAmount,
-  formatBudget
+  formatBudget,
+  remainingFiscalMonths
 } from "../../data/attainmentData";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -23,11 +26,19 @@ const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
 type BudgetDraft = Record<BudgetKey, string>;
 type ChartPoint = Readonly<{ id: string; seriesId: "Budget Target" | "Actual" | "Forecast"; groupId: string; value: number; shortDesc: string }>;
+type CompositionPoint = Readonly<{ id: string; seriesId: "DP Actual" | "DP Forecast" | "OCI Actual" | "OCI Forecast"; groupId: "Actual" | "Forecast"; value: number; shortDesc: string }>;
 
 const amountAxisConverter = new IntlNumberConverter({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const chartDataLabel = ({ value }: Readonly<{ value: number }>) => `${value.toFixed(0)}K`;
 
 const renderChartItem = ({ data }: Readonly<{ data: ChartPoint }>) => <oj-chart-item
+  value={data.value}
+  seriesId={data.seriesId}
+  groupId={[data.groupId]}
+  shortDesc={data.shortDesc}>
+</oj-chart-item>;
+
+const renderCompositionItem = ({ data }: Readonly<{ data: CompositionPoint }>) => <oj-chart-item
   value={data.value}
   seriesId={data.seriesId}
   groupId={[data.groupId]}
@@ -120,10 +131,24 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     { id: `${quarter.quarter}-forecast`, seriesId: "Forecast", groupId: quarter.quarter, value: quarter.forecast, shortDesc: `${quarter.quarter} Forecast ${formatAttainmentAmount(quarter.forecast)}` } as const
   ]) : [], [dashboard]);
   const chartData = useMemo(() => new ArrayDataProvider(chartPoints, { keyAttributes: "id" }), [chartPoints]);
+  const compositionPoints = useMemo<CompositionPoint[]>(() => dashboard ? [
+    { id: "dp-actual", seriesId: "DP Actual", groupId: "Actual", value: dashboard.summary.dpActual, shortDesc: `DP Actual ${formatAttainmentAmount(dashboard.summary.dpActual)}` },
+    { id: "oci-actual", seriesId: "OCI Actual", groupId: "Actual", value: dashboard.summary.ociActual, shortDesc: `OCI Actual ${formatAttainmentAmount(dashboard.summary.ociActual)}` },
+    { id: "dp-forecast", seriesId: "DP Forecast", groupId: "Forecast", value: dashboard.summary.dpForecast, shortDesc: `DP Forecast ${formatAttainmentAmount(dashboard.summary.dpForecast)}` },
+    { id: "oci-forecast", seriesId: "OCI Forecast", groupId: "Forecast", value: dashboard.summary.ociForecast, shortDesc: `OCI Forecast ${formatAttainmentAmount(dashboard.summary.ociForecast)}` }
+  ] : [], [dashboard]);
+  const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
 
   if (loading && !dashboard) return <section class="kpi-panel attainment-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Attainment…</section>;
   if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
   if (!dashboard) return <section class="kpi-panel" role="alert">Attainment is unavailable.</section>;
+
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthsRemaining = remainingFiscalMonths(fiscalYear, currentPeriod);
+  const remainingTarget = calculateRemainingTarget(dashboard.summary.budget, dashboard.summary.actual);
+  const requiredMonthlyAverage = calculateRequiredMonthlyAverage(remainingTarget, monthsRemaining);
+  const requiredMonthlyDisplay = monthsRemaining === 0 ? "FY Complete" : requiredMonthlyAverage === null ? "—" : formatAttainmentAmount(requiredMonthlyAverage);
 
   const values = [...dashboard.quarters, dashboard.summary];
   const metricRows = [
@@ -151,6 +176,8 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
       <article><span>FY Budget</span><strong>{formatBudget(dashboard.summary.budget)}</strong></article>
       <article><span>Actual variance to budget</span><strong>{signedAmount(dashboard.summary.actualVarianceToBudget)}</strong></article>
       <article><span>Forecast variance to budget</span><strong>{signedAmount(dashboard.summary.forecastVarianceToBudget)}</strong></article>
+      <article><span>Remaining Target</span><strong>{remainingTarget === null ? "—" : formatAttainmentAmount(remainingTarget)}</strong><small>Budget less Actual-to-date</small></article>
+      <article><span>Required Monthly Average</span><strong>{requiredMonthlyDisplay}</strong><small>{monthsRemaining > 0 ? `${monthsRemaining} FY month${monthsRemaining === 1 ? "" : "s"} remaining; current month is included` : "Fiscal year period has ended"}</small></article>
     </section>
 
     <section class="kpi-panel attainment-table-card" aria-labelledby="attainmentTableTitle">
@@ -173,6 +200,16 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
         tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }}
         styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart">
         <template slot="itemTemplate" render={renderChartItem}></template>
+      </oj-chart>
+    </section>
+
+    <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentCompositionTitle">
+      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">DP / OCI Actual and Forecast composition</h2><p>FY Actual and Forecast composition with Budget marker. Amounts in K.</p></div></div>
+      <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel}
+        yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" },
+          referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget marker", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }}
+        styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart">
+        <template slot="itemTemplate" render={renderCompositionItem}></template>
       </oj-chart>
     </section>
 

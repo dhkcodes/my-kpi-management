@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import {
   calculateAttainment,
   calculateFiscalYearSummary,
+  calculateRemainingTarget,
+  calculateRequiredMonthlyAverage,
   formatAttainment,
   formatAttainmentAmount,
-  formatBudget
+  formatBudget,
+  remainingFiscalMonths
 } from "../src/data/attainmentData";
 
 assert.equal(formatAttainmentAmount(1234.49), "$1,234 K", "amounts are displayed as rounded integer K");
@@ -71,5 +74,16 @@ assert.equal(zeroBudget.actualAttainment, null);
 assert.equal(zeroBudget.forecastAttainment, null);
 assert.equal(zeroBudget.actualVarianceToBudget, null);
 assert.equal(zeroBudget.forecastVarianceToBudget, null);
+
+assert.equal(calculateRemainingTarget(1000, 400), 600, "Actual-to-date is subtracted from target");
+assert.equal(calculateRemainingTarget(1000, 1200), 0, "an exceeded target floors remaining target at zero");
+assert.equal(calculateRemainingTarget(null, 400), null, "missing budget is not displayed as zero");
+assert.equal(calculateRequiredMonthlyAverage(600, 6), 100);
+assert.equal(calculateRequiredMonthlyAverage(0, 6), 0, "an exceeded target needs 0K per month");
+assert.equal(calculateRequiredMonthlyAverage(600, 0), null, "a completed FY has no monthly denominator");
+assert.equal(calculateRequiredMonthlyAverage(null, 6), null, "missing budget remains unavailable");
+assert.equal(remainingFiscalMonths("FY27", "2026-09"), 9, "current fiscal month is included through FY end in May");
+assert.equal(remainingFiscalMonths("FY26", "2026-09"), 0, "completed fiscal years report no remaining months");
+assert.equal(remainingFiscalMonths("FY28", "2026-09"), 12, "future fiscal years include all months");
 
 console.log("attainmentData tests passed");

@@ -31,7 +31,7 @@ assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
-assert.match(insightsPage, /\{analysis\.fiscalYear\} Quarter totals/, "FY and all four Quarter stacked totals use the selected fiscal-year title");
+assert.match(insightsPage, /\{analysis\.fiscalYear\} Mixed quarter consumption/, "FY fact-cell quarter totals use the selected fiscal-year title");
 assert.match(insightsPage, /Quarter-over-quarter[\s\S]*qoqChangePercent/, "QoQ values render as decision cards");
 assert.match(insightsPage, /const selectedAlert = analysis\?\.alerts\.find[^\n]+\?\? null/, "alerts start and remain unselected without falling back to the first alert");
 assert.match(insightsPage, /const trendPoints[\s\S]*selectedAlert[\s\S]*getAlertActualTrend[\s\S]*analysis\?\.contextActualTrend/, "unselected Trend uses the backend current-context ACTUAL trend");
@@ -52,7 +52,7 @@ assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights
 assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
 assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^\n]+\?\? null/, "account contribution starts unselected without falling back to the first account");
 assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
-assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Quarter totals<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names the selected fiscal year");
+assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Mixed quarter consumption<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names its Actual-first Forecast-fallback meaning");
 assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Consumption Analysis removes the aggregate Other Accounts contract and UI");
 assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
 assert.match(insightsPage, /\{!isUnmappedConsumptionLabel\(workload\) && <>\s*<b>\{workload\}<\/b> · <\/?>\}Plan \{plan\.planId\}/, "Plan Contribution keeps actual workload names while omitting unmapped labels regardless of case or surrounding whitespace");
@@ -63,7 +63,7 @@ assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Al
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
 assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Chart value labels use the approved compact USD format");
 assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendDataLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendDataLabel\}/, "FY and Quarter totals expose each value through the official JET chart dataLabel callback");
-assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|organicGrowthChart|movementBridge/, "deferred New/Expansion analysis charts are removed until Consumption Records is complete");
+assert.doesNotMatch(insightsPage, /Organic Consumption Growth Proxy|organicGrowthChart/, "the UI does not relabel Forecast movement composition as an organic-growth proxy");
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
 assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
@@ -112,6 +112,10 @@ assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinal
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
 assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
+assert.match(recordsPage, /renderSalesRepPreview\(pendingImport\.preview\.salesRepChanges/, "Actual preview renders Sales Rep changes before Apply");
+assert.match(recordsPage, /renderSalesRepPreview\(pendingForecastImport\.preview\.salesRepChanges/, "Forecast preview renders Sales Rep changes before Apply");
+assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Changed[\s\S]*Unchanged/, "Sales Rep preview exposes account, before-to-after, and changed/unchanged semantics");
+assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.match(recordsPage, /oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "actions are ordered Forecast Import, Forecast Export, Actual Import, Actual Export with matching upload/download icons");
 assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*onojAction=\{\(\) => void exportForecastCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*onojAction=\{\(\) => fileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*onojAction=\{\(\) => void exportImportCompatibleCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "each ordered action remains connected to its matching Forecast/Actual import/export handler");
@@ -229,7 +233,17 @@ assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-a
 
 // Approved Consumption follow-up: clearer visual regions, accessible alerts, stable records and zoom-safe navigation.
 assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
-assert.doesNotMatch(insightsPage, /Movement Bridge|Organic Consumption Growth Proxy|movementBridge|organicGrowthChart/, "deferred movement and Organic Growth charts are absent");
+assert.match(insightsPage, /analysis\.quarters\.flatMap/, "mixed quarter consumption remains sourced from effective fact-cell quarter totals");
+assert.match(insightsPage, /analysis\.movementBridge\.flatMap/, "Forecast movement composition remains a separate data source");
+assert.match(insightsPage, /seriesId: "New"/);
+assert.match(insightsPage, /seriesId: "Expansion"/);
+assert.match(insightsPage, /seriesId: "Reduction"/);
+assert.match(insightsPage, /value: -point\.reductionAmount/, "Reduction is rendered below zero exactly once at the visual boundary");
+assert.match(insightsPage, /point\.compositionStatus !== "CLASSIFIED"[\s\S]*return \[\]/, "unavailable or incomplete movement quarters are omitted instead of rendered as zero");
+assert.match(insightsPage, /point\.includedForecastPeriods\.join/, "movement labels expose only included Forecast periods");
+assert.doesNotMatch(insightsPage, /run[- ]?rate/i, "movement labels do not invent run-rate periods");
+assert.match(insightsPage, /onojItemDrill=\{selectMovement\}/, "movement bars drill to Account detail");
+assert.match(insightsPage, /Array\.isArray\(detail\.group\)/, "JET item drill accepts the public string or string-array group contract");
 assert.match(insightsPage, /consumption-signal-badges[\s\S]*consumption-signal-type[\s\S]*aria-hidden="true"[\s\S]*consumption-signal-grade/, "alert type and grade are separate accessible icon and text badges");
 assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s*stretch[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-inbox[^}]*height:\s*24rem[^}]*overflow-y:\s*auto[\s\S]*\.consumption-insights-linked-trend[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto[^}]*height:\s*24rem[\s\S]*\.consumption-insights-actual-chart[^}]*height:\s*100%[^}]*min-height:\s*15rem/, "alert and trend panels compact naturally after duplicate-list removal while preserving equal height and chart space");
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");

@@ -38,6 +38,7 @@ import {
   ConsumptionImportPreview,
   ConsumptionForecastVariance,
   ConsumptionForecastWidePreview,
+  ConsumptionSalesRepChange,
   applyConsumptionImport,
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
@@ -153,6 +154,27 @@ const fallbackForecastQuarters = [...new Set(fallbackEditablePeriods.map(getFisc
 const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackActualQuarters.filter((quarter) => !fallbackForecastQuarters.includes(quarter))];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const formatForecastK = (amount: number | null) => amount === null ? "" : (amount / 1000).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+const renderSalesRepPreview = (changes: readonly ConsumptionSalesRepChange[]) => (
+  <section class="consumption-sales-rep-preview" aria-label="Sales Rep preview">
+    <div class="consumption-sales-rep-heading">
+      <strong>Sales Rep assignments</strong>
+      <span>{changes.filter((change) => change.changed).length} changed · {changes.filter((change) => !change.changed).length} unchanged</span>
+    </div>
+    <p>Blank or missing Sales Rep values are ignored and leave the current assignment unchanged.</p>
+    {changes.length === 0 ? <p class="consumption-sales-rep-empty">No Sales Rep values to apply.</p> : (
+      <div class="consumption-sales-rep-table-wrap">
+        <table class="consumption-sales-rep-table">
+          <thead><tr><th>Account</th><th>Sales Rep (before → after)</th><th>Status</th></tr></thead>
+          <tbody>{changes.map((change) => <tr key={change.normalizedAccount} class={change.changed ? "is-changed" : "is-unchanged"}>
+            <th scope="row">{change.account}</th>
+            <td><span>{change.beforeSalesRep ?? "Unassigned"}</span><span class="consumption-sales-rep-arrow" aria-hidden="true">→</span><strong>{change.afterSalesRep}</strong></td>
+            <td><span class="consumption-sales-rep-status">{change.changed ? "Changed" : "Unchanged"}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    )}
+  </section>
+);
 const formatConflictCurrency = (value: string) => {
   const [, sign, integer, fraction = "", exponent = ""] = /^(-?)(\d+)(\.\d+)?([eE][+-]?\d+)?$/.exec(value)!;
   return `${sign === "-" ? "-$" : "$"}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction}${exponent}`;
@@ -1188,6 +1210,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
                 <div><dt>No change</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.existingSameValueCount + pendingImport.preview.skippedFactCount + pendingImport.preview.sameValueDuplicateCount}</dd></div>
                 <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Errors</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
               </dl>
+              {renderSalesRepPreview(pendingImport.preview.salesRepChanges)}
               <details class="consumption-import-technical-details">
                 <summary>View technical details</summary>
                 <dl>
@@ -1259,6 +1282,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
               <div><dt>Explicit zero</dt><dd>{pendingForecastImport.preview.explicitZeroCount}</dd></div>
               <div class={pendingForecastImport.preview.hasBlockedErrors ? "is-conflict" : ""}><dt>Blocked</dt><dd>{pendingForecastImport.preview.blockedErrors.length}</dd></div>
             </dl>
+            {renderSalesRepPreview(pendingForecastImport.preview.salesRepChanges)}
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
             <p>{pendingForecastImport.preview.exactReplay ? "EXACT_REPLAY — Apply is unnecessary and DB mutation remains 0."
               : `Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
