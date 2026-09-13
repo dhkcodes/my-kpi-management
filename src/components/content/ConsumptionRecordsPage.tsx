@@ -328,6 +328,9 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const [availableQuarterOptions, setAvailableQuarterOptions] = useState<string[]>([]);
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
   const [currentFiscalMonth, setCurrentFiscalMonth] = useState("");
+  const forecastFileName = currentFiscalMonth
+    ? `OCI Consumption Forecast - ${getFiscalQuarter(currentFiscalMonth)}.csv`
+    : "OCI Consumption Forecast - FYxx-Qx.csv";
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeInitialized, setRangeInitialized] = useState(false);
   const [rangeTouched, setRangeTouched] = useState(false);
@@ -1114,7 +1117,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
             disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
-          <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+          <oj-button chroming="outlined" title={`Import ${forecastFileName}`} disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>

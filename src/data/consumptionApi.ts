@@ -950,8 +950,8 @@ export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): P
   const blob = await response.blob();
   if (!contentType.toLowerCase().startsWith("text/csv") || blob.size === 0) throw new Error("Malformed Consumption Forecast CSV export response");
   const disposition = response.headers.get("Content-Disposition") ?? "";
-  const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
-  return { blob, fileName: match?.[1] ?? "consumption-forecast-export.csv" };
+  const match = /filename="([^"]+\.csv)"/i.exec(disposition);
+  return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.csv" };
 };
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
 export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar): Promise<ConsumptionMultiImportResult>;
