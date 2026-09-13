@@ -119,18 +119,17 @@ void (async () => {
   "Consumption Records rejects a negative composition amount instead of replacing the validated amount");
 
   runtime.fetch = async (input, init) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=ALL&fromQuarter=FY27-Q1&toQuarter=FY27-Q4");
     assert.equal(init?.method, "GET");
-    return new Response("\uFEFFCustomer,End User,Sold To,Plan ID,Data Center,Plan Type,FY27-AUG,Total\r\nA,EU,,P1,DC,OCI,$100,$100\r\n", {
+    return new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
       status: 200,
-      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="consumption-actuals-export.csv"' }
+      headers: { "Content-Type": "application/zip", "Content-Disposition": 'attachment; filename="consumption-actuals-export.zip"' }
     });
   };
-  const exported = await exportConsumptionImportCompatibleCsv();
-  assert.equal(exported.fileName, "consumption-actuals-export.csv");
+  const exported = await exportConsumptionImportCompatibleCsv("ALL", "FY27-Q1", "FY27-Q4");
+  assert.equal(exported.fileName, "consumption-actuals-export.zip");
   const exportedBytes = new Uint8Array(await exported.blob.arrayBuffer());
-  assert.deepEqual([...exportedBytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
-  assert.match(await exported.blob.text(), /^Customer,End User,Sold To,Plan ID,Data Center,Plan Type,/);
+  assert.deepEqual([...exportedBytes], [0x50, 0x4b, 0x03, 0x04]);
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/forecast?pillar=DP");

@@ -119,6 +119,7 @@ export type ConsumptionOrganicGrowthProxy = Readonly<{
 }>;
 export type ConsumptionMovementBridgePoint = Readonly<{
   quarter: "Q1" | "Q2" | "Q3" | "Q4";
+  totalForecastAmount: number | null;
   newAmount: number | null; expansionAmount: number | null; reductionAmount: number | null;
   netMovementAmount: number | null; compositionStatus: ConsumptionForecastCompositionStatus;
   classifiedAccountCount: number; unclassifiedAccountCount: number; unavailableReason: string | null;
@@ -126,7 +127,7 @@ export type ConsumptionMovementBridgePoint = Readonly<{
   accounts: readonly ConsumptionMovementAccountDetail[];
 }>;
 export type ConsumptionMovementAccountDetail = Readonly<{
-  account: string; newAmount: number; expansionAmount: number; reductionAmount: number; netMovementAmount: number;
+  account: string; totalForecastAmount: number; newAmount: number; expansionAmount: number; reductionAmount: number; netMovementAmount: number;
 }>;
 export type ConsumptionAnalysis = Readonly<{
   selectedPillar: ConsumptionPillar;
@@ -415,6 +416,7 @@ const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] =
     const includedForecastPeriods = point.includedForecastPeriods === undefined ? [] : point.includedForecastPeriods;
     const accounts = point.accounts === undefined ? [] : point.accounts;
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(point.quarter))
+      || !isNullableFiniteNumber(point.totalForecastAmount)
       || !isNullableFiniteNumber(point.newAmount) || !isNullableFiniteNumber(point.expansionAmount)
       || !isNullableFiniteNumber(point.reductionAmount) || !isNullableFiniteNumber(point.netMovementAmount)
       || !compositionStatuses.has(point.compositionStatus as ConsumptionForecastCompositionStatus)
@@ -424,7 +426,8 @@ const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] =
       || !Array.isArray(accounts) || !accounts.every((detail) => {
         if (typeof detail !== "object" || detail === null) return false;
         const row = detail as Record<string, unknown>;
-        return isNonEmptyString(row.account) && isFiniteNumber(row.newAmount) && isFiniteNumber(row.expansionAmount)
+        return isNonEmptyString(row.account) && isFiniteNumber(row.totalForecastAmount)
+          && isFiniteNumber(row.newAmount) && isFiniteNumber(row.expansionAmount)
           && isFiniteNumber(row.reductionAmount) && isFiniteNumber(row.netMovementAmount);
       })) return malformedAnalysis();
     return { ...point, includedForecastPeriods, accounts } as unknown as ConsumptionMovementBridgePoint;
@@ -896,12 +899,20 @@ export const previewConsumptionImport = async (input: string | readonly File[], 
   const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) });
   return decodeImportPreview(payload, pillar, input);
 };
-export const exportConsumptionImportCompatibleCsv = async (pillar?: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
+export const exportConsumptionImportCompatibleCsv = async (
+  pillar?: ConsumptionPillar,
+  fromQuarter?: string,
+  toQuarter?: string
+): Promise<ConsumptionCsvExport> => {
   const selectedPillar = pillar ?? "ALL";
   if (!isConsumptionPillar(selectedPillar)) throw new Error("Invalid Consumption pillar");
+  const query = new URLSearchParams();
+  if (pillar !== undefined) query.set("pillar", selectedPillar);
+  if (fromQuarter) query.set("fromQuarter", fromQuarter);
+  if (toQuarter) query.set("toQuarter", toQuarter);
   let response: Response;
   try {
-    response = await apiFetch(`${apiBase()}/consumption/exports/import-compatible${pillar === undefined ? "" : `?pillar=${pillar}`}`, { method: "GET" });
+    response = await apiFetch(`${apiBase()}/consumption/exports/import-compatible${query.size ? `?${query}` : ""}`, { method: "GET" });
   } catch (cause) {
     throw new ConsumptionNetworkError(cause);
   }
@@ -913,10 +924,13 @@ export const exportConsumptionImportCompatibleCsv = async (pillar?: ConsumptionP
   }
   const contentType = response.headers.get("Content-Type") ?? "";
   const blob = await response.blob();
-  if (!contentType.toLowerCase().startsWith("text/csv") || blob.size === 0) throw new Error("Malformed Consumption CSV export response");
+  const normalizedContentType = contentType.toLowerCase();
+  if ((!normalizedContentType.startsWith("text/csv") && !normalizedContentType.startsWith("application/zip")) || blob.size === 0) {
+    throw new Error("Malformed Consumption export response");
+  }
   const disposition = response.headers.get("Content-Disposition") ?? "";
-  const match = /filename="([A-Za-z0-9._-]+\.csv)"/i.exec(disposition);
-  return { blob, fileName: match?.[1] ?? "consumption-actuals-export.csv" };
+  const match = /filename="([A-Za-z0-9._-]+\.(?:csv|zip))"/i.exec(disposition);
+  return { blob, fileName: match?.[1] ?? (normalizedContentType.startsWith("application/zip") ? "consumption-actuals-export.zip" : "consumption-actuals-export.csv") };
 };
 export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");

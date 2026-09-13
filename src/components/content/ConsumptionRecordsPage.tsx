@@ -987,7 +987,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     setIsExporting(true);
     setImportError("");
     try {
-      const exported = await exportConsumptionImportCompatibleCsv(selectedPillar);
+      const exported = await exportConsumptionImportCompatibleCsv(selectedPillar, fromQuarter, toQuarter);
       const url = URL.createObjectURL(exported.blob);
       try {
         const anchor = document.createElement("a");
