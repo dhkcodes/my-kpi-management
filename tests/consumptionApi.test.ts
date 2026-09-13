@@ -136,11 +136,11 @@ void (async () => {
     assert.equal(init?.method, "GET");
     return new Response("\uFEFFaccount_name,pillar,FY27-SEP,FY27-OCT,FY27-NOV\r\nA,DP,,999,\r\n", {
       status: 200,
-      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="consumption-forecast-dp-export.csv"' }
+      headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="OCI Consumption Forecast - FY27-Q2.csv"' }
     });
   };
   const forecastExported = await exportConsumptionForecastCsv("DP");
-  assert.equal(forecastExported.fileName, "consumption-forecast-dp-export.csv");
+  assert.equal(forecastExported.fileName, "OCI Consumption Forecast - FY27-Q2.csv");
   assert.match(await forecastExported.blob.text(), /^account_name,pillar,FY27-SEP,FY27-OCT,FY27-NOV/);
 
   runtime.fetch = async (input) => {
