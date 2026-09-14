@@ -9,6 +9,7 @@ import {
   detectConsumptionSignals,
   expandConsumptionQuarterOptions,
   filterVisibleConsumptionPlans,
+  filterForecastCompositionAccounts,
   getFiscalQuarter,
   getLatestActualMonth,
   getConsumptionPlanLabel,
@@ -222,5 +223,14 @@ const monthBoundarySignals = detectConsumptionSignals([
 assert.equal(monthBoundarySignals[0]?.month, "FY27-JUL", "completed months advance at midnight in the Asia/Seoul business zone");
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
 
-
+const forecastCompositionAccounts = [
+  { account: "SuperConnect", newAmount: 0, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 4326.268673, netMovementAmount: 0 },
+  { account: "New Account", newAmount: 1000, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 1000, netMovementAmount: 1000 },
+  { account: "No forecast", newAmount: 0, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 0, netMovementAmount: 0 }
+];
+assert.deepEqual(
+  filterForecastCompositionAccounts(forecastCompositionAccounts, "All").map((account) => account.account),
+  ["SuperConnect", "New Account"],
+  "All Forecast detail includes base-only account forecasts while excluding rows with no visible amount"
+);
 console.log("consumptionData tests passed");
