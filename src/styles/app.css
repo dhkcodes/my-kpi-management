@@ -2519,6 +2519,13 @@ h4.weekly-activity-section-label--next-week,
 .consumption-quarter-total small.is-forecast { color: #175b8e; }
 .consumption-quarter-total small.is-incomplete, .consumption-quarter-total small.is-mixed { color: #9a4f00; }
 .consumption-forecast-editor { background: #fff; border: 2px solid #2f6f9f; font: inherit; font-variant-numeric: tabular-nums; height: 2.25rem; min-width: 6rem; padding: .35rem; text-align: right; width: 100%; }
+.consumption-forecast-composition-dialog { --oj-dialog-width: min(22rem, 88vw); }
+.consumption-forecast-composition-form { display: grid; gap: .35rem; min-width: min(19rem, 76vw); }
+.consumption-forecast-composition-form > small { color: var(--kpi-muted); }
+.consumption-forecast-composition-fields { display: grid; gap: .45rem; margin-top: .35rem; }
+.consumption-forecast-composition-fields label { display: grid; font-size: .75rem; font-weight: 750; gap: .2rem; }
+.consumption-forecast-composition-fields input { border: 1px solid var(--oj-core-divider-color, #c6c6c6); border-radius: .25rem; box-sizing: border-box; font: inherit; font-variant-numeric: tabular-nums; padding: .4rem .5rem; text-align: right; width: 100%; }
+.consumption-forecast-composition-error { color: var(--oj-core-danger-3, #b3261e); font-size: .75rem; font-weight: 700; }
 .consumption-account-single { display: grid; gap: .2rem; min-width: 0; }
 .consumption-account-single strong, .consumption-account-single small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-account-single small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; }

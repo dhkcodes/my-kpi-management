@@ -145,7 +145,15 @@ export type ConsumptionAnalysis = Readonly<{
   movementBridge: readonly ConsumptionMovementBridgePoint[];
 }>;
 export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; pillar?: ConsumptionPillar }>;
-export type ConsumptionControlForecastUpdate = Readonly<{ account: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">; amount: number }>;
+export type ConsumptionControlForecastUpdate = Readonly<{
+  account: string;
+  periodKey: string;
+  pillar: Exclude<ConsumptionPillar, "ALL">;
+  amount: number;
+  totalAmount?: number;
+  newAmount?: number;
+  expansionAmount?: number;
+}>;
 export type ConsumptionImportFilePreview = Readonly<{
   fileName: string; owner: string; fromPeriod: string; toPeriod: string; detectedPillar: Exclude<ConsumptionPillar, "ALL">;
   sourceSha256: string; planCount: number; controlTotalCount: number; sourceRowCount: number;

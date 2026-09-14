@@ -12,6 +12,7 @@ import {
   saveConsumptionForecasts
 } from "../src/data/consumptionApi";
 import { buildDisplayQuarterSummaries } from "../src/data/consumptionData";
+import { parseForecastCompositionK } from "../src/data/forecastComposition";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -48,6 +49,13 @@ runtime.fetch = async (input) => {
 };
 
 void (async () => {
+  assert.deepEqual(parseForecastCompositionK("100.25", "20", "30.25"), {
+    totalAmount: 100250, newAmount: 20000, expansionAmount: 30250
+  });
+  assert.equal(typeof parseForecastCompositionK("100", "60", "50"), "string");
+  assert.equal(typeof parseForecastCompositionK("", "0", "0"), "string");
+  assert.equal(typeof parseForecastCompositionK("1.001", "0", "0"), "string");
+
   const workspace = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1" });
   assert.equal(workspace.etag, '"header-etag"');
   assert.equal(workspace.currentFiscalMonth, "FY27-AUG");
@@ -200,10 +208,12 @@ void (async () => {
     putInit = init;
     return new Response(JSON.stringify({ ...payload, selectedPillar: "DP", plans: [], controlTotals: [], etag: '"next-etag"' }), { status: 200, headers: { ETag: '"next-etag"' } });
   };
-  const saved = await saveConsumptionForecasts('"header-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1001 }], "DP");
+  const saved = await saveConsumptionForecasts('"header-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
+    amount: 100000, totalAmount: 100000, newAmount: 20000, expansionAmount: 30000 }], "DP");
   assert.equal(putInit?.method, "PUT");
   assert.equal((putInit?.headers as Record<string, string>)["If-Match"], '"header-etag"');
-  assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 1001 }] });
+  assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
+    amount: 100000, totalAmount: 100000, newAmount: 20000, expansionAmount: 30000 }] });
   assert.equal(saved.etag, '"next-etag"');
   await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }], "DP");
   assert.deepEqual(JSON.parse(String(putInit?.body)), {

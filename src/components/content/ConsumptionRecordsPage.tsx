@@ -29,6 +29,7 @@ import {
   sortConsumptionMonthsNewestFirst
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
+import { ForecastCompositionDraft, parseForecastCompositionK } from "../../data/forecastComposition";
 import {
   ConsumptionAccountForecast,
   ConsumptionApiControlTotal,
@@ -279,6 +280,18 @@ type ConsumptionChartPoint = Readonly<{
   shortDesc: string;
 }>;
 
+type ForecastCompositionEditor = Readonly<{
+  account: string;
+  month: string;
+  pillar: Exclude<ConsumptionPillar, "ALL">;
+  total: string;
+  newValue: string;
+  expansion: string;
+  error: string;
+}>;
+const forecastDraftKey = (account: string, month: string) => `${account}::${month}`;
+const toKInput = (amount: number | null | undefined) => amount === null || amount === undefined ? "" : `${amount / 1000}`;
+
 const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPoint }>) => (
   <oj-chart-item
     value={context.data.value}
@@ -308,6 +321,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [forecastVariances, setForecastVariances] = useState<ConsumptionForecastVariance[]>([]);
   const [accountForecasts, setAccountForecasts] = useState<ConsumptionAccountForecast[]>([]);
+  const [draftForecastCompositions, setDraftForecastCompositions] = useState<Map<string, ForecastCompositionDraft>>(() => new Map());
+  const [forecastEditor, setForecastEditor] = useState<ForecastCompositionEditor | null>(null);
   const [selectedSignalId, setSelectedSignalId] = useState("");
   const [selectedSeriesId, setSelectedSeriesId] = useState("__all__");
   const [planSearch, setPlanSearch] = useState("");
@@ -358,6 +373,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const forecastFileInputRef = useRef<HTMLInputElement | null>(null);
   const importDialogRef = useRef<ojDialog | null>(null);
   const forecastImportDialogRef = useRef<ojDialog | null>(null);
+  const forecastEditorDialogRef = useRef<ojDialog | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -367,7 +383,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const recordsLoadingRef = useRef(false);
   const recordsQueryRef = useRef<RecordsQuery>({ fromQuarter: "", toQuarter: "", search: "", pillar: "ALL" });
   const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
-  const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals);
+  const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals) || draftForecastCompositions.size > 0;
   const hasDraftChanges = hasControlDraftChanges;
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
@@ -393,6 +409,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     setDraftControlTotals(cloneControlTotals(forecastControls));
     setForecastVariances([...workspace.forecastVariances]);
     setAccountForecasts([...workspace.accountForecasts]);
+    setDraftForecastCompositions(new Map());
     setServerSignals(workspace.signals);
     setApiEtag(workspace.etag);
     setFromQuarter(workspace.fromQuarter);
@@ -771,41 +788,52 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
 
   const beginControlEdit = (account: string, month: string, value: number | null) => {
     if (selectedPillar === "ALL" || isSaving || recordsLoading || dataMode !== "backend") return;
-    editEntryValueRef.current = value;
-    setEditCell({ planKey: account, month, control: true });
+    const key = forecastDraftKey(account, month);
+    const draft = draftForecastCompositions.get(key);
+    const saved = accountForecasts.find((forecast) => forecast.account === account && forecast.periodKey === month && forecast.pillar === selectedPillar);
+    setForecastEditor({
+      account,
+      month,
+      pillar: selectedPillar,
+      total: toKInput(draft?.totalAmount ?? saved?.amount ?? value),
+      newValue: toKInput(draft?.newAmount ?? saved?.newAmount),
+      expansion: toKInput(draft?.expansionAmount ?? saved?.expansionAmount),
+      error: ""
+    });
+    window.requestAnimationFrame(() => forecastEditorDialogRef.current?.open());
   };
 
-  const commitForecastEdit = () => {
-    if(editCell?.control){
-      const draft=controlValue(draftControlTotals,editCell.planKey,editCell.month);
-      const saved=controlValue(savedControlTotals,editCell.planKey,editCell.month);
-      if(draft===undefined&&saved!==undefined)updateControlForecast(editCell.planKey,editCell.month,saved);
-    }
-    editEntryValueRef.current = null;
-    setEditCell(null);
+  const updateForecastEditor = (field: "total" | "newValue" | "expansion", value: string) => {
+    setForecastEditor((current) => current ? { ...current, [field]: value, error: "" } : current);
   };
 
-  const cancelForecastEdit = () => {
-    if (!editCell) {
-      setEditCell(null);
+  const applyForecastComposition = () => {
+    if (!forecastEditor) return;
+    const parsed = parseForecastCompositionK(forecastEditor.total, forecastEditor.newValue, forecastEditor.expansion);
+    if (typeof parsed === "string") {
+      setForecastEditor({ ...forecastEditor, error: parsed });
       return;
     }
-    updateControlForecast(editCell.planKey, editCell.month, controlValue(savedControlTotals, editCell.planKey, editCell.month) ?? null);
-    editEntryValueRef.current = null;
-    setEditCell(null);
+    const key = forecastDraftKey(forecastEditor.account, forecastEditor.month);
+    const saved = accountForecasts.find((forecast) => forecast.account === forecastEditor.account
+      && forecast.periodKey === forecastEditor.month && forecast.pillar === forecastEditor.pillar);
+    const unchanged = saved?.compositionStatus === "CLASSIFIED"
+      && saved.amount === parsed.totalAmount
+      && saved.newAmount === parsed.newAmount
+      && saved.expansionAmount === parsed.expansionAmount;
+    setDraftForecastCompositions((current) => {
+      const next = new Map(current);
+      if (unchanged) next.delete(key); else next.set(key, parsed);
+      return next;
+    });
+    updateControlForecast(forecastEditor.account, forecastEditor.month, parsed.totalAmount);
+    forecastEditorDialogRef.current?.close();
+    setForecastEditor(null);
   };
 
-  const editorKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || event.keyCode === 229) return;
-    if (event.key === "Enter") {
-      event.preventDefault();
-      event.stopPropagation();
-      commitForecastEdit();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      cancelForecastEdit();
-    }
+  const cancelForecastComposition = () => {
+    forecastEditorDialogRef.current?.close();
+    setForecastEditor(null);
   };
 
   const saveForecasts = async () => {
@@ -817,10 +845,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     setConflictRows([]);
     const controlUpdates = accounts.flatMap((account) =>
       [...editablePeriodIds].flatMap((month) => {
-        const savedValue = controlValue(savedControlTotals, account.customer, month);
-        const draftValue = controlValue(draftControlTotals, account.customer, month);
-        if (draftValue === undefined || savedValue === draftValue) return [];
-        return [{ account: account.customer, periodKey: month, pillar: selectedPillar, amount: draftValue }];
+        const composition = draftForecastCompositions.get(forecastDraftKey(account.customer, month));
+        if (!composition) return [];
+        return [{ account: account.customer, periodKey: month, pillar: selectedPillar,
+          amount: composition.totalAmount, ...composition }];
       }));
     try {
       if (dataMode === "fallback") {
@@ -847,7 +875,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
 
         draftControlTotals.forEach((draft) => {
           const savedValue = controlValue(savedControlTotals, draft.account, draft.periodKey);
-          if ((savedValue ?? null) === draft.controlAmount) return;
+          if ((savedValue ?? null) === draft.controlAmount
+            && !draftForecastCompositions.has(forecastDraftKey(draft.account, draft.periodKey))) return;
           rows.push({ plan: `${draft.account} · Account Forecast`, month: draft.periodKey,
             saved: savedValue ?? null, draft: draft.controlAmount,
             current: controlValue(accountForecastControls(error.current), draft.account, draft.periodKey) ?? null });
@@ -872,6 +901,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const cancelAllForecasts = () => {
     setDraftPlans(clonePlans(savedPlans));
     setDraftControlTotals(cloneControlTotals(savedControlTotals));
+    setDraftForecastCompositions(new Map());
+    cancelForecastComposition();
     setEditCell(null);
     editEntryValueRef.current = null;
   };
@@ -1089,22 +1120,25 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             const composition = selectedPillar === "ALL" ? undefined : accountForecasts.find((item) =>
               item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const canEditControl = editable;
-            const editing = canEditControl && editCell?.control && editCell.planKey === series.customer && editCell.month === month;
-            const savedValue = controlValue(savedControlTotals, series.customer, month);
-            const dirty = savedValue !== controlValue(draftControlTotals, series.customer, month);
+            const compositionDraft = draftForecastCompositions.get(forecastDraftKey(series.customer, month));
+            const displayedComposition = compositionDraft && composition ? {
+              ...composition,
+              amount: compositionDraft.totalAmount,
+              totalAmount: compositionDraft.totalAmount,
+              newAmount: compositionDraft.newAmount,
+              expansionAmount: compositionDraft.expansionAmount,
+              baseAmount: compositionDraft.totalAmount - compositionDraft.newAmount - compositionDraft.expansionAmount,
+              compositionStatus: "CLASSIFIED" as const
+            } : composition;
+            const dirty = draftForecastCompositions.has(forecastDraftKey(series.customer, month));
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
               onDblClick={() => canEditControl && beginControlEdit(series.customer, month, value)}>
-              {editing ? <input class="consumption-forecast-editor" type="text" inputMode="decimal" value={value === null ? "" : `${value}`}
-                data-forecast-editor={key} ref={selectForecastEditor(key)}
-                aria-label={`${series.customer} ${month} Account Forecast`} disabled={isSaving}
-                onInput={(event) => { const raw = event.currentTarget.value; const parsed = raw === "" ? null : parseForecastDecimal(raw); if (raw === "" || parsed !== null) updateControlForecast(series.customer, month, parsed); }}
-                onKeyDown={editorKeyDown} autofocus />
-                : <span>{value === null ? currency.format(0) : currency.format(value)}{composition && <ForecastCompositionTooltip composition={composition} />}{dirty && <small>draft</small>}
-                  {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
-                    Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
-                  </small>}</span>}
+              <span>{value === null ? currency.format(0) : currency.format(value)}{displayedComposition && <ForecastCompositionTooltip composition={displayedComposition} />}{dirty && <small>draft</small>}
+                {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
+                  Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
+                </small>}</span>
             </td>;
           }
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>{value === null ? "—" : currency.format(value)}</td>;
@@ -1324,6 +1358,27 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             disabled={pendingForecastImport.preview.hasBlockedErrors}
             onojAction={() => void applyPendingForecastImport()}>{`Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
+        </div>
+      </oj-dialog>
+      <oj-dialog ref={forecastEditorDialogRef} class="consumption-forecast-composition-dialog" cancelBehavior="none"
+        onojClose={() => setForecastEditor(null)}>
+        <span slot="header">Edit Forecast</span>
+        {forecastEditor && <div class="consumption-forecast-composition-form">
+          <strong>{forecastEditor.account}</strong>
+          <small>{forecastEditor.pillar} · {forecastEditor.month}</small>
+          <div class="consumption-forecast-composition-fields">
+            <label>Total (K)<input type="text" inputMode="decimal" value={forecastEditor.total} autofocus
+              onInput={(event) => updateForecastEditor("total", event.currentTarget.value)} /></label>
+            <label>New (K)<input type="text" inputMode="decimal" value={forecastEditor.newValue}
+              onInput={(event) => updateForecastEditor("newValue", event.currentTarget.value)} /></label>
+            <label>Expansion (K)<input type="text" inputMode="decimal" value={forecastEditor.expansion}
+              onInput={(event) => updateForecastEditor("expansion", event.currentTarget.value)} /></label>
+          </div>
+          {forecastEditor.error && <span class="consumption-forecast-composition-error" role="alert">{forecastEditor.error}</span>}
+        </div>}
+        <div slot="footer">
+          <oj-button chroming="outlined" onojAction={cancelForecastComposition}>Cancel</oj-button>
+          <oj-button chroming="callToAction" onojAction={applyForecastComposition}>Apply changes</oj-button>
         </div>
       </oj-dialog>
       {conflictRows.length > 0 && (
