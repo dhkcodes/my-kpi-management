@@ -240,7 +240,6 @@ export type ConsumptionForecastWidePreview = Readonly<{
   hasBlockedErrors: boolean;
 }>;
 export type ConsumptionForecastWideApplyResult = Readonly<{
-  workspace: ConsumptionApiWorkspace;
   batchId: number;
   exactReplay: boolean;
   status: "EXACT_REPLAY" | "APPLIED" | "APPLIED_NO_CONTROL_CHANGE";
@@ -1094,8 +1093,7 @@ export const applyConsumptionForecastWide = async (file: File, etag: string): Pr
     || raw.replay !== (raw.status === "EXACT_REPLAY")
     || (raw.status === "APPLIED" && raw.appliedCount === 0)
     || (raw.status !== "APPLIED" && raw.appliedCount !== 0)) throw new Error("Malformed Forecast Wide apply result");
-  const workspace = await fetchConsumptionWorkspace();
-  return { workspace, batchId: raw.batchId, exactReplay: raw.replay,
+  return { batchId: raw.batchId, exactReplay: raw.replay,
     status: raw.status as ConsumptionForecastWideApplyResult["status"], appliedCount: raw.appliedCount,
     noOpCount: 0, explicitZeroCount: 0, planUnassignedCount: 0 };
 };

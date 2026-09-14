@@ -9,15 +9,23 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 assert.match(recordsPage,
   /error instanceof ConsumptionConflictError[\s\S]*accountForecastControls\(error\.current\)[\s\S]*setConflictRows\(rows\)[\s\S]*setConflictWorkspace\(error\.current\)[\s\S]*Forecast Save conflicted with a newer server version/,
   "DP/OCI version conflicts reach the comparison UI with the selected-pillar server workspace");
-assert.match(recordsPage, /이미 반영된 파일입니다\. 추가로 변경된 데이터는 없습니다\./,
-  "exact Forecast replays are explained in user language");
-assert.match(recordsPage, /변경할 Forecast 값이나 Sales Rep 정보가 없습니다\./,
-  "a successful no-change Forecast import is distinct from an exact replay");
-assert.match(recordsPage, /변경된 항목[\s\S]*Forecast 값과 Sales Rep 합계/,
-  "changed counts disclose their Forecast-plus-Sales-Rep basis instead of pretending to be Account counts");
-assert.match(recordsPage, /Forecast Import에 실패했습니다/,
+assert.match(recordsPage, /변경 없음: Forecast 값과 Sales Rep 정보가 현재 데이터와 같습니다\./,
+  "an accepted same-file Forecast re-upload clearly reports no data change");
+assert.match(recordsPage, /result\.status === "APPLIED_NO_CONTROL_CHANGE" \|\| result\.status === "EXACT_REPLAY"/,
+  "all supported no-mutation Forecast outcomes use the no-change message");
+assert.match(recordsPage, /forecastApplyingRef\.current[\s\S]*setForecastImportPhase\("applying"\)[\s\S]*finally[\s\S]*forecastApplyingRef\.current = false/,
+  "Forecast Apply is synchronously locked against same-render double submission");
+assert.match(recordsPage, /setForecastImportPhase\("complete"\);[\s\S]*?try \{[\s\S]*?await loadRecordsPage/,
+  "a post-commit records refresh cannot relabel a successful Forecast apply as failed");
+assert.match(recordsPage, /반영은 완료됐지만 목록 새로고침에 실패했습니다/,
+  "post-commit refresh failure preserves the apply result and gives recovery guidance");
+assert.match(recordsPage, /반영 완료: 변경된 항목[\s\S]*Forecast 값과 Sales Rep 합계/,
+  "changed counts use a clear applied label and disclose their Forecast-plus-Sales-Rep basis");
+assert.match(recordsPage, /반영 실패:/,
   "Forecast import failures have a plain-language failure label");
-assert.doesNotMatch(recordsPage, /EXACT_REPLAY|DB mutation|Applied \$\{result\.appliedCount\} Forecast cells/,
+assert.doesNotMatch(recordsPage, /pendingForecastImport\.preview\.exactReplay|이미 반영된 파일/,
+  "historical file equality never blocks a deliberate Forecast re-upload");
+assert.doesNotMatch(recordsPage, /DB mutation|Applied \$\{result\.appliedCount\} Forecast cells/,
   "internal Forecast replay, mutation, and Applied codes are not shown to users");
 assert.doesNotMatch(recordsPage, /Applied: 0/, "Actual result decoding failures must not claim that zero rows were applied");
 assert.match(recordsPage, /처리 결과를 확인하지 못했습니다\. 반영 여부 확인이 필요합니다\./,
@@ -140,7 +148,7 @@ assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\
 assert.match(recordsPage, /Import \$\{forecastFileName\}/, "Forecast Import names the current editable FY-quarter template without enforcing it as an upload restriction");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
-assert.match(recordsPage, /이미 반영된 파일입니다\. 추가로 변경된 데이터는 없습니다\.[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview explains exact replay in user language and keeps plan-unassigned semantics");
+assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
 assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
 assert.match(recordsPage, /<button type="button" class=\{`consumption-range-apply[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "mobile Apply uses a stable native button instead of a late-upgrading custom element");
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");

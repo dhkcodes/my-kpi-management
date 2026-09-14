@@ -364,6 +364,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
   const exportingRef = useRef(false);
+  const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const recordsLoadingRef = useRef(false);
   const recordsQueryRef = useRef<RecordsQuery>({ fromQuarter: "", toQuarter: "", search: "", pillar: "ALL" });
@@ -907,25 +908,30 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   };
 
   const applyPendingForecastImport = async () => {
-    if (!pendingForecastImport || forecastImportPhase !== "preview" || pendingForecastImport.preview.hasBlockedErrors
-      || pendingForecastImport.preview.exactReplay) return;
+    if (forecastApplyingRef.current || !pendingForecastImport || forecastImportPhase !== "preview" || pendingForecastImport.preview.hasBlockedErrors) return;
+    forecastApplyingRef.current = true;
     setForecastImportPhase("applying");
     setImportError("");
     try {
       const result = await applyConsumptionForecastWide(pendingForecastImport.file, pendingForecastImport.preview.etag);
-      adoptWorkspace(result.workspace);
-      await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch });
-      setForecastImportResult(result.exactReplay
-        ? "이미 반영된 파일입니다. 추가로 변경된 데이터는 없습니다."
-        : result.status === "APPLIED_NO_CONTROL_CHANGE"
-          ? "파일을 확인했지만 변경할 Forecast 값이나 Sales Rep 정보가 없습니다."
-          : `Import를 완료했습니다. 변경된 항목 ${result.appliedCount}건 (Forecast 값과 Sales Rep 합계이며 Account 수가 아닙니다).`);
+      const hasNoChanges = result.status === "APPLIED_NO_CONTROL_CHANGE" || result.status === "EXACT_REPLAY";
+      setForecastImportResult(hasNoChanges
+        ? "변경 없음: Forecast 값과 Sales Rep 정보가 현재 데이터와 같습니다."
+        : `반영 완료: 변경된 항목 ${result.appliedCount}건 (Forecast 값과 Sales Rep 합계이며 Account 수가 아닙니다).`);
       setForecastImportPhase("complete");
+      try {
+        await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch });
+      } catch (refreshError) {
+        const message = refreshError instanceof Error ? refreshError.message : "Forecast records could not be refreshed.";
+        setImportError(`반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Forecast CSV could not be applied.";
       setImportError(message);
-      setForecastImportResult(`Forecast Import에 실패했습니다. ${message}`);
+      setForecastImportResult(`반영 실패: ${message}`);
       setForecastImportPhase("error");
+    } finally {
+      forecastApplyingRef.current = false;
     }
   };
 
@@ -1296,8 +1302,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             </dl>
             {renderSalesRepPreview(pendingForecastImport.preview.salesRepChanges)}
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
-            <p>{pendingForecastImport.preview.exactReplay ? "이미 반영된 파일입니다. 추가로 변경된 데이터는 없습니다."
-              : `Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
+            <p>{`Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
             {pendingForecastImport.preview.changes.length > 0 && <table class="consumption-import-preview-table">
               <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Base</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>
               <tbody>{pendingForecastImport.preview.changes.slice(0, 20).map((change) => <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
@@ -1319,8 +1324,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
         </div>
         <div slot="footer">
           {forecastImportPhase === "preview" && pendingForecastImport && <><oj-button chroming="outlined" onojAction={() => forecastImportDialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={pendingForecastImport.preview.hasBlockedErrors || pendingForecastImport.preview.exactReplay}
-            onojAction={() => void applyPendingForecastImport()}>{pendingForecastImport.preview.exactReplay ? "Already imported" : `Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
+            disabled={pendingForecastImport.preview.hasBlockedErrors}
+            onojAction={() => void applyPendingForecastImport()}>{`Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
         </div>
       </oj-dialog>

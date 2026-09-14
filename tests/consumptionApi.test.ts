@@ -337,13 +337,15 @@ void (async () => {
     { batchId: 32, replay: false, appliedCount: 0, status: "APPLIED_NO_CONTROL_CHANGE" },
     { batchId: 33, replay: false, appliedCount: 4, status: "APPLIED" }
   ] as const) {
+    let forecastApplyRequestCount = 0;
     runtime.fetch = async (input) => {
+      forecastApplyRequestCount += 1;
       if (String(input).endsWith("/consumption/forecast-imports/apply"))
         return new Response(JSON.stringify(expected), { status: 200, headers: { "Content-Type": "application/json" } });
-      assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace");
-      return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json", ETag: '"apply-etag"' } });
+      throw new Error(`unexpected post-commit refresh request: ${String(input)}`);
     };
     const applied = await applyConsumptionForecastWide(new File(["csv"], "forecast.csv"), '"expected-etag"');
+    assert.equal(forecastApplyRequestCount, 1, "Forecast Apply returns its committed receipt without a failure-prone follow-up fetch");
     assert.deepEqual({ exactReplay: applied.exactReplay, status: applied.status, appliedCount: applied.appliedCount },
       { exactReplay: expected.replay, status: expected.status, appliedCount: expected.appliedCount },
       "Forecast Apply preserves the server status needed for replay, no-change, and changed user messages");
