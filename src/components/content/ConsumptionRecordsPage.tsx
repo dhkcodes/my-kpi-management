@@ -284,6 +284,7 @@ type ForecastCompositionEditor = Readonly<{
   account: string;
   month: string;
   pillar: Exclude<ConsumptionPillar, "ALL">;
+  anchor: HTMLElement;
   total: string;
   newValue: string;
   expansion: string;
@@ -291,6 +292,7 @@ type ForecastCompositionEditor = Readonly<{
 }>;
 const forecastDraftKey = (account: string, month: string) => `${account}::${month}`;
 const toKInput = (amount: number | null | undefined) => amount === null || amount === undefined ? "" : `${amount / 1000}`;
+const validForecastKInput = (value: string) => /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value.trim());
 
 const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPoint }>) => (
   <oj-chart-item
@@ -373,7 +375,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const forecastFileInputRef = useRef<HTMLInputElement | null>(null);
   const importDialogRef = useRef<ojDialog | null>(null);
   const forecastImportDialogRef = useRef<ojDialog | null>(null);
-  const forecastEditorDialogRef = useRef<ojDialog | null>(null);
+  const forecastEditorPopoverRef = useRef<HTMLDivElement | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -786,7 +788,48 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     });
   };
 
-  const beginControlEdit = (account: string, month: string, value: number | null) => {
+  const positionForecastPopover = () => {
+    const popover = forecastEditorPopoverRef.current;
+    const anchor = forecastEditor?.anchor;
+    if (!popover || !anchor?.isConnected) return;
+    const gap = 6;
+    const edge = 8;
+    const anchorRect = anchor.getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+    let left = anchorRect.right + gap;
+    if (left + popoverRect.width > window.innerWidth - edge) left = anchorRect.left - popoverRect.width - gap;
+    left = Math.max(edge, Math.min(left, window.innerWidth - popoverRect.width - edge));
+    const top = Math.max(edge, Math.min(anchorRect.top, window.innerHeight - popoverRect.height - edge));
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  };
+
+  const closeForecastComposition = () => setForecastEditor(null);
+
+  useEffect(() => {
+    if (!forecastEditor) return;
+    let frame = window.requestAnimationFrame(positionForecastPopover);
+    const reposition = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(positionForecastPopover);
+    };
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target || forecastEditorPopoverRef.current?.contains(target) || forecastEditor.anchor.contains(target)) return;
+      closeForecastComposition();
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [forecastEditor?.account, forecastEditor?.month, forecastEditor?.pillar, forecastEditor?.anchor, forecastEditor?.error]);
+
+  const beginControlEdit = (anchor: HTMLElement, account: string, month: string, value: number | null) => {
     if (selectedPillar === "ALL" || isSaving || recordsLoading || dataMode !== "backend") return;
     const key = forecastDraftKey(account, month);
     const draft = draftForecastCompositions.get(key);
@@ -795,12 +838,12 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
       account,
       month,
       pillar: selectedPillar,
+      anchor,
       total: toKInput(draft?.totalAmount ?? saved?.amount ?? value),
       newValue: toKInput(draft?.newAmount ?? saved?.newAmount),
       expansion: toKInput(draft?.expansionAmount ?? saved?.expansionAmount),
       error: ""
     });
-    window.requestAnimationFrame(() => forecastEditorDialogRef.current?.open());
   };
 
   const updateForecastEditor = (field: "total" | "newValue" | "expansion", value: string) => {
@@ -827,14 +870,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
       return next;
     });
     updateControlForecast(forecastEditor.account, forecastEditor.month, parsed.totalAmount);
-    forecastEditorDialogRef.current?.close();
     setForecastEditor(null);
   };
 
-  const cancelForecastComposition = () => {
-    forecastEditorDialogRef.current?.close();
-    setForecastEditor(null);
-  };
+  const cancelForecastComposition = () => setForecastEditor(null);
 
   const saveForecasts = async () => {
     if (selectedPillar === "ALL" || isSaving || recordsLoading) return;
@@ -1134,7 +1173,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
-              onDblClick={() => canEditControl && beginControlEdit(series.customer, month, value)}>
+              onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, value)}>
               <span>{value === null ? currency.format(0) : currency.format(value)}{displayedComposition && <ForecastCompositionTooltip composition={displayedComposition} />}{dirty && <small>draft</small>}
                 {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
                   Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
@@ -1360,27 +1399,46 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
         </div>
       </oj-dialog>
-      <oj-dialog ref={forecastEditorDialogRef} class="consumption-forecast-composition-dialog" cancelBehavior="none"
-        onojClose={() => setForecastEditor(null)}>
-        <span slot="header">Edit Forecast</span>
-        {forecastEditor && <div class="consumption-forecast-composition-form">
-          <strong>{forecastEditor.account}</strong>
-          <small>{forecastEditor.pillar} · {forecastEditor.month}</small>
-          <div class="consumption-forecast-composition-fields">
-            <label>Total (K)<input type="text" inputMode="decimal" value={forecastEditor.total} autofocus
-              onInput={(event) => updateForecastEditor("total", event.currentTarget.value)} /></label>
-            <label>New (K)<input type="text" inputMode="decimal" value={forecastEditor.newValue}
-              onInput={(event) => updateForecastEditor("newValue", event.currentTarget.value)} /></label>
-            <label>Expansion (K)<input type="text" inputMode="decimal" value={forecastEditor.expansion}
-              onInput={(event) => updateForecastEditor("expansion", event.currentTarget.value)} /></label>
-          </div>
-          {forecastEditor.error && <span class="consumption-forecast-composition-error" role="alert">{forecastEditor.error}</span>}
-        </div>}
-        <div slot="footer">
-          <oj-button chroming="outlined" onojAction={cancelForecastComposition}>Cancel</oj-button>
-          <oj-button chroming="callToAction" onojAction={applyForecastComposition}>Apply changes</oj-button>
-        </div>
-      </oj-dialog>
+      {forecastEditor && createPortal(
+        <div ref={forecastEditorPopoverRef} class="consumption-forecast-composition-popover" role="dialog"
+          aria-modal="false" aria-label={`Edit ${forecastEditor.account} forecast`}>
+          <form onSubmit={(event) => { event.preventDefault(); applyForecastComposition(); }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelForecastComposition();
+              }
+            }}>
+            <header>
+              <span><strong>{forecastEditor.account}</strong><small>{forecastEditor.pillar} · {forecastEditor.month}</small></span>
+              <small class="consumption-forecast-composition-unit">K</small>
+            </header>
+            <div class="consumption-forecast-composition-fields">
+              <label><span>Total</span><input type="text" inputMode="decimal" value={forecastEditor.total}
+                ref={selectForecastEditor(`${forecastEditor.account}:${forecastEditor.month}`)}
+                aria-invalid={forecastEditor.error && !validForecastKInput(forecastEditor.total) ? "true" : "false"}
+                onInput={(event) => updateForecastEditor("total", event.currentTarget.value)} />
+                {forecastEditor.error && !validForecastKInput(forecastEditor.total) && <small role="alert">Required · 0+ · max 2 decimals</small>}
+              </label>
+              <label><span>New</span><input type="text" inputMode="decimal" value={forecastEditor.newValue}
+                aria-invalid={forecastEditor.error && !validForecastKInput(forecastEditor.newValue) ? "true" : "false"}
+                onInput={(event) => updateForecastEditor("newValue", event.currentTarget.value)} />
+                {forecastEditor.error && !validForecastKInput(forecastEditor.newValue) && <small role="alert">Required · 0+ · max 2 decimals</small>}
+              </label>
+              <label><span>Expansion</span><input type="text" inputMode="decimal" value={forecastEditor.expansion}
+                aria-invalid={forecastEditor.error ? "true" : "false"}
+                onInput={(event) => updateForecastEditor("expansion", event.currentTarget.value)} />
+                {forecastEditor.error && (!validForecastKInput(forecastEditor.expansion)
+                  ? <small role="alert">Required · 0+ · max 2 decimals</small>
+                  : forecastEditor.error.startsWith("New + Expansion") && <small role="alert">New + Expansion ≤ Total</small>)}
+              </label>
+            </div>
+            <footer>
+              <button type="button" class="is-secondary" onClick={cancelForecastComposition}>취소</button>
+              <button type="submit" class="is-primary">적용</button>
+            </footer>
+          </form>
+        </div>, document.body)}
       {conflictRows.length > 0 && (
         <section class="kpi-panel consumption-conflict-panel" aria-labelledby="consumptionConflictTitle">
           <div class="consumption-section-heading"><div><span class="kpi-section-label">HTTP 409 comparison</span><h2 id="consumptionConflictTitle">Forecast version conflict</h2></div></div>
