@@ -92,7 +92,6 @@ const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: Con
   const unavailable = forecastCompositionUnavailable(composition);
   const accessibleText = unavailable ?? [
     `Total ${currency.format(composition.totalAmount)}`,
-    `Base ${composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}`,
     `New ${composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}`,
     `Expansion ${composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}`,
     `Reduction ${composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)} (previous Total minus current Total, floored at zero)`,
@@ -103,7 +102,6 @@ const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: Con
     <span class="consumption-forecast-tooltip__content" role="tooltip">
       {unavailable ? <>{unavailable}</> : <dl>
         <div><dt>Total</dt><dd>{currency.format(composition.totalAmount)}</dd></div>
-        <div><dt>Base</dt><dd>{composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}</dd></div>
         <div><dt>New</dt><dd>{composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}</dd></div>
         <div><dt>Expansion</dt><dd>{composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}</dd></div>
         <div><dt>Reduction</dt><dd>{composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}<small>Previous Total − current Total, minimum 0</small></dd></div>
@@ -1304,12 +1302,11 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
             <p>{`Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
             {pendingForecastImport.preview.changes.length > 0 && <table class="consumption-import-preview-table">
-              <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Base</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>
+              <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>
               <tbody>{pendingForecastImport.preview.changes.slice(0, 20).map((change) => <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
                 <th>{change.account} · {change.periodKey}</th>
                 <td>{change.rawValue}</td>
                 <td>{[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastK).join(" | ")}</td>
-                <td>{change.baseAmount === null ? "N/A" : formatForecastK(change.baseAmount)}</td>
                 <td>{change.reductionAmount === null ? "N/A" : formatForecastK(change.reductionAmount)}</td>
                 <td>{change.previousSource}</td>
                 <td>{change.compositionStatus}</td>

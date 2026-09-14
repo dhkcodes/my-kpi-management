@@ -239,7 +239,8 @@ assert.match(recordsPage, /Reduction \$\{composition\.reductionAmount[\s\S]*prev
 assert.doesNotMatch(recordsPage, /this legacy scalar Forecast does not include movement components/, "normal legacy scalar Forecasts do not emit a repeated Consumption Records warning");
 assert.match(recordsPage, /composition\.compositionStatus === "UNCLASSIFIED"[\s\S]*return null/, "legacy scalar Forecast composition is intentionally omitted from Consumption Records");
 assert.match(recordsPage, /compositionStatus === "UNAVAILABLE"[\s\S]*Forecast composition unavailable/, "actual missing Forecast composition still has an explicit unavailable message");
-assert.match(recordsPage, /Raw[\s\S]*Canonical T \| N \| E[\s\S]*Base[\s\S]*Reduction[\s\S]*Previous source[\s\S]*Status/, "Forecast Import Preview makes raw-to-canonical composition and derivation status auditable");
+assert.match(recordsPage, /Raw[\s\S]*Canonical T \| N \| E[\s\S]*Reduction[\s\S]*Previous source[\s\S]*Status/, "Forecast Import Preview keeps the remaining derivation status auditable");
+assert.doesNotMatch(recordsPage, /`Base \$\{composition\.baseAmount|<dt>Base<\/dt>|<th>Base<\/th>|change\.baseAmount/, "Base stays in the internal API model but is hidden from the Forecast tooltip and Import Preview");
 assert.match(recordsPage, /preview\.canonicalPeriods/, "Forecast Preview renders backend-provided canonical periods instead of deriving an allowed window from the browser clock");
 assert.match(recordsPage, /setDraftPlans\(clonePlans\(savedPlans\)\)/, "Cancel restores the authoritative saved snapshot");
 assert.match(recordsPage, /setDraftControlTotals\(cloneControlTotals\(savedControlTotals\)\)/, "Cancel also restores missing-versus-zero Multiple controls");
