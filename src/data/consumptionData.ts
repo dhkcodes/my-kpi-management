@@ -20,7 +20,8 @@ export const hasVisibleCompositionAmount = (amount: number): boolean =>
 export const filterForecastCompositionAccounts = <T extends ForecastCompositionAccount>(
   accounts: readonly T[], category: ForecastCompositionCategory
 ): readonly T[] => accounts.filter((account) => category === "All"
-  ? hasVisibleCompositionAmount(account.newAmount)
+  ? hasVisibleCompositionAmount(account.totalForecastAmount)
+    || hasVisibleCompositionAmount(account.newAmount)
     || hasVisibleCompositionAmount(account.expansionAmount)
     || hasVisibleCompositionAmount(account.reductionAmount)
   : category === "New" ? hasVisibleCompositionAmount(account.newAmount)
