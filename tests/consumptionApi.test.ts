@@ -7,6 +7,7 @@ import {
   exportConsumptionForecastCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
+  applyConsumptionForecastWide,
   previewConsumptionForecastWide,
   saveConsumptionForecasts
 } from "../src/data/consumptionApi";
@@ -330,6 +331,23 @@ void (async () => {
   assert.deepEqual(blockedPreview.blockedErrors, [{ rowNumber: 4, column: "FY27-NOV", code: "PERIOD_NOT_EDITABLE", message: "FY27-NOV is outside the editable window." }]);
   assert.deepEqual(blockedPreview.salesRepChanges, [], "legacy Forecast previews without salesRepChanges remain compatible");
   assert.equal(blockedPreview.hasBlockedErrors, true, "backend blocking errors prevent applying an invalid Forecast import");
+
+  for (const expected of [
+    { batchId: 31, replay: true, appliedCount: 0, status: "EXACT_REPLAY" },
+    { batchId: 32, replay: false, appliedCount: 0, status: "APPLIED_NO_CONTROL_CHANGE" },
+    { batchId: 33, replay: false, appliedCount: 4, status: "APPLIED" }
+  ] as const) {
+    runtime.fetch = async (input) => {
+      if (String(input).endsWith("/consumption/forecast-imports/apply"))
+        return new Response(JSON.stringify(expected), { status: 200, headers: { "Content-Type": "application/json" } });
+      assert.equal(String(input), "http://unit.test/api/v1/consumption/workspace");
+      return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json", ETag: '"apply-etag"' } });
+    };
+    const applied = await applyConsumptionForecastWide(new File(["csv"], "forecast.csv"), '"expected-etag"');
+    assert.deepEqual({ exactReplay: applied.exactReplay, status: applied.status, appliedCount: applied.appliedCount },
+      { exactReplay: expected.replay, status: expected.status, appliedCount: expected.appliedCount },
+      "Forecast Apply preserves the server status needed for replay, no-change, and changed user messages");
+  }
 
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });

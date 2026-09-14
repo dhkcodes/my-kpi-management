@@ -119,6 +119,41 @@ void (async () => {
   ], "Actual preview preserves Sales Rep before/after and changed semantics");
   assert.equal(preview.hasConflicts, false);
 
+  const unifiedActualFileName = "OCI Consumption Actual - Dec-2025-Aug-2026.csv";
+  const unifiedActualFiles = [new File(["actual"], unifiedActualFileName, { type: "text/csv" })];
+  const unifiedActualPreviewPayload = {
+    ...previewPayload,
+    files: previewPayload.files.map((file) => ({ ...file, sourceFileName: unifiedActualFileName })),
+    overwrites: previewPayload.overwrites.map((overwrite) => ({ ...overwrite, sourceFileName: unifiedActualFileName }))
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(unifiedActualPreviewPayload), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
+  const unifiedActualPreview = await previewConsumptionImport(unifiedActualFiles, "ALL");
+  assert.deepEqual(unifiedActualPreview.files.map((file) => file.detectedPillar), ["DP", "OCI"],
+    "one canonical Actual CSV may produce separate DP and OCI preview entries");
+  assert.deepEqual(unifiedActualPreview.salesRepChanges, preview.salesRepChanges,
+    "the unified Actual preview still preserves nullable Sales Rep change information");
+  const unifiedOciConflict = {
+    pillar: "OCI", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
+    firstValue: "10", conflictingValue: "11", firstFile: unifiedActualFileName, conflictingFile: unifiedActualFileName,
+    firstFileOrdinal: 1, conflictingFileOrdinal: 1, firstRowNumber: 2, conflictingRowNumber: 3,
+    reason: "DUPLICATE_PLAN_ROW"
+  };
+  runtime.fetch = async () => new Response(JSON.stringify({ ...unifiedActualPreviewPayload, conflicts: [unifiedOciConflict] }), {
+    status: 200, headers: { "Content-Type": "application/json" }
+  });
+  const unifiedConflictPreview = await previewConsumptionImport(unifiedActualFiles, "ALL");
+  assert.equal(unifiedConflictPreview.conflicts[0].key.startsWith("OCI::"), true,
+    "unified-file upload ordinals validate against the source upload while pillar validates against the split preview entry");
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...unifiedActualPreviewPayload,
+    files: unifiedActualPreviewPayload.files.map((file) => ({ ...file, pillar: "DP" }))
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => previewConsumptionImport(unifiedActualFiles, "ALL"), /Malformed Consumption import preview/,
+    "one uploaded Actual CSV cannot claim duplicate preview entries for the same pillar");
+
   const { salesRepChanges: _omittedSalesRepChanges, ...legacyPreviewWithoutSalesReps } = previewPayload;
   runtime.fetch = async () => new Response(JSON.stringify(legacyPreviewWithoutSalesReps), { status: 200, headers: { "Content-Type": "application/json" } });
   assert.deepEqual((await previewConsumptionImport(files, "ALL")).salesRepChanges, [],

@@ -914,12 +914,16 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
       const result = await applyConsumptionForecastWide(pendingForecastImport.file, pendingForecastImport.preview.etag);
       adoptWorkspace(result.workspace);
       await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch });
-      setForecastImportResult(result.exactReplay ? "EXACT_REPLAY · DB mutation 0" : `Applied ${result.appliedCount} Forecast cells · Explicit zero ${result.explicitZeroCount} · Plan unassigned ${result.planUnassignedCount}`);
+      setForecastImportResult(result.exactReplay
+        ? "이미 반영된 파일입니다. 추가로 변경된 데이터는 없습니다."
+        : result.status === "APPLIED_NO_CONTROL_CHANGE"
+          ? "파일을 확인했지만 변경할 Forecast 값이나 Sales Rep 정보가 없습니다."
+          : `Import를 완료했습니다. 변경된 항목 ${result.appliedCount}건 (Forecast 값과 Sales Rep 합계이며 Account 수가 아닙니다).`);
       setForecastImportPhase("complete");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Forecast CSV could not be applied.";
       setImportError(message);
-      setForecastImportResult(`Applied: 0 · ${message}`);
+      setForecastImportResult(`Forecast Import에 실패했습니다. ${message}`);
       setForecastImportPhase("error");
     }
   };
@@ -1287,7 +1291,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             </dl>
             {renderSalesRepPreview(pendingForecastImport.preview.salesRepChanges)}
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
-            <p>{pendingForecastImport.preview.exactReplay ? "EXACT_REPLAY — Apply is unnecessary and DB mutation remains 0."
+            <p>{pendingForecastImport.preview.exactReplay ? "이미 반영된 파일입니다. 추가로 변경된 데이터는 없습니다."
               : `Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
             {pendingForecastImport.preview.changes.length > 0 && <table class="consumption-import-preview-table">
               <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Base</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>

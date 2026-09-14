@@ -9,6 +9,16 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 assert.match(recordsPage,
   /error instanceof ConsumptionConflictError[\s\S]*accountForecastControls\(error\.current\)[\s\S]*setConflictRows\(rows\)[\s\S]*setConflictWorkspace\(error\.current\)[\s\S]*Forecast Save conflicted with a newer server version/,
   "DP/OCI version conflicts reach the comparison UI with the selected-pillar server workspace");
+assert.match(recordsPage, /이미 반영된 파일입니다\. 추가로 변경된 데이터는 없습니다\./,
+  "exact Forecast replays are explained in user language");
+assert.match(recordsPage, /변경할 Forecast 값이나 Sales Rep 정보가 없습니다\./,
+  "a successful no-change Forecast import is distinct from an exact replay");
+assert.match(recordsPage, /변경된 항목[\s\S]*Forecast 값과 Sales Rep 합계/,
+  "changed counts disclose their Forecast-plus-Sales-Rep basis instead of pretending to be Account counts");
+assert.match(recordsPage, /Forecast Import에 실패했습니다/,
+  "Forecast import failures have a plain-language failure label");
+assert.doesNotMatch(recordsPage, /EXACT_REPLAY|DB mutation|Applied \$\{result\.appliedCount\} Forecast cells/,
+  "internal Forecast replay, mutation, and Applied codes are not shown to users");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
@@ -127,7 +137,7 @@ assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\
 assert.match(recordsPage, /Import \$\{forecastFileName\}/, "Forecast Import names the current editable FY-quarter template without enforcing it as an upload restriction");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
-assert.match(recordsPage, /EXACT_REPLAY[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview exposes exact replay and plan-unassigned semantics");
+assert.match(recordsPage, /이미 반영된 파일입니다\. 추가로 변경된 데이터는 없습니다\.[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview explains exact replay in user language and keeps plan-unassigned semantics");
 assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
 assert.match(recordsPage, /<button type="button" class=\{`consumption-range-apply[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "mobile Apply uses a stable native button instead of a late-upgrading custom element");
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");

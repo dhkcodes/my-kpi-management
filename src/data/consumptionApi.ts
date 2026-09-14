@@ -243,6 +243,7 @@ export type ConsumptionForecastWideApplyResult = Readonly<{
   workspace: ConsumptionApiWorkspace;
   batchId: number;
   exactReplay: boolean;
+  status: "EXACT_REPLAY" | "APPLIED" | "APPLIED_NO_CONTROL_CHANGE";
   appliedCount: number;
   noOpCount: number;
   explicitZeroCount: number;
@@ -815,8 +816,7 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     || !isNonNegativeInteger(raw.insertedFactCount) || !isNonNegativeInteger(raw.unchangedFactCount)
     || !isNonNegativeInteger(raw.skippedFactCount)
     || !isNonNegativeInteger(raw.exactReplayFileCount) || raw.exactReplayFileCount > raw.files.length
-    || raw.deletedFactCount !== 0
-    || raw.files.length !== uploaded.length) throw new Error("Malformed Consumption import preview");
+    || raw.deletedFactCount !== 0) throw new Error("Malformed Consumption import preview");
   const files = raw.files.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
     const file = value as Record<string, unknown>;
@@ -833,7 +833,11 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
   });
   const expectedNames=uploaded.map(file=>file.name);
   const actualNames=files.map(file=>file.fileName);
-  if(expectedNames.length!==actualNames.length||expectedNames.some((name,index)=>name!==actualNames[index]))
+  const sourceFilesMatch=expectedNames.length===1
+    ? actualNames.length>=1&&actualNames.length<=2&&actualNames.every(name=>name===expectedNames[0])
+    : expectedNames.length===actualNames.length&&expectedNames.every((name,index)=>name===actualNames[index]);
+  if(!sourceFilesMatch
+    || (expectedNames.length===1&&files.length>1&&new Set(files.map(file=>file.detectedPillar)).size!==files.length))
     throw new Error("Malformed Consumption import preview");
   const conflicts = raw.conflicts.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
@@ -847,11 +851,12 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
       || !isPositiveInteger(conflict.firstRowNumber) || !isPositiveInteger(conflict.conflictingRowNumber)
       || !(conflict.reason==="DUPLICATE_PLAN_ROW"||conflict.reason==="CONFLICTING_UPLOAD_VALUE"))
       throw new Error("Malformed Consumption import preview");
-    const firstSource=files[conflict.firstFileOrdinal-1];
-    const conflictingSource=files[conflict.conflictingFileOrdinal-1];
-    if (!firstSource || !conflictingSource || firstSource.fileName!==conflict.firstFile
-      || conflictingSource.fileName!==conflict.conflictingFile || firstSource.detectedPillar!==conflictPillar
-      || conflictingSource.detectedPillar!==conflictPillar) throw new Error("Malformed Consumption import preview");
+    const firstSourceName=expectedNames[conflict.firstFileOrdinal-1];
+    const conflictingSourceName=expectedNames[conflict.conflictingFileOrdinal-1];
+    const hasMatchingPillarFile=files.some((file)=>file.fileName===conflict.firstFile&&file.detectedPillar===conflictPillar);
+    if (!firstSourceName || !conflictingSourceName || firstSourceName!==conflict.firstFile
+      || conflictingSourceName!==conflict.conflictingFile || !hasMatchingPillarFile)
+      throw new Error("Malformed Consumption import preview");
     return {key:`${conflictPillar}::${conflict.account}::${conflict.endUser}::${conflict.planCode}::${conflict.periodKey}::${conflict.firstFileOrdinal}::${conflict.firstRowNumber}::${conflict.conflictingFileOrdinal}::${conflict.conflictingRowNumber}`,
       files:[conflict.firstFile,conflict.conflictingFile] as string[],values:[conflict.firstValue,conflict.conflictingValue] as (string|null)[],
       fileOrdinals:[conflict.firstFileOrdinal,conflict.conflictingFileOrdinal] as number[],
@@ -1070,9 +1075,15 @@ export const applyConsumptionForecastWide = async (file: File, etag: string): Pr
   const { payload } = await request("/consumption/forecast-imports/apply", { method: "POST", headers: { "If-Match": etag }, body: forecastWideBody(file) });
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast Wide apply result");
   const raw = payload as Record<string, unknown>;
-  if (!isPositiveInteger(raw.batchId) || typeof raw.replay !== "boolean" || !isNonNegativeInteger(raw.appliedCount)) throw new Error("Malformed Forecast Wide apply result");
+  const statuses = new Set(["EXACT_REPLAY", "APPLIED", "APPLIED_NO_CONTROL_CHANGE"]);
+  if (!isPositiveInteger(raw.batchId) || typeof raw.replay !== "boolean" || !isNonNegativeInteger(raw.appliedCount)
+    || !statuses.has(raw.status as string)
+    || raw.replay !== (raw.status === "EXACT_REPLAY")
+    || (raw.status === "APPLIED" && raw.appliedCount === 0)
+    || (raw.status !== "APPLIED" && raw.appliedCount !== 0)) throw new Error("Malformed Forecast Wide apply result");
   const workspace = await fetchConsumptionWorkspace();
-  return { workspace, batchId: raw.batchId, exactReplay: raw.replay, appliedCount: raw.appliedCount,
+  return { workspace, batchId: raw.batchId, exactReplay: raw.replay,
+    status: raw.status as ConsumptionForecastWideApplyResult["status"], appliedCount: raw.appliedCount,
     noOpCount: 0, explicitZeroCount: 0, planUnassignedCount: 0 };
 };
 export const saveConsumptionForecasts = async (etag: string,
