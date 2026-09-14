@@ -228,6 +228,41 @@ void (async () => {
   assert.deepEqual([applied.physicalFactCount, applied.deduplicatedFactCount, applied.duplicate], [1, 1, false]);
   assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.skippedFactCount, applied.deletedFactCount], [0, 0, 1, 0, 0]);
 
+  const unifiedApplyWorkspace = { ...workspace, selectedPillar: "ALL",
+    plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts.map((fact) => ({ ...fact, pillar: "ALL" })) }] };
+  runtime.fetch = async () => new Response(JSON.stringify({
+    workspace: unifiedApplyWorkspace, batchIds: [79, 80], duplicate: false,
+    physicalFactCount: 1350, deduplicatedFactCount: 0, insertedFactCount: 1350,
+    unchangedFactCount: 0, overwrittenFactCount: 0, skippedFactCount: 0, deletedFactCount: 0
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const unifiedApplied = await applyConsumptionImport(unifiedActualFiles, "ALL", unifiedActualPreview);
+  assert.deepEqual([unifiedApplied.batchIds.length, unifiedApplied.physicalFactCount, unifiedApplied.insertedFactCount], [2, 1350, 1350],
+    "one validated canonical Actual upload accepts the API's separate DP and OCI apply batch ids");
+  runtime.fetch = async () => new Response(JSON.stringify({
+    workspace: unifiedApplyWorkspace, batchIds: [79, 80], duplicate: true,
+    physicalFactCount: 1350, deduplicatedFactCount: 0, insertedFactCount: 0,
+    unchangedFactCount: 0, overwrittenFactCount: 0, skippedFactCount: 1350, deletedFactCount: 0
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const unifiedReplay = await applyConsumptionImport(unifiedActualFiles, "ALL", unifiedActualPreview);
+  assert.deepEqual([unifiedReplay.batchIds.length, unifiedReplay.duplicate, unifiedReplay.insertedFactCount, unifiedReplay.skippedFactCount], [2, true, 0, 1350],
+    "exact replay remains decodable and reports no second insertion");
+  await assert.rejects(
+    () => applyConsumptionImport(unifiedActualFiles, "ALL", {
+      ...unifiedActualPreview,
+      files: unifiedActualPreview.files.map((file) => ({ ...file, detectedPillar: "DP" }))
+    }),
+    /Malformed Consumption import preview/,
+    "apply keeps duplicate-pillar validation instead of trusting a mutated preview"
+  );
+  await assert.rejects(
+    () => applyConsumptionImport(unifiedActualFiles, "ALL", {
+      ...unifiedActualPreview,
+      files: unifiedActualPreview.files.map((file) => ({ ...file, fileName: "wrong.csv" }))
+    }),
+    /Malformed Consumption import preview/,
+    "apply keeps source-file mapping validation instead of trusting a mutated preview"
+  );
+
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/import-compatible?pillar=OCI");
     return new Response("Customer\n", { status: 200, headers: { "Content-Type": "text/csv", "Content-Disposition": 'attachment; filename="oci.csv"' } });

@@ -960,9 +960,22 @@ export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): P
   return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.csv" };
 };
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
-export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar): Promise<ConsumptionMultiImportResult>;
-export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL"): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
+export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar, validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionMultiImportResult>;
+export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL", validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+  const expectedBatchCount = typeof input === "string" ? 1 : validatedPreview ? (() => {
+    const expectedNames = input.map((file) => file.name);
+    const actualNames = validatedPreview.files.map((file) => file.fileName);
+    const sourceFilesMatch = expectedNames.length === 1
+      ? actualNames.length >= 1 && actualNames.length <= 2 && actualNames.every((name) => name === expectedNames[0])
+      : expectedNames.length === actualNames.length && expectedNames.every((name, index) => name === actualNames[index]);
+    const distinctPillars = new Set(validatedPreview.files.map((file) => file.detectedPillar));
+    if (!sourceFilesMatch || validatedPreview.files.length < 1
+      || (expectedNames.length === 1 && validatedPreview.files.length > 1 && distinctPillars.size !== validatedPreview.files.length)) {
+      throw new Error("Malformed Consumption import preview");
+    }
+    return validatedPreview.files.length;
+  })() : input.length;
   const init: RequestInit = typeof input === "string"
     ? { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: input }
     : { method: "POST", body: multipartFiles(input) };
@@ -972,7 +985,7 @@ export async function applyConsumptionImport(input: string | readonly File[], pi
     if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption multi-file import result");
     const raw=payload as Record<string,unknown>;
     const workspace=parseWorkspace(raw.workspace,response.headers.get("ETag"),"ALL");
-    if (!Array.isArray(raw.batchIds) || raw.batchIds.length !== input.length || raw.batchIds.some((id)=>!isPositiveInteger(id))
+    if (!Array.isArray(raw.batchIds) || raw.batchIds.length !== expectedBatchCount || raw.batchIds.some((id)=>!isPositiveInteger(id))
       || typeof raw.duplicate !== "boolean" || !isNonNegativeInteger(raw.physicalFactCount)
       || !isNonNegativeInteger(raw.deduplicatedFactCount) || !isNonNegativeInteger(raw.insertedFactCount)
       || !isNonNegativeInteger(raw.unchangedFactCount) || !isNonNegativeInteger(raw.overwrittenFactCount)

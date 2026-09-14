@@ -19,6 +19,9 @@ assert.match(recordsPage, /Forecast Import에 실패했습니다/,
   "Forecast import failures have a plain-language failure label");
 assert.doesNotMatch(recordsPage, /EXACT_REPLAY|DB mutation|Applied \$\{result\.appliedCount\} Forecast cells/,
   "internal Forecast replay, mutation, and Applied codes are not shown to users");
+assert.doesNotMatch(recordsPage, /Applied: 0/, "Actual result decoding failures must not claim that zero rows were applied");
+assert.match(recordsPage, /처리 결과를 확인하지 못했습니다\. 반영 여부 확인이 필요합니다\./,
+  "ambiguous Actual apply results must explicitly require a data-state check");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
@@ -107,7 +110,7 @@ assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains av
 assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleCsvFiles/, "Import accepts multiple CSV files");
 assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
 assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files, preview/, "multipart preview retains the exact selected File objects and lets filenames own pillar detection");
-assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL"\)/, "multipart apply reuses the retained files as one cross-pillar atomic set");
+assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL", pendingImport\.preview\)/, "multipart apply reuses the retained files and validated preview mapping as one cross-pillar atomic set");
 assert.match(recordsPage, /pendingImport\.preview\.files\.map[\s\S]*detectedPillar[\s\S]*owner[\s\S]*fromPeriod[\s\S]*toPeriod[\s\S]*sourceRowCount/, "preview lists pillar, owner, range, and counts per file");
 assert.match(recordsPage, /sameValueDuplicateCount[\s\S]*conflictCount[\s\S]*pendingImport\.preview\.conflicts/, "preview summarizes same-value duplicates and conflicting keys");
 assert.match(recordsPage, /existingSameValueCount[\s\S]*overwriteCount[\s\S]*pendingImport\.preview\.overwrites/, "preview separates existing same-value rows from scoped Actual overwrites");
