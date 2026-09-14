@@ -34,6 +34,7 @@ import {
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
   ConsumptionRecordsPage,
+  ConsumptionApiError,
   ConsumptionConflictError,
   ConsumptionImportPreview,
   ConsumptionForecastVariance,
@@ -961,7 +962,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     setImportError("");
     try {
       const viewPillar=selectedPillar;
-      const result = await applyConsumptionImport(pendingImport.files, "ALL");
+      const result = await applyConsumptionImport(pendingImport.files, "ALL", pendingImport.preview);
       if(viewPillar==="ALL")adoptWorkspace(result.workspace);
       let refreshFailed=false;
       try {
@@ -982,8 +983,12 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Consumption CSV files could not be imported.";
-      setImportError(message);
-      setImportResult(`Applied: 0 · ${message}`);
+      const confirmedRequestFailure = error instanceof ConsumptionApiError && error.status >= 400 && error.status < 500;
+      const resultMessage = confirmedRequestFailure
+        ? `Actual Import에 실패했습니다. ${message}`
+        : "처리 결과를 확인하지 못했습니다. 반영 여부 확인이 필요합니다.";
+      setImportError(resultMessage);
+      setImportResult(resultMessage);
       setImportPhase("error");
     }
   };
