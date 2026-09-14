@@ -95,7 +95,7 @@ const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: Con
     `Base ${composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}`,
     `New ${composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}`,
     `Expansion ${composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}`,
-    `Reduction ${composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}`,
+    `Reduction ${composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)} (previous Total minus current Total, floored at zero)`,
     `Previous source ${composition.previousSource}${composition.previousAmount === null ? "" : ` ${currency.format(composition.previousAmount)}`}`
   ].join("; ");
   return <span class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}>
@@ -106,7 +106,7 @@ const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: Con
         <div><dt>Base</dt><dd>{composition.baseAmount === null ? "N/A" : currency.format(composition.baseAmount)}</dd></div>
         <div><dt>New</dt><dd>{composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}</dd></div>
         <div><dt>Expansion</dt><dd>{composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}</dd></div>
-        <div><dt>Reduction</dt><dd>{composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}</dd></div>
+        <div><dt>Reduction</dt><dd>{composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}<small>Previous Total − current Total, minimum 0</small></dd></div>
         <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmount === null ? "" : ` · ${currency.format(composition.previousAmount)}`}</dd></div>
       </dl>}
     </span>

@@ -15,13 +15,17 @@ export type ForecastCompositionAccount = Readonly<{
   reductionAmount: number;
   netMovementAmount: number;
 }>;
+export const hasVisibleCompositionAmount = (amount: number): boolean =>
+  Math.round(Math.abs(amount) / 10) > 0;
 export const filterForecastCompositionAccounts = <T extends ForecastCompositionAccount>(
   accounts: readonly T[], category: ForecastCompositionCategory
 ): readonly T[] => accounts.filter((account) => category === "All"
-  ? account.newAmount !== 0 || account.expansionAmount !== 0 || account.reductionAmount !== 0
-  : category === "New" ? account.newAmount !== 0
-  : category === "Expansion" ? account.expansionAmount !== 0
-  : account.reductionAmount !== 0);
+  ? hasVisibleCompositionAmount(account.newAmount)
+    || hasVisibleCompositionAmount(account.expansionAmount)
+    || hasVisibleCompositionAmount(account.reductionAmount)
+  : category === "New" ? hasVisibleCompositionAmount(account.newAmount)
+  : category === "Expansion" ? hasVisibleCompositionAmount(account.expansionAmount)
+  : hasVisibleCompositionAmount(account.reductionAmount));
 export type ConsumptionDataCenterBreakdown = Readonly<{
   dpCount: number | null;
   ociCount: number | null;

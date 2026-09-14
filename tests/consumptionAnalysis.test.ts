@@ -170,11 +170,13 @@ void (async () => {
     { account: "Natural", totalForecastAmount: 400, newAmount: 0, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 0 },
     { account: "New", totalForecastAmount: 200, newAmount: 200, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 200 },
     { account: "Expansion", totalForecastAmount: 250, newAmount: 0, expansionAmount: 50, reductionAmount: 0, netMovementAmount: 50 },
-    { account: "Reduction", totalForecastAmount: 180, newAmount: 0, expansionAmount: 0, reductionAmount: 20, netMovementAmount: -20 }
+    { account: "Reduction", totalForecastAmount: 180, newAmount: 0, expansionAmount: 0, reductionAmount: 20, netMovementAmount: -20 },
+    { account: "Rounded zero", totalForecastAmount: 5, newAmount: 4.9, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 4.9 },
+    { account: "Visible precision", totalForecastAmount: 5, newAmount: 5, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 5 }
   ];
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "All").map((row) => row.account),
-    ["New", "Expansion", "Reduction"], "All composition detail excludes natural-growth-only accounts");
-  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account), ["New"]);
+    ["New", "Expansion", "Reduction", "Visible precision"], "All excludes natural growth and values displayed as 0K");
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account), ["New", "Visible precision"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Expansion").map((row) => row.account), ["Expansion"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Reduction").map((row) => row.account), ["Reduction"]);
   console.log("consumptionAnalysis tests passed");

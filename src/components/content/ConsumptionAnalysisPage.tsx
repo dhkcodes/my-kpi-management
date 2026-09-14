@@ -10,6 +10,7 @@ import {
 import {
   ConsumptionAnalysisAccountCandidate,
   ConsumptionAnalysisPlan,
+  ForecastCompositionCategory,
   ConsumptionPillar,
   consumptionPillarOptions,
   filterForecastCompositionAccounts,
@@ -41,6 +42,7 @@ const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
 const ALL_ACCOUNTS = "All Accounts Total";
+const COMPOSITION_CATEGORIES: readonly ForecastCompositionCategory[] = ["All", "New", "Expansion", "Reduction"];
 type InsightChartPoint = Readonly<{
   id: string;
   seriesId: string;
@@ -101,7 +103,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [selectedAlertId, setSelectedAlertId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
-  const [selectedMovement, setSelectedMovement] = useState<{ quarter: string; category: "All" | "New" | "Expansion" | "Reduction" } | null>(null);
+  const [selectedMovement, setSelectedMovement] = useState<{ quarter: string; category: ForecastCompositionCategory } | null>(null);
   const requestGeneration = useRef(0);
 
   useEffect(() => {
@@ -261,8 +263,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const selectedMovementPoint = selectedMovement ? analysis.movementBridge.find((point) => point.quarter === selectedMovement.quarter) ?? null : null;
   const selectedMovementAccounts = selectedMovement && selectedMovementPoint
     ? filterForecastCompositionAccounts(selectedMovementPoint.accounts, selectedMovement.category) : [];
-  const movementValue = (account: ConsumptionAnalysis["movementBridge"][number]["accounts"][number]) => selectedMovement?.category === "All"
-    ? account.totalForecastAmount : selectedMovement?.category === "New"
+  const movementValue = (account: ConsumptionAnalysis["movementBridge"][number]["accounts"][number]) => selectedMovement?.category === "New"
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const selectMovement = (event: ojChart.ojItemDrill<string, InsightChartPoint, null>) => {
     const { detail } = event;
@@ -353,12 +354,20 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
         </div>
         <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
           {selectedMovement && selectedMovementPoint ? <>
-            <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div><button type="button" onClick={() => setSelectedMovement(null)}>Close</button></div>
+            <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div></div>
             <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
-            {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th><th>{selectedMovement.category} (K)</th></tr></thead><tbody>
-              {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{currencyK.format(toK(movementValue(account)))} K</td></tr>)}
-            </tbody><tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot></table>
-              : <p class="consumption-empty-state">No Accounts have a non-zero {selectedMovement.category === "All" ? "New, Expansion or Reduction" : selectedMovement.category} value in this quarter.</p>}
+            <div class="consumption-insights-composition-selector" role="group" aria-label={`${selectedMovement.quarter} composition category`}>
+              {COMPOSITION_CATEGORIES.map((category) => <button key={category} type="button" aria-pressed={selectedMovement.category === category}
+                onClick={() => setSelectedMovement({ quarter: selectedMovement.quarter, category })}>{category}</button>)}
+            </div>
+            <div class="consumption-insights-movement-list">
+              {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th>{selectedMovement.category === "All" ? <><th>Total (K)</th><th>New (K)</th><th>Expansion (K)</th><th>Reduction (K)</th></> : <th>{selectedMovement.category} (K)</th>}</tr></thead><tbody>
+                {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td>{selectedMovement.category === "All" ? <>
+                  <td>{currencyK.format(toK(account.totalForecastAmount))} K</td><td>{currencyK.format(toK(account.newAmount))} K</td><td>{currencyK.format(toK(account.expansionAmount))} K</td><td>{currencyK.format(toK(account.reductionAmount))} K</td>
+                </> : <td>{currencyK.format(toK(movementValue(account)))} K</td>}</tr>)}
+              </tbody>{selectedMovement.category !== "All" && <tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot>}</table>
+                : <p class="consumption-empty-state">No Accounts have a visible {selectedMovement.category === "All" ? "New, Expansion or Reduction" : selectedMovement.category} value in this quarter.</p>}
+            </div>
           </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3><p>Only Accounts with a non-zero New, Expansion or Reduction value are listed. Natural growth remains part of All Forecast and is not reclassified.</p></div>}
         </section>
       </div>
