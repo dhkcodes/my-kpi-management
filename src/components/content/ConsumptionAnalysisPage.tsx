@@ -12,6 +12,7 @@ import {
   ConsumptionAnalysisPlan,
   ConsumptionPillar,
   consumptionPillarOptions,
+  filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
   getAlertActualTrend,
   isUnmappedConsumptionLabel
@@ -224,16 +225,19 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const movementChart = useMemo(() => {
     if (!analysis) return chart([]);
     return chart(analysis.movementBridge.flatMap((point) => {
-      if (point.totalForecastAmount === null) return [];
-      const all = { id: `${point.quarter}-All`, seriesId: "All", groupId: point.quarter, value: toK(point.totalForecastAmount), color: "#4b5563", shortDesc: `${point.quarter} All Forecast ${currencyK.format(toK(point.totalForecastAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` };
-      if (point.compositionStatus !== "CLASSIFIED"
-        || point.newAmount === null || point.expansionAmount === null || point.reductionAmount === null) return [all];
-      return [
-        all,
-        { id: `${point.quarter}-New`, seriesId: "New", groupId: point.quarter, value: toK(point.newAmount), color: MOVEMENT_COLORS.New, shortDesc: `${point.quarter} New ${currencyK.format(toK(point.newAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` },
-        { id: `${point.quarter}-Expansion`, seriesId: "Expansion", groupId: point.quarter, value: toK(point.expansionAmount), color: MOVEMENT_COLORS.Expansion, shortDesc: `${point.quarter} Expansion ${currencyK.format(toK(point.expansionAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` },
+      const all = point.totalForecastAmount === null ? null
+        : { id: `${point.quarter}-All`, seriesId: "All", groupId: point.quarter, value: toK(point.totalForecastAmount), color: "#4b5563", shortDesc: `${point.quarter} All Forecast ${currencyK.format(toK(point.totalForecastAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` };
+      const components = [];
+      if (point.newAmount !== null) components.push(
+        { id: `${point.quarter}-New`, seriesId: "New", groupId: point.quarter, value: toK(point.newAmount), color: MOVEMENT_COLORS.New, shortDesc: `${point.quarter} New ${currencyK.format(toK(point.newAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` }
+      );
+      if (point.expansionAmount !== null) components.push(
+        { id: `${point.quarter}-Expansion`, seriesId: "Expansion", groupId: point.quarter, value: toK(point.expansionAmount), color: MOVEMENT_COLORS.Expansion, shortDesc: `${point.quarter} Expansion ${currencyK.format(toK(point.expansionAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` }
+      );
+      if (point.reductionAmount !== null) components.push(
         { id: `${point.quarter}-Reduction`, seriesId: "Reduction", groupId: point.quarter, value: -toK(point.reductionAmount), color: MOVEMENT_COLORS.Reduction, shortDesc: `${point.quarter} Reduction ${currencyK.format(-toK(point.reductionAmount))} K USD · ${point.includedForecastPeriods.join(", ")}` }
-      ];
+      );
+      return all === null ? components : [all, ...components];
     }));
   }, [analysis]);
   const trendChart = useMemo(() => chart(trendPoints.map((point) => ({
@@ -255,6 +259,8 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
   const selectedMovementPoint = selectedMovement ? analysis.movementBridge.find((point) => point.quarter === selectedMovement.quarter) ?? null : null;
+  const selectedMovementAccounts = selectedMovement && selectedMovementPoint
+    ? filterForecastCompositionAccounts(selectedMovementPoint.accounts, selectedMovement.category) : [];
   const movementValue = (account: ConsumptionAnalysis["movementBridge"][number]["accounts"][number]) => selectedMovement?.category === "All"
     ? account.totalForecastAmount : selectedMovement?.category === "New"
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
@@ -328,24 +334,34 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           <div class="consumption-insights-quarter-totals">
             <h3>{analysis.fiscalYear} Mixed quarter consumption</h3>
             <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL-first and FORECAST fallback consumption in K`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
-            <h3>Forecast composition by quarter</h3>
-            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
-            <p class="consumption-insights-note">Stored Forecast composition only · {analysis.movementBridge.map((point) => `${point.quarter}: ${point.includedForecastPeriods.join(", ") || point.compositionStatus}`).join(" · ")}</p>
           </div>
         </div>
-        {selectedMovement && selectedMovementPoint && <section class="consumption-insights-movement-detail" aria-label={`${selectedMovement.quarter} ${selectedMovement.category} Account detail`}>
-          <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div><button type="button" onClick={() => setSelectedMovement(null)}>Close</button></div>
-          <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
-          <table><thead><tr><th>Account</th><th>{selectedMovement.category} (K)</th></tr></thead><tbody>
-            {selectedMovementPoint.accounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{currencyK.format(toK(movementValue(account)))} K</td></tr>)}
-          </tbody><tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementPoint.accounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot></table>
-        </section>}
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">Quarter-over-quarter</h2></div></div>
         <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small>{qoqKind(quarter.status)}</small></article>)}</div>
         <p class="consumption-insights-note">Completed ACTUAL quarters drive the decision metric; MIXED and FORECAST quarters remain visibly labelled projections.</p>
       </section>
+    </section>
+
+    <section class="kpi-panel consumption-insights-composition" aria-labelledby="forecastCompositionTitle">
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Stored Forecast components · K USD</span><h2 id="forecastCompositionTitle">Forecast composition by quarter</h2></div></div>
+      <div class="consumption-insights-composition-grid">
+        <div class="consumption-insights-composition-chart">
+          <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+          <p class="consumption-insights-note">Select a bar to inspect Accounts with a non-zero New, Expansion or Reduction value · {analysis.movementBridge.map((point) => `${point.quarter}: ${point.includedForecastPeriods.join(", ") || point.compositionStatus}`).join(" · ")}</p>
+        </div>
+        <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
+          {selectedMovement && selectedMovementPoint ? <>
+            <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div><button type="button" onClick={() => setSelectedMovement(null)}>Close</button></div>
+            <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
+            {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th><th>{selectedMovement.category} (K)</th></tr></thead><tbody>
+              {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td><td>{currencyK.format(toK(movementValue(account)))} K</td></tr>)}
+            </tbody><tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot></table>
+              : <p class="consumption-empty-state">No Accounts have a non-zero {selectedMovement.category === "All" ? "New, Expansion or Reduction" : selectedMovement.category} value in this quarter.</p>}
+          </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3><p>Only Accounts with a non-zero New, Expansion or Reduction value are listed. Natural growth remains part of All Forecast and is not reclassified.</p></div>}
+        </section>
+      </div>
     </section>
 
     <section class="kpi-panel consumption-insights-alert-trend" aria-labelledby="alertTrendTitle">

@@ -6,6 +6,22 @@ export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; v
   { label: "OCI", value: "OCI" }
 ];
 export const isUnmappedConsumptionLabel = (value: string): boolean => value.trim().toUpperCase() === "UNMAPPED";
+export type ForecastCompositionCategory = "All" | "New" | "Expansion" | "Reduction";
+export type ForecastCompositionAccount = Readonly<{
+  account: string;
+  totalForecastAmount: number;
+  newAmount: number;
+  expansionAmount: number;
+  reductionAmount: number;
+  netMovementAmount: number;
+}>;
+export const filterForecastCompositionAccounts = <T extends ForecastCompositionAccount>(
+  accounts: readonly T[], category: ForecastCompositionCategory
+): readonly T[] => accounts.filter((account) => category === "All"
+  ? account.newAmount !== 0 || account.expansionAmount !== 0 || account.reductionAmount !== 0
+  : category === "New" ? account.newAmount !== 0
+  : category === "Expansion" ? account.expansionAmount !== 0
+  : account.reductionAmount !== 0);
 export type ConsumptionDataCenterBreakdown = Readonly<{
   dpCount: number | null;
   ociCount: number | null;

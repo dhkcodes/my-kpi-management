@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -165,5 +165,17 @@ void (async () => {
     { amount: 0, detailState: "ZERO", editable: true, source: "DETAIL" }, "an explicit zero Actual remains visible without a manual Forecast");
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 25 }), plan("b", {}, { "FY27-SEP": 0 })], "FY27-SEP", 999),
     { amount: 25, detailState: "VALUE", editable: false, source: "DETAIL" }, "a non-zero child value immediately owns the Control Total");
+
+  const compositionAccounts = [
+    { account: "Natural", totalForecastAmount: 400, newAmount: 0, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 0 },
+    { account: "New", totalForecastAmount: 200, newAmount: 200, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 200 },
+    { account: "Expansion", totalForecastAmount: 250, newAmount: 0, expansionAmount: 50, reductionAmount: 0, netMovementAmount: 50 },
+    { account: "Reduction", totalForecastAmount: 180, newAmount: 0, expansionAmount: 0, reductionAmount: 20, netMovementAmount: -20 }
+  ];
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "All").map((row) => row.account),
+    ["New", "Expansion", "Reduction"], "All composition detail excludes natural-growth-only accounts");
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account), ["New"]);
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Expansion").map((row) => row.account), ["Expansion"]);
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Reduction").map((row) => row.account), ["Reduction"]);
   console.log("consumptionAnalysis tests passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
