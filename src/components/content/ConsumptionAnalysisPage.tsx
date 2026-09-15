@@ -24,7 +24,7 @@ import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
-import html2canvas = require("html2canvas");
+import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -316,7 +316,12 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     setExportError("");
     try {
       await document.fonts?.ready;
-      const renderElement = html2canvas as unknown as (element: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+      const html2canvasModule = html2canvasPro as unknown as {
+        default?: (element: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+        html2canvas?: (element: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+      };
+      const renderElement = html2canvasModule.default ?? html2canvasModule.html2canvas
+        ?? html2canvasPro as unknown as (element: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
       const canvas = await renderElement(target, {
         backgroundColor: "#f7f7f8",
         scale: Math.min(2, 4096 / Math.max(target.scrollWidth, 1)),
@@ -359,8 +364,12 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Download current Consumption Analysis view">
-          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}><span class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Preparing PNG…" : "PNG"}</button>
-          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}><span class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Preparing PDF…" : "PDF"}</button>
+          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>
+            {exporting === "png" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PNG 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>}
+          </button>
+          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}>
+            {exporting === "pdf" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PDF 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>}
+          </button>
           {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
         </div>
         <div class="consumption-insights-pillar">

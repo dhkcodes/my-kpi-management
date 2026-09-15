@@ -5,7 +5,7 @@
   "dependencies": {
     "@oracle/oraclejet": "~20.1.0",
     "@oracle/oraclejet-core-pack": "~20.1.0",
-    "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.4.3",
     "jspdf": "^4.2.1",
     "quill": "^2.0.3"
   },

@@ -7,7 +7,7 @@
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
+import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
 import { getNavigationPath, getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
@@ -222,18 +222,15 @@ const isHomeRoute = (route: NavigationRouteDefinition) => route.module === "home
 type BreadcrumbItem = Readonly<{ label: string; routeId?: string }>;
 
 const routeBreadcrumbs = (route: NavigationRouteDefinition): BreadcrumbItem[] => {
-  if (route.module === "home") return [{ label: "Home" }];
-  const parent = route.module === "kpiPage"
-    ? { label: "KPI Activities", routeId: "kpis-overview" }
-    : ["myCustomers360", "accountsWorkloads", "weeklyActivities"].includes(route.module)
-      ? { label: "Customer Management", routeId: "customers-overview" }
-      : ["consumptionAnalysis", "consumptionAttainment", "consumptionRecords"].includes(route.module)
-        ? { label: "Consumption", routeId: "analysis" }
-        : { label: "Administration", routeId: "profile" };
-  const trail: BreadcrumbItem[] = [{ label: "Home", routeId: "home" }];
-  trail.push(parent);
-  trail.push({ label: route.pageTitle });
-  return trail;
+  if (route.module === "home") return [{ label: navItems.find((item) => item.id === "home")?.label ?? route.pageTitle }];
+  const group = navItems.find((item) => item.children?.some((child) => child.id === route.id));
+  if (!group) return [{ label: route.pageTitle }];
+  const current = group.children?.find((child) => child.id === route.id);
+  const defaultRouteId = group.children?.[0]?.id;
+  return [
+    { label: group.label, routeId: defaultRouteId && defaultRouteId !== route.id ? defaultRouteId : undefined },
+    { label: current?.label ?? route.pageTitle }
+  ];
 };
 
 function PageBreadcrumb({ route, onNavigate }: Readonly<{ route: NavigationRouteDefinition; onNavigate: (routeId: string) => void }>) {
@@ -446,7 +443,6 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />
       {!['profile', 'users', 'consumptionRecords'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
@@ -496,6 +492,8 @@ export function Content({
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
       )}
+
+      <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />
 
       {activeRoute.module === "profile" ? (
         <ProfilePage profile={profile} />
