@@ -163,7 +163,7 @@ assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|con
 
 // Consumption Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /<h1 id="consumptionTitle">Consumption Records<\/h1>/, "data-management leaf uses the approved name");
-assert.doesNotMatch(recordsPage, /<span class="kpi-eyebrow">Consumption<\/span>/, "Consumption Records removes redundant header copy");
+assert.match(recordsPage, /<span class="kpi-eyebrow">Consumption \/ Attainment<\/span>[\s\S]*<h1 id="consumptionTitle">Consumption Records<\/h1>/, "Consumption Records uses the shared Consumption / Attainment eyebrow");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains available");
 assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleCsvFiles/, "Import accepts multiple CSV files");

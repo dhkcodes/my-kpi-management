@@ -1240,6 +1240,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
         <div>
+          <span class="kpi-eyebrow">Consumption / Attainment</span>
           <h1 id="consumptionTitle">Consumption Records</h1>
         </div>
         <div class="consumption-import-actions">
