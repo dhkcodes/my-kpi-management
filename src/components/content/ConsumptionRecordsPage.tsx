@@ -60,6 +60,10 @@ import "ojs/ojprogress-circle";
 import { ojDialog } from "ojs/ojdialog";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
+const koreaBusinessDate = (): string => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
+}).format(new Date());
+
 const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
     ...plan,
@@ -357,9 +361,12 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const [appliedSearch, setAppliedSearch] = useState("");
   const [searchComposing, setSearchComposing] = useState(false);
   const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
+  const [serverActualTotals, setServerActualTotals] = useState<Record<string, number> | null>(null);
+  const [serverAccountActualTotals, setServerAccountActualTotals] = useState<Record<string, Record<string, number>>>({});
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("idle");
+  const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
   const blockingRecordsLoading = recordsLoadingPhase === "initial" || recordsLoadingPhase === "query";
   const [recordAccountNames, setRecordAccountNames] = useState<string[]>([]);
@@ -506,6 +513,12 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
       setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean)));
       setCurrentFiscalMonth(page.currentFiscalMonth);
       setRecordsTotalAccounts(page.totalAccounts);
+      setServerActualTotals({ ...page.totals.actualByPeriod });
+      setServerAccountActualTotals((current) => {
+        const next = append ? { ...current } : {};
+        page.accountGroups.forEach((group) => { next[group.account] = { ...group.totals.actualByPeriod }; });
+        return next;
+      });
       setRecordsNextOffset(page.nextOffset);
       setRecordsHasMore(page.hasMore);
       setDataMode("backend");
@@ -553,6 +566,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
         setAvailableQuarterOptions(expandConsumptionQuarterOptions([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters]));
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
         setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
+        setServerActualTotals(null);
+        setServerAccountActualTotals({});
         setRecordAccountNames(aggregateConsumptionAccounts(fallbackPlans).map((account) => account.customer));
         setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);
         setRecordsHasMore(false);
@@ -567,22 +582,41 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     return () => { active = false; recordsRequestGeneration.current++; };
   }, []);
 
+  useEffect(() => {
+    const refreshAtBusinessDateChange = () => {
+      const nextDate = koreaBusinessDate();
+      if (nextDate === businessDateRef.current || hasDraftChanges || dataMode !== "backend" || recordsLoadingRef.current) return;
+      businessDateRef.current = nextDate;
+      void loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, selectedPillar, "query")
+        .catch((error) => setImportError(error instanceof Error ? error.message : "Consumption periods could not be refreshed."));
+    };
+    const timer = window.setInterval(refreshAtBusinessDateChange, 60_000);
+    const onVisibility = () => { if (document.visibilityState === "visible") refreshAtBusinessDateChange(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
+  }, [hasDraftChanges, dataMode, fromQuarter, toQuarter, appliedSearch, selectedPillar]);
+
   const visiblePlans = draftPlans;
   const accounts = useMemo(() => {
-    const grouped = new Map(aggregateConsumptionAccounts(visiblePlans).map((account) => [account.customer, account]));
+    const grouped = new Map(aggregateConsumptionAccounts(visiblePlans).map((account) => [account.customer, {
+      ...account, actuals: serverAccountActualTotals[account.customer] ?? account.actuals
+    }]));
     return recordAccountNames.map((customer) => grouped.get(customer) ?? ({
       id: `account::${customer}`, customer, endUser: "", planId: "", dataCenter: "", planType: "Aggregate" as const,
       actuals: {}, forecasts: Object.fromEntries(draftControlTotals.filter((control) =>
         control.account === customer && control.matchStatus === "MANUAL_FORECAST")
         .map((control) => [control.periodKey, control.controlAmount])), plans: []
     }));
-  }, [visiblePlans, recordAccountNames, draftControlTotals]);
+  }, [visiblePlans, recordAccountNames, draftControlTotals, serverAccountActualTotals]);
   const renderedRecordAccounts = accounts;
   const loadedAccountCount = renderedRecordAccounts.length;
   const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
-  const allAccountsTotal = useMemo(() => aggregateConsumptionActualTotals(draftPlans), [draftPlans]);
+  const allAccountsTotal = useMemo(() => {
+    const total = aggregateConsumptionActualTotals(draftPlans);
+    return serverActualTotals === null ? total : { ...total, actuals: serverActualTotals };
+  }, [draftPlans, serverActualTotals]);
   const selectedPlan = selectedSeriesId === "__all__"
     ? allAccountsTotal
     : draftPlans.find((plan) => plan.id === selectedSeriesId) ?? allAccountsTotal;

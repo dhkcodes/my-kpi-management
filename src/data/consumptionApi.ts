@@ -86,8 +86,15 @@ export type ConsumptionRecordsQuery = Readonly<{
   fromQuarter: string; toQuarter: string; search: string; sort: "ACCOUNT" | "AMOUNT";
   direction: "ASC" | "DESC"; offset: number; limit: number; pillar?: ConsumptionPillar;
 }>;
+export type ConsumptionRecordsTotals = Readonly<{
+  actualByPeriod: Readonly<Record<string, number>>;
+  appliedForecastByPeriod: Readonly<Record<string, number>>;
+  outlookByPeriod: Readonly<Record<string, number>>;
+  incompletePeriods: readonly string[];
+}>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
-  accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[] }>>;
+  accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
+  totals: ConsumptionRecordsTotals;
   totalAccounts: number; nextOffset: number; hasMore: boolean;
 }>;
 export type ConsumptionAnalysisQuarter = ConsumptionAmountSplit & Readonly<{
@@ -739,6 +746,25 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
   const { response, payload } = await request(`/consumption/workspace${query}`);
   return parseWorkspace(payload, response.headers.get("ETag"), pillar === undefined ? undefined : selectedPillar);
 };
+const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
+  if (value === undefined || value === null) {
+    return { actualByPeriod: {}, appliedForecastByPeriod: {}, outlookByPeriod: {}, incompletePeriods: [] };
+  }
+  if (typeof value !== "object") throw new Error("Malformed Consumption records totals");
+  const raw = value as Record<string, unknown>;
+  const decodeMap = (candidate: unknown): Readonly<Record<string, number>> => {
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) throw new Error("Malformed Consumption records totals");
+    const entries = Object.entries(candidate as Record<string, unknown>);
+    if (entries.some(([period, amount]) => !/^FY\d{2}-[A-Z]{3}$/.test(period) || typeof amount !== "number" || !Number.isFinite(amount)))
+      throw new Error("Malformed Consumption records totals");
+    return Object.fromEntries(entries) as Record<string, number>;
+  };
+  if (!Array.isArray(raw.incompletePeriods) || raw.incompletePeriods.some((period) => typeof period !== "string"))
+    throw new Error("Malformed Consumption records totals");
+  return { actualByPeriod: decodeMap(raw.actualByPeriod), appliedForecastByPeriod: decodeMap(raw.appliedForecastByPeriod),
+    outlookByPeriod: decodeMap(raw.outlookByPeriod), incompletePeriods: raw.incompletePeriods as string[] };
+};
+
 export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {
   const pillar = query.pillar ?? "ALL";
   if (!isConsumptionPillar(pillar) || !((query.fromQuarter === "" || fiscalQuarterPattern.test(query.fromQuarter))
@@ -765,12 +791,12 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   }
   const rawGroups = raw.accountGroups.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption records response");
-    const group = value as { account?: unknown; plans?: unknown };
+    const group = value as { account?: unknown; plans?: unknown; totals?: unknown };
     if (!isNonEmptyString(group.account) || !Array.isArray(group.plans)
       || group.plans.some((plan) => typeof plan !== "object" || plan === null || (plan as Record<string, unknown>).account !== group.account)) {
       throw new Error("Malformed Consumption records response");
     }
-    return { account: group.account, plans: group.plans };
+    return { account: group.account, plans: group.plans, totals: decodeRecordsTotals(group.totals) };
   });
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
@@ -782,13 +808,13 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);
     planOffset += group.plans.length;
-    return { account: group.account, plans };
+    return { account: group.account, plans, totals: group.totals };
   });
   return { selectedPillar: workspace.selectedPillar, etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
     currentFiscalMonth: workspace.currentFiscalMonth, fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter,
     editablePeriodIds: workspace.editablePeriodIds, displayQuarterOrder: workspace.displayQuarterOrder,
     accountForecasts: workspace.accountForecasts, forecastVariances: workspace.forecastVariances,
-    accountGroups, totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
+    accountGroups, totals: decodeRecordsTotals(raw.totals), totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
 };
 export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery): Promise<ConsumptionAnalysis> => {
   const pillar = query.pillar ?? "ALL";

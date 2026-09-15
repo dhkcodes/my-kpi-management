@@ -138,7 +138,7 @@ export const applyManagedToSelection = (
     const saved = savedById.get(draft.id);
     if (!saved || isKpiRowChanged(saved, updated, KPI_FIELD_CONTRACTS[updated.kpiCode])) next.push(updated);
   }
-  for (const id of selected) {
+  for (const id of Array.from(selected)) {
     if (handled.has(id)) continue;
     const saved = savedById.get(id);
     if (!saved) continue;

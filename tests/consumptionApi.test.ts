@@ -78,7 +78,12 @@ void (async () => {
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
       controlTotals: payload.controlTotals,
-      accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 11, nextOffset: 11, hasMore: false
+      accountGroups: [{ account: "A", plans: payload.plans, totals: {
+        actualByPeriod: { "FY27-AUG": 100 }, appliedForecastByPeriod: { "FY27-OCT": 20 },
+        outlookByPeriod: { "FY27-AUG": 100, "FY27-OCT": 20 }, incompletePeriods: ["FY27-SEP"]
+      } }], totalAccounts: 11, nextOffset: 11, hasMore: false,
+      totals: { actualByPeriod: { "FY27-AUG": 300 }, appliedForecastByPeriod: { "FY27-OCT": 40 },
+        outlookByPeriod: { "FY27-AUG": 300, "FY27-OCT": 40 }, incompletePeriods: ["FY27-SEP"] }
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"records-header\"' } });
   };
   const records = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "database",
@@ -87,6 +92,9 @@ void (async () => {
   assert.deepEqual(records.accountGroups.map((group) => group.account), ["A"]);
   assert.equal(records.accountGroups[0].plans[0].workload, "Autonomous Database");
   assert.deepEqual([records.totalAccounts, records.nextOffset, records.hasMore], [11, 11, false]);
+  assert.equal(records.totals.actualByPeriod["FY27-AUG"], 300, "server total covers the full filtered result, not only the loaded page");
+  assert.equal(records.accountGroups[0].totals.outlookByPeriod["FY27-OCT"], 20);
+  assert.deepEqual(records.totals.incompletePeriods, ["FY27-SEP"]);
 
   runtime.fetch = async (input) => {
     assert.match(String(input), /offset=11&limit=10$/);
@@ -104,7 +112,11 @@ void (async () => {
   };
   const forecastOnlyPage = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
     sort: "ACCOUNT", direction: "ASC", offset: 11, limit: 10 });
-  assert.deepEqual(forecastOnlyPage.accountGroups, [{ account: "Forecast Only", plans: [] }]);
+  assert.deepEqual(forecastOnlyPage.accountGroups, [{
+    account: "Forecast Only",
+    plans: [],
+    totals: { actualByPeriod: {}, appliedForecastByPeriod: {}, outlookByPeriod: {}, incompletePeriods: [] },
+  }]);
   assert.deepEqual([forecastOnlyPage.nextOffset, forecastOnlyPage.hasMore], [12, false]);
   assert.deepEqual(forecastOnlyPage.accountForecasts[0], {
     account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",

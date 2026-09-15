@@ -4,6 +4,7 @@ import {
   createAccountWorkload,
   deleteAccountWorkload,
   fetchAccountsWorkloads,
+  fetchAccountsWorkloadsFiscalYears,
   fetchAccountsWorkloadsSummary,
   patchAccountWorkload,
   permanentlyDeleteAccountWorkload,
@@ -69,6 +70,14 @@ async function run() {
   }, fetchImpl);
   assert.equal(list.items.length, 1);
   assert.equal(calls[0].url, "/api/v1/accounts-workloads?fiscalYear=FY27&search=Demo+%26+Cloud&includeDeleted=true&sort=account&direction=desc");
+
+  const fiscalYearCalls: string[] = [];
+  const fiscalYearResult = await fetchAccountsWorkloadsFiscalYears(async (input) => {
+    fiscalYearCalls.push(String(input));
+    return response({ fiscalYears: ["FY28", "FY26", "FY27", "FY27"] });
+  });
+  assert.deepEqual(fiscalYearResult.fiscalYears, ["FY26", "FY27", "FY28"]);
+  assert.equal(fiscalYearCalls[0], "/api/v1/accounts-workloads/fiscal-years");
 
   const newRow = { ...saved, id: "new-atomic", commitmentId: undefined, versionNo: undefined, account: "Atomic New" };
   const deleted = { ...saved, isDeleted: true };
