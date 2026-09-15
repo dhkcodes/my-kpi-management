@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
 import { ConsumptionAnalysisAccount, ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
+const deployedNonComparableAnalysis = JSON.parse(readFileSync(
+  "tests/fixtures/deployed-analysis-noncomparable.json",
+  "utf8"
+));
 
 const analysis = {
   selectedPillar: "ALL",
@@ -105,6 +110,16 @@ void (async () => {
   assert.deepEqual(getAlertActualTrend(decoded.accounts[0].workloads[0].plans[0].actualTrend, "FY27-AUG").map((point) => point.periodKey),
     ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
     "the selected alert base month anchors the preceding five ACTUAL months");
+
+  runtime.fetch = async () => new Response(JSON.stringify(deployedNonComparableAnalysis),
+    { status: 200, headers: { "Content-Type": "application/json" } });
+  const nonComparable = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.deepEqual(nonComparable.quarters.slice(2).map((quarter) => quarter.status), ["NOT_OPEN", "NOT_OPEN"],
+    "deployed NOT_OPEN quarter semantics survive decoding");
+  assert.equal(nonComparable.salesRepOverview[0].actualGrowthAmount, null,
+    "unavailable Sales Rep YoY amount remains null");
+  assert.equal(nonComparable.accounts[0].actualGrowthAmount, null,
+    "unavailable Account YoY amount remains null");
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=%ED%95%9C%EA%B5%AD&account=Acme&salesRep=Rep+A");

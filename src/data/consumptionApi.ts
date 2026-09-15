@@ -97,7 +97,8 @@ export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "
   totals: ConsumptionRecordsTotals;
   totalAccounts: number; nextOffset: number; hasMore: boolean;
 }>;
-export type ConsumptionAnalysisQuarter = ConsumptionAmountSplit & Readonly<{
+export type ConsumptionAnalysisQuarter = Omit<ConsumptionAmountSplit, "status"> & Readonly<{
+  status: ConsumptionAmountSplit["status"] | "NOT_OPEN";
   quarter: "Q1" | "Q2" | "Q3" | "Q4"; coveragePercent: number;
   qoqChangeAmount: number | null; qoqChangePercent: number | null;
 }>;
@@ -161,7 +162,7 @@ export type ConsumptionAnalysisPeriodCoverage = Readonly<{
 }>;
 export type ConsumptionSalesRepOverview = Readonly<{
   salesRep: string; actualAmount: number; priorActualAmount: number;
-  actualGrowthAmount: number; actualGrowthPercent: number | null;
+  actualGrowthAmount: number | null; actualGrowthPercent: number | null;
   yoyComparisonStatus: string; yoyUnavailableReason: string | null;
   forecastAmount: number; fyExpectedAmount: number; accountCount: number;
   topThreeConcentrationPercent: number; attentionAccountCount: number;
@@ -363,13 +364,19 @@ const expectedSignalGrade = (amount: number, percent: number | null): Consumptio
     : Math.abs(amount) >= 300 || Math.abs(percent ?? 0) >= 30 ? "HIGH" : "WATCH";
 
 const amountStatuses = new Set<ConsumptionAmountSplit["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE"]);
+const quarterAmountStatuses = new Set<ConsumptionAnalysisQuarter["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE", "NOT_OPEN"]);
 const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "NO_DETAIL", "MANUAL_FORECAST"]);
 const malformedAnalysis = (): never => { throw new Error("Malformed Consumption analysis response"); };
-const parseAmountSplit = (value: unknown): ConsumptionAmountSplit => {
+const hasValidYoyResult = (amount: unknown, percent: unknown, status: unknown, reason: unknown): boolean => {
+  if (!isNonEmptyString(status) || !isNullableFiniteNumber(amount) || !isNullableFiniteNumber(percent)
+    || !(reason === null || isNonEmptyString(reason))) return false;
+  return amount !== null || (percent === null && isNonEmptyString(reason));
+};
+const parseAmountSplit = (value: unknown, allowedStatuses: ReadonlySet<string> = amountStatuses): ConsumptionAmountSplit => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
   if (!isFiniteNumber(raw.actualAmount) || !isFiniteNumber(raw.forecastAmount)
-    || !isFiniteNumber(raw.totalAmount) || !amountStatuses.has(raw.status as ConsumptionAmountSplit["status"])
+    || !isFiniteNumber(raw.totalAmount) || typeof raw.status !== "string" || !allowedStatuses.has(raw.status)
     || !nearlyEqual(raw.totalAmount, raw.actualAmount + raw.forecastAmount)) return malformedAnalysis();
   return { actualAmount: raw.actualAmount, forecastAmount: raw.forecastAmount, totalAmount: raw.totalAmount,
     status: raw.status as ConsumptionAmountSplit["status"] };
@@ -491,11 +498,14 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
     || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   const quarters = raw.quarters.map((value) => {
-    const split = parseAmountSplit(value); const quarter = value as Record<string, unknown>;
+    const split = parseAmountSplit(value, quarterAmountStatuses); const quarter = value as Record<string, unknown>;
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)
       || !isNullableFiniteNumber(quarter.qoqChangeAmount)
-      || !isNullableFiniteNumber(quarter.qoqChangePercent)) return malformedAnalysis();
-    return { ...split, quarter: quarter.quarter as ConsumptionAnalysisQuarter["quarter"],
+      || !isNullableFiniteNumber(quarter.qoqChangePercent)
+      || (quarter.status === "NOT_OPEN" && (split.actualAmount !== 0 || split.forecastAmount !== 0
+        || split.totalAmount !== 0 || quarter.coveragePercent !== 0
+        || quarter.qoqChangeAmount !== null || quarter.qoqChangePercent !== null))) return malformedAnalysis();
+    return { ...split, status: quarter.status as ConsumptionAnalysisQuarter["status"], quarter: quarter.quarter as ConsumptionAnalysisQuarter["quarter"],
       coveragePercent: quarter.coveragePercent, qoqChangeAmount: quarter.qoqChangeAmount, qoqChangePercent: quarter.qoqChangePercent };
   });
   if (quarters.length !== 4 || quarters.some((quarter, index) => quarter.quarter !== `Q${index + 1}`)) return malformedAnalysis();
@@ -503,7 +513,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const split = parseAmountSplit(value); const account = value as Record<string, unknown>;
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
       || !isFiniteNumber(account.percentage) || !isFiniteNumber(account.priorActualAmount)
-      || !isFiniteNumber(account.actualGrowthAmount) || !isNullableFiniteNumber(account.actualGrowthPercent)
+      || !isNullableFiniteNumber(account.actualGrowthAmount) || !isNullableFiniteNumber(account.actualGrowthPercent)
       || !["MISSING", "ZERO", "ENTERED"].includes(String(account.forecastEntryStatus))
       || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
       || !Array.isArray(account.workloads)) return malformedAnalysis();
@@ -565,9 +575,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     if (typeof value !== "object" || value === null) return malformedAnalysis();
     const row = value as Record<string, unknown>;
     if (!isNonEmptyString(row.salesRep) || !isFiniteNumber(row.actualAmount) || !isFiniteNumber(row.priorActualAmount)
-      || !isFiniteNumber(row.actualGrowthAmount) || !isNullableFiniteNumber(row.actualGrowthPercent)
-      || !isNonEmptyString(row.yoyComparisonStatus)
-      || !(row.yoyUnavailableReason === null || isNonEmptyString(row.yoyUnavailableReason))
+      || !hasValidYoyResult(row.actualGrowthAmount, row.actualGrowthPercent,
+        row.yoyComparisonStatus, row.yoyUnavailableReason)
       || !isFiniteNumber(row.forecastAmount) || !isFiniteNumber(row.fyExpectedAmount)
       || !isNonNegativeInteger(row.accountCount) || !isFiniteNumber(row.topThreeConcentrationPercent)
       || !isNonNegativeInteger(row.attentionAccountCount)) return malformedAnalysis();
