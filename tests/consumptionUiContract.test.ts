@@ -44,6 +44,10 @@ const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 
+assert.match(styles,
+  /\.kpi-content:has\(\.consumption-insights-page\),\s*\.kpi-content:has\(\.attainment-page\)\s*\{[^}]*align-content:\s*start;[^}]*grid-auto-rows:\s*max-content;/,
+  "Analysis and Attainment keep short initial loading content directly below the fiscal-year panel");
+
 // Navigation and route ownership.
 assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "attainment"[\s\S]*label: "Attainment"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved Consumption leaf names exist");
 assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/, "Consumption is the parent of the approved leaves");
