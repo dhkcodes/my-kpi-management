@@ -3158,7 +3158,7 @@ h4.weekly-activity-section-label--next-week,
 /* Shared page hierarchy: one visual scale for every route. */
 .kpi-page-breadcrumb {
   min-width: 0;
-  margin: 0 0 .65rem;
+  margin: .2rem 0 .25rem;
   color: var(--oj-core-text-color-secondary, #52606d);
   font-size: .78rem;
   font-weight: 600;
@@ -3177,6 +3177,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-page-breadcrumb a { color: #315f75; text-decoration: none; }
 .kpi-page-breadcrumb a:hover { text-decoration: underline; }
 .kpi-page-breadcrumb [aria-current="page"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--oj-core-text-color-primary); }
+.kpi-page-breadcrumb + * > :first-child .kpi-eyebrow:first-child { display: none; }
 
 /* Page title = Accounts & Workloads baseline. */
 .kpi-content :is(.consumption-page__header, .kap-users-header, .kpi-route-page, .my-customers-360-page__header, .accounts-workloads-header, .accounts-pulse-v2__header, .weekly-activities-page__header) :is(h1, h2),
@@ -3223,7 +3224,9 @@ h4.weekly-activity-section-label--next-week,
 }
 .consumption-export-actions button:hover:not(:disabled) { background: #f1f6f8; border-color: #315f75; }
 .consumption-export-actions button:disabled { opacity: .55; cursor: wait; }
+.consumption-export-actions oj-progress-circle { width: 1rem; height: 1rem; }
 .consumption-export-error { flex-basis: 100%; color: var(--oj-core-danger-3, #8b1d1d); font-size: .75rem; }
+.consumption-insights-linked-trend h3 { font-size: 1rem; line-height: 1.35; font-weight: 700; }
 .consumption-insights-qoq-cards .consumption-insights-status { justify-self: start; width: fit-content; padding: .18rem .45rem; border-radius: 999px; }
 
 @media (max-width: 700px) {

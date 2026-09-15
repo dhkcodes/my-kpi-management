@@ -43,8 +43,15 @@ assert.equal(isKpiActivitiesRoute(getNavigationRouteFromPath("/accounts-workload
 
 const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
 const appSource = readFileSync("src/components/app.tsx", "utf8");
+const stylesSource = readFileSync("src/styles/app.css", "utf8");
 assert.match(contentSource, /isKpiActivitiesRoute\(activeRoute\)[\s\S]*kpi-guide-entry-button/, "KPI Guide entry is route-gated");
 assert.match(contentSource, /guideOpen && isKpiActivitiesRoute\(activeRoute\)/, "open guide cannot remain visible outside KPI routes");
 assert.match(appSource, /if \(!isKpiActivitiesRoute\(activeRoute\)\) setGuideOpen\(false\)/, "route changes clear stale guide state");
+assert.match(contentSource, /import \{ FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage \}/, "breadcrumbs use the actual navigation menu definition as their label source");
+assert.match(contentSource, /const group = navItems\.find\(\(item\) => item\.children\?\.some/, "breadcrumbs resolve their parent from the live navigation hierarchy");
+assert.doesNotMatch(contentSource, /Customer Management/, "breadcrumbs never invent a customer menu label");
+assert.match(contentSource, /accountsWorkloadsLoadError[\s\S]*<PageBreadcrumb route=\{activeRoute\}/, "the compact breadcrumb is rendered with route content after global controls, directly before the page heading");
+assert.doesNotMatch(contentSource, /<main[^>]*>[\s\S]{0,120}<PageBreadcrumb/, "the breadcrumb is not a detached top-of-content strip");
+assert.match(stylesSource, /\.kpi-page-breadcrumb \+ \* > :first-child \.kpi-eyebrow:first-child \{ display: none; \}/, "the integrated breadcrumb replaces the old duplicated route eyebrow");
 
 console.log("navigationRoutes tests passed");

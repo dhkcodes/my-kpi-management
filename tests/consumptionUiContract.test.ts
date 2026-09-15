@@ -355,4 +355,13 @@ assert.match(styles, /\.consumption-range-bar\s*\{[^}]*padding:\s*\.5rem \.75rem
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-main > span:not\(\.consumption-signal-badges\)[^}]*font-size:\s*\.88rem[\s\S]*\.consumption-insights-linked-trend > div > p[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-contribution-list button > span[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-plan-list article small b[^}]*font-size:\s*\.9rem/, "alert workload, trend context, Account, Workload, and Plan labels use prominent typography");
 assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
 
+// Export follow-up: modern CSS colors must be handled inside the capture engine and progress is explicit.
+assert.match(insightsPage, /import html2canvasPro = require\("html2canvas-pro"\)/, "the export-only renderer supports modern CSS color() values without changing the live design");
+assert.match(insightsPage, /html2canvasModule\.default \?\? html2canvasModule\.html2canvas/, "the renderer is resolved from its AMD module shape");
+assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PNG 생성 중…/, "PNG export shows an immediate spinner and progress label");
+assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PDF 생성 중…/, "PDF export shows an immediate spinner and progress label");
+assert.match(insightsPage, /disabled=\{loading \|\| !!exporting\}/, "both export buttons reject duplicate clicks while either export is active");
+assert.match(insightsPage, /finally\s*\{[\s\S]*setExporting\(""\)/, "export controls recover after both success and failure");
+assert.match(styles, /\.consumption-insights-linked-trend h3\s*\{[^}]*font-size:\s*1rem[^}]*font-weight:\s*700/, "ACTUAL Trend matches the card-heading hierarchy rather than inheriting an oversized title");
+
 console.log("consumptionUiContract tests passed");
