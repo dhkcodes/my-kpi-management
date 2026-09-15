@@ -18,6 +18,8 @@ import "ojs/ojbutton";
 import "ojs/ojchart";
 import "ojs/ojdialog";
 import "ojs/ojprogress-circle";
+import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
+import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 
 const quarterKeys = ["q1", "q2", "q3", "q4"] as const;
 type BudgetKey = typeof quarterKeys[number];
@@ -48,6 +50,24 @@ const draftTotal = (draft: BudgetDraft): number | null => {
 const signedAmount = (value: number | null): string => value === null ? "—" : `${value > 0 ? "+" : ""}${formatAttainmentAmount(value)}`;
 const includedForecast = (quarter: AttainmentQuarterRecord): number | null => quarter.outlook === null
   ? null : Math.max(0, quarter.outlook - quarter.actual);
+const formatIncludedPeriods = (dashboard: AttainmentDashboard): string => {
+  const periods = new Map<string, string>();
+  dashboard.quarters.forEach((quarter) => quarter.details.forEach((detail) => detail.months.forEach((month) => {
+    if (month.appliedSource !== "NONE" && month.appliedAmount !== null && !periods.has(month.periodKey)) {
+      periods.set(month.periodKey, month.month || month.periodKey);
+    }
+  })));
+  const included = [...periods.entries()].sort(([left], [right]) => left.localeCompare(right));
+  if (included.length === 0) return "";
+  if (included.length === 1) return included[0][1];
+  const indexes = included.map(([periodKey]) => {
+    const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(periodKey);
+    return match ? Number(match[1]) * 12 + Number(match[2]) : null;
+  });
+  const contiguous = indexes.every((value, index) => value !== null && (index === 0 || value === (indexes[index - 1] as number) + 1));
+  const labels = included.map(([, label]) => label);
+  return contiguous ? `${labels[0]}–${labels[labels.length - 1]} (${labels.length} months)` : `${labels.join(", ")} (${labels.length} months)`;
+};
 function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>) {
   return <div class="attainment-quarter-card">
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
@@ -113,22 +133,30 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-total", seriesId: "OCI Total", groupId: "Total", value: dashboard.summary.ociOutlook, shortDesc: `OCI Total ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
+  const includedPeriods = useMemo(() => dashboard ? formatIncludedPeriods(dashboard) : "", [dashboard]);
 
-  if (loading && !dashboard) return <section class="kpi-panel attainment-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Attainment…</section>;
-  if (error && !dashboard) return <section class="kpi-panel" role="alert"><h1>Consumption Attainment</h1><p>{error}</p></section>;
-  if (!dashboard) return <section class="kpi-panel" role="alert">Attainment is unavailable.</section>;
+  if (loading && !dashboard) return <section class="attainment-page consumption-initial-state" aria-busy="true">
+    <header class="consumption-page__header attainment-header"><div><span class="kpi-eyebrow">Consumption / Attainment</span><h1>Consumption Attainment</h1></div></header>
+    <div class="consumption-initial-loading"><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>불러오는 중</span></div>
+  </section>;
+  const messages: ConsumptionMessage[] = error
+    ? [{ id: "attainment-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
+    : [];
+  if (!dashboard) return <section class="attainment-page consumption-initial-state">
+    <header class="consumption-page__header attainment-header"><div><span class="kpi-eyebrow">Consumption / Attainment</span><h1>Consumption Attainment</h1></div></header>
+    <ConsumptionMessageBanner messages={messages} />
+  </section>;
 
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; available remaining months use Forecast. Each included month is counted once. Amounts in K.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
-    {error && <div class="attainment-inline-error" role="alert">{error}</div>}
+    <ConsumptionMessageBanner messages={messages} />
 
-    <p class="attainment-inline-note" role="status">This API response does not expose fiscal-period completeness or unopened-period status. Values below are included-period results and are not asserted to be a complete full-year outlook.</p>
     <section class="attainment-fy-hero" aria-label={`${fiscalYear} included-period summary`}>
-      <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>Included-period summary</strong></div>
+      <div class="attainment-fy-hero__title"><span>{fiscalYear}{includedPeriods && ` · 포함기간 ${includedPeriods}`}</span><strong>기간 합계</strong></div>
       <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
       <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
       <div class="attainment-fy-hero__primary"><small>Included Actual + Forecast</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
@@ -136,22 +164,22 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section aria-labelledby="quarterlyAttainmentTitle">
-      <div class="attainment-section-heading"><div><h2 id="quarterlyAttainmentTitle">Quarterly attainment</h2><p>Quarter totals combine each month's policy-selected Actual or Forecast without duplicate counting.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="quarterlyAttainmentTitle">Quarterly attainment</h2></div></div>
       <div class="attainment-quarter-grid">{dashboard.quarters.map((quarter) => <QuarterCard key={quarter.quarter} quarter={quarter} />)}</div>
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly attainment against budget</h2><p>Budget, closed-month Actual, available remaining-month Forecast, and their included-period total are shown separately.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly attainment against budget</h2></div></div>
       <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderChartItem}></template></oj-chart>
     </section>
 
     <section class="kpi-panel attainment-chart-card attainment-supporting-card" aria-labelledby="attainmentCompositionTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>Included Actual and Actual + Forecast split by Pillar. Labels and values supplement color.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2></div></div>
       <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" }, referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderCompositionItem}></template></oj-chart>
     </section>
 
     <oj-dialog ref={dialogRef} dialogTitle={`Budget · ${fiscalYear}`} cancelBehavior={saving ? "none" : "icon"} class="attainment-budget-dialog">
-      <div slot="body" class="attainment-budget-form"><p>Enter each budget in K. Values are stored as entered; blank means no budget and zero remains explicit.</p><div class="attainment-budget-fields">{quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving} onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}</div><div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>{saveError && <div role="alert" class="attainment-inline-error">{saveError}</div>}</div>
+      <div slot="body" class="attainment-budget-form"><p>분기별 예산을 K 단위로 입력하세요. 비워 두면 미설정으로 저장됩니다.</p><div class="attainment-budget-fields">{quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving} onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}</div><div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>{saveError && <div role="alert" class="attainment-inline-error">저장하지 못했습니다. 입력값을 확인해 주세요.</div>}</div>
       <div slot="footer"><oj-button disabled={saving} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void saveBudget()}>{saving ? "Saving…" : "Save budget"}</oj-button></div>
     </oj-dialog>
   </section>;

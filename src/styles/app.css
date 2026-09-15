@@ -3028,7 +3028,11 @@ h4.weekly-activity-section-label--next-week,
 .attainment-header p,
 .attainment-chart-card p,
 .attainment-budget-form p { margin: .25rem 0 0; color: var(--oj-core-text-color-secondary); }
-.attainment-loading { display: flex; align-items: center; justify-content: center; gap: .75rem; min-height: 18rem; }
+.attainment-loading { display: flex; align-items: center; justify-content: center; gap: .75rem; }
+.consumption-initial-state { display: grid; gap: .75rem; }
+.consumption-initial-loading { display: inline-flex; align-items: center; gap: .5rem; min-height: 2rem; color: var(--oj-core-text-color-secondary, #52606d); font-size: .875rem; }
+.consumption-message-region { margin-block: .25rem .75rem; }
+.consumption-analysis-period { color: var(--oj-core-text-color-secondary, #52606d); font-size: .75rem; line-height: 1.35; }
 .attainment-inline-error { padding: .75rem 1rem; border-radius: .5rem; background: var(--oj-core-danger-1); color: var(--oj-core-danger-3); }
 .attainment-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .attainment-summary article { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); box-shadow: var(--oj-core-box-shadow-sm); }
