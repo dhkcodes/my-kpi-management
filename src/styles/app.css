@@ -2723,6 +2723,7 @@ h4.weekly-activity-section-label--next-week,
   .consumption-insights-alert-trend .consumption-signal-inbox { height: 22rem; }
 }
 @media (max-width: 800px) {
+  .consumption-insights-page { align-content: start; grid-auto-rows: max-content; }
   .consumption-insights-header { align-items: stretch; flex-direction: column; }
   .consumption-insights-header-actions { justify-content: flex-start; width: 100%; }
   .consumption-insights-context { align-items: stretch; flex-direction: column; width: 100%; }
@@ -2949,6 +2950,9 @@ h4.weekly-activity-section-label--next-week,
 }
 
 @media (max-width: 480px) {
+  .kpi-header__brand { gap: .5rem; padding-inline-start: .5rem; }
+  .kpi-header__brand .demo-oracle-icon { height: auto; width: 96px; }
+
   .kpi-menu-matrix {
     width: calc(100vw - 3rem);
   }
