@@ -614,14 +614,15 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
   const allAccountsTotal = useMemo(() => {
+    if (serverActualTotals === null) return null;
     const total = aggregateConsumptionActualTotals(draftPlans);
-    return serverActualTotals === null ? total : { ...total, actuals: serverActualTotals };
+    return { ...total, actuals: serverActualTotals };
   }, [draftPlans, serverActualTotals]);
   const selectedPlan = selectedSeriesId === "__all__"
     ? allAccountsTotal
     : draftPlans.find((plan) => plan.id === selectedSeriesId) ?? allAccountsTotal;
   const selectedPlanLabel = selectedSeriesId === "__all__" || !("planId" in (selectedPlan ?? {}))
-    ? "All accounts · Total"
+    ? serverActualTotals === null ? "All accounts · Server total unavailable" : "All accounts · Server total"
     : getConsumptionPlanLabel(selectedPlan as ConsumptionPlan);
   const filteredPlans = draftPlans.filter((plan) => getConsumptionPlanLabel(plan).toLowerCase().includes(planSearch.trim().toLowerCase()));
   const selectTrendPlan = (plan: ConsumptionPlan | null) => {
@@ -1259,6 +1260,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
           </oj-button>
         </div>
       </header>
+      {dataMode !== "loading" && serverActualTotals === null && <p class="consumption-inline-note" role="status">All-account totals are unavailable because this response does not provide a server total. Loaded-page values are not presented as the full portfolio.</p>}
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">

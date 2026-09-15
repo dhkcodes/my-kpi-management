@@ -12,8 +12,17 @@ const analysis = {
   selectedAccount: null,
   selectedSalesRep: null,
   salesRepOptions: ["Rep A", "Unassigned"],
+  periodCoverage: {
+    actualPeriods: ["FY27-JUN", "FY27-JUL", "FY27-AUG"],
+    forecastPeriods: ["FY27-SEP"],
+    includedPeriods: ["FY27-JUN", "FY27-JUL", "FY27-AUG", "FY27-SEP"],
+    priorComparisonPeriods: ["FY26-JUN", "FY26-JUL", "FY26-AUG"],
+    comparisonStatus: "AVAILABLE",
+    comparisonUnavailableReason: null
+  },
   salesRepOverview: [{ salesRep: "Rep A", actualAmount: 600, priorActualAmount: 500, actualGrowthAmount: 100,
-    actualGrowthPercent: 20, forecastAmount: 400, fyExpectedAmount: 1000, accountCount: 1,
+    actualGrowthPercent: 20, yoyComparisonStatus: "AVAILABLE", yoyUnavailableReason: null,
+    forecastAmount: 400, fyExpectedAmount: 1000, accountCount: 1,
     topThreeConcentrationPercent: 100, attentionAccountCount: 1 }],
   portfolio: {
     actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", coveragePercent: 75,
@@ -86,6 +95,8 @@ void (async () => {
   })), "legacy movement responses gain empty drill fields without turning unavailable coverage into zero");
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
   assert.equal(decoded.salesRepOverview[0].fyExpectedAmount, 1000);
+  assert.deepEqual(decoded.periodCoverage, analysis.periodCoverage);
+  assert.equal(decoded.salesRepOverview[0].yoyComparisonStatus, "AVAILABLE");
   assert.equal(decoded.accounts[0].forecastEntryStatus, "ENTERED");
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.equal(Object.prototype.hasOwnProperty.call(decoded, "otherContribution"), false,
@@ -184,7 +195,8 @@ void (async () => {
     { account: "Visible precision", totalForecastAmount: 5, newAmount: 5, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 5 }
   ];
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "All").map((row) => row.account),
-    ["New", "Expansion", "Reduction", "Visible precision"], "All excludes natural growth and values displayed as 0K");
+    ["Natural", "New", "Expansion", "Reduction", "Rounded zero", "Visible precision"],
+    "All preserves the API's full Forecast Total account set, including Base/Natural-only and small positive values");
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account), ["New", "Visible precision"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Expansion").map((row) => row.account), ["Expansion"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Reduction").map((row) => row.account), ["Reduction"]);

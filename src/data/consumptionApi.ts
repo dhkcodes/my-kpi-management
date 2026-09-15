@@ -141,6 +141,7 @@ export type ConsumptionAnalysis = Readonly<{
   fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
   selectedSalesRep: string | null;
   salesRepOptions: readonly string[];
+  periodCoverage: ConsumptionAnalysisPeriodCoverage;
   salesRepOverview: readonly ConsumptionSalesRepOverview[];
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
@@ -154,9 +155,14 @@ export type ConsumptionAnalysis = Readonly<{
   organicConsumptionGrowthProxy: ConsumptionOrganicGrowthProxy | null;
   movementBridge: readonly ConsumptionMovementBridgePoint[];
 }>;
+export type ConsumptionAnalysisPeriodCoverage = Readonly<{
+  actualPeriods: readonly string[]; forecastPeriods: readonly string[]; includedPeriods: readonly string[];
+  priorComparisonPeriods: readonly string[]; comparisonStatus: string; comparisonUnavailableReason: string | null;
+}>;
 export type ConsumptionSalesRepOverview = Readonly<{
   salesRep: string; actualAmount: number; priorActualAmount: number;
   actualGrowthAmount: number; actualGrowthPercent: number | null;
+  yoyComparisonStatus: string; yoyUnavailableReason: string | null;
   forecastAmount: number; fyExpectedAmount: number; accountCount: number;
   topThreeConcentrationPercent: number; attentionAccountCount: number;
 }>;
@@ -465,10 +471,16 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
     || !(raw.selectedSalesRep === null || isNonEmptyString(raw.selectedSalesRep))
     || !Array.isArray(raw.salesRepOptions) || !raw.salesRepOptions.every(isNonEmptyString)
-    || !Array.isArray(raw.salesRepOverview)
+    || !Array.isArray(raw.salesRepOverview) || typeof raw.periodCoverage !== "object" || raw.periodCoverage === null
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
+  const coverageRaw = raw.periodCoverage as Record<string, unknown>;
+  const periodLists = [coverageRaw.actualPeriods, coverageRaw.forecastPeriods, coverageRaw.includedPeriods, coverageRaw.priorComparisonPeriods];
+  if (periodLists.some((periods) => !Array.isArray(periods) || periods.some((period) => !isPeriodKey(period)))
+    || !isNonEmptyString(coverageRaw.comparisonStatus)
+    || !(coverageRaw.comparisonUnavailableReason === null || isNonEmptyString(coverageRaw.comparisonUnavailableReason))) return malformedAnalysis();
+  const periodCoverage: ConsumptionAnalysisPeriodCoverage = coverageRaw as unknown as ConsumptionAnalysisPeriodCoverage;
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
@@ -554,6 +566,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const row = value as Record<string, unknown>;
     if (!isNonEmptyString(row.salesRep) || !isFiniteNumber(row.actualAmount) || !isFiniteNumber(row.priorActualAmount)
       || !isFiniteNumber(row.actualGrowthAmount) || !isNullableFiniteNumber(row.actualGrowthPercent)
+      || !isNonEmptyString(row.yoyComparisonStatus)
+      || !(row.yoyUnavailableReason === null || isNonEmptyString(row.yoyUnavailableReason))
       || !isFiniteNumber(row.forecastAmount) || !isFiniteNumber(row.fyExpectedAmount)
       || !isNonNegativeInteger(row.accountCount) || !isFiniteNumber(row.topThreeConcentrationPercent)
       || !isNonNegativeInteger(row.attentionAccountCount)) return malformedAnalysis();
@@ -561,7 +575,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   });
   return { selectedPillar,
     fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
-    selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], salesRepOverview,
+    selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], periodCoverage, salesRepOverview,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],

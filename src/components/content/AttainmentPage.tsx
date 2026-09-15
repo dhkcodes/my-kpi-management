@@ -121,17 +121,18 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; current and remaining months use Forecast. Each month is counted once. Amounts in K.</p></div>
+      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1><p>Closed months use Actual; available remaining months use Forecast. Each included month is counted once. Amounts in K.</p></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
     {error && <div class="attainment-inline-error" role="alert">{error}</div>}
 
-    <section class="attainment-fy-hero" aria-label={`${fiscalYear} total`}>
-      <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>FY Total</strong></div>
+    <p class="attainment-inline-note" role="status">This API response does not expose fiscal-period completeness or unopened-period status. Values below are included-period results and are not asserted to be a complete full-year outlook.</p>
+    <section class="attainment-fy-hero" aria-label={`${fiscalYear} included-period summary`}>
+      <div class="attainment-fy-hero__title"><span>{fiscalYear}</span><strong>Included-period summary</strong></div>
       <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
       <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
-      <div class="attainment-fy-hero__primary"><small>Total (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
-      <div><small>Attainment · Total / Budget</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
+      <div class="attainment-fy-hero__primary"><small>Included Actual + Forecast</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>
+      <div><small>Included total / Budget</small><strong>{formatAttainment(dashboard.summary.outlookAttainment)}</strong></div>
     </section>
 
     <section aria-labelledby="quarterlyAttainmentTitle">
@@ -140,12 +141,12 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     </section>
 
     <section class="kpi-panel attainment-chart-card" aria-labelledby="attainmentChartTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly attainment against budget</h2><p>Budget, closed-month Actual, selected remaining-month Forecast, and their Total are shown separately.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentChartTitle">Quarterly attainment against budget</h2><p>Budget, closed-month Actual, available remaining-month Forecast, and their included-period total are shown separately.</p></div></div>
       <oj-chart type="bar" data={chartData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" } }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "outsideBarEdge", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderChartItem}></template></oj-chart>
     </section>
 
     <section class="kpi-panel attainment-chart-card attainment-supporting-card" aria-labelledby="attainmentCompositionTitle">
-      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>FY Actual and Total split by Pillar. Labels and values supplement color.</p></div></div>
+      <div class="attainment-section-heading"><div><h2 id="attainmentCompositionTitle">Supporting detail · DP / OCI</h2><p>Included Actual and Actual + Forecast split by Pillar. Labels and values supplement color.</p></div></div>
       <oj-chart type="bar" stack="on" data={compositionData} dataLabel={chartDataLabel} yAxis={{ title: "Amount (K)", tickLabel: { converter: amountAxisConverter, scaling: "none" }, referenceObjects: dashboard.summary.budget === null ? [] : [{ value: dashboard.summary.budget, text: "Budget", color: "#8b5e00", lineWidth: 2, lineStyle: "dashed" as const, lineType: "straight" as const, type: "line" as const, displayInLegend: "on" as const }] }} legend={{ position: "bottom" }} styleDefaults={{ dataLabelPosition: "center", dataLabelCollision: "fitInBounds" }} animationOnDisplay="auto" class="attainment-chart"><template slot="itemTemplate" render={renderCompositionItem}></template></oj-chart>
     </section>
 
