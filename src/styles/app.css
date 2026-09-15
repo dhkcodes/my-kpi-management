@@ -414,6 +414,12 @@ body {
 }
 .kpi-content:has(.accounts-workloads-page.is-empty) { gap: 0.25rem; }
 
+.kpi-content:has(.consumption-insights-page),
+.kpi-content:has(.attainment-page) {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
 .kpi-content:has(.kpi-spreadsheet-page) { align-content: start; }
 
 .kpi-panel,
