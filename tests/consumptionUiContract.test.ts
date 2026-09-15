@@ -47,6 +47,15 @@ const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 assert.match(styles,
   /\.kpi-content:has\(\.consumption-insights-page\),\s*\.kpi-content:has\(\.attainment-page\)\s*\{[^}]*align-content:\s*start;[^}]*grid-auto-rows:\s*max-content;/,
   "Analysis and Attainment keep short initial loading content directly below the fiscal-year panel");
+assert.match(styles,
+  /\.consumption-insights-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
+  "Consumption Analysis is one Redwood-aligned white outer panel");
+assert.match(styles,
+  /\.consumption-insights-page > \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
+  "top-level Analysis sections use separators instead of nested cards");
+assert.match(styles,
+  /\.consumption-insights-page \.consumption-insights-kpis \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
+  "KPI summary cells form one continuous band without nested shadows");
 
 // Navigation and route ownership.
 assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "attainment"[\s\S]*label: "Attainment"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved Consumption leaf names exist");
