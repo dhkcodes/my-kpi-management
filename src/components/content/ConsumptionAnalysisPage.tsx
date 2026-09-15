@@ -298,15 +298,18 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
-          <label htmlFor="consumptionSalesRepContext">Sales Rep</label>
-          <select id="consumptionSalesRepContext" value={selectedSalesRep}
-            onChange={(event) => { setSelectedSalesRep(event.currentTarget.value); setSelectedAccountContext(""); setSelectedAccountName(""); setSelectedAlertId(""); }}>
-            <option value="">All Sales Reps</option>
-            {analysis.salesRepOptions.map((salesRep) => <option key={salesRep} value={salesRep}>{salesRep}</option>)}
-          </select>
-          <label htmlFor="consumptionAccountContext">Account</label>
-          <div class="consumption-insights-combobox">
-          <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
+          <div class="consumption-insights-filter consumption-insights-filter--sales-rep">
+            <label htmlFor="consumptionSalesRepContext">Sales Rep</label>
+            <select id="consumptionSalesRepContext" value={selectedSalesRep}
+              onChange={(event) => { setSelectedSalesRep(event.currentTarget.value); setSelectedAccountContext(""); setSelectedAccountName(""); setSelectedAlertId(""); }}>
+              <option value="">All Sales Reps</option>
+              {analysis.salesRepOptions.map((salesRep) => <option key={salesRep} value={salesRep}>{salesRep}</option>)}
+            </select>
+          </div>
+          <div class="consumption-insights-filter consumption-insights-filter--account">
+            <label htmlFor="consumptionAccountContext">Account</label>
+            <div class="consumption-insights-combobox">
+            <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
             value={comboboxOpen ? candidateSearch : selectedContextLabel}
@@ -331,6 +334,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
           </div>}
           </div>
+        </div>
         </div>
       </div>
     </header>
@@ -385,11 +389,12 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
         </div>
         <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
           {selectedMovement && selectedMovementPoint ? <>
-            <div class="consumption-section-heading"><div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div></div>
-            <p>Included periods: {selectedMovementPoint.includedForecastPeriods.join(", ") || "Unavailable"}</p>
-            <div class="consumption-insights-composition-selector" role="group" aria-label={`${selectedMovement.quarter} composition category`}>
-              {COMPOSITION_CATEGORIES.map((category) => <button key={category} type="button" aria-pressed={selectedMovement.category === category}
-                onClick={() => setSelectedMovement({ quarter: selectedMovement.quarter, category })}>{category}</button>)}
+            <div class="consumption-insights-movement-heading">
+              <div><span class="kpi-section-label">Forecast composition detail</span><h3>{selectedMovement.quarter} · {selectedMovement.category}</h3></div>
+              <div class="consumption-insights-composition-selector" role="group" aria-label={`${selectedMovement.quarter} composition category`}>
+                {COMPOSITION_CATEGORIES.map((category) => <button key={category} type="button" aria-pressed={selectedMovement.category === category}
+                  onClick={() => setSelectedMovement({ quarter: selectedMovement.quarter, category })}>{category}</button>)}
+              </div>
             </div>
             <div class="consumption-insights-movement-list">
               {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th>{selectedMovement.category === "All" ? <><th>Total (K)</th><th>New (K)</th><th>Expansion (K)</th><th>Reduction (K)</th></> : <th>{selectedMovement.category} (K)</th>}</tr></thead><tbody>
@@ -425,13 +430,13 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     </section>
 
     <section class="consumption-sales-account-review" aria-label="Sales Account growth and attention">
-      <section class="kpi-panel"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY contribution · K USD</span><h2>Account Growth / Decline</h2></div></div>
+      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY contribution · K USD</span><h2>Account Growth / Reduction</h2></div></div>
         <div class="consumption-sales-movement-columns">
           <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
-          <div><h3>Decline</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No declining Accounts.</p>}</div>
+          <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
         </div>
       </section>
-      <section class="kpi-panel"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2></div></div>
+      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2></div></div>
         <div class="consumption-sales-attention-list">{attentionAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}>
           <span><strong>{account.account}</strong><small>{account.salesRep} · {account.attentionReasons.join(" · ")}</small></span>
           <span>{amountK(account.actualAmount)}<small>{account.forecastEntryStatus === "MISSING" ? "Forecast missing" : account.forecastEntryStatus === "ZERO" ? "Forecast entered as 0" : `FY Expected ${amountK(account.totalAmount)}`}</small></span>
