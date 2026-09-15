@@ -132,6 +132,9 @@ export type ConsumptionMovementAccountDetail = Readonly<{
 export type ConsumptionAnalysis = Readonly<{
   selectedPillar: ConsumptionPillar;
   fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
+  selectedSalesRep: string | null;
+  salesRepOptions: readonly string[];
+  salesRepOverview: readonly ConsumptionSalesRepOverview[];
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
@@ -144,7 +147,13 @@ export type ConsumptionAnalysis = Readonly<{
   organicConsumptionGrowthProxy: ConsumptionOrganicGrowthProxy | null;
   movementBridge: readonly ConsumptionMovementBridgePoint[];
 }>;
-export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; pillar?: ConsumptionPillar }>;
+export type ConsumptionSalesRepOverview = Readonly<{
+  salesRep: string; actualAmount: number; priorActualAmount: number;
+  actualGrowthAmount: number; actualGrowthPercent: number | null;
+  forecastAmount: number; fyExpectedAmount: number; accountCount: number;
+  topThreeConcentrationPercent: number; attentionAccountCount: number;
+}>;
+export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; salesRep?: string; pillar?: ConsumptionPillar }>;
 export type ConsumptionControlForecastUpdate = Readonly<{
   account: string;
   periodKey: string;
@@ -447,6 +456,9 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const selectedPillar = normalizeConsumptionPillar(raw.selectedPillar);
   if (!selectedPillar || !isFiscalYear(raw.fiscalYear) || !isFiscalYear(raw.priorFiscalYear)
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
+    || !(raw.selectedSalesRep === null || isNonEmptyString(raw.selectedSalesRep))
+    || !Array.isArray(raw.salesRepOptions) || !raw.salesRepOptions.every(isNonEmptyString)
+    || !Array.isArray(raw.salesRepOverview)
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
@@ -470,7 +482,12 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (quarters.length !== 4 || quarters.some((quarter, index) => quarter.quarter !== `Q${index + 1}`)) return malformedAnalysis();
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
     const split = parseAmountSplit(value); const account = value as Record<string, unknown>;
-    if (!isNonEmptyString(account.account) || !isFiniteNumber(account.percentage) || !Array.isArray(account.workloads)) return malformedAnalysis();
+    if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
+      || !isFiniteNumber(account.percentage) || !isFiniteNumber(account.priorActualAmount)
+      || !isFiniteNumber(account.actualGrowthAmount) || !isNullableFiniteNumber(account.actualGrowthPercent)
+      || !["MISSING", "ZERO", "ENTERED"].includes(String(account.forecastEntryStatus))
+      || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
+      || !Array.isArray(account.workloads)) return malformedAnalysis();
     const workloads = account.workloads.map((value) => {
       const workloadSplit = parseAmountSplit(value); const workload = value as Record<string, unknown>;
       if (!isNonEmptyString(workload.workload) || !isFiniteNumber(workload.percentage) || !Array.isArray(workload.plans)) return malformedAnalysis();
@@ -478,23 +495,26 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
         plans: workload.plans.map((plan) => parseAnalysisPlan(plan, allowedTrendYears)) };
     });
     if (new Set(workloads.map((workload) => workload.workload)).size !== workloads.length) return malformedAnalysis();
-    return { ...split, account: account.account, percentage: account.percentage, workloads };
+    return { ...split, account: account.account, salesRep: account.salesRep, percentage: account.percentage,
+      priorActualAmount: account.priorActualAmount, actualGrowthAmount: account.actualGrowthAmount,
+      actualGrowthPercent: account.actualGrowthPercent, forecastEntryStatus: account.forecastEntryStatus,
+      attentionReasons: account.attentionReasons, workloads } as ConsumptionAnalysisAccount;
   });
   if (new Set(accounts.map((account) => account.account)).size !== accounts.length) return malformedAnalysis();
   const rawAccountCandidates = Array.isArray(raw.accountCandidates) ? raw.accountCandidates : accounts.map((account) => ({
-    account: account.account,
+    account: account.account, salesRep: account.salesRep,
     workloads: account.workloads.map((workload) => workload.workload),
     planIds: [...new Set(account.workloads.flatMap((workload) => workload.plans.map((plan) => plan.planId)))]
   }));
   const accountCandidates: ConsumptionAnalysisAccountCandidate[] = rawAccountCandidates.map((value) => {
     if (typeof value !== "object" || value === null) return malformedAnalysis();
     const candidate = value as Record<string, unknown>;
-    if (!isNonEmptyString(candidate.account) || !Array.isArray(candidate.workloads) || !Array.isArray(candidate.planIds)
+    if (!isNonEmptyString(candidate.account) || !isNonEmptyString(candidate.salesRep) || !Array.isArray(candidate.workloads) || !Array.isArray(candidate.planIds)
       || candidate.workloads.some((workload) => !isNonEmptyString(workload))
       || candidate.planIds.some((planId) => !isNonEmptyString(planId))
       || new Set(candidate.workloads).size !== candidate.workloads.length
       || new Set(candidate.planIds).size !== candidate.planIds.length) return malformedAnalysis();
-    return { account: candidate.account, workloads: candidate.workloads as string[], planIds: candidate.planIds as string[] };
+    return { account: candidate.account, salesRep: candidate.salesRep, workloads: candidate.workloads as string[], planIds: candidate.planIds as string[] };
   });
   if (new Set(accountCandidates.map((candidate) => candidate.account)).size !== accountCandidates.length) return malformedAnalysis();
   const contextActualTrend = parseActualTrend(raw.contextActualTrend, allowedTrendYears);
@@ -522,8 +542,19 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const matches = accounts.flatMap((account) => account.workloads.flatMap((workload) => workload.plans.map((plan) => ({ account: account.account, workload: workload.workload, plan })))).filter((entry) => entry.account === alert.account && entry.workload === alert.workload && entry.plan.serverPlanId === alert.serverPlanId && entry.plan.planId === alert.planId);
     if (matches.length !== 1) return malformedAnalysis();
   });
+  const salesRepOverview: ConsumptionSalesRepOverview[] = raw.salesRepOverview.map((value) => {
+    if (typeof value !== "object" || value === null) return malformedAnalysis();
+    const row = value as Record<string, unknown>;
+    if (!isNonEmptyString(row.salesRep) || !isFiniteNumber(row.actualAmount) || !isFiniteNumber(row.priorActualAmount)
+      || !isFiniteNumber(row.actualGrowthAmount) || !isNullableFiniteNumber(row.actualGrowthPercent)
+      || !isFiniteNumber(row.forecastAmount) || !isFiniteNumber(row.fyExpectedAmount)
+      || !isNonNegativeInteger(row.accountCount) || !isFiniteNumber(row.topThreeConcentrationPercent)
+      || !isNonNegativeInteger(row.attentionAccountCount)) return malformedAnalysis();
+    return row as unknown as ConsumptionSalesRepOverview;
+  });
   return { selectedPillar,
     fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
+    selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], salesRepOverview,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
@@ -793,8 +824,9 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
 export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery): Promise<ConsumptionAnalysis> => {
   const pillar = query.pillar ?? "ALL";
   if (!isConsumptionPillar(pillar) || !isFiscalYear(query.fiscalYear) || typeof query.search !== "string" || query.search.length > 160
-    || typeof query.account !== "string" || query.account.length > 160) throw new Error("Invalid Consumption analysis query");
-  const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account });
+    || typeof query.account !== "string" || query.account.length > 160
+    || typeof (query.salesRep ?? "") !== "string" || (query.salesRep ?? "").length > 160) throw new Error("Invalid Consumption analysis query");
+  const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account, salesRep: query.salesRep ?? "" });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
   const { payload } = await request(`/consumption/analysis?${parameters}`);
   const decoded = parseConsumptionAnalysis(payload);

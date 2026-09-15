@@ -10,6 +10,11 @@ const analysis = {
   fiscalYear: "FY27",
   priorFiscalYear: "FY26",
   selectedAccount: null,
+  selectedSalesRep: null,
+  salesRepOptions: ["Rep A", "Unassigned"],
+  salesRepOverview: [{ salesRep: "Rep A", actualAmount: 600, priorActualAmount: 500, actualGrowthAmount: 100,
+    actualGrowthPercent: 20, forecastAmount: 400, fyExpectedAmount: 1000, accountCount: 1,
+    topThreeConcentrationPercent: 100, attentionAccountCount: 1 }],
   portfolio: {
     actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", coveragePercent: 75,
     priorActualAmount: 900, priorForecastAmount: 0, priorTotalAmount: 900, priorStatus: "ACTUAL", priorCoveragePercent: 100
@@ -27,7 +32,7 @@ const analysis = {
       compositionStatus: "UNAVAILABLE", classifiedAccountCount: 0, unclassifiedAccountCount: 1,
       unavailableReason: "Movement composition is unavailable for legacy scalar forecasts." }
   ],
-  accountCandidates: [{ account: "Acme", workloads: ["Database"], planIds: ["P1"] }],
+  accountCandidates: [{ account: "Acme", salesRep: "Rep A", workloads: ["Database"], planIds: ["P1"] }],
   contextActualTrend: [
     { periodKey: "FY26-MAR", actualAmount: 10, alertCalculationMonth: false },
     { periodKey: "FY26-APR", actualAmount: 20, alertCalculationMonth: false },
@@ -42,7 +47,9 @@ const analysis = {
     changePercent: 150, reason: "Actual usage exceeded its recent baseline."
   }],
   accounts: [{
-    account: "Acme", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
+    account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
+    priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
+    forecastEntryStatus: "ENTERED", attentionReasons: ["Recent actual above usual"],
     workloads: [{
       workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
       plans: [{ serverPlanId: 1, planId: "P1", endUser: "Acme", dataCenter: "IAD", actualAmount: 600, forecastAmount: 400,
@@ -65,7 +72,7 @@ void (async () => {
   assert.equal(isUnmappedConsumptionLabel("Database"), false, "actual workload names remain visible");
 
   runtime.fetch = async (input, init) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=");
     assert.equal(init?.method, undefined);
     return new Response(JSON.stringify(analysis), { status: 200, headers: { "Content-Type": "application/json" } });
   };
@@ -78,6 +85,8 @@ void (async () => {
     ...point, includedForecastPeriods: [], accounts: []
   })), "legacy movement responses gain empty drill fields without turning unavailable coverage into zero");
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
+  assert.equal(decoded.salesRepOverview[0].fyExpectedAmount, 1000);
+  assert.equal(decoded.accounts[0].forecastEntryStatus, "ENTERED");
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.equal(Object.prototype.hasOwnProperty.call(decoded, "otherContribution"), false,
     "the removed aggregate contribution is not exposed by the frontend API contract");
@@ -87,10 +96,10 @@ void (async () => {
     "the selected alert base month anchors the preceding five ACTUAL months");
 
   runtime.fetch = async (input) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=%ED%95%9C%EA%B5%AD&account=Acme");
-    return new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=%ED%95%9C%EA%B5%AD&account=Acme&salesRep=Rep+A");
+    return new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme", selectedSalesRep: "Rep A" }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
-  await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "한국", account: "Acme" });
+  await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "한국", account: "Acme", salesRep: "Rep A" });
 
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...analysis, selectedAccount: "Acme",

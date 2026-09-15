@@ -49,10 +49,15 @@ export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
   workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
 }>;
 export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
-  account: string; percentage: number; workloads: readonly ConsumptionAnalysisWorkload[];
+  account: string; salesRep: string; percentage: number;
+  priorActualAmount: number; actualGrowthAmount: number; actualGrowthPercent: number | null;
+  forecastEntryStatus: "MISSING" | "ZERO" | "ENTERED";
+  attentionReasons: readonly string[];
+  workloads: readonly ConsumptionAnalysisWorkload[];
 }>;
 export type ConsumptionAnalysisAccountCandidate = Readonly<{
   account: string;
+  salesRep: string;
   workloads: readonly string[];
   planIds: readonly string[];
 }>;

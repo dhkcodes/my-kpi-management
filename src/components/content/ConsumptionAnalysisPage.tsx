@@ -38,6 +38,7 @@ const movementAxisConverter = {
   format: (value: string | number) => `${currencyK.format(Number(value))} K`,
   parse: (value: string) => Number(value.replace(/[^0-9.-]/g, ""))
 };
+const amountK = (amount: number) => `${currencyK.format(toK(amount))} K`;
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
@@ -92,6 +93,7 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
 
 export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
+  const [selectedSalesRep, setSelectedSalesRep] = useState("");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -108,6 +110,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
 
   useEffect(() => {
     setSelectedAccountContext("");
+    setSelectedSalesRep("");
     setCandidateSearch("");
     setDebouncedCandidateSearch("");
     setSelectedAlertId("");
@@ -126,7 +129,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     const generation = ++requestGeneration.current;
     setLoading(true);
     setError("");
-    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, pillar: selectedPillar })
+    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, salesRep: selectedSalesRep, pillar: selectedPillar })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
         if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
@@ -152,12 +155,13 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       })
       .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext, selectedPillar]);
+  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext, selectedPillar, selectedSalesRep]);
 
   const analysis = analysisResponse
     && analysisResponse.fiscalYear === fiscalYear
     && analysisResponse.selectedPillar === selectedPillar
     && analysisResponse.selectedAccount === (selectedAccountContext || null)
+    && analysisResponse.selectedSalesRep === (selectedSalesRep || null)
     ? analysisResponse : null;
 
   const filteredCandidates = useMemo(() => (analysis?.accountCandidates ?? [])
@@ -172,6 +176,15 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const emphasizedTrendPeriods = useMemo(() => new Set(trendPoints.slice(-4).map((point) => point.periodKey)), [trendPoints]);
   const selectedAccount = analysis?.accounts.find((account) => account.account === selectedAccountName) ?? null;
   const topAccounts = analysis?.accounts.slice(0, 5) ?? [];
+  const growthAccounts = useMemo(() => [...(analysis?.accounts ?? [])]
+    .filter((account) => account.actualGrowthAmount > 0)
+    .sort((left, right) => right.actualGrowthAmount - left.actualGrowthAmount).slice(0, 5), [analysis]);
+  const declineAccounts = useMemo(() => [...(analysis?.accounts ?? [])]
+    .filter((account) => account.actualGrowthAmount < 0)
+    .sort((left, right) => left.actualGrowthAmount - right.actualGrowthAmount).slice(0, 5), [analysis]);
+  const attentionAccounts = useMemo(() => (analysis?.accounts ?? [])
+    .filter((account) => account.attentionReasons.length > 0)
+    .sort((left, right) => right.actualAmount - left.actualAmount), [analysis]);
   const selectedPlans = selectedAccount?.workloads.flatMap((workload) =>
     workload.plans.map((plan) => ({ workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
 
@@ -285,6 +298,12 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
+          <label htmlFor="consumptionSalesRepContext">Sales Rep</label>
+          <select id="consumptionSalesRepContext" value={selectedSalesRep}
+            onChange={(event) => { setSelectedSalesRep(event.currentTarget.value); setSelectedAccountContext(""); setSelectedAccountName(""); setSelectedAlertId(""); }}>
+            <option value="">All Sales Reps</option>
+            {analysis.salesRepOptions.map((salesRep) => <option key={salesRep} value={salesRep}>{salesRep}</option>)}
+          </select>
           <label htmlFor="consumptionAccountContext">Account</label>
           <div class="consumption-insights-combobox">
           <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
@@ -318,6 +337,18 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
 
     {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> Updating analysis context…</div>}
     {error && <div class="consumption-import-error" role="alert">{error}</div>}
+
+    <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
+        <small>Current Account ownership basis; unassigned Accounts remain in totals.</small></div>
+      <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY</th><th>FY Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
+        {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={selectedSalesRep === row.salesRep ? "is-selected" : ""}>
+          <th><button type="button" onClick={() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
+          <td>{amountK(row.actualAmount)}</td><td class={row.actualGrowthAmount < 0 ? "is-negative" : "is-positive"}>{amountK(row.actualGrowthAmount)} · {signedPercent(row.actualGrowthPercent)}</td>
+          <td>{amountK(row.fyExpectedAmount)}</td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
+        </tr>)}
+      </tbody></table></div>
+    </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
       <article class="kpi-panel"><span>{analysis.fiscalYear} total consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small>{splitLabel(analysis.portfolio)}</small></article>
@@ -393,6 +424,21 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       </div>
     </section>
 
+    <section class="consumption-sales-account-review" aria-label="Sales Account growth and attention">
+      <section class="kpi-panel"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY contribution · K USD</span><h2>Account Growth / Decline</h2></div></div>
+        <div class="consumption-sales-movement-columns">
+          <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
+          <div><h3>Decline</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No declining Accounts.</p>}</div>
+        </div>
+      </section>
+      <section class="kpi-panel"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2></div></div>
+        <div class="consumption-sales-attention-list">{attentionAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}>
+          <span><strong>{account.account}</strong><small>{account.salesRep} · {account.attentionReasons.join(" · ")}</small></span>
+          <span>{amountK(account.actualAmount)}<small>{account.forecastEntryStatus === "MISSING" ? "Forecast missing" : account.forecastEntryStatus === "ZERO" ? "Forecast entered as 0" : `FY Expected ${amountK(account.totalAmount)}`}</small></span>
+        </button>)}{attentionAccounts.length === 0 && <p class="consumption-empty-state">No Accounts require attention for this context.</p>}</div>
+      </section>
+    </section>
+
     <section class="consumption-insights-contribution" aria-label="Account to Plan contribution">
       <span class="kpi-section-label">Account Contribution → Plan Contribution</span>
       <div class="consumption-insights-contribution-grid">
@@ -400,7 +446,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
             class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
             onClick={() => setSelectedAccountName(account.account)}>
-            <span>{account.account}</span><strong>{compactCurrency.format(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
+            <span>{account.account} · {account.salesRep}</span><strong>{amountK(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)} · {account.forecastEntryStatus === "MISSING" ? "Forecast missing" : account.forecastEntryStatus === "ZERO" ? "Forecast 0 entered" : "Forecast entered"}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
           </button>)}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"}</p></div></div>
