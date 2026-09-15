@@ -30,7 +30,7 @@ const toK = (amount: number): number => amount / 1_000;
 const signedCurrency = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${currency.format(amount)}`;
 const signedPercent = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${amount.toFixed(1)}%`;
 const qoqKind = (status: ConsumptionAnalysisQuarter["status"]) => status === "ACTUAL" ? "ACTUAL"
-  : status === "FORECAST" ? "FORECAST · projection" : status === "MIXED" ? "MIXED · projection" : "INCOMPLETE";
+  : status === "FORECAST" ? "FORECAST · projection" : status === "MIXED" ? "MIXED · projection" : status === "NOT_OPEN" ? "NOT OPEN" : "INCOMPLETE";
 const splitLabel = (value: { actualAmount: number; forecastAmount: number }) => `ACTUAL ${currency.format(value.actualAmount)} · FORECAST ${currency.format(value.forecastAmount)}`;
 const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurrency.format(value);
 const movementDataLabel = ({ value }: Readonly<{ value: number }>) => `${currencyK.format(value)} K`;
@@ -177,10 +177,10 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const selectedAccount = analysis?.accounts.find((account) => account.account === selectedAccountName) ?? null;
   const topAccounts = analysis?.accounts.slice(0, 5) ?? [];
   const growthAccounts = useMemo(() => [...(analysis?.accounts ?? [])]
-    .filter((account) => account.actualGrowthAmount > 0)
+    .filter((account): account is typeof account & { actualGrowthAmount: number } => typeof account.actualGrowthAmount === "number" && account.actualGrowthAmount > 0)
     .sort((left, right) => right.actualGrowthAmount - left.actualGrowthAmount).slice(0, 5), [analysis]);
   const declineAccounts = useMemo(() => [...(analysis?.accounts ?? [])]
-    .filter((account) => account.actualGrowthAmount < 0)
+    .filter((account): account is typeof account & { actualGrowthAmount: number } => typeof account.actualGrowthAmount === "number" && account.actualGrowthAmount < 0)
     .sort((left, right) => left.actualGrowthAmount - right.actualGrowthAmount).slice(0, 5), [analysis]);
   const attentionAccounts = useMemo(() => (analysis?.accounts ?? [])
     .filter((account) => account.attentionReasons.length > 0)
@@ -358,8 +358,8 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={selectedSalesRep === row.salesRep ? "is-selected" : ""}>
           <th><button type="button" onClick={() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
-          <td>{amountK(row.actualAmount)}</td><td class={row.yoyComparisonStatus === "PRIOR_PERIOD_NOT_PROVIDED" ? "" : row.actualGrowthAmount < 0 ? "is-negative" : "is-positive"}>
-            {row.yoyComparisonStatus === "PRIOR_PERIOD_NOT_PROVIDED" ? <>N/A<small>{row.yoyUnavailableReason ?? "Prior same-period ACTUAL not provided"}</small></>
+          <td>{amountK(row.actualAmount)}</td><td class={typeof row.actualGrowthAmount !== "number" ? "" : row.actualGrowthAmount < 0 ? "is-negative" : "is-positive"}>
+            {typeof row.actualGrowthAmount !== "number" ? <>N/A<small>{row.yoyUnavailableReason ?? "Prior same-period ACTUAL not provided"}</small></>
               : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A (prior Actual 0)" : signedPercent(row.actualGrowthPercent)}</>}
           </td>
           <td>{amountK(row.fyExpectedAmount)}<small>{expectedCoverageLabel}</small></td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
