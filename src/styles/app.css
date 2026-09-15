@@ -2408,6 +2408,15 @@ h4.weekly-activity-section-label--next-week,
 .consumption-signal-panel, .consumption-trend-panel, .consumption-table-panel { margin: 0; min-width: 0; }
 .consumption-section-heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .65rem; }
 .consumption-section-heading h2 { font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.02em; margin: .15rem 0 0; }
+.consumption-overview-context { align-items: flex-end; display: flex; flex-direction: column; gap: .25rem; }
+.consumption-help { color: var(--kpi-muted); font-size: .76rem; max-width: min(22rem, 72vw); }
+.consumption-help summary { align-items: center; color: var(--kpi-brand); cursor: pointer; display: inline-flex; font-size: 1rem; justify-content: center; list-style: none; min-height: 2rem; min-width: 2rem; }
+.consumption-help summary::-webkit-details-marker { display: none; }
+.consumption-help summary:focus-visible { outline: 2px solid var(--kpi-brand); outline-offset: 2px; }
+.consumption-help p { background: #f8f6f4; border-left: .2rem solid var(--kpi-brand); line-height: 1.4; margin: .25rem 0 0; padding: .55rem .65rem; white-space: normal; }
+.consumption-na-value { align-items: center; display: inline-flex; gap: .15rem; white-space: nowrap; }
+.consumption-row-help { display: inline-block; text-align: left; vertical-align: middle; }
+.consumption-row-help[open] { display: block; white-space: normal; }
 .consumption-count-badge { align-items: center; background: #f0eeeb; border-radius: 999px; display: inline-flex; font-size: .78rem; font-weight: 800; justify-content: center; min-height: 1.8rem; min-width: 1.8rem; padding: .2rem .5rem; }
 .consumption-signal-inbox { border: 1px solid var(--kpi-border); max-height: 23rem; overflow-x: hidden; overflow-y: auto; }
 .consumption-signal { align-items: start; background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); color: var(--kpi-ink); cursor: pointer; display: grid; font: inherit; gap: .45rem .8rem; grid-template-columns: minmax(0, 1fr) auto; padding: .75rem; text-align: left; width: 100%; }
