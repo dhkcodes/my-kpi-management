@@ -91,8 +91,11 @@ assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account, salesRep: query\.salesRep \?\? "" \}\)/, "Analysis client sends the FY, candidate search, selected Account, and Sales Rep query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
-assert.match(insightsPage, /YoY same-period ACTUAL:[\s\S]*Covered-period Expected/, "Sales Rep Overview explains the actual comparison periods and avoids claiming a full-year total");
-assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A \(prior Actual 0\)/, "explicit prior zero preserves amount while explaining unavailable percentage");
+assert.match(insightsPage, /YoY: \{actualComparisonLabel\} · K USD[\s\S]*Covered-period Expected/, "Sales Rep Overview shows the comparison period and unit once without claiming a full-year total");
+assert.match(insightsPage, /About current ownership and unavailable comparisons[\s\S]*current Sales Rep[\s\S]*may appear as Unassigned/, "current ownership has one tap-accessible definition");
+assert.match(insightsPage, /N\/A[\s\S]*Why YoY is unavailable for[\s\S]*yoyUnavailableReason/, "unavailable YoY cells keep N/A short and move the detailed reason into a tap-accessible disclosure");
+assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A[\s\S]*Why the YoY rate is unavailable/, "explicit prior zero preserves the amount while moving the unavailable-rate reason into a disclosure");
+assert.doesNotMatch(insightsPage, /rate N\/A \(prior Actual 0\)|<small>\{row\.yoyUnavailableReason/, "long N/A reasons are not rendered inline in Sales Rep cells");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*All filtered Accounts total/, "Forecast Composition All includes a bottom total row sourced from the full API account set");
 assert.match(recordsPage, /Server total unavailable[\s\S]*Loaded-page values are not presented as the full portfolio/, "Records does not promote loaded-page sums when a legacy response lacks server totals");
 assert.match(attainmentPage, /included-period results[\s\S]*not asserted to be a complete full-year outlook/, "Attainment labels legacy responses conservatively when completeness metadata is absent");

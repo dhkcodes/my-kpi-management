@@ -354,13 +354,16 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
-        <small>YoY same-period ACTUAL: {actualComparisonLabel}. Current ownership basis; unassigned Accounts remain in totals.</small></div>
+        <div class="consumption-overview-context"><small>YoY: {actualComparisonLabel} · K USD</small>
+          <details class="consumption-help"><summary aria-label="About current ownership and unavailable comparisons"><span aria-hidden="true">ⓘ</span></summary>
+            <p>Amounts are grouped by each Account&apos;s current Sales Rep. Unassigned Accounts remain in totals and may appear as Unassigned. Tap the info control beside N/A for its detailed reason.</p>
+          </details></div></div>
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={selectedSalesRep === row.salesRep ? "is-selected" : ""}>
           <th><button type="button" onClick={() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
           <td>{amountK(row.actualAmount)}</td><td class={typeof row.actualGrowthAmount !== "number" ? "" : row.actualGrowthAmount < 0 ? "is-negative" : "is-positive"}>
-            {typeof row.actualGrowthAmount !== "number" ? <>N/A<small>{row.yoyUnavailableReason ?? "Prior same-period ACTUAL not provided"}</small></>
-              : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A (prior Actual 0)" : signedPercent(row.actualGrowthPercent)}</>}
+            {typeof row.actualGrowthAmount !== "number" ? <div class="consumption-na-value">N/A <details class="consumption-help consumption-row-help"><summary aria-label={`Why YoY is unavailable for ${row.salesRep}`}><span aria-hidden="true">ⓘ</span></summary><p>{row.yoyUnavailableReason ?? "Prior same-period Actual is unavailable."}</p></details></div>
+              : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? <div class="consumption-na-value">rate N/A <details class="consumption-help consumption-row-help"><summary aria-label={`Why the YoY rate is unavailable for ${row.salesRep}`}><span aria-hidden="true">ⓘ</span></summary><p>{row.yoyUnavailableReason ?? "Prior same-period Actual is explicitly zero, so the rate is unavailable."}</p></details></div> : signedPercent(row.actualGrowthPercent)}</>}
           </td>
           <td>{amountK(row.fyExpectedAmount)}<small>{expectedCoverageLabel}</small></td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
         </tr>)}
