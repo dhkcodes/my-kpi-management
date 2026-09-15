@@ -56,6 +56,27 @@ assert.match(styles,
 assert.match(styles,
   /\.consumption-insights-page \.consumption-insights-kpis \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
   "KPI summary cells form one continuous band without nested shadows");
+assert.match(styles,
+  /\.attainment-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
+  "Consumption Attainment is one Redwood-aligned white outer panel, including its initial state");
+assert.match(styles,
+  /\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*box-shadow:\s*none;/,
+  "Attainment quarter comparisons retain boundaries without nested shadows");
+assert.match(styles,
+  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*box-shadow:\s*none;[^}]*padding-inline:\s*0;/,
+  "Attainment charts become separated sections instead of nested cards");
+assert.match(styles,
+  /\.consumption-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*box-sizing:\s*border-box;[^}]*padding:\s*\.75rem;/,
+  "Consumption Records follows the Accounts and Workloads single-panel workspace pattern");
+assert.match(styles,
+  /\.consumption-table-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;[^}]*padding:\s*0;/,
+  "Records absorbs the old table card while leaving the functional scroll boundary separate");
+assert.match(styles,
+  /\.consumption-table-scroll\s*\{[^}]*border:\s*1px solid var\(--kpi-border\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*auto;/,
+  "Records preserves the table scroll boundary and both scroll axes");
+assert.match(styles,
+  /@media \(min-width: 64rem\)[\s\S]*\.consumption-page\s*\{[^}]*padding-block:\s*\.45rem;[^}]*\}[\s\S]*\.consumption-table-panel\s*\{[^}]*padding:\s*0;/,
+  "desktop Records moves the former table padding to the outer panel without reducing table space");
 
 // Navigation and route ownership.
 assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "attainment"[\s\S]*label: "Attainment"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved Consumption leaf names exist");
