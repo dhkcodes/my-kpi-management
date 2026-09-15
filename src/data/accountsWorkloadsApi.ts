@@ -54,6 +54,10 @@ export type AccountsWorkloadsListResponse = Readonly<{
   total: number;
 }>;
 
+export type AccountsWorkloadsFiscalYearsResponse = Readonly<{
+  fiscalYears: FiscalYear[];
+}>;
+
 export type AccountsWorkloadsBatchSaveResponse = AccountsWorkloadsListResponse & Readonly<{
   fxRate?: FxRateRecord;
 }>;
@@ -308,6 +312,18 @@ export const fetchAccountsWorkloads = async (
     throw new Error("Malformed Accounts & Workloads API list response");
   }
   return { items: parsedItems as AccountWorkloadRow[], total };
+};
+
+export const fetchAccountsWorkloadsFiscalYears = async (
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsFiscalYearsResponse> => {
+  const payload = await requestJson<unknown>(fetchImpl, `${accountsWorkloadsApiBase()}/accounts-workloads/fiscal-years`);
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed fiscal-year response");
+  const values = (payload as { fiscalYears?: unknown }).fiscalYears;
+  if (!Array.isArray(values) || values.some((value) => typeof value !== "string" || !/^FY\d{2}$/.test(value))) {
+    throw new Error("Malformed fiscal-year response");
+  }
+  return { fiscalYears: Array.from(new Set(values as FiscalYear[])).sort() };
 };
 
 const mutableFields: Array<keyof AccountWorkloadRow> = [

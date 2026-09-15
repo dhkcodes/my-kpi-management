@@ -22,7 +22,7 @@ import {
   isKpiActivitiesRoute,
   NavigationRouteDefinition
 } from "./navigationRoutes";
-import { fiscalYearData, fiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
+import { fiscalYearData, fiscalYears as fallbackFiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
 import { AccountWorkloadMetadata, AccountWorkloadRow, getAccountWorkloadMetadata } from "../data/accountsWorkloadsMockData";
 import {
   AccountsWorkloadsDataSource,
@@ -33,6 +33,7 @@ import {
   AccountsWorkloadsListQuery,
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloads,
+  fetchAccountsWorkloadsFiscalYears,
   saveAccountsWorkloadsBatch
 } from "../data/accountsWorkloadsApi";
 import {
@@ -111,6 +112,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const navigationIntentOpenRef = useRef(false);
     const navigationPopupRef = useRef<ojPopup | null>(null);
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
+    const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>(fallbackFiscalYears);
     const fiscalYearRef = useRef(fiscalYear);
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
 
@@ -168,8 +170,25 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       direction: "asc"
     });
     const [accountsWorkloadsRows, setAccountsWorkloadsRows] = useState<Record<FiscalYear, AccountWorkloadRow[]>>(() =>
-      Object.fromEntries(fiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
+      Object.fromEntries(fallbackFiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
     );
+
+    useEffect(() => {
+      let active = true;
+      void fetchAccountsWorkloadsFiscalYears()
+        .then(({ fiscalYears: years }) => {
+          if (!active || years.length === 0) return;
+          setFiscalYears(years);
+          setAccountsWorkloadsRows((current) => Object.fromEntries(
+            years.map((year) => [year, current[year] ?? []])
+          ) as Record<FiscalYear, AccountWorkloadRow[]>);
+        })
+        .catch((error) => {
+          if (!active || canUseDevelopmentDataFallback(error)) return;
+          setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Fiscal-year API request failed.");
+        });
+      return () => { active = false; };
+    }, []);
 
 
     useEffect(() => {

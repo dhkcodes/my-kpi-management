@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.tsx", "utf8");
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
+const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 
@@ -88,8 +89,13 @@ assert.doesNotMatch(insightsPage, /Organic Consumption Growth Proxy|organicGrowt
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
 assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
-assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account \}\)/, "Analysis client sends the FY, candidate search, and selected Account query");
+assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account, salesRep: query\.salesRep \?\? "" \}\)/, "Analysis client sends the FY, candidate search, selected Account, and Sales Rep query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
+assert.match(insightsPage, /YoY same-period ACTUAL:[\s\S]*Covered-period Expected/, "Sales Rep Overview explains the actual comparison periods and avoids claiming a full-year total");
+assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A \(prior Actual 0\)/, "explicit prior zero preserves amount while explaining unavailable percentage");
+assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*All filtered Accounts total/, "Forecast Composition All includes a bottom total row sourced from the full API account set");
+assert.match(recordsPage, /Server total unavailable[\s\S]*Loaded-page values are not presented as the full portfolio/, "Records does not promote loaded-page sums when a legacy response lacks server totals");
+assert.match(attainmentPage, /included-period results[\s\S]*not asserted to be a complete full-year outlook/, "Attainment labels legacy responses conservatively when completeness metadata is absent");
 
 // PILLAR is an explicit, accessible page context on both Consumption leaves.
 assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Consumption Records exposes the shared compact All, DP, OCI selector");
@@ -143,13 +149,13 @@ assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{sel
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total \(K\)<\/th><th>New \(K\)<\/th><th>Expansion \(K\)<\/th><th>Reduction \(K\)<\/th>/, "All detail distinguishes Total and every stored composition amount");
 assert.match(insightsPage, /consumption-insights-movement-list[\s\S]*<thead>[\s\S]*<th>Account<\/th>/, "the account table is isolated in its own scroll region with a retained header");
 assert.doesNotMatch(insightsPage, />Close<\/button>/, "composition detail no longer has a Close button");
-assert.match(styles, /\.consumption-insights-movement-detail \{[^}]*height: 21rem;[^}]*overflow: hidden;[\s\S]*\.consumption-insights-movement-list \{[^}]*overflow: auto;[\s\S]*\.consumption-insights-movement-detail thead th \{[^}]*position: sticky;/, "detail matches the 21rem chart height and scrolls only the list while keeping the header");
+assert.match(styles, /\.consumption-insights-movement-detail \{[^}]*height: 100%;[^}]*overflow: hidden;[\s\S]*\.consumption-insights-movement-list \{[^}]*overflow: auto;[\s\S]*\.consumption-insights-movement-detail thead th \{[^}]*position: sticky;/, "detail matches the chart height and scrolls only the list while keeping the header");
 assert.match(insightsPage, /seriesId: "All"[\s\S]*value: toK\(point\.totalForecastAmount\)/, "All displays total Forecast in explicit K units rather than Renewal or net movement");
 assert.doesNotMatch(insightsPage, /compositionStatus !== "CLASSIFIED"/, "partially classified quarters do not suppress every stored Forecast component");
 assert.match(insightsPage, /point\.newAmount !== null[\s\S]*seriesId: "New"[\s\S]*point\.expansionAmount !== null[\s\S]*seriesId: "Expansion"[\s\S]*point\.reductionAmount !== null[\s\S]*seriesId: "Reduction"/, "each stored Forecast component is charted independently when available");
 assert.doesNotMatch(insightsPage, /if \(point\.totalForecastAmount === null\) return \[\]/, "a missing total Forecast never suppresses stored component series");
 assert.match(insightsPage, /const all = point\.totalForecastAmount === null \? null[\s\S]*return all === null \? components : \[all, \.\.\.components\]/, "All is omitted independently when unavailable while New, Expansion, and Reduction remain chartable");
-assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMovementPoint\.accounts, selectedMovement\.category\)/, "composition detail lists only Accounts with a non-zero selected component and excludes natural-growth-only Accounts");
+assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMovementPoint\.accounts, selectedMovement\.category\)/, "composition detail applies Forecast Total for All and component criteria for category tabs");
 assert.match(insightsPage, /consumption-insights-composition-grid[\s\S]*consumption-insights-composition-chart__plot[\s\S]*consumption-insights-movement-detail/, "Forecast composition chart and detail share an independent responsive section");
 assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:[^}]*1\.2fr[^}]*\.8fr[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses two columns on desktop and one column on narrower screens");
 assert.match(insightsPage, /Forecast composition by quarter/);
@@ -165,16 +171,14 @@ assert.match(recordsPage, /<button type="button" class=\{`consumption-range-appl
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Consumption Records layouts keep the action group visible and naturally wrapped");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
-assert.doesNotMatch(recordsPage, /beginForecastEdit|updateForecast/, "Consumption Records expose no Plan-level Forecast editor");
+assert.doesNotMatch(recordsPage, /\b(?:beginForecastEdit|updateForecast)\b/, "Consumption Records expose no Plan-level Forecast editor");
 assert.match(recordsPage, /onDblClick[\s\S]*beginControlEdit/, "double click enters Account-level Forecast editing");
 assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
-assert.match(recordsPage, /data-forecast-editor=\{key\}[\s\S]*ref=\{selectForecastEditor\(key\)\}/, "each editable Forecast input binds whole-value selection to its stable cell key");
-assert.match(recordsPage, /class="consumption-forecast-editor" type="text" inputMode="decimal" value=\{value === null[\s\S]*data-forecast-editor=\{key\}/, "Account Forecast editor exposes a measurable whole-text selection range");
-assert.match(recordsPage, /parseForecastDecimal[\s\S]*\^\[\+-\]\?\(\?:\\d\+[\s\S]*Number\.isFinite/, "text Forecast editors accept only finite signed decimal syntax, rejecting whitespace and JavaScript hex/binary literals");
-assert.match(recordsPage, /raw === "" \? null : parseForecastDecimal\(raw\)[\s\S]*parsed !== null[\s\S]*updateControlForecast/, "Control Forecast preserves exact empty-to-null semantics and ignores invalid non-empty text");
-assert.match(recordsPage, /raw === "" \? null : parseForecastDecimal\(raw\)[\s\S]*parsed !== null[\s\S]*updateControlForecast/, "Account Forecast preserves blank-to-derived semantics while ignoring invalid non-empty text");
-assert.match(recordsPage, /event\.key === "Enter"[\s\S]*commitForecastEdit/, "Enter commits the cell draft");
-assert.match(recordsPage, /event\.key === "Escape"[\s\S]*cancelForecastEdit/, "Escape restores the cell edit entry value");
+assert.match(recordsPage, /ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "each editable Forecast input binds whole-value selection to its stable Account-period key");
+assert.match(recordsPage, /<label><span>Total<\/span><input type="text" inputMode="decimal" value=\{forecastEditor\.total\}[\s\S]*ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "Forecast composition editor exposes a measurable whole-text selection range on its Total input");
+assert.match(recordsPage, /const validForecastKInput[\s\S]*\\d\{1,2\}[\s\S]*value\.trim/, "Forecast composition inputs accept non-negative K values with at most two decimals");
+assert.match(recordsPage, /applyForecastComposition[\s\S]*parseForecastCompositionK[\s\S]*updateControlForecast/, "Forecast composition apply validates the full composition before updating the Account control total");
+assert.match(recordsPage, /<form onSubmit=\{\(event\) => \{ event\.preventDefault\(\); applyForecastComposition\(\); \}\}[\s\S]*event\.key === "Escape"[\s\S]*cancelForecastComposition/, "submit applies and Escape cancels the Forecast composition popover");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
 assert.match(recordsPage, /onNavigationGuardChange[\s\S]*window\.confirm\(/, "unsaved Forecast changes retain route protection");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "Data keeps its independent Quarter range");

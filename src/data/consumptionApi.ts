@@ -86,8 +86,15 @@ export type ConsumptionRecordsQuery = Readonly<{
   fromQuarter: string; toQuarter: string; search: string; sort: "ACCOUNT" | "AMOUNT";
   direction: "ASC" | "DESC"; offset: number; limit: number; pillar?: ConsumptionPillar;
 }>;
+export type ConsumptionRecordsTotals = Readonly<{
+  actualByPeriod: Readonly<Record<string, number>>;
+  appliedForecastByPeriod: Readonly<Record<string, number>>;
+  outlookByPeriod: Readonly<Record<string, number>>;
+  incompletePeriods: readonly string[];
+}>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
-  accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[] }>>;
+  accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
+  totals: ConsumptionRecordsTotals;
   totalAccounts: number; nextOffset: number; hasMore: boolean;
 }>;
 export type ConsumptionAnalysisQuarter = ConsumptionAmountSplit & Readonly<{
@@ -134,6 +141,7 @@ export type ConsumptionAnalysis = Readonly<{
   fiscalYear: string; priorFiscalYear: string; selectedAccount: string | null;
   selectedSalesRep: string | null;
   salesRepOptions: readonly string[];
+  periodCoverage: ConsumptionAnalysisPeriodCoverage;
   salesRepOverview: readonly ConsumptionSalesRepOverview[];
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
@@ -147,9 +155,14 @@ export type ConsumptionAnalysis = Readonly<{
   organicConsumptionGrowthProxy: ConsumptionOrganicGrowthProxy | null;
   movementBridge: readonly ConsumptionMovementBridgePoint[];
 }>;
+export type ConsumptionAnalysisPeriodCoverage = Readonly<{
+  actualPeriods: readonly string[]; forecastPeriods: readonly string[]; includedPeriods: readonly string[];
+  priorComparisonPeriods: readonly string[]; comparisonStatus: string; comparisonUnavailableReason: string | null;
+}>;
 export type ConsumptionSalesRepOverview = Readonly<{
   salesRep: string; actualAmount: number; priorActualAmount: number;
   actualGrowthAmount: number; actualGrowthPercent: number | null;
+  yoyComparisonStatus: string; yoyUnavailableReason: string | null;
   forecastAmount: number; fyExpectedAmount: number; accountCount: number;
   topThreeConcentrationPercent: number; attentionAccountCount: number;
 }>;
@@ -458,10 +471,16 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !(raw.selectedAccount === null || isNonEmptyString(raw.selectedAccount)) || !Array.isArray(raw.quarters)
     || !(raw.selectedSalesRep === null || isNonEmptyString(raw.selectedSalesRep))
     || !Array.isArray(raw.salesRepOptions) || !raw.salesRepOptions.every(isNonEmptyString)
-    || !Array.isArray(raw.salesRepOverview)
+    || !Array.isArray(raw.salesRepOverview) || typeof raw.periodCoverage !== "object" || raw.periodCoverage === null
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
     || !Array.isArray(raw.contextActualTrend)
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
+  const coverageRaw = raw.periodCoverage as Record<string, unknown>;
+  const periodLists = [coverageRaw.actualPeriods, coverageRaw.forecastPeriods, coverageRaw.includedPeriods, coverageRaw.priorComparisonPeriods];
+  if (periodLists.some((periods) => !Array.isArray(periods) || periods.some((period) => !isPeriodKey(period)))
+    || !isNonEmptyString(coverageRaw.comparisonStatus)
+    || !(coverageRaw.comparisonUnavailableReason === null || isNonEmptyString(coverageRaw.comparisonUnavailableReason))) return malformedAnalysis();
+  const periodCoverage: ConsumptionAnalysisPeriodCoverage = coverageRaw as unknown as ConsumptionAnalysisPeriodCoverage;
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
   const portfolioSplit = parseAmountSplit(raw.portfolio);
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
@@ -547,6 +566,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     const row = value as Record<string, unknown>;
     if (!isNonEmptyString(row.salesRep) || !isFiniteNumber(row.actualAmount) || !isFiniteNumber(row.priorActualAmount)
       || !isFiniteNumber(row.actualGrowthAmount) || !isNullableFiniteNumber(row.actualGrowthPercent)
+      || !isNonEmptyString(row.yoyComparisonStatus)
+      || !(row.yoyUnavailableReason === null || isNonEmptyString(row.yoyUnavailableReason))
       || !isFiniteNumber(row.forecastAmount) || !isFiniteNumber(row.fyExpectedAmount)
       || !isNonNegativeInteger(row.accountCount) || !isFiniteNumber(row.topThreeConcentrationPercent)
       || !isNonNegativeInteger(row.attentionAccountCount)) return malformedAnalysis();
@@ -554,7 +575,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   });
   return { selectedPillar,
     fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
-    selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], salesRepOverview,
+    selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], periodCoverage, salesRepOverview,
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
@@ -770,6 +791,25 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
   const { response, payload } = await request(`/consumption/workspace${query}`);
   return parseWorkspace(payload, response.headers.get("ETag"), pillar === undefined ? undefined : selectedPillar);
 };
+const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
+  if (value === undefined || value === null) {
+    return { actualByPeriod: {}, appliedForecastByPeriod: {}, outlookByPeriod: {}, incompletePeriods: [] };
+  }
+  if (typeof value !== "object") throw new Error("Malformed Consumption records totals");
+  const raw = value as Record<string, unknown>;
+  const decodeMap = (candidate: unknown): Readonly<Record<string, number>> => {
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) throw new Error("Malformed Consumption records totals");
+    const entries = Object.entries(candidate as Record<string, unknown>);
+    if (entries.some(([period, amount]) => !/^FY\d{2}-[A-Z]{3}$/.test(period) || typeof amount !== "number" || !Number.isFinite(amount)))
+      throw new Error("Malformed Consumption records totals");
+    return Object.fromEntries(entries) as Record<string, number>;
+  };
+  if (!Array.isArray(raw.incompletePeriods) || raw.incompletePeriods.some((period) => typeof period !== "string"))
+    throw new Error("Malformed Consumption records totals");
+  return { actualByPeriod: decodeMap(raw.actualByPeriod), appliedForecastByPeriod: decodeMap(raw.appliedForecastByPeriod),
+    outlookByPeriod: decodeMap(raw.outlookByPeriod), incompletePeriods: raw.incompletePeriods as string[] };
+};
+
 export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {
   const pillar = query.pillar ?? "ALL";
   if (!isConsumptionPillar(pillar) || !((query.fromQuarter === "" || fiscalQuarterPattern.test(query.fromQuarter))
@@ -796,12 +836,12 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   }
   const rawGroups = raw.accountGroups.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption records response");
-    const group = value as { account?: unknown; plans?: unknown };
+    const group = value as { account?: unknown; plans?: unknown; totals?: unknown };
     if (!isNonEmptyString(group.account) || !Array.isArray(group.plans)
       || group.plans.some((plan) => typeof plan !== "object" || plan === null || (plan as Record<string, unknown>).account !== group.account)) {
       throw new Error("Malformed Consumption records response");
     }
-    return { account: group.account, plans: group.plans };
+    return { account: group.account, plans: group.plans, totals: decodeRecordsTotals(group.totals) };
   });
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
@@ -813,13 +853,13 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);
     planOffset += group.plans.length;
-    return { account: group.account, plans };
+    return { account: group.account, plans, totals: group.totals };
   });
   return { selectedPillar: workspace.selectedPillar, etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
     currentFiscalMonth: workspace.currentFiscalMonth, fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter,
     editablePeriodIds: workspace.editablePeriodIds, displayQuarterOrder: workspace.displayQuarterOrder,
     accountForecasts: workspace.accountForecasts, forecastVariances: workspace.forecastVariances,
-    accountGroups, totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
+    accountGroups, totals: decodeRecordsTotals(raw.totals), totalAccounts: raw.totalAccounts, nextOffset: raw.nextOffset, hasMore: raw.hasMore };
 };
 export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery): Promise<ConsumptionAnalysis> => {
   const pillar = query.pillar ?? "ALL";

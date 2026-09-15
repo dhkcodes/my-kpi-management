@@ -45,14 +45,25 @@ const toParsed = (row: KpiSpreadsheetRow): ParsedKpiActivityRow => ({
   description: row.title, workload: row.accountWorkload || undefined, srNumber: row.srNumber || undefined,
   deliveryDate: row.deliveryDate || undefined, stage: row.stage || undefined, amountK: row.acrK ?? undefined
 });
-const workbookSeeds: WorkbookSeed[] = (["FY26", "FY27"] as FiscalYear[]).map((fiscalYear) => ({
+const workbookSeedYears = Array.from(new Set(kpiSpreadsheetSyntheticRows.map((row) => row.fiscalYear))) as FiscalYear[];
+const currentFiscalYear = (): FiscalYear => {
+  const now = new Date();
+  const year = (now.getFullYear() + (now.getMonth() >= 5 ? 1 : 0)) % 100;
+  return `FY${String(year).padStart(2, "0")}` as FiscalYear;
+};
+const adjacentFiscalYears = (fiscalYear: FiscalYear): FiscalYear[] => {
+  const year = Number(fiscalYear.substring(2));
+  return [-1, 0, 1].map((offset) => `FY${String((year + offset + 100) % 100).padStart(2, "0")}` as FiscalYear);
+};
+export const fiscalYears: FiscalYear[] = Array.from(new Set([...workbookSeedYears, ...adjacentFiscalYears(currentFiscalYear())]))
+  .sort((left, right) => Number(left.substring(2)) - Number(right.substring(2)));
+const workbookSeeds: WorkbookSeed[] = fiscalYears.map((fiscalYear) => ({
   fiscalYear, sourceWorkbook: "synthetic-kpi-fixtures", rows: kpiSpreadsheetSyntheticRows.filter((row) => row.fiscalYear === fiscalYear).map(toParsed)
 }));
-export const fiscalYears: FiscalYear[] = workbookSeeds.map((seed) => seed.fiscalYear);
 export const fiscalYearData: Record<FiscalYear, FiscalYearDataset> = workbookSeeds.reduce((result, seed) => {
   result[seed.fiscalYear] = calculateFiscalYearDataset(parseWorkbookSeed(seed)); return result;
 }, {} as Record<FiscalYear, FiscalYearDataset>);
-export const getLatestFiscalYear = (): FiscalYear => fiscalYears[fiscalYears.length - 1];
+export const getLatestFiscalYear = (): FiscalYear => currentFiscalYear();
 
 export const kpiNavItems: NavigationItem[] = [
   { id: "kpis-overview", label: "Overview", icon: "oj-ux-ico-dashboard" },
