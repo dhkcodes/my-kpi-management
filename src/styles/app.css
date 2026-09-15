@@ -3154,3 +3154,84 @@ h4.weekly-activity-section-label--next-week,
   .attainment-budget-fields { grid-template-columns: 1fr; }
   .attainment-budget-form { min-width: 0; }
 }
+
+/* Shared page hierarchy: one visual scale for every route. */
+.kpi-page-breadcrumb {
+  min-width: 0;
+  margin: 0 0 .65rem;
+  color: var(--oj-core-text-color-secondary, #52606d);
+  font-size: .78rem;
+  font-weight: 600;
+}
+.kpi-page-breadcrumb ol {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kpi-page-breadcrumb li { display: inline-flex; align-items: center; min-width: 0; }
+.kpi-page-breadcrumb li + li::before { content: "/"; margin-inline-end: .4rem; color: #8b8580; }
+.kpi-page-breadcrumb a { color: #315f75; text-decoration: none; }
+.kpi-page-breadcrumb a:hover { text-decoration: underline; }
+.kpi-page-breadcrumb [aria-current="page"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--oj-core-text-color-primary); }
+
+/* Page title = Accounts & Workloads baseline. */
+.kpi-content :is(.consumption-page__header, .kap-users-header, .kpi-route-page, .my-customers-360-page__header, .accounts-workloads-header, .accounts-pulse-v2__header, .weekly-activities-page__header) :is(h1, h2),
+.accounts-workloads-page h1,
+.weekly-activities-page h1,
+.profile-page h1 {
+  margin-block: .2rem;
+  font-size: clamp(1.4rem, 2vw, 1.65rem);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+/* Section and card headings: same semantic level, same type scale. */
+.kpi-content :is(.consumption-section-heading, .attainment-section-heading) h2,
+.kpi-content .kpi-panel__header h2,
+.kpi-content .kpi-section-header h2 {
+  margin-block: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.kpi-content article h3,
+.kpi-content .kpi-card h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.consumption-export-actions { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; flex-wrap: wrap; }
+.consumption-export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 2.25rem;
+  padding: .35rem .7rem;
+  border: 1px solid #b8b2ac;
+  border-radius: .35rem;
+  background: #fff;
+  color: #315f75;
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.consumption-export-actions button:hover:not(:disabled) { background: #f1f6f8; border-color: #315f75; }
+.consumption-export-actions button:disabled { opacity: .55; cursor: wait; }
+.consumption-export-error { flex-basis: 100%; color: var(--oj-core-danger-3, #8b1d1d); font-size: .75rem; }
+.consumption-insights-qoq-cards .consumption-insights-status { justify-self: start; width: fit-content; padding: .18rem .45rem; border-radius: 999px; }
+
+@media (max-width: 700px) {
+  .kpi-page-breadcrumb { overflow: hidden; }
+  .kpi-page-breadcrumb ol { overflow-x: auto; scrollbar-width: none; }
+  .kpi-page-breadcrumb ol::-webkit-scrollbar { display: none; }
+  .kpi-page-breadcrumb li { flex: 0 0 auto; }
+  .kpi-page-breadcrumb li:last-child { flex: 0 1 auto; }
+  .consumption-export-actions { width: 100%; justify-content: flex-start; }
+  .consumption-export-actions button { flex: 1 1 7rem; justify-content: center; }
+}

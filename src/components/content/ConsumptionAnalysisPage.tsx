@@ -24,6 +24,8 @@ import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
+import html2canvas = require("html2canvas");
+import { jsPDF } from "jspdf";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const compactCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
@@ -108,7 +110,10 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
   const [selectedAlertId, setSelectedAlertId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
   const [selectedMovement, setSelectedMovement] = useState<{ quarter: string; category: ForecastCompositionCategory } | null>(null);
+  const [exporting, setExporting] = useState<"png" | "pdf" | "">("");
+  const [exportError, setExportError] = useState("");
   const requestGeneration = useRef(0);
+  const exportTargetRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setSelectedAccountContext("");
@@ -304,11 +309,60 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     if ((category === "All" || category === "New" || category === "Expansion" || category === "Reduction") && quarter) setSelectedMovement({ quarter, category });
   };
 
-  return <section class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
+  const downloadCanvas = async (format: "png" | "pdf") => {
+    const target = exportTargetRef.current;
+    if (!target || exporting) return;
+    setExporting(format);
+    setExportError("");
+    try {
+      await document.fonts?.ready;
+      const renderElement = html2canvas as unknown as (element: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+      const canvas = await renderElement(target, {
+        backgroundColor: "#f7f7f8",
+        scale: Math.min(2, 4096 / Math.max(target.scrollWidth, 1)),
+        useCORS: true,
+        logging: false,
+        windowWidth: target.scrollWidth,
+        windowHeight: target.scrollHeight
+      });
+      const filename = `consumption-analysis-${fiscalYear}-${new Date().toISOString().slice(0, 10)}`;
+      if (format === "png") {
+        const link = document.createElement("a");
+        link.download = `${filename}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      } else {
+        const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4", compress: true });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const printableHeightPx = Math.floor(canvas.width * pageHeight / pageWidth);
+        for (let top = 0, page = 0; top < canvas.height; top += printableHeightPx, page += 1) {
+          if (page > 0) pdf.addPage();
+          const sliceHeight = Math.min(printableHeightPx, canvas.height - top);
+          const slice = document.createElement("canvas");
+          slice.width = canvas.width;
+          slice.height = sliceHeight;
+          slice.getContext("2d")?.drawImage(canvas, 0, top, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+          pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, sliceHeight * pageWidth / canvas.width, undefined, "FAST");
+        }
+        pdf.save(`${filename}.pdf`);
+      }
+    } catch (reason) {
+      setExportError(reason instanceof Error ? reason.message : "Export failed.");
+    } finally {
+      setExporting("");
+    }
+  };
+
+  return <section ref={exportTargetRef} class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-
+        <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Download current Consumption Analysis view">
+          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}><span class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Preparing PNG…" : "PNG"}</button>
+          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}><span class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Preparing PDF…" : "PDF"}</button>
+          {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
+        </div>
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
@@ -398,7 +452,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">Quarter-over-quarter</h2></div></div>
-        <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small>{qoqKind(quarter.status)}</small></article>)}</div>
+        <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small class={statusTone(quarter.status)}>{qoqKind(quarter.status)}</small></article>)}</div>
 
       </section>
     </section>
