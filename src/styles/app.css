@@ -2736,6 +2736,7 @@ h4.weekly-activity-section-label--next-week,
   .consumption-insights-header { align-items: stretch; flex-direction: column; }
   .consumption-insights-header-actions { justify-content: flex-start; width: 100%; }
   .consumption-insights-context { align-items: stretch; flex-direction: column; width: 100%; }
+  .consumption-insights-filter--account { flex: 0 0 auto; }
   .consumption-insights-filter--account, .consumption-insights-filter--sales-rep { min-width: 0; width: 100%; }
   .consumption-insights-filter > select { width: 100%; }
   .consumption-sales-account-review, .consumption-sales-movement-columns { grid-template-columns: minmax(0, 1fr); }
