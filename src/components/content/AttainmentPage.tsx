@@ -50,24 +50,7 @@ const draftTotal = (draft: BudgetDraft): number | null => {
 const signedAmount = (value: number | null): string => value === null ? "—" : `${value > 0 ? "+" : ""}${formatAttainmentAmount(value)}`;
 const includedForecast = (quarter: AttainmentQuarterRecord): number | null => quarter.outlook === null
   ? null : Math.max(0, quarter.outlook - quarter.actual);
-const formatIncludedPeriods = (dashboard: AttainmentDashboard): string => {
-  const periods = new Map<string, string>();
-  dashboard.quarters.forEach((quarter) => quarter.details.forEach((detail) => detail.months.forEach((month) => {
-    if (month.appliedSource !== "NONE" && month.appliedAmount !== null && !periods.has(month.periodKey)) {
-      periods.set(month.periodKey, month.month || month.periodKey);
-    }
-  })));
-  const included = [...periods.entries()].sort(([left], [right]) => left.localeCompare(right));
-  if (included.length === 0) return "";
-  if (included.length === 1) return included[0][1];
-  const indexes = included.map(([periodKey]) => {
-    const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(periodKey);
-    return match ? Number(match[1]) * 12 + Number(match[2]) : null;
-  });
-  const contiguous = indexes.every((value, index) => value !== null && (index === 0 || value === (indexes[index - 1] as number) + 1));
-  const labels = included.map(([, label]) => label);
-  return contiguous ? `${labels[0]}–${labels[labels.length - 1]} (${labels.length} months)` : `${labels.join(", ")} (${labels.length} months)`;
-};
+
 function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>) {
   return <div class="attainment-quarter-card">
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
@@ -133,11 +116,9 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-total", seriesId: "OCI Total", groupId: "Total", value: dashboard.summary.ociOutlook, shortDesc: `OCI Total ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
-  const includedPeriods = useMemo(() => dashboard ? formatIncludedPeriods(dashboard) : "", [dashboard]);
-
-  if (loading && !dashboard) return <section class="attainment-page consumption-initial-state" aria-busy="true">
-    <header class="consumption-page__header attainment-header"><div><span class="kpi-eyebrow">Consumption / Attainment</span><h1>Consumption Attainment</h1></div></header>
-    <div class="consumption-initial-loading"><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>불러오는 중</span></div>
+  if (loading && !dashboard) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Attainment loading">
+    <oj-progress-circle value={-1} size="md" aria-label="Consumption Attainment loading"></oj-progress-circle>
+    <p>Loading Consumption Attainment...</p>
   </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "attainment-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
@@ -156,7 +137,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     <ConsumptionMessageBanner messages={messages} />
 
     <section class="attainment-fy-hero" aria-label={`${fiscalYear} included-period summary`}>
-      <div class="attainment-fy-hero__title"><span>{fiscalYear}{includedPeriods && ` · 포함기간 ${includedPeriods}`}</span><strong>기간 합계</strong></div>
+      <div class="attainment-fy-hero__title"><strong>기간 합계</strong></div>
       <div><small>Budget</small><strong>{formatBudget(dashboard.summary.budget)}</strong></div>
       <div><small>Actual to date</small><strong>{formatAttainmentAmount(dashboard.summary.actual)}</strong></div>
       <div class="attainment-fy-hero__primary"><small>Included Actual + Forecast</small><strong>{formatOptionalAttainmentAmount(dashboard.summary.outlook)}</strong><span>{signedAmount(dashboard.summary.outlookVarianceToBudget)} vs budget</span></div>

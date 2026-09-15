@@ -10,8 +10,9 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
-assert.match(insightsPage, /consumption-initial-loading[\s\S]*불러오는 중/, "Analysis initial loading is compact and uses simple Korean");
-assert.doesNotMatch(insightsPage, /Loading Consumption Analysis|consumption-insights-loading/, "Analysis does not render the former large loading panel");
+assert.match(insightsPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Analysis/, "Analysis loading matches Accounts & Workloads");
+assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
+assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
 assert.doesNotMatch(attainmentPage, /Closed months use Actual|fiscal-period completeness|unopened-period status|complete full-year outlook/i, "Attainment removes standing implementation disclaimers");
 
@@ -63,8 +64,8 @@ assert.match(styles,
   /\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*box-shadow:\s*none;/,
   "Attainment quarter comparisons retain boundaries without nested shadows");
 assert.match(styles,
-  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*box-shadow:\s*none;[^}]*padding-inline:\s*0;/,
-  "Attainment charts become separated sections instead of nested cards");
+  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*\.75rem;[^}]*box-shadow:\s*none;/,
+  "Attainment charts use a clearer Redwood-neutral boundary without shadow");
 assert.match(styles,
   /\.consumption-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*box-sizing:\s*border-box;[^}]*padding:\s*\.75rem;/,
   "Consumption Records follows the Accounts and Workloads single-panel workspace pattern");
@@ -133,11 +134,11 @@ assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account, salesRep: query\.salesRep \?\? "" \}\)/, "Analysis client sends the FY, candidate search, selected Account, and Sales Rep query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
-assert.match(insightsPage, /포함기간 \{periodRange\(analysis\.periodCoverage\.includedPeriods\)\} · K USD/, "Analysis keeps period and unit as compact header context");
+assert.doesNotMatch(insightsPage, /포함기간|FY\d+-[A-Z]{3}–FY\d+-[A-Z]{3} Actual \+ Forecast/, "Analysis removes visible period guidance without changing calculations");
 assert.doesNotMatch(insightsPage, /About current ownership and unavailable comparisons|Why YoY is unavailable|Why the YoY rate is unavailable/, "Analysis removes standing explanatory disclosures");
 assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A/, "explicit prior zero preserves the amount and presents the unavailable rate concisely");
 assert.doesNotMatch(insightsPage, /rate N\/A \(prior Actual 0\)|<small>\{row\.yoyUnavailableReason/, "long N/A reasons are not rendered inline in Sales Rep cells");
-assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*All filtered Accounts total/, "Forecast Composition All includes a bottom total row sourced from the full API account set");
+assert.match(insightsPage, /selectedMovement\.category === "All" \? <tfoot><tr><th>Total<\/th>/, "Forecast Composition All uses the concise Total label");
 assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
 assert.doesNotMatch(attainmentPage, /included-period results|not asserted to be a complete full-year outlook/, "Attainment removes the standing technical completeness disclaimer");
 
@@ -343,8 +344,7 @@ assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-in
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
-assert.match(recordsPage, /class=\{`consumption-range-apply\$\{dataMode === "loading" \? " consumption-range-apply--initializing" : ""\}`\}/, "Apply stays explicitly hidden while the first Consumption Records request initializes");
-assert.match(styles, /\.consumption-range-apply--initializing\s*\{[^}]*visibility:\s*hidden/, "the initializing Apply state preserves its layout slot without flashing");
+assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Records uses the full Accounts & Workloads loader instead of flashing an initializing Apply control");
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
 assert.match(styles, /\.consumption-range-apply:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--oj-core-focus-border-color, #0572ce\)[^}]*outline-offset:\s*2px/, "Apply retains a distinct accessible focus ring without replacing its fill color");
 assert.doesNotMatch(styles, /\.consumption-range-apply[^\n]*#194f63/, "Apply never changes permanently to the legacy teal interaction color");

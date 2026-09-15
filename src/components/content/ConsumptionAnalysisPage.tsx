@@ -266,9 +266,9 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  if (loading && !analysis) return <section class="consumption-insights-page consumption-initial-state" aria-busy="true">
-    <header class="consumption-page__header consumption-insights-header"><div><span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
-    <div class="consumption-initial-loading"><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>불러오는 중</span></div>
+  if (loading && !analysis) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
+    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
+    <p>Loading Consumption Analysis...</p>
   </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
@@ -290,8 +290,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
-  const actualComparisonLabel = `${periodRange(analysis.periodCoverage.actualPeriods)} vs ${periodRange(analysis.periodCoverage.priorComparisonPeriods)}`;
-  const expectedCoverageLabel = `${periodRange(analysis.periodCoverage.includedPeriods)} Actual + Forecast`;
+
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmount: total.totalForecastAmount + account.totalForecastAmount,
     newAmount: total.newAmount + account.newAmount,
@@ -309,7 +308,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-      <span class="consumption-analysis-period">포함기간 {periodRange(analysis.periodCoverage.includedPeriods)} · K USD</span>
+
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
@@ -365,7 +364,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
-        <div class="consumption-overview-context"><small>YoY: {actualComparisonLabel} · K USD</small></div></div>
+      </div>
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={selectedSalesRep === row.salesRep ? "is-selected" : ""}>
           <th><button type="button" onClick={() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
@@ -373,13 +372,13 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
             {typeof row.actualGrowthAmount !== "number" ? "N/A"
               : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : signedPercent(row.actualGrowthPercent)}</>}
           </td>
-          <td>{amountK(row.fyExpectedAmount)}<small>{expectedCoverageLabel}</small></td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
+          <td>{amountK(row.fyExpectedAmount)}</td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
         </tr>)}
       </tbody></table></div>
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small>{splitLabel(analysis.portfolio)} · {expectedCoverageLabel}</small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small>{splitLabel(analysis.portfolio)}</small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? compactCurrency.format(latestCompleteQuarter.totalAmount) : "N/A"}</strong><small>{latestCompleteQuarter ? `${latestCompleteQuarter.quarter} · ${signedPercent(latestCompleteQuarter.qoqChangePercent)} QoQ` : "No complete ACTUAL quarter"}</small></article>
       <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposure.toFixed(1)}%</strong><small>{currency.format(analysis.portfolio.forecastAmount)} of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small>{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical · {analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</small></article>
@@ -389,7 +388,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">Actual + Forecast</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>ACTUAL <i class="is-forecast"></i>FORECAST</span></div>
         <div class="consumption-insights-total-regions">
-          <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><p>{expectedCoverageLabel}</p><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
           <div class="consumption-insights-quarter-totals">
             <h3>{analysis.fiscalYear} Mixed quarter consumption</h3>
@@ -409,7 +408,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <div class="consumption-insights-composition-grid">
         <div class="consumption-insights-composition-chart">
           <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
-          <small class="consumption-analysis-period">포함기간 {analysis.movementBridge.map((point) => `${point.quarter} ${point.includedForecastPeriods.join(", ") || "없음"}`).join(" · ")}</small>
+
         </div>
         <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
           {selectedMovement && selectedMovementPoint ? <>
@@ -425,7 +424,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
                 {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td>{selectedMovement.category === "All" ? <>
                   <td>{currencyK.format(toK(account.totalForecastAmount))} K</td><td>{currencyK.format(toK(account.newAmount))} K</td><td>{currencyK.format(toK(account.expansionAmount))} K</td><td>{currencyK.format(toK(account.reductionAmount))} K</td>
                 </> : <td>{currencyK.format(toK(movementValue(account)))} K</td>}</tr>)}
-              </tbody>{selectedMovement.category === "All" ? <tfoot><tr><th>All filtered Accounts total</th><th>{currencyK.format(toK(compositionTotals.totalForecastAmount))} K</th><th>{currencyK.format(toK(compositionTotals.newAmount))} K</th><th>{currencyK.format(toK(compositionTotals.expansionAmount))} K</th><th>{currencyK.format(toK(compositionTotals.reductionAmount))} K</th></tr></tfoot>
+              </tbody>{selectedMovement.category === "All" ? <tfoot><tr><th>Total</th><th>{currencyK.format(toK(compositionTotals.totalForecastAmount))} K</th><th>{currencyK.format(toK(compositionTotals.newAmount))} K</th><th>{currencyK.format(toK(compositionTotals.expansionAmount))} K</th><th>{currencyK.format(toK(compositionTotals.reductionAmount))} K</th></tr></tfoot>
                 : <tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot>}</table>
                 : <p class="consumption-empty-state">No Account has a non-zero Forecast Total for this quarter.</p>}
             </div>
@@ -455,7 +454,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     </section>
 
     <section class="consumption-sales-account-review" aria-label="Sales Account growth and attention">
-      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY same-period ACTUAL contribution · K USD</span><h2>Account Growth / Reduction</h2></div><small>{actualComparisonLabel}</small></div>
+      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY same-period ACTUAL contribution · K USD</span><h2>Account Growth / Reduction</h2></div></div>
         <div class="consumption-sales-movement-columns">
           <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
           <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>

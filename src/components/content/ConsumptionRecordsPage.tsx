@@ -1236,6 +1236,11 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
 
+  if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
+    <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
+    <p>Loading Consumption Records...</p>
+  </section>;
+
   return (
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
@@ -1245,7 +1250,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
-            disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
+            disabled={hasDraftChanges || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
             disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
           <oj-button chroming="outlined" title={`Import ${forecastFileName}`} disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
@@ -1258,7 +1263,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button chroming="outlined" disabled={hasDraftChanges || dataMode === "loading" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button chroming="outlined" disabled={hasDraftChanges || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
@@ -1300,7 +1305,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
             onInput={(event) => setDraftSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
         </label>
-        <button type="button" class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
+        <button type="button" class={`consumption-range-apply`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </button>
 
