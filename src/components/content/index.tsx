@@ -9,7 +9,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
-import { isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
+import { getNavigationPath, getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
@@ -219,6 +219,32 @@ const overviewTooltip = (dataset: FiscalYearDataset, rowCode: string, quarter: s
 
 const isHomeRoute = (route: NavigationRouteDefinition) => route.module === "home";
 
+type BreadcrumbItem = Readonly<{ label: string; routeId?: string }>;
+
+const routeBreadcrumbs = (route: NavigationRouteDefinition): BreadcrumbItem[] => {
+  if (route.module === "home") return [{ label: "Home" }];
+  const parent = route.module === "kpiPage"
+    ? { label: "KPI Activities", routeId: "kpis-overview" }
+    : ["myCustomers360", "accountsWorkloads", "weeklyActivities"].includes(route.module)
+      ? { label: "Customer Management", routeId: "customers-overview" }
+      : ["consumptionAnalysis", "consumptionAttainment", "consumptionRecords"].includes(route.module)
+        ? { label: "Consumption", routeId: "analysis" }
+        : { label: "Administration", routeId: "profile" };
+  const trail: BreadcrumbItem[] = [{ label: "Home", routeId: "home" }];
+  trail.push(parent);
+  trail.push({ label: route.pageTitle });
+  return trail;
+};
+
+function PageBreadcrumb({ route, onNavigate }: Readonly<{ route: NavigationRouteDefinition; onNavigate: (routeId: string) => void }>) {
+  return <nav class="kpi-page-breadcrumb" aria-label="Page hierarchy">
+    <ol>{routeBreadcrumbs(route).map((item, index) => <li key={`${item.label}-${index}`}>
+      {item.routeId ? <a href={getNavigationPath(getNavigationRoute(item.routeId))} onClick={(event) => { event.preventDefault(); onNavigate(item.routeId!); }}>{item.label}</a>
+        : <span aria-current="page">{item.label}</span>}
+    </li>)}</ol>
+  </nav>;
+}
+
 function EmptyRoutePage({ route }: Readonly<{ route: NavigationRouteDefinition }>) {
   return (
     <section id="routePage" class="kpi-panel kpi-route-page" aria-labelledby="routePageTitle" data-route-id={route.id}>
@@ -420,6 +446,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
+      <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />
       {!['profile', 'users', 'consumptionRecords'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
