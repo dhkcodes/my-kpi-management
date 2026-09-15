@@ -4,8 +4,16 @@ import { readFileSync } from "node:fs";
 const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.tsx", "utf8");
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
+const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+
+assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
+assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
+assert.match(insightsPage, /consumption-initial-loading[\s\S]*불러오는 중/, "Analysis initial loading is compact and uses simple Korean");
+assert.doesNotMatch(insightsPage, /Loading Consumption Analysis|consumption-insights-loading/, "Analysis does not render the former large loading panel");
+assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
+assert.doesNotMatch(attainmentPage, /Closed months use Actual|fiscal-period completeness|unopened-period status|complete full-year outlook/i, "Attainment removes standing implementation disclaimers");
 
 assert.match(recordsPage,
   /error instanceof ConsumptionConflictError[\s\S]*accountForecastControls\(error\.current\)[\s\S]*setConflictRows\(rows\)[\s\S]*setConflictWorkspace\(error\.current\)[\s\S]*Forecast Save conflicted with a newer server version/,
@@ -91,14 +99,13 @@ assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account, salesRep: query\.salesRep \?\? "" \}\)/, "Analysis client sends the FY, candidate search, selected Account, and Sales Rep query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
-assert.match(insightsPage, /YoY: \{actualComparisonLabel\} · K USD[\s\S]*Covered-period Expected/, "Sales Rep Overview shows the comparison period and unit once without claiming a full-year total");
-assert.match(insightsPage, /About current ownership and unavailable comparisons[\s\S]*current Sales Rep[\s\S]*may appear as Unassigned/, "current ownership has one tap-accessible definition");
-assert.match(insightsPage, /N\/A[\s\S]*Why YoY is unavailable for[\s\S]*yoyUnavailableReason/, "unavailable YoY cells keep N/A short and move the detailed reason into a tap-accessible disclosure");
-assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A[\s\S]*Why the YoY rate is unavailable/, "explicit prior zero preserves the amount while moving the unavailable-rate reason into a disclosure");
+assert.match(insightsPage, /포함기간 \{periodRange\(analysis\.periodCoverage\.includedPeriods\)\} · K USD/, "Analysis keeps period and unit as compact header context");
+assert.doesNotMatch(insightsPage, /About current ownership and unavailable comparisons|Why YoY is unavailable|Why the YoY rate is unavailable/, "Analysis removes standing explanatory disclosures");
+assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A/, "explicit prior zero preserves the amount and presents the unavailable rate concisely");
 assert.doesNotMatch(insightsPage, /rate N\/A \(prior Actual 0\)|<small>\{row\.yoyUnavailableReason/, "long N/A reasons are not rendered inline in Sales Rep cells");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*All filtered Accounts total/, "Forecast Composition All includes a bottom total row sourced from the full API account set");
-assert.match(recordsPage, /Server total unavailable[\s\S]*Loaded-page values are not presented as the full portfolio/, "Records does not promote loaded-page sums when a legacy response lacks server totals");
-assert.match(attainmentPage, /included-period results[\s\S]*not asserted to be a complete full-year outlook/, "Attainment labels legacy responses conservatively when completeness metadata is absent");
+assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
+assert.doesNotMatch(attainmentPage, /included-period results|not asserted to be a complete full-year outlook/, "Attainment removes the standing technical completeness disclaimer");
 
 // PILLAR is an explicit, accessible page context on both Consumption leaves.
 assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Consumption Records exposes the shared compact All, DP, OCI selector");
@@ -236,7 +243,8 @@ assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPl
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
 assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\)[\s\S]*const canEditControl = editable/, "every backend-declared DP or OCI Forecast cell is editable regardless of an existing value while ALL remains read-only");
-assert.match(recordsPage, /ALL Forecast is read-only and sums entered Pillar values; missing values count as zero/, "ALL is derived from entered Forecast values and never directly entered");
+assert.match(recordsPage, /const editable = selectedPillar !== "ALL"/, "ALL is derived from entered pillar values and never directly entered without a standing helper note");
+assert.doesNotMatch(recordsPage, /ALL Forecast is read-only and sums entered Pillar values; missing values count as zero/, "derived ALL guidance is not repeated in the main content");
 assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");
 assert.doesNotMatch(recordsPage, />\{summary\.status\}<\//, "quarter status words are not rendered inside money cells");
 assert.doesNotMatch(recordsPage, /missingForecastLabel|Forecast membership unavailable|consumption-fast-tooltip|data-tooltip=\{missingForecastLabel\}/, "Forecast membership warnings and their icons are removed");

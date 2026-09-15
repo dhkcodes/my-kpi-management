@@ -53,6 +53,8 @@ import {
   saveConsumptionForecasts
 } from "../../data/consumptionApi";
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
+import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
+import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import "ojs/ojbutton";
 import "ojs/ojchart";
 import "ojs/ojdialog";
@@ -1227,6 +1229,13 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     });
   };
 
+  const pageMessages: ConsumptionMessage[] = [];
+  if (dataMode === "fallback") pageMessages.push({ id: "records-fallback", severity: "warning", summary: "운영 데이터를 불러오지 못해 예시 데이터를 표시합니다.", detail: "실제 업무에는 사용하지 마세요." });
+  if (importError) pageMessages.push({ id: "records-operation-error", severity: "error", summary: "요청을 처리하지 못했습니다.", detail: "입력 내용을 확인한 뒤 다시 시도해 주세요." });
+  if (rangeInitialized && rangeTouched && !rangeValid) pageMessages.push({ id: "records-range", severity: "warning", summary: "조회기간을 확인해 주세요.", detail: "시작 분기는 종료 분기보다 늦을 수 없습니다." });
+  if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
+  if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
+
   return (
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
@@ -1260,7 +1269,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
           </oj-button>
         </div>
       </header>
-      {dataMode !== "loading" && serverActualTotals === null && <p class="consumption-inline-note" role="status">All-account totals are unavailable because this response does not provide a server total. Loaded-page values are not presented as the full portfolio.</p>}
+      <ConsumptionMessageBanner messages={pageMessages} />
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">
@@ -1293,12 +1302,9 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
         <button type="button" class={`consumption-range-apply${dataMode === "loading" ? " consumption-range-apply--initializing" : ""}`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </button>
-        {rangeInitialized && rangeTouched && !rangeValid && <span class="consumption-range-error" role="alert">From Quarter must not be after To Quarter.</span>}
-        {hasDraftChanges && <span class="consumption-range-note">Save or cancel Forecast changes before changing range.</span>}
-        {selectedPillar === "ALL" ? <span class="consumption-pillar-forecast-note">ALL Forecast is read-only and sums entered Pillar values; missing values count as zero.</span>
-          : <span class="consumption-pillar-forecast-note">{selectedPillar === "DP" ? "DP" : "OCI"} Forecast is edited once per Account and is never allocated to Plan lines.</span>}
+
       </section>
-      {importError && <div class="consumption-import-error" role="alert">{importError}</div>}
+
       <oj-dialog
         id="consumptionImportDialog"
         ref={importDialogRef}

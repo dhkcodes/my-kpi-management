@@ -22,6 +22,8 @@ import "ojs/ojprogress-circle";
 import "ojs/ojchart";
 import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
+import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
+import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const compactCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
@@ -264,9 +266,17 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  if (loading && !analysis) return <section class="kpi-panel consumption-insights-loading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading Consumption Analysis…</section>;
-  if (error && !analysis) return <section class="kpi-panel" role="alert"><h1>Consumption Analysis</h1><p>{error}</p></section>;
-  if (!analysis) return <section class="kpi-panel" role="alert">Analysis is unavailable.</section>;
+  if (loading && !analysis) return <section class="consumption-insights-page consumption-initial-state" aria-busy="true">
+    <header class="consumption-page__header consumption-insights-header"><div><span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
+    <div class="consumption-initial-loading"><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>불러오는 중</span></div>
+  </section>;
+  const messages: ConsumptionMessage[] = error
+    ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
+    : [];
+  if (!analysis) return <section class="consumption-insights-page consumption-initial-state">
+    <header class="consumption-page__header consumption-insights-header"><div><span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
+    <ConsumptionMessageBanner messages={messages} />
+  </section>;
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
@@ -299,6 +309,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     <header class="consumption-page__header consumption-insights-header">
       <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
+      <span class="consumption-analysis-period">포함기간 {periodRange(analysis.periodCoverage.includedPeriods)} · K USD</span>
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
@@ -349,21 +360,18 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       </div>
     </header>
 
-    {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> Updating analysis context…</div>}
-    {error && <div class="consumption-import-error" role="alert">{error}</div>}
+    <ConsumptionMessageBanner messages={messages} />
+    {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> 불러오는 중</div>}
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
-        <div class="consumption-overview-context"><small>YoY: {actualComparisonLabel} · K USD</small>
-          <details class="consumption-help"><summary aria-label="About current ownership and unavailable comparisons"><span aria-hidden="true">ⓘ</span></summary>
-            <p>Amounts are grouped by each Account&apos;s current Sales Rep. Unassigned Accounts remain in totals and may appear as Unassigned. Tap the info control beside N/A for its detailed reason.</p>
-          </details></div></div>
+        <div class="consumption-overview-context"><small>YoY: {actualComparisonLabel} · K USD</small></div></div>
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={selectedSalesRep === row.salesRep ? "is-selected" : ""}>
           <th><button type="button" onClick={() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
           <td>{amountK(row.actualAmount)}</td><td class={typeof row.actualGrowthAmount !== "number" ? "" : row.actualGrowthAmount < 0 ? "is-negative" : "is-positive"}>
-            {typeof row.actualGrowthAmount !== "number" ? <div class="consumption-na-value">N/A <details class="consumption-help consumption-row-help"><summary aria-label={`Why YoY is unavailable for ${row.salesRep}`}><span aria-hidden="true">ⓘ</span></summary><p>{row.yoyUnavailableReason ?? "Prior same-period Actual is unavailable."}</p></details></div>
-              : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? <div class="consumption-na-value">rate N/A <details class="consumption-help consumption-row-help"><summary aria-label={`Why the YoY rate is unavailable for ${row.salesRep}`}><span aria-hidden="true">ⓘ</span></summary><p>{row.yoyUnavailableReason ?? "Prior same-period Actual is explicitly zero, so the rate is unavailable."}</p></details></div> : signedPercent(row.actualGrowthPercent)}</>}
+            {typeof row.actualGrowthAmount !== "number" ? "N/A"
+              : <>{amountK(row.actualGrowthAmount)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : signedPercent(row.actualGrowthPercent)}</>}
           </td>
           <td>{amountK(row.fyExpectedAmount)}<small>{expectedCoverageLabel}</small></td><td>{row.accountCount}</td><td>{row.topThreeConcentrationPercent.toFixed(1)}%</td><td>{row.attentionAccountCount}</td>
         </tr>)}
@@ -392,7 +400,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <section class="kpi-panel" aria-labelledby="qoqTitle">
         <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">Quarter-over-quarter</h2></div></div>
         <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={(quarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{signedPercent(quarter.qoqChangePercent)}</strong><small>{qoqKind(quarter.status)}</small></article>)}</div>
-        <p class="consumption-insights-note">Completed ACTUAL quarters drive the decision metric; MIXED and FORECAST quarters remain visibly labelled projections.</p>
+
       </section>
     </section>
 
@@ -401,7 +409,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
       <div class="consumption-insights-composition-grid">
         <div class="consumption-insights-composition-chart">
           <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
-          <p class="consumption-insights-note">Select a bar to inspect Accounts with a non-zero New, Expansion or Reduction value · {analysis.movementBridge.map((point) => `${point.quarter}: ${point.includedForecastPeriods.join(", ") || point.compositionStatus}`).join(" · ")}</p>
+          <small class="consumption-analysis-period">포함기간 {analysis.movementBridge.map((point) => `${point.quarter} ${point.includedForecastPeriods.join(", ") || "없음"}`).join(" · ")}</small>
         </div>
         <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
           {selectedMovement && selectedMovementPoint ? <>
@@ -421,7 +429,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
                 : <tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot>}</table>
                 : <p class="consumption-empty-state">No Account has a non-zero Forecast Total for this quarter.</p>}
             </div>
-          </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3><p>All uses the server's Forecast Total Account set, including Base/Natural-only and small non-zero values. Category tabs keep their own component criteria.</p></div>}
+          </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3></div>}
         </section>
       </div>
     </section>
