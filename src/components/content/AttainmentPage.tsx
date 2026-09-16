@@ -117,7 +117,6 @@ export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
   if (loading && !dashboard) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Attainment loading">
-    {breadcrumb}
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Attainment loading"></oj-progress-circle>
     <p>Loading Consumption Attainment...</p>
   </section>;

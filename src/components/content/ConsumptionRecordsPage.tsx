@@ -371,7 +371,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("idle");
   const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
-  const blockingRecordsLoading = recordsLoadingPhase === "initial" || recordsLoadingPhase === "query";
+  const blockingRecordsLoading = recordsLoadingPhase === "initial";
   const [recordAccountNames, setRecordAccountNames] = useState<string[]>([]);
   const [pulseExpanded, setPulseExpanded] = useState(true);
 
@@ -761,7 +761,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const selectPillar = async (pillar: ConsumptionPillar) => {
-    if (pillar === selectedPillar || hasDraftChanges || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle") return;
+    if (pillar === selectedPillar || hasDraftChanges || forecastEditor || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle") return;
     setImportError("");
     try {
       await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
@@ -773,7 +773,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const submitRecordsQuery = async () => {
-    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing) return;
+    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || forecastEditor || searchComposing) return;
     const query = { fromQuarter, toQuarter, search: draftSearch.trim() };
     setRangeLoading(true);
     setImportError("");
@@ -1238,7 +1238,6 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
 
   if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
-    {breadcrumb}
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
     <p>Loading Consumption Records...</p>
   </section>;
@@ -1253,25 +1252,25 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
-            disabled={hasDraftChanges || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
+            disabled={hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
-            disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
-          <oj-button chroming="outlined" title={`Import ${forecastFileName}`} disabled={hasDraftChanges || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+            disabled={hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
+          <oj-button chroming="outlined" title={`Import ${forecastFileName}`} disabled={hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>
           <oj-button chroming="outlined" title="Export FORECAST data in the Forecast Import CSV format"
-            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportForecastCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button chroming="outlined" disabled={hasDraftChanges || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button chroming="outlined" disabled={hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
-            disabled={dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportImportCompatibleCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Export"}
@@ -1286,7 +1285,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Records pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button"
               aria-pressed={selectedPillar === option.value}
-              disabled={hasDraftChanges || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle"}
+              disabled={hasDraftChanges || !!forecastEditor || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle"}
               onClick={() => void selectPillar(option.value)}>{option.label}</button>)}
           </div>
         </div>
@@ -1308,7 +1307,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             onInput={(event) => setDraftSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
         </label>
-        <button type="button" class={`consumption-range-apply`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
+        <button type="button" class={`consumption-range-apply`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || !!forecastEditor || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
           {rangeLoading ? "Applying…" : "Apply"}
         </button>
 
@@ -1500,7 +1499,11 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </section>
       )}
 
-      <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
+      <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle" aria-busy={recordsLoadingPhase === "query" ? "true" : undefined}>
+        {recordsLoadingPhase === "query" && <div class="consumption-results-refresh" role="status">
+          <oj-progress-circle value={-1} size="sm" aria-label="Refreshing Consumption Records results"></oj-progress-circle>
+          <span>Refreshing results…</span>
+        </div>}
         <div class="consumption-section-heading consumption-table-heading">
           <div class="consumption-table-toggle">
             <span><span class="kpi-section-label">Actual + Forecast</span>

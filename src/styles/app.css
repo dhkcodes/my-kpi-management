@@ -2697,6 +2697,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-options button:hover, .consumption-insights-options button:focus-visible, .consumption-insights-options button.is-active { background: var(--oj-core-bg-color-hover); outline: none; }
 .consumption-insights-options small, .consumption-insights-options p { color: var(--kpi-muted); margin: 0; }
 .consumption-insights-refresh { align-items: center; color: var(--kpi-muted); display: flex; font-size: .78rem; gap: .45rem; min-height: 1.5rem; }
+.consumption-results-refresh { align-items: center; color: var(--kpi-muted); display: flex; font-size: .82rem; gap: .55rem; min-height: 2.25rem; padding: 0 .1rem .55rem; }
 .consumption-insights-kpis { display: grid; gap: .7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .consumption-insights-kpis article { display: grid; gap: .3rem; padding: .9rem; }
 .consumption-insights-kpis article > span { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
@@ -2716,7 +2717,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-fy-total, .consumption-insights-quarter-totals { min-width: 0; padding: .35rem .7rem 0; }
 .consumption-insights-totals-divider { background: var(--kpi-border); height: 100%; }
 .consumption-insights-totals-chart { display: block; height: 16.5rem; width: 100%; }
-.consumption-insights-composition-grid { align-items: stretch; display: grid; gap: .85rem; grid-template-columns: minmax(30rem, 1.2fr) minmax(22rem, .8fr); height: 24rem; min-width: 0; }
+.consumption-insights-composition-grid { align-items: stretch; display: grid; gap: .85rem; grid-template-columns: repeat(2, minmax(0, 1fr)); height: 24rem; min-width: 0; }
 .consumption-insights-composition-chart { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
 .consumption-insights-composition-chart__plot { display: block; height: 100%; min-height: 0; width: 100%; }
 .consumption-insights-composition-legend { align-items: center; display: flex; flex-wrap: wrap; font-size: .72rem; font-weight: 750; gap: .45rem 1rem; justify-content: center; padding-top: .35rem; }
