@@ -161,6 +161,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             setSelectedAccountContext(analysisResponse.selectedAccount ?? "");
             setCandidateSearch("");
             setDebouncedCandidateSearch("");
+          } else if (analysisResponse) {
+            setAnalysis(null);
           }
         }
       })
@@ -173,6 +175,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   // response with null here would also remove and recreate the header/filter
   // controls before the request completes.
   const analysis = analysisResponse?.fiscalYear === fiscalYear ? analysisResponse : null;
+  const hasStaleFiscalYearResponse = analysisResponse !== null && analysisResponse.fiscalYear !== fiscalYear;
 
   const filteredCandidates = useMemo(() => (analysis?.accountCandidates ?? [])
     .filter((candidate) => matchesCandidate(candidate, candidateSearch)), [analysis, candidateSearch]);
@@ -275,12 +278,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  if (loading && !analysis) return <section class="consumption-insights-page" aria-busy="true" aria-label="Consumption Analysis loading">
-    <header class="consumption-page__header consumption-insights-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
-    <div class="kpi-page-loading__body">
-      <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
-      <p>Loading Consumption Analysis...</p>
-    </div>
+  if (!analysis && (loading || hasStaleFiscalYearResponse)) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
+    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
+    <p>Loading Consumption Analysis...</p>
   </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
@@ -365,11 +365,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       setExporting("");
     }
   };
-
-  if (loading && !analysisResponse) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
-    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
-    <p>Loading Consumption Analysis...</p>
-  </section>;
 
   return <section ref={exportTargetRef} class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" aria-busy={loading ? "true" : "false"} data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">

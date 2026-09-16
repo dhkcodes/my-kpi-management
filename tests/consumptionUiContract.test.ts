@@ -12,7 +12,6 @@ const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", 
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
-assert.match(insightsPage, /consumption-insights-page[\s\S]*consumption-page__header consumption-insights-header[\s\S]*Loading Consumption Analysis/, "Analysis loading retains the normal page header before the centered progress body");
 assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
@@ -104,6 +103,14 @@ assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]
 assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
 assert.match(insightsPage, /aria-busy=\{loading \? "true" : "false"\}/, "Analysis exposes refresh state without replacing its mounted page shell");
+assert.match(insightsPage, /const hasStaleFiscalYearResponse = analysisResponse !== null && analysisResponse\.fiscalYear !== fiscalYear/, "Analysis recognizes a previous-FY response before the next request effect runs");
+const analysisBlockingLoadingStart = insightsPage.indexOf("if (!analysis && (loading || hasStaleFiscalYearResponse))");
+const analysisBlockingLoadingEnd = insightsPage.indexOf("const messages:", analysisBlockingLoadingStart);
+const analysisBlockingLoadingBranch = insightsPage.slice(analysisBlockingLoadingStart, analysisBlockingLoadingEnd);
+assert.ok(analysisBlockingLoadingStart >= 0 && analysisBlockingLoadingEnd > analysisBlockingLoadingStart, "Analysis has an isolated initial/FY-transition loading branch");
+assert.match(analysisBlockingLoadingBranch, /class="accounts-workloads-page accounts-workloads-loading"[\s\S]*Loading Consumption Analysis\.\.\./, "Analysis blocking loading uses the Attainment loading presentation");
+assert.doesNotMatch(analysisBlockingLoadingBranch, /consumption-page__header|Consumption \/ Analysis|<h1>/, "Analysis title and breadcrumb stay hidden during initial and FY-transition loading");
+assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
