@@ -56,7 +56,7 @@ function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>
     <span class="attainment-quarter-card__heading"><strong>{quarter.quarter}</strong><b>{formatAttainment(quarter.outlookAttainment)}</b></span>
     <span class="attainment-quarter-card__metric"><small>Budget</small><strong>{formatBudget(quarter.budget)}</strong></span>
     <span class="attainment-quarter-card__metric attainment-quarter-card__metric--primary"><small>Total (Actual + Forecast)</small><strong>{formatOptionalAttainmentAmount(quarter.outlook)}</strong></span>
-    <span class="attainment-quarter-card__actual">Actual {formatAttainmentAmount(quarter.actual)} · Forecast {formatOptionalAttainmentAmount(includedForecast(quarter))}</span>
+    <span class="attainment-quarter-card__actual"><span class="consumption-metric is-actual">Actual {formatAttainmentAmount(quarter.actual)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">Forecast {formatOptionalAttainmentAmount(includedForecast(quarter))}</span></span>
     <span class="attainment-quarter-card__basis">Attainment = Total / Budget</span>
     <span class="attainment-quarter-card__pillars">DP {formatOptionalAttainmentAmount(quarter.dpOutlook)} · OCI {formatOptionalAttainmentAmount(quarter.ociOutlook)}</span>
   </div>;

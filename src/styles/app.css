@@ -2657,6 +2657,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-pillar .consumption-pillar-selector { margin-top: 0; }
 .consumption-insights-pillar .consumption-pillar-selector button { height: 2.6rem; min-height: 2.6rem; }
+.consumption-insights-export { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-context { align-items: end; display: flex; gap: .75rem; min-width: 0; }
 .consumption-insights-filter { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-filter > select { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-border-color-enabled); color: var(--oj-core-text-color-primary); min-height: 2.6rem; padding: .45rem 2rem .45rem .65rem; width: max-content; }
@@ -2672,6 +2673,12 @@ h4.weekly-activity-section-label--next-week,
 .consumption-sales-rep-table th:first-child { text-align: left; }
 .consumption-sales-rep-table button { background: transparent; border: 0; color: var(--oj-link-text-color); cursor: pointer; font: inherit; font-weight: 800; padding: 0; }
 .consumption-sales-rep-table tr.is-selected { background: color-mix(in srgb, var(--oj-core-bg-color-selected) 65%, transparent); }
+.consumption-sales-rep-overview .consumption-sales-rep-table thead th {
+  background: #e9eef2;
+  color: #263746;
+  font-size: .82rem;
+  font-weight: 800;
+}
 .consumption-sales-rep-table .is-positive { color: var(--kpi-success); }
 .consumption-sales-rep-table .is-negative { color: var(--kpi-danger); }
 .consumption-sales-account-review { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2695,6 +2702,14 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-kpis article > span { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .consumption-insights-kpis article > strong { font-size: clamp(1.45rem, 2.2vw, 2rem); letter-spacing: -.035em; }
 .consumption-insights-kpis article > small { font-weight: 700; }
+.consumption-metric { font-weight: 800; }
+.consumption-metric.is-actual { color: #315f75; }
+.consumption-metric.is-forecast { color: #2f6f9f; }
+.consumption-metric.is-quarter { color: #614f82; }
+.consumption-metric.is-positive { color: #2f672c; }
+.consumption-metric.is-negative,
+.consumption-metric.is-critical { color: #a3352a; }
+.consumption-metric.is-high { color: #8b5e00; }
 .consumption-insights-performance-grid { display: grid; gap: .85rem; grid-template-columns: minmax(25rem, 1.08fr) minmax(22rem, .92fr); min-width: 0; }
 .consumption-insights-total-regions { display: grid; grid-template-columns: minmax(0, .85fr) 1px minmax(0, 1.15fr); min-width: 0; }
 .consumption-insights-total-regions h3 { color: var(--kpi-muted); font-size: .75rem; margin: 0; text-transform: uppercase; }
@@ -2704,6 +2719,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-composition-grid { align-items: stretch; display: grid; gap: .85rem; grid-template-columns: minmax(30rem, 1.2fr) minmax(22rem, .8fr); height: 24rem; min-width: 0; }
 .consumption-insights-composition-chart { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
 .consumption-insights-composition-chart__plot { display: block; height: 100%; min-height: 0; width: 100%; }
+.consumption-insights-composition-legend { align-items: center; display: flex; flex-wrap: wrap; font-size: .72rem; font-weight: 750; gap: .45rem 1rem; justify-content: center; padding-top: .35rem; }
+.consumption-insights-composition-legend span { align-items: center; display: inline-flex; gap: .35rem; }
+.consumption-insights-composition-legend i { background: var(--legend-color); border-radius: 2px; display: inline-block; height: .65rem; width: 1.2rem; }
+.consumption-insights-composition-warning { background: #fff7e1; border-inline-start: 3px solid #8b5e00; color: #5d4714; font-size: .78rem; margin: .25rem 0 .55rem; padding: .45rem .6rem; }
 .consumption-insights-movement-detail { border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; overflow: hidden; padding: .65rem .8rem; }
 .consumption-insights-movement-heading { align-items: end; display: flex; flex: 0 0 auto; gap: .6rem; justify-content: space-between; margin-bottom: .45rem; min-width: 0; }
 .consumption-insights-movement-heading h3 { font-size: .9rem; line-height: 1.2; margin: .12rem 0 0; white-space: nowrap; }
@@ -2725,6 +2744,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-qoq-cards article { border-top: 3px solid var(--oj-palette-success-90, #3b6f36); display: grid; gap: .35rem; min-width: 0; padding: .65rem .5rem; }
 .consumption-insights-qoq-cards article.is-negative { border-top-color: var(--kpi-danger); }
 .consumption-insights-qoq-cards strong { color: var(--oj-palette-success-110, #2f672c); font-size: 1.25rem; }
+.consumption-insights-qoq-cards h3 { color: #614f82; }
 .consumption-insights-qoq-cards .is-negative strong { color: var(--kpi-danger); }
 .consumption-insights-qoq-cards small, .consumption-insights-note { color: var(--kpi-muted); font-size: .66rem; }
 .consumption-insights-alert-trend-grid { align-items: stretch; display: grid; gap: .8rem; grid-template-columns: minmax(17rem, .72fr) minmax(28rem, 1.28fr); min-width: 0; }
@@ -3119,6 +3139,7 @@ h4.weekly-activity-section-label--next-week,
 .attainment-quarter-card__metric strong { color: var(--oj-core-text-color-primary); font-size: 1.15rem; font-weight: 700; }
 .attainment-quarter-card__metric--primary strong { font-size: 1.5rem; font-weight: 800; }
 .attainment-quarter-card__actual { color: var(--oj-core-text-color-primary); font-weight: 650; }
+.attainment-quarter-card__actual { display: flex; flex-wrap: wrap; gap: .15rem; }
 .attainment-quarter-card__basis { font-weight: 650; }
 .attainment-quarter-card__pillars { padding-block-start: .55rem; border-block-start: 1px solid var(--oj-core-divider-color); }
 .attainment-chart-card { min-width: 0; }
@@ -3173,6 +3194,7 @@ h4.weekly-activity-section-label--next-week,
   display: inline-flex;
   align-items: center;
 }
+.kpi-page-menu__chevron { align-self: center; color: var(--oj-core-text-color-secondary, #625f5b); font-size: 1rem; padding-inline: .1rem; }
 .kpi-page-menu__item.is-current::after {
   content: "";
   position: absolute;
@@ -3185,10 +3207,10 @@ h4.weekly-activity-section-label--next-week,
 }
 .kpi-page-menu__separator {
   align-self: center;
-  width: 1px;
-  height: 1.5rem;
   margin-inline: .25rem;
-  background: var(--oj-core-divider-color, #d4cfca);
+  color: var(--oj-core-text-color-secondary, #625f5b);
+  font-size: .9rem;
+  font-weight: 700;
 }
 .kpi-page-menu + .kpi-eyebrow { display: none; }
 
@@ -3224,7 +3246,8 @@ h4.weekly-activity-section-label--next-week,
   display: inline-flex;
   align-items: center;
   gap: .35rem;
-  min-height: 2.25rem;
+  height: 2.6rem;
+  min-height: 2.6rem;
   padding: .35rem .7rem;
   border: 1px solid #b8b2ac;
   border-radius: .35rem;

@@ -34,7 +34,7 @@ const toK = (amount: number): number => amount / 1_000;
 const signedCurrency = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${currency.format(amount)}`;
 const signedPercent = (amount: number | null) => amount === null ? "N/A" : `${amount > 0 ? "+" : ""}${amount.toFixed(1)}%`;
 const qoqKind = (status: ConsumptionAnalysisQuarter["status"]) => status === "ACTUAL" ? "ACTUAL"
-  : status === "FORECAST" ? "FORECAST · projection" : status === "MIXED" ? "MIXED · projection" : status === "NOT_OPEN" ? "NOT OPEN" : "INCOMPLETE";
+  : status === "FORECAST" ? "FORECAST" : status === "MIXED" ? "MIXED" : status === "NOT_OPEN" ? "NOT OPEN" : "INCOMPLETE";
 const splitLabel = (value: { actualAmount: number; forecastAmount: number }) => `ACTUAL ${currency.format(value.actualAmount)} · FORECAST ${currency.format(value.forecastAmount)}`;
 const trendDataLabel = ({ value }: Readonly<{ value: number }>) => compactCurrency.format(value);
 const movementDataLabel = ({ value }: Readonly<{ value: number }>) => `${currencyK.format(value)} K`;
@@ -364,14 +364,17 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     <header class="consumption-page__header consumption-insights-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-        <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Download current Consumption Analysis view">
-          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>
-            {exporting === "png" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PNG 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>}
-          </button>
-          <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}>
-            {exporting === "pdf" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PDF 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>}
-          </button>
-          {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
+        <div class="consumption-insights-export">
+          <span>Export</span>
+          <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
+            <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>
+              {exporting === "png" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PNG 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>}
+            </button>
+            <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}>
+              {exporting === "pdf" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PDF 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>}
+            </button>
+            {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
+          </div>
         </div>
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
@@ -442,10 +445,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small>{splitLabel(analysis.portfolio)}</small></article>
-      <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? compactCurrency.format(latestCompleteQuarter.totalAmount) : "N/A"}</strong><small>{latestCompleteQuarter ? `${latestCompleteQuarter.quarter} · ${signedPercent(latestCompleteQuarter.qoqChangePercent)} QoQ` : "No complete ACTUAL quarter"}</small></article>
-      <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposure.toFixed(1)}%</strong><small>{currency.format(analysis.portfolio.forecastAmount)} of selected total</small></article>
-      <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small>{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical · {analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small><span class="consumption-metric is-actual">ACTUAL {currency.format(analysis.portfolio.actualAmount)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {currency.format(analysis.portfolio.forecastAmount)}</span></small></article>
+      <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? compactCurrency.format(latestCompleteQuarter.totalAmount) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={(latestCompleteQuarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}>{signedPercent(latestCompleteQuarter.qoqChangePercent)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
+      <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposure.toFixed(1)}%</strong><small><span class="consumption-metric is-forecast">{currency.format(analysis.portfolio.forecastAmount)}</span> of selected total</small></article>
+      <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
     </section>
 
     <section class="consumption-insights-performance-grid">
@@ -471,7 +474,12 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Stored Forecast components · K USD</span><h2 id="forecastCompositionTitle">Forecast composition by quarter</h2></div></div>
       <div class="consumption-insights-composition-grid">
         <div class="consumption-insights-composition-chart">
-          <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "on" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+          <div class="consumption-insights-composition-legend" aria-label="Forecast composition categories">
+            <span><i style="--legend-color:#59636e"></i>All</span>
+            {Object.entries(MOVEMENT_COLORS).map(([category, color]) => <span key={category}><i style={`--legend-color:${color}`}></i>{category}</span>)}
+          </div>
+          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">Composition is unavailable where one or more Forecast rows are unclassified or incomplete. Total Forecast remains visible; classified components are hidden to avoid presenting an unreconciled partial composition.</p>}
+          <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
 
         </div>
         <section class="consumption-insights-movement-detail" aria-live="polite" aria-label={selectedMovement ? `${selectedMovement.quarter} ${selectedMovement.category} Account detail` : "Forecast composition detail"}>
@@ -484,7 +492,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
               </div>
             </div>
             <div class="consumption-insights-movement-list">
-              {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th>{selectedMovement.category === "All" ? <><th>Total (K)</th><th>New (K)</th><th>Expansion (K)</th><th>Reduction (K)</th></> : <th>{selectedMovement.category} (K)</th>}</tr></thead><tbody>
+              {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th>{selectedMovement.category === "All" ? <><th>Total</th><th>New</th><th>Expansion</th><th>Reduction</th></> : <th>{selectedMovement.category}</th>}</tr></thead><tbody>
                 {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td>{selectedMovement.category === "All" ? <>
                   <td>{currencyK.format(toK(account.totalForecastAmount))} K</td><td>{currencyK.format(toK(account.newAmount))} K</td><td>{currencyK.format(toK(account.expansionAmount))} K</td><td>{currencyK.format(toK(account.reductionAmount))} K</td>
                 </> : <td>{currencyK.format(toK(movementValue(account)))} K</td>}</tr>)}
