@@ -7,10 +7,13 @@ const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx",
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
+const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
-assert.match(insightsPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Analysis/, "Analysis loading matches Accounts & Workloads");
+assert.match(insightsPage, /consumption-insights-page[\s\S]*consumption-page__header consumption-insights-header[\s\S]*Loading Consumption Analysis/, "Analysis loading retains the normal page header before the centered progress body");
+assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
@@ -48,6 +51,14 @@ const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 assert.match(styles,
   /\.kpi-content:has\(\.consumption-insights-page\),\s*\.kpi-content:has\(\.attainment-page\)\s*\{[^}]*align-content:\s*start;[^}]*grid-auto-rows:\s*max-content;/,
   "Analysis and Attainment keep short initial loading content directly below the fiscal-year panel");
+assert.match(styles, /\.kpi-page-menu oj-toolbar\s*\{[^}]*column-gap:\s*\.4rem;/,
+  "all breadcrumb segments use one common left/right gap");
+assert.match(styles, /\.kpi-page-menu__chevron\s*\{[^}]*padding:\s*0;/,
+  "breadcrumb chevrons do not use route-specific padding");
+assert.match(styles, /\.kpi-page-loading__body\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/,
+  "only the loading body is centered so the page header does not move");
+assert.match(pageNavigation, /kpi-page-menu__chevron[\s\S]*kpi-page-menu__item is-section[\s\S]*kpi-page-menu__chevron[\s\S]*kpi-page-menu__current-label/,
+  "every breadcrumb level uses the same separator element");
 assert.match(styles,
   /\.consumption-insights-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
   "Consumption Analysis is one Redwood-aligned white outer panel");
@@ -198,7 +209,8 @@ assert.match(insightsPage, /consumption-insights-export[\s\S]*<span>Export<\/spa
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
 assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
-assert.match(insightsPage, /analysis\.movementBridge\.some\(\(point\) => point\.compositionStatus === "UNCLASSIFIED"\)[\s\S]*미분류 포함 · 확인된 구성만 표시/, "only an unclassified composition range shows the short confirmed-only label");
+assert.doesNotMatch(insightsPage, /미분류 포함|consumption-insights-composition-warning/, "Forecast composition does not warn about normal natural movement");
+assert.match(insightsPage, /Forecast signals by quarter[\s\S]*not a full breakdown of Total/, "Forecast chart explains that entered and derived signals are not a complete Total decomposition");
 assert.doesNotMatch(insightsPage, /Some quarters include unclassified Forecast|Confirmed New, Expansion, and Reduction amounts are shown|Total Forecast remains unchanged/, "the long explanatory composition message is removed from the chart surface");
 assert.match(attainmentPage, /attainment-quarter-card__actual[\s\S]*consumption-metric is-actual[\s\S]*consumption-metric is-forecast/, "Attainment uses the same semantic Actual and Forecast emphasis");
 assert.match(styles, /\.consumption-sales-rep-overview \.consumption-sales-rep-table thead th \{[\s\S]*font-size: \.82rem;[\s\S]*background: #e9eef2|\.consumption-sales-rep-overview \.consumption-sales-rep-table thead th \{[\s\S]*background: #e9eef2;[\s\S]*font-size: \.82rem;/, "Sales Rep Overview header uses a larger readable Redwood-compatible treatment");
@@ -213,7 +225,7 @@ assert.match(insightsPage, /const all = point\.totalForecastAmount === null \? n
 assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMovementPoint\.accounts, selectedMovement\.category\)/, "composition detail applies Forecast Total for All and component criteria for category tabs");
 assert.match(insightsPage, /consumption-insights-composition-grid[\s\S]*consumption-insights-composition-chart__plot[\s\S]*consumption-insights-movement-detail/, "Forecast composition chart and detail share an independent responsive section");
 assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:[^}]*1\.2fr[^}]*\.8fr[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses two columns on desktop and one column on narrower screens");
-assert.match(insightsPage, /Forecast composition by quarter/);
+assert.match(insightsPage, /Forecast signals by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, /oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "actions are ordered Forecast Import, Forecast Export, Actual Import, Actual Export with matching upload/download icons");
 assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*onojAction=\{\(\) => void exportForecastCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*onojAction=\{\(\) => fileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*onojAction=\{\(\) => void exportImportCompatibleCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "each ordered action remains connected to its matching Forecast/Actual import/export handler");
@@ -295,7 +307,7 @@ assert.doesNotMatch(recordsPage, /missingForecastLabel|Forecast membership unava
 assert.doesNotMatch(recordsPage, /<small>ACCOUNT · \{selectedPillar === "DP" \? "DP" : "OCI-OTHER"\}<\/small>/, "Account Forecast cells omit redundant Pillar helper text");
 assert.match(recordsPage, /currency\.format\(summary\.total \?\? 0\)[\s\S]*summary\.preQGap === null \? "—"/, "quarter totals render zero for missing values while a missing prior quarter keeps Pre-Q Gap unavailable");
 assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
-assert.match(recordsPage, /Reduction \$\{composition\.reductionAmount[\s\S]*previous Total minus current Total[\s\S]*Previous source/, "Consumption Records Forecast tooltip exposes the complete composition and Total-only Reduction basis");
+assert.match(recordsPage, /Reduction \$\{composition\.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" \? "비교 기준 없음"[\s\S]*composition\.reductionAmount[\s\S]*previous Total minus current Total[\s\S]*Previous source/, "Consumption Records Forecast tooltip distinguishes a missing comparison basis from a calculated zero Reduction");
 assert.doesNotMatch(recordsPage, /this legacy scalar Forecast does not include movement components/, "normal legacy scalar Forecasts do not emit a repeated Consumption Records warning");
 assert.match(recordsPage, /composition\.compositionStatus === "UNCLASSIFIED"[\s\S]*return null/, "legacy scalar Forecast composition is intentionally omitted from Consumption Records");
 assert.match(recordsPage, /compositionStatus === "UNAVAILABLE"[\s\S]*Forecast composition unavailable/, "actual missing Forecast composition still has an explicit unavailable message");

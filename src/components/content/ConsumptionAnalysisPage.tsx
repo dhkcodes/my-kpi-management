@@ -271,10 +271,12 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  if (loading && !analysis) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
-    {breadcrumb}
-    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
-    <p>Loading Consumption Analysis...</p>
+  if (loading && !analysis) return <section class="consumption-insights-page" aria-busy="true" aria-label="Consumption Analysis loading">
+    <header class="consumption-page__header consumption-insights-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
+    <div class="kpi-page-loading__body">
+      <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
+      <p>Loading Consumption Analysis...</p>
+    </div>
   </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
@@ -471,14 +473,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="kpi-panel consumption-insights-composition" aria-labelledby="forecastCompositionTitle">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">Stored Forecast components · K USD</span><h2 id="forecastCompositionTitle">Forecast composition by quarter</h2></div></div>
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Entered and derived Forecast signals · K USD</span><h2 id="forecastCompositionTitle">Forecast signals by quarter</h2><p>All is Total Forecast. New and Expansion are entered values; Reduction is derived from a valid prior Total. These signals are not a full breakdown of Total.</p></div></div>
       <div class="consumption-insights-composition-grid">
         <div class="consumption-insights-composition-chart">
-          <div class="consumption-insights-composition-legend" aria-label="Forecast composition categories">
+          <div class="consumption-insights-composition-legend" aria-label="Forecast signal categories">
             <span><i style="--legend-color:#59636e"></i>All</span>
             {Object.entries(MOVEMENT_COLORS).map(([category, color]) => <span key={category}><i style={`--legend-color:${color}`}></i>{category}</span>)}
           </div>
-          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">미분류 포함 · 확인된 구성만 표시</p>}
           <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
 
         </div>
