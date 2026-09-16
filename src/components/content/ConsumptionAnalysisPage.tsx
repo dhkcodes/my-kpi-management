@@ -478,7 +478,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             <span><i style="--legend-color:#59636e"></i>All</span>
             {Object.entries(MOVEMENT_COLORS).map(([category, color]) => <span key={category}><i style={`--legend-color:${color}`}></i>{category}</span>)}
           </div>
-          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">Composition is unavailable where one or more Forecast rows are unclassified or incomplete. Total Forecast remains visible; classified components are hidden to avoid presenting an unreconciled partial composition.</p>}
+          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">Some quarters include unclassified Forecast. Confirmed New, Expansion, and Reduction amounts are shown; Total Forecast remains unchanged. <strong>Unclassified included · confirmed components only.</strong></p>}
           <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
 
         </div>
@@ -498,7 +498,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
                 </> : <td>{currencyK.format(toK(movementValue(account)))} K</td>}</tr>)}
               </tbody>{selectedMovement.category === "All" ? <tfoot><tr><th>Total</th><th>{currencyK.format(toK(compositionTotals.totalForecastAmount))} K</th><th>{currencyK.format(toK(compositionTotals.newAmount))} K</th><th>{currencyK.format(toK(compositionTotals.expansionAmount))} K</th><th>{currencyK.format(toK(compositionTotals.reductionAmount))} K</th></tr></tfoot>
                 : <tfoot><tr><th>Total</th><th>{currencyK.format(toK(selectedMovementAccounts.reduce((sum, account) => sum + movementValue(account), 0)))} K</th></tr></tfoot>}</table>
-                : <p class="consumption-empty-state">No Account has a non-zero Forecast Total for this quarter.</p>}
+                : <p class="consumption-empty-state">No Account has a visible Forecast amount or confirmed component for this quarter.</p>}
             </div>
           </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3></div>}
         </section>
