@@ -473,9 +473,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="kpi-panel consumption-insights-composition" aria-labelledby="forecastCompositionTitle">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">Entered and derived Forecast signals · K USD</span><h2 id="forecastCompositionTitle">Forecast signals by quarter</h2><p>All is Total Forecast. New and Expansion are entered values; Reduction is derived from a valid prior Total. These signals are not a full breakdown of Total.</p></div></div>
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Entered and derived Forecast signals · K USD</span><h2 id="forecastCompositionTitle">Forecast signals by quarter</h2></div></div>
       <div class="consumption-insights-composition-grid">
-        <div class="consumption-insights-composition-chart">
+        <div class="consumption-insights-composition-chart" data-quarter-count={analysis.movementBridge.length}>
           <div class="consumption-insights-composition-legend" aria-label="Forecast signal categories">
             <span><i style="--legend-color:#59636e"></i>All</span>
             {Object.entries(MOVEMENT_COLORS).map(([category, color]) => <span key={category}><i style={`--legend-color:${color}`}></i>{category}</span>)}
