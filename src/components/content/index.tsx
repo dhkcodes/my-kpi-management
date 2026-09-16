@@ -7,9 +7,10 @@
  */
 import { ComponentChildren, h } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage } from "../../data/kpiMockData";
+import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
-import { getNavigationPath, getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
+import { getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
+import { PageNavigationToolbar } from "../PageNavigationToolbar";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
@@ -219,29 +220,6 @@ const overviewTooltip = (dataset: FiscalYearDataset, rowCode: string, quarter: s
 
 const isHomeRoute = (route: NavigationRouteDefinition) => route.module === "home";
 
-type BreadcrumbItem = Readonly<{ label: string; routeId?: string }>;
-
-const routeBreadcrumbs = (route: NavigationRouteDefinition): BreadcrumbItem[] => {
-  if (route.module === "home") return [{ label: navItems.find((item) => item.id === "home")?.label ?? route.pageTitle }];
-  const group = navItems.find((item) => item.children?.some((child) => child.id === route.id));
-  if (!group) return [{ label: route.pageTitle }];
-  const current = group.children?.find((child) => child.id === route.id);
-  const defaultRouteId = group.children?.[0]?.id;
-  return [
-    { label: group.label, routeId: defaultRouteId && defaultRouteId !== route.id ? defaultRouteId : undefined },
-    { label: current?.label ?? route.pageTitle }
-  ];
-};
-
-function PageBreadcrumb({ route, onNavigate }: Readonly<{ route: NavigationRouteDefinition; onNavigate: (routeId: string) => void }>) {
-  return <nav class="kpi-page-breadcrumb" aria-label="Page hierarchy">
-    <ol>{routeBreadcrumbs(route).map((item, index) => <li key={`${item.label}-${index}`}>
-      {item.routeId ? <a href={getNavigationPath(getNavigationRoute(item.routeId))} onClick={(event) => { event.preventDefault(); onNavigate(item.routeId!); }}>{item.label}</a>
-        : <span aria-current="page">{item.label}</span>}
-    </li>)}</ol>
-  </nav>;
-}
-
 function EmptyRoutePage({ route, breadcrumb }: Readonly<{ route: NavigationRouteDefinition; breadcrumb?: ComponentChildren }>) {
   return (
     <section id="routePage" class="kpi-panel kpi-route-page" aria-labelledby="routePageTitle" data-route-id={route.id}>
@@ -441,7 +419,7 @@ export function Content({
   const openAccountWorkloads = (account: string) => {
     onOpenAccountWorkloads(account);
   };
-  const pageBreadcrumb = <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />;
+  const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} access={profile.access} onNavigate={onNavigate} />;
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
@@ -496,9 +474,9 @@ export function Content({
       )}
 
       {activeRoute.module === "profile" ? (
-        <ProfilePage profile={profile} breadcrumb={pageBreadcrumb} />
+        <ProfilePage profile={profile} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "users" ? (
-        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageBreadcrumb} /> : <section class="kap-empty-state" role="alert">{pageBreadcrumb}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
+        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageNavigation} /> : <section class="kap-empty-state" role="alert">{pageNavigation}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (
         <>
           <AccountsWorkloadsPulseV2
@@ -509,7 +487,7 @@ export function Content({
             loading={accountsWorkloadsLoading}
             dataSource={accountsWorkloadsDataSource}
             onOpenAccount={openAccountWorkloads}
-            breadcrumb={pageBreadcrumb}
+            breadcrumb={pageNavigation}
           />
           {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
@@ -606,11 +584,11 @@ export function Content({
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
-          onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageBreadcrumb} />
+          onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "myCustomers360" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
-            {pageBreadcrumb}
+            {pageNavigation}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Account Portfolio"></oj-progress-circle>
             <span id="accountPortfolioLoadingText">Loading Account Portfolio data…</span>
           </section>
@@ -620,13 +598,13 @@ export function Content({
             rows={accountsWorkloadsRows}
             dataAvailable={accountsWorkloadsDatasetAvailable}
             onOpenAccount={openAccountWorkloads}
-            breadcrumb={pageBreadcrumb}
+            breadcrumb={pageNavigation}
           />
         )
       ) : activeRoute.module === "accountsWorkloads" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">
-            {pageBreadcrumb}
+            {pageNavigation}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Accounts and Workloads"></oj-progress-circle>
             <span id="accountsWorkloadsLoadingText">Loading Accounts &amp; Workloads data…</span>
           </section>
@@ -646,23 +624,23 @@ export function Content({
             onRefresh={onAccountsWorkloadsRefresh}
             onDraftStateChange={onAccountsWorkloadsDraftStateChange}
             onRowsChange={onAccountsWorkloadsRowsChange}
-            breadcrumb={pageBreadcrumb}
+            breadcrumb={pageNavigation}
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageBreadcrumb} />
+        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
-        <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageBreadcrumb} />
+        <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAttainment" ? (
-        <AttainmentPage fiscalYear={fiscalYear} breadcrumb={pageBreadcrumb} />
+        <AttainmentPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
           fiscalYear={fiscalYear}
           onNavigationGuardChange={onKpiNavigationGuardChange}
-          breadcrumb={pageBreadcrumb}
+          breadcrumb={pageNavigation}
         />
       ) : (
-        <EmptyRoutePage route={activeRoute} breadcrumb={pageBreadcrumb} />
+        <EmptyRoutePage route={activeRoute} breadcrumb={pageNavigation} />
       )}
 
       {guideOpen && isKpiActivitiesRoute(activeRoute) && (

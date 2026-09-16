@@ -43,15 +43,20 @@ assert.equal(isKpiActivitiesRoute(getNavigationRouteFromPath("/accounts-workload
 
 const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
 const appSource = readFileSync("src/components/app.tsx", "utf8");
+const toolbarSource = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
 const stylesSource = readFileSync("src/styles/app.css", "utf8");
 assert.match(contentSource, /isKpiActivitiesRoute\(activeRoute\)[\s\S]*kpi-guide-entry-button/, "KPI Guide entry is route-gated");
 assert.match(contentSource, /guideOpen && isKpiActivitiesRoute\(activeRoute\)/, "open guide cannot remain visible outside KPI routes");
 assert.match(appSource, /if \(!isKpiActivitiesRoute\(activeRoute\)\) setGuideOpen\(false\)/, "route changes clear stale guide state");
-assert.match(contentSource, /import \{ FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage \}/, "breadcrumbs use the actual navigation menu definition as their label source");
-assert.match(contentSource, /const group = navItems\.find\(\(item\) => item\.children\?\.some/, "breadcrumbs resolve their parent from the live navigation hierarchy");
-assert.doesNotMatch(contentSource, /Customer Management/, "breadcrumbs never invent a customer menu label");
-assert.match(contentSource, /const pageBreadcrumb = <PageBreadcrumb route=\{activeRoute\}/, "the shared breadcrumb is created once from the active route");
-assert.doesNotMatch(contentSource, /\n\s*<PageBreadcrumb route=\{activeRoute\}/, "the breadcrumb is not rendered as a detached content sibling");
+assert.match(toolbarSource, /import \{ navItems, NavigationItem \}/, "the page menu uses the actual navigation definition");
+assert.match(toolbarSource, /<oj-toolbar chroming="borderless"/, "the page menu uses the Oracle JET borderless toolbar pattern");
+assert.match(toolbarSource, /item\.children[\s\S]*<oj-menu-button/, "navigation groups render as Oracle JET menu buttons");
+assert.match(toolbarSource, /onojMenuAction=\{\(event\) => onNavigate\(String\(event\.detail\.selectedValue\)\)\}/, "selecting a submenu route delegates to application navigation");
+assert.match(toolbarSource, /aria-current=\{child\.id === activeRouteId \? "page" : undefined\}/, "the current submenu route remains exposed to assistive technology");
+assert.match(toolbarSource, /item\.id !== "users" \|\| access === "Admin"/, "user administration follows the live access rule");
+assert.doesNotMatch(toolbarSource, /Customer Management/, "the page menu never invents a customer menu label");
+assert.match(contentSource, /const pageNavigation = <PageNavigationToolbar activeRoute=\{activeRoute\} access=\{profile\.access\}/, "the shared page menu is created once from route and permission state");
+assert.doesNotMatch(contentSource, /\n\s*<PageNavigationToolbar activeRoute=\{activeRoute\}/, "the page menu is not rendered as a detached content sibling");
 for (const file of [
   "AccountsWorkloadsPage.tsx",
   "AccountsWorkloadsPulseV2.tsx",
@@ -65,8 +70,9 @@ for (const file of [
   "WeeklyActivitiesPage.tsx"
 ]) {
   const pageSource = readFileSync(`src/components/content/${file}`, "utf8");
-  assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the breadcrumb inside its title surface`);
+  assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the page menu inside its title surface`);
 }
-assert.match(stylesSource, /\.kpi-page-breadcrumb \+ \.kpi-eyebrow \{ display: none; \}/, "the integrated breadcrumb replaces the old duplicated route eyebrow");
+assert.match(stylesSource, /\.kpi-page-menu \+ \.kpi-eyebrow \{ display: none; \}/, "the integrated page menu replaces the old duplicated route eyebrow");
+assert.match(stylesSource, /\.kpi-page-menu__item\.is-current::after/, "the current menu section has a visible borderless-toolbar indicator");
 
 console.log("navigationRoutes tests passed");
