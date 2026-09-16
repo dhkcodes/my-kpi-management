@@ -5,7 +5,7 @@
  * as shown at https://oss.oracle.com/licenses/upl/
  * @ignore
  */
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
@@ -242,9 +242,10 @@ function PageBreadcrumb({ route, onNavigate }: Readonly<{ route: NavigationRoute
   </nav>;
 }
 
-function EmptyRoutePage({ route }: Readonly<{ route: NavigationRouteDefinition }>) {
+function EmptyRoutePage({ route, breadcrumb }: Readonly<{ route: NavigationRouteDefinition; breadcrumb?: ComponentChildren }>) {
   return (
     <section id="routePage" class="kpi-panel kpi-route-page" aria-labelledby="routePageTitle" data-route-id={route.id}>
+      {breadcrumb}
       <span class="kpi-eyebrow">Page</span>
       <h2 id="routePageTitle">{route.pageTitle}</h2>
     </section>
@@ -440,6 +441,7 @@ export function Content({
   const openAccountWorkloads = (account: string) => {
     onOpenAccountWorkloads(account);
   };
+  const pageBreadcrumb = <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />;
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
@@ -493,12 +495,10 @@ export function Content({
         </div>
       )}
 
-      <PageBreadcrumb route={activeRoute} onNavigate={onNavigate} />
-
       {activeRoute.module === "profile" ? (
-        <ProfilePage profile={profile} />
+        <ProfilePage profile={profile} breadcrumb={pageBreadcrumb} />
       ) : activeRoute.module === "users" ? (
-        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} /> : <section class="kap-empty-state" role="alert"><h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
+        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageBreadcrumb} /> : <section class="kap-empty-state" role="alert">{pageBreadcrumb}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (
         <>
           <AccountsWorkloadsPulseV2
@@ -509,6 +509,7 @@ export function Content({
             loading={accountsWorkloadsLoading}
             dataSource={accountsWorkloadsDataSource}
             onOpenAccount={openAccountWorkloads}
+            breadcrumb={pageBreadcrumb}
           />
           {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
@@ -605,10 +606,11 @@ export function Content({
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
-          onWriteStateChange={onKpiWriteStateChange} />
+          onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageBreadcrumb} />
       ) : activeRoute.module === "myCustomers360" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
+            {pageBreadcrumb}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Account Portfolio"></oj-progress-circle>
             <span id="accountPortfolioLoadingText">Loading Account Portfolio data…</span>
           </section>
@@ -618,11 +620,13 @@ export function Content({
             rows={accountsWorkloadsRows}
             dataAvailable={accountsWorkloadsDatasetAvailable}
             onOpenAccount={openAccountWorkloads}
+            breadcrumb={pageBreadcrumb}
           />
         )
       ) : activeRoute.module === "accountsWorkloads" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">
+            {pageBreadcrumb}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Accounts and Workloads"></oj-progress-circle>
             <span id="accountsWorkloadsLoadingText">Loading Accounts &amp; Workloads data…</span>
           </section>
@@ -642,21 +646,23 @@ export function Content({
             onRefresh={onAccountsWorkloadsRefresh}
             onDraftStateChange={onAccountsWorkloadsDraftStateChange}
             onRowsChange={onAccountsWorkloadsRowsChange}
+            breadcrumb={pageBreadcrumb}
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
+        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageBreadcrumb} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
-        <ConsumptionAnalysisPage fiscalYear={fiscalYear} />
+        <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageBreadcrumb} />
       ) : activeRoute.module === "consumptionAttainment" ? (
-        <AttainmentPage fiscalYear={fiscalYear} />
+        <AttainmentPage fiscalYear={fiscalYear} breadcrumb={pageBreadcrumb} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
           fiscalYear={fiscalYear}
           onNavigationGuardChange={onKpiNavigationGuardChange}
+          breadcrumb={pageBreadcrumb}
         />
       ) : (
-        <EmptyRoutePage route={activeRoute} />
+        <EmptyRoutePage route={activeRoute} breadcrumb={pageBreadcrumb} />
       )}
 
       {guideOpen && isKpiActivitiesRoute(activeRoute) && (

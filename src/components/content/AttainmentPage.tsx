@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { IntlNumberConverter } from "ojs/ojconverter-number";
@@ -62,7 +62,7 @@ function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>
   </div>;
 }
 
-export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
+export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
   const [dashboard, setDashboard] = useState<AttainmentDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -117,6 +117,7 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
   if (loading && !dashboard) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Attainment loading">
+    {breadcrumb}
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Attainment loading"></oj-progress-circle>
     <p>Loading Consumption Attainment...</p>
   </section>;
@@ -124,14 +125,14 @@ export function AttainmentPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear
     ? [{ id: "attainment-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
   if (!dashboard) return <section class="attainment-page consumption-initial-state">
-    <header class="consumption-page__header attainment-header"><div><span class="kpi-eyebrow">Consumption / Attainment</span><h1>Consumption Attainment</h1></div></header>
+    <header class="consumption-page__header attainment-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Attainment</span><h1>Consumption Attainment</h1></div></header>
     <ConsumptionMessageBanner messages={messages} />
   </section>;
 
 
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
-      <div><span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1></div>
+      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1></div>
       <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
     <ConsumptionMessageBanner messages={messages} />

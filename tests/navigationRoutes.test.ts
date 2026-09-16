@@ -50,8 +50,23 @@ assert.match(appSource, /if \(!isKpiActivitiesRoute\(activeRoute\)\) setGuideOpe
 assert.match(contentSource, /import \{ FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, navItems, WorkloadStage \}/, "breadcrumbs use the actual navigation menu definition as their label source");
 assert.match(contentSource, /const group = navItems\.find\(\(item\) => item\.children\?\.some/, "breadcrumbs resolve their parent from the live navigation hierarchy");
 assert.doesNotMatch(contentSource, /Customer Management/, "breadcrumbs never invent a customer menu label");
-assert.match(contentSource, /accountsWorkloadsLoadError[\s\S]*<PageBreadcrumb route=\{activeRoute\}/, "the compact breadcrumb is rendered with route content after global controls, directly before the page heading");
-assert.doesNotMatch(contentSource, /<main[^>]*>[\s\S]{0,120}<PageBreadcrumb/, "the breadcrumb is not a detached top-of-content strip");
-assert.match(stylesSource, /\.kpi-page-breadcrumb \+ \* > :first-child \.kpi-eyebrow:first-child \{ display: none; \}/, "the integrated breadcrumb replaces the old duplicated route eyebrow");
+assert.match(contentSource, /const pageBreadcrumb = <PageBreadcrumb route=\{activeRoute\}/, "the shared breadcrumb is created once from the active route");
+assert.doesNotMatch(contentSource, /\n\s*<PageBreadcrumb route=\{activeRoute\}/, "the breadcrumb is not rendered as a detached content sibling");
+for (const file of [
+  "AccountsWorkloadsPage.tsx",
+  "AccountsWorkloadsPulseV2.tsx",
+  "AttainmentPage.tsx",
+  "ConsumptionAnalysisPage.tsx",
+  "ConsumptionRecordsPage.tsx",
+  "KpiSpreadsheetPage.tsx",
+  "MyCustomers360Page.tsx",
+  "ProfilePage.tsx",
+  "UsersPage.tsx",
+  "WeeklyActivitiesPage.tsx"
+]) {
+  const pageSource = readFileSync(`src/components/content/${file}`, "utf8");
+  assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the breadcrumb inside its title surface`);
+}
+assert.match(stylesSource, /\.kpi-page-breadcrumb \+ \.kpi-eyebrow \{ display: none; \}/, "the integrated breadcrumb replaces the old duplicated route eyebrow");
 
 console.log("navigationRoutes tests passed");

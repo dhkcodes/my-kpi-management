@@ -3177,7 +3177,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-page-breadcrumb a { color: #315f75; text-decoration: none; }
 .kpi-page-breadcrumb a:hover { text-decoration: underline; }
 .kpi-page-breadcrumb [aria-current="page"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--oj-core-text-color-primary); }
-.kpi-page-breadcrumb + * > :first-child .kpi-eyebrow:first-child { display: none; }
+.kpi-page-breadcrumb + .kpi-eyebrow { display: none; }
 
 /* Page title = Accounts & Workloads baseline. */
 .kpi-content :is(.consumption-page__header, .kap-users-header, .kpi-route-page, .my-customers-360-page__header, .accounts-workloads-header, .accounts-pulse-v2__header, .weekly-activities-page__header) :is(h1, h2),
