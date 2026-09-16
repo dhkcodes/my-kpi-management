@@ -3155,29 +3155,42 @@ h4.weekly-activity-section-label--next-week,
   .attainment-budget-form { min-width: 0; }
 }
 
-/* Shared page hierarchy: one visual scale for every route. */
-.kpi-page-breadcrumb {
+/* Shared page navigation: Oracle JET borderless toolbar inside every page title surface. */
+.kpi-page-menu {
   min-width: 0;
-  margin: .2rem 0 .25rem;
-  color: var(--oj-core-text-color-secondary, #52606d);
-  font-size: .78rem;
-  font-weight: 600;
+  margin: 0 0 .2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.kpi-page-breadcrumb ol {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  min-width: 0;
-  margin: 0;
+.kpi-page-menu::-webkit-scrollbar { display: none; }
+.kpi-page-menu oj-toolbar {
+  display: inline-flex;
+  min-width: max-content;
   padding: 0;
-  list-style: none;
 }
-.kpi-page-breadcrumb li { display: inline-flex; align-items: center; min-width: 0; }
-.kpi-page-breadcrumb li + li::before { content: "/"; margin-inline-end: .4rem; color: #8b8580; }
-.kpi-page-breadcrumb a { color: #315f75; text-decoration: none; }
-.kpi-page-breadcrumb a:hover { text-decoration: underline; }
-.kpi-page-breadcrumb [aria-current="page"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--oj-core-text-color-primary); }
-.kpi-page-breadcrumb + .kpi-eyebrow { display: none; }
+.kpi-page-menu__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.kpi-page-menu__item.is-current::after {
+  content: "";
+  position: absolute;
+  inset-inline: .55rem;
+  inset-block-end: .08rem;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--oj-core-text-color-primary, #161513);
+  pointer-events: none;
+}
+.kpi-page-menu__separator {
+  align-self: center;
+  width: 1px;
+  height: 1.5rem;
+  margin-inline: .25rem;
+  background: var(--oj-core-divider-color, #d4cfca);
+}
+.kpi-page-menu + .kpi-eyebrow { display: none; }
 
 /* Page title = Accounts & Workloads baseline. */
 .kpi-content :is(.consumption-page__header, .kap-users-header, .kpi-route-page, .my-customers-360-page__header, .accounts-workloads-header, .accounts-pulse-v2__header, .weekly-activities-page__header) :is(h1, h2),
@@ -3230,11 +3243,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-qoq-cards .consumption-insights-status { justify-self: start; width: fit-content; padding: .18rem .45rem; border-radius: 999px; }
 
 @media (max-width: 700px) {
-  .kpi-page-breadcrumb { overflow: hidden; }
-  .kpi-page-breadcrumb ol { overflow-x: auto; scrollbar-width: none; }
-  .kpi-page-breadcrumb ol::-webkit-scrollbar { display: none; }
-  .kpi-page-breadcrumb li { flex: 0 0 auto; }
-  .kpi-page-breadcrumb li:last-child { flex: 0 1 auto; }
+  .kpi-page-menu__separator { margin-inline: .1rem; }
   .consumption-export-actions { width: 100%; justify-content: flex-start; }
   .consumption-export-actions button { flex: 1 1 7rem; justify-content: center; }
 }
