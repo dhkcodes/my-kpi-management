@@ -54,8 +54,10 @@ export function PageNavigationToolbar({ activeRoute, access: _access, onNavigate
             </oj-menu-button>
           </span>
           <span class="kpi-page-menu__chevron" aria-hidden="true">›</span>
-          <span class="kpi-page-menu__item is-current kpi-page-menu__current-label" aria-current="page">
-            {path.current.label}
+          <span class="kpi-page-menu__item is-current kpi-page-menu__current-label">
+            <oj-button chroming="borderless" aria-current="page" onojAction={() => onNavigate(path.current.id)}>
+              {path.current.label}
+            </oj-button>
           </span>
         </>}
       </oj-toolbar>

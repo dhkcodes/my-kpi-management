@@ -362,6 +362,11 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     }
   };
 
+  if (loading && !analysisResponse) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
+    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
+    <p>Loading Consumption Analysis...</p>
+  </section>;
+
   return <section ref={exportTargetRef} class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
