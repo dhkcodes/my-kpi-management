@@ -3195,15 +3195,9 @@ h4.weekly-activity-section-label--next-week,
   align-items: center;
 }
 .kpi-page-menu__chevron { align-self: center; color: var(--oj-core-text-color-secondary, #625f5b); font-size: 1rem; padding-inline: .1rem; }
-.kpi-page-menu__item.is-current::after {
-  content: "";
-  position: absolute;
-  inset-inline: .55rem;
-  inset-block-end: .08rem;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--oj-core-text-color-primary, #161513);
-  pointer-events: none;
+.kpi-page-menu__item.is-current {
+  color: var(--oj-core-text-color-primary, #161513);
+  font-weight: 700;
 }
 .kpi-page-menu__separator {
   align-self: center;

@@ -478,7 +478,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             <span><i style="--legend-color:#59636e"></i>All</span>
             {Object.entries(MOVEMENT_COLORS).map(([category, color]) => <span key={category}><i style={`--legend-color:${color}`}></i>{category}</span>)}
           </div>
-          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">Some quarters include unclassified Forecast. Confirmed New, Expansion, and Reduction amounts are shown; Total Forecast remains unchanged. <strong>Unclassified included · confirmed components only.</strong></p>}
+          {analysis.movementBridge.some((point) => point.compositionStatus === "UNCLASSIFIED") && <p class="consumption-insights-composition-warning" role="status">미분류 포함 · 확인된 구성만 표시</p>}
           <oj-chart class="consumption-insights-composition-chart__plot" type="bar" orientation="horizontal" stack="off" data={movementChart} dataLabel={movementDataLabel} xAxis={{ tickLabel: { converter: movementAxisConverter } }} drilling="on" onojItemDrill={selectMovement} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Quarterly All Forecast New Expansion and Reduction as separate K USD amount bars"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
 
         </div>

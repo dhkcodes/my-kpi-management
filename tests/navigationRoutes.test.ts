@@ -75,6 +75,7 @@ for (const file of [
   assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the page menu inside its title surface`);
 }
 assert.match(stylesSource, /\.kpi-page-menu \+ \.kpi-eyebrow \{ display: none; \}/, "the integrated page menu replaces the old duplicated route eyebrow");
-assert.match(stylesSource, /\.kpi-page-menu__item\.is-current::after/, "the current menu section has a visible borderless-toolbar indicator");
+assert.doesNotMatch(stylesSource, /\.kpi-page-menu__item\.is-current::after/, "the current page never uses an underline indicator");
+assert.match(stylesSource, /\.kpi-page-menu__item\.is-current\s*\{[\s\S]*font-weight:\s*700;[\s\S]*color:/, "the current page uses restrained weight and color emphasis");
 
 console.log("navigationRoutes tests passed");
