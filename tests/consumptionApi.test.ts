@@ -104,7 +104,7 @@ void (async () => {
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
       accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
         amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
-        previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+        previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
         compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
       forecastVariances: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "ALL", actualAmount: null, forecastAmount: null, varianceAmount: null, variancePercent: null, completeness: "INCOMPLETE" }],
       accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
@@ -121,7 +121,7 @@ void (async () => {
   assert.deepEqual(forecastOnlyPage.accountForecasts[0], {
     account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
     amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
-    previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+    previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
     compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE"
   }, "Consumption Records preserves every forecast-composition field supplied by the backend");
 
@@ -131,7 +131,7 @@ void (async () => {
     editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
     accountForecasts: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
       amount: 25, totalAmount: -1, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
-      previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", previousStatus: "AVAILABLE",
+      previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
       compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
     forecastVariances: [], accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 1, nextOffset: 1, hasMore: false
   }), { status: 200, headers: { "Content-Type": "application/json" } });

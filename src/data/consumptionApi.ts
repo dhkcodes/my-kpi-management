@@ -73,7 +73,7 @@ export type ConsumptionAccountForecast = Readonly<{
   account: string; normalizedAccount: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">;
   amount: number; totalAmount: number; newAmount: number | null; expansionAmount: number | null;
   baseAmount: number | null; reductionAmount: number | null; previousAmount: number | null;
-  previousSource: string; previousStatus: string; compositionStatus: ConsumptionForecastCompositionStatus;
+  previousSource: string; reductionStatus: string; compositionStatus: ConsumptionForecastCompositionStatus;
   version: number; status: "DRAFT" | "FINAL"; completeness: string;
 }>;
 export type ConsumptionForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: ConsumptionPillar; actualAmount: number | null; forecastAmount: number | null; varianceAmount: number | null; variancePercent: number | null; completeness: string }>;
@@ -639,7 +639,7 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
       newAmount: nullableAmount("newAmount"), expansionAmount: nullableAmount("expansionAmount"),
       baseAmount: nullableAmount("baseAmount"), reductionAmount: nullableAmount("reductionAmount"),
       previousAmount: nullableAmount("previousAmount"), previousSource: typeof record.previousSource === "string" ? record.previousSource : "Unavailable",
-      previousStatus: typeof record.previousStatus === "string" ? record.previousStatus : "UNAVAILABLE", compositionStatus };
+      reductionStatus: typeof record.reductionStatus === "string" ? record.reductionStatus : "UNAVAILABLE", compositionStatus };
   });
   const forecastVariances=(raw.forecastVariances ?? []).map((variance):ConsumptionForecastVariance=>{
     const pillar = normalizeConsumptionPillar(variance?.pillar);
