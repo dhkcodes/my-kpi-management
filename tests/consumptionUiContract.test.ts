@@ -101,7 +101,10 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords'\]\.includes\(
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
-assert.match(insightsPage, /analysisResponse\.fiscalYear === fiscalYear[\s\S]*analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "Analysis renders only when the response FY and Account match the requested context");
+assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
+assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
+assert.match(insightsPage, /aria-busy=\{loading \? "true" : "false"\}/, "Analysis exposes refresh state without replacing its mounted page shell");
+assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
@@ -170,7 +173,7 @@ assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
-assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
+assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{analysis\.selectedPillar\}/, "Plan Contribution uses the completed response's scoped DC total during refresh");
 assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Consumption Analysis omits DP + OCI breakdown and duplicate warnings");
 
 // Consumption Records remains the mutable Data workspace and excludes analysis duplication.
@@ -227,6 +230,8 @@ assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMoveme
 assert.match(insightsPage, /consumption-insights-composition-grid[\s\S]*consumption-insights-composition-chart__plot[\s\S]*consumption-insights-movement-detail/, "Forecast composition chart and detail share an independent responsive section");
 assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses balanced columns on desktop and one column on narrower screens");
 assert.match(insightsPage, /consumption-insights-composition-chart" data-quarter-count=\{analysis\.movementBridge\.length\}/, "mobile chart receives the displayed quarter count for content-sized height");
+assert.match(insightsPage, /consumption-insights-composition-grid" data-quarter-count=\{analysis\.movementBridge\.length\}/, "desktop chart and detail share the displayed quarter count");
+assert.match(styles, /@media \(min-width: 1101px\)[\s\S]*composition-grid \{[^}]*align-items: start;[^}]*height: auto;[\s\S]*composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*height: 18\.5rem;[\s\S]*data-quarter-count="1"[\s\S]*height: 12\.5rem;[\s\S]*data-quarter-count="3"[\s\S]*height: 16\.5rem;/, "wide Forecast composition aligns to the top and sizes both chart and detail by quarter count");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\)[^}]*height: 18\.5rem[^}]*[\s\S]*data-quarter-count="1"[^}]*height: 13rem[^}]*[\s\S]*data-quarter-count="2"[^}]*height: 14\.5rem[^}]*[\s\S]*data-quarter-count="3"[^}]*height: 16\.5rem/, "mobile Forecast legend precedes a quarter-count-sized plot without the inherited fixed 24rem gap");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
 assert.match(insightsPage, /Forecast signals by quarter/);

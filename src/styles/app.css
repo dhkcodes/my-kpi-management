@@ -2792,6 +2792,32 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-plan-track { background: #ece9e6; height: .55rem; overflow: hidden; width: 100%; }
 .consumption-insights-split-bar { display: flex; height: 100%; overflow: hidden; }
 .consumption-insights-split-bar i.is-actual { background: #315f75; }
+
+/* Keep the wide-screen chart sized to its quarter count. The detail table
+   scrolls within the same bounded row instead of stretching the chart. */
+@media (min-width: 1101px) {
+  .consumption-insights-composition-grid {
+    align-items: start;
+    height: auto;
+  }
+  .consumption-insights-composition-chart {
+    gap: .25rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 18.5rem;
+  }
+  .consumption-insights-composition-legend {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+  .consumption-insights-movement-detail { height: 18.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="1"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="1"] .consumption-insights-movement-detail { height: 12.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="2"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="2"] .consumption-insights-movement-detail { height: 14.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="3"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="3"] .consumption-insights-movement-detail { height: 16.5rem; }
+}
+
 @media (max-width: 1100px) {
   .consumption-insights-performance-grid, .consumption-insights-composition-grid, .consumption-insights-alert-trend-grid, .consumption-insights-contribution-grid { grid-template-columns: minmax(0, 1fr); }
   .consumption-insights-composition-grid { height: auto; }
