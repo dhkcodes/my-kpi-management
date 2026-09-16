@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
@@ -39,9 +39,10 @@ type Props = Readonly<{
   loading: boolean;
   dataSource: AccountsWorkloadsDataSource;
   onOpenAccount: (account: string) => void;
+  breadcrumb?: ComponentChildren;
 }>;
 
-export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable, loading, dataSource, onOpenAccount }: Props) {
+export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable, loading, dataSource, onOpenAccount, breadcrumb }: Props) {
   const pulse = useMemo(
     () => calculateAccountsWorkloadsPulseV2(rows, fiscalYear, asOf),
     [rows, fiscalYear, asOf]
@@ -94,7 +95,7 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
   if (loading) {
     return (
       <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source="loading">
-        <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
+        <div class="accounts-pulse-v2__header"><div>{breadcrumb}<span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
         <div class="accounts-pulse-v2__unavailable" role="status"><strong>Loading Accounts &amp; Workloads data…</strong></div>
       </section>
     );
@@ -103,7 +104,7 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
   if (!dataAvailable) {
     return (
       <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source={dataSource}>
-        <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
+        <div class="accounts-pulse-v2__header"><div>{breadcrumb}<span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
         <div class="accounts-pulse-v2__unavailable" role="status">
           <strong>Accounts &amp; Workloads data is not available for {fiscalYear}</strong>
           <span>Select FY27 to view the currently loaded dataset.</span>
@@ -114,7 +115,7 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
 
   return (
     <section class="accounts-pulse-v2 kpi-panel" aria-labelledby="accountsPulseV2Title" data-source={dataSource}>
-      <div class="accounts-pulse-v2__header"><div><span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
+      <div class="accounts-pulse-v2__header"><div>{breadcrumb}<span class="kpi-eyebrow">My Customers 360</span><h2 id="accountsPulseV2Title">Accounts &amp; Workloads</h2></div></div>
       <div class="accounts-pulse-v2__metrics" aria-label="Accounts and workloads metrics">
         {metricCards.map((metric) => <article class="accounts-pulse-v2-metric" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></article>)}
       </div>

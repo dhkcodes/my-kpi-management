@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import {
@@ -95,7 +95,7 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
   return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}><span>DC {display.primary}</span></span>;
 };
 
-export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: FiscalYear }>) {
+export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [selectedSalesRep, setSelectedSalesRep] = useState("");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
@@ -272,6 +272,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmount === null ? "N/A" : currency.format(point.actualAmount)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   if (loading && !analysis) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
+    {breadcrumb}
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
     <p>Loading Consumption Analysis...</p>
   </section>;
@@ -279,7 +280,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
   if (!analysis) return <section class="consumption-insights-page consumption-initial-state">
-    <header class="consumption-page__header consumption-insights-header"><div><span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
+    <header class="consumption-page__header consumption-insights-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
     <ConsumptionMessageBanner messages={messages} />
   </section>;
 
@@ -361,7 +362,7 @@ export function ConsumptionAnalysisPage({ fiscalYear }: Readonly<{ fiscalYear: F
 
   return <section ref={exportTargetRef} class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
     <header class="consumption-page__header consumption-insights-header">
-      <div><span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
+      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Download current Consumption Analysis view">
           <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>

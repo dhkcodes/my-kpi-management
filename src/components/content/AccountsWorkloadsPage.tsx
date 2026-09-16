@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsClonePreview, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError, cloneAccountsWorkloadsPreviousFiscalYear, fetchAccountsWorkloadsClonePreview } from "../../data/accountsWorkloadsApi";
@@ -71,6 +71,7 @@ type Props = Readonly<{
   onRefresh: () => void;
   onDraftStateChange: (active: boolean) => void;
   onRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
+  breadcrumb?: ComponentChildren;
 }>;
 
 const editableFields: EditableField[] = [
@@ -322,7 +323,8 @@ export function AccountsWorkloadsPage({
   onQueryChange,
   onRefresh,
   onDraftStateChange,
-  onRowsChange
+  onRowsChange,
+  breadcrumb
 } : Props) {
   const targetOptions = getTargetPeriodOptions(fiscalYear);
   const [draftRows, setDraftRows] = useState<AccountWorkloadRow[]>(rows);
@@ -949,6 +951,7 @@ export function AccountsWorkloadsPage({
     <section class={rows.length === 0 ? "accounts-workloads-page is-empty" : "accounts-workloads-page"} aria-labelledby="accountsWorkloadsTitle">
       <div class="accounts-workloads-header">
         <div>
+          {breadcrumb}
           <span class="kpi-eyebrow">My Customers 360</span>
           <h2 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h2>
 

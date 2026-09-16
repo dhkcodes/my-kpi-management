@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
@@ -319,9 +319,10 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
 type Props = Readonly<{
   fiscalYear: FiscalYear;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
+  breadcrumb?: ComponentChildren;
 }>;
 
-export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: Props) {
+export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, breadcrumb }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -1237,6 +1238,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
 
   if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
+    {breadcrumb}
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
     <p>Loading Consumption Records...</p>
   </section>;
@@ -1245,6 +1247,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange }: 
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
         <div>
+          {breadcrumb}
           <span class="kpi-eyebrow">Consumption / Attainment</span>
           <h1 id="consumptionTitle">Consumption Records</h1>
         </div>

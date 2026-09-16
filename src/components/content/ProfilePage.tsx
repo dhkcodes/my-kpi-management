@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojdialog";
@@ -9,7 +9,7 @@ import { changePassword } from "../../auth/authApi";
 import type { AuthSession } from "../../auth/authSession";
 import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from "../../auth/passwordPolicy";
 
-export function ProfilePage({ profile }: Readonly<{ profile: AuthSession }>) {
+export function ProfilePage({ profile, breadcrumb }: Readonly<{ profile: AuthSession; breadcrumb?: ComponentChildren }>) {
   const dialogRef = useRef<DialogElement>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -64,7 +64,7 @@ export function ProfilePage({ profile }: Readonly<{ profile: AuthSession }>) {
 
   return (
     <section class="kap-account-page" aria-labelledby="kapProfileTitle">
-      <header class="kap-profile-header"><div><span class="kpi-eyebrow">Account</span><h2 id="kapProfileTitle">Profile</h2></div>
+      <header class="kap-profile-header"><div>{breadcrumb}<span class="kpi-eyebrow">Account</span><h2 id="kapProfileTitle">Profile</h2></div>
         <oj-button chroming="callToAction" onojAction={openDialog}>Change password</oj-button>
       </header>
       <dl class="kap-profile-fields">

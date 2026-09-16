@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useMemo } from "preact/hooks";
 import { AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { FiscalYear } from "../../data/kpiMockData";
@@ -17,15 +17,17 @@ type Props = Readonly<{
   rows: AccountWorkloadRow[];
   dataAvailable: boolean;
   onOpenAccount: (account: string) => void;
+  breadcrumb?: ComponentChildren;
 }>;
 
-export function MyCustomers360Page({ fiscalYear, rows, dataAvailable, onOpenAccount }: Props) {
+export function MyCustomers360Page({ fiscalYear, rows, dataAvailable, onOpenAccount, breadcrumb }: Props) {
   const accounts = useMemo(() => summarizeAccountsWorkloadsByAccount(rows), [rows]);
 
   return (
     <section class="my-customers-360-page" aria-labelledby="myCustomers360Title">
       <div class="my-customers-360-page__header">
         <div>
+          {breadcrumb}
           <span class="kpi-eyebrow">My Customers 360</span>
           <h2 id="myCustomers360Title">Account Portfolio</h2>
 
