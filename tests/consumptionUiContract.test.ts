@@ -65,17 +65,20 @@ assert.match(styles,
   /\.consumption-insights-page > \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
   "top-level Analysis sections use separators instead of nested cards");
 assert.match(styles,
+  /\.consumption-insights-page > \.consumption-insights-composition,\s*\.consumption-insights-page > \.consumption-insights-alert-trend\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*padding:\s*1rem;/,
+  "Forecast composition and Alerts/Trend keep their headings and related content inside matching Analysis cards");
+assert.match(styles,
   /\.consumption-insights-page \.consumption-insights-kpis \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
   "KPI summary cells form one continuous band without nested shadows");
 assert.match(styles,
   /\.attainment-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
   "Consumption Attainment is one Redwood-aligned white outer panel, including its initial state");
 assert.match(styles,
-  /\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*box-shadow:\s*none;/,
-  "Attainment quarter comparisons retain boundaries without nested shadows");
+  /\.attainment-fy-hero\s*\{[^}]*border-radius:\s*var\(--oj-core-border-radius-md\)[\s\S]*\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*box-shadow:\s*none;/,
+  "Attainment summary and quarter boxes use the Analysis-level corner radius without nested shadows");
 assert.match(styles,
-  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*\.75rem;[^}]*box-shadow:\s*none;/,
-  "Attainment charts use a clearer Redwood-neutral boundary without shadow");
+  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*box-shadow:\s*none;/,
+  "Attainment charts use the Analysis-level corner radius and Redwood-neutral boundary without shadow");
 assert.match(styles,
   /\.consumption-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*box-sizing:\s*border-box;[^}]*padding:\s*\.75rem;/,
   "Consumption Records follows the Accounts and Workloads single-panel workspace pattern");
@@ -85,6 +88,7 @@ assert.match(styles,
 assert.match(styles,
   /\.consumption-table-scroll\s*\{[^}]*border:\s*1px solid var\(--kpi-border\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*auto;/,
   "Records preserves the table scroll boundary and both scroll axes");
+assert.match(recordsPage, /Account \/ Plan Consumption/, "Records uses the Account / Plan Consumption title");
 assert.match(styles,
   /@media \(min-width: 64rem\)[\s\S]*\.consumption-page\s*\{[^}]*padding-block:\s*\.45rem;[^}]*\}[\s\S]*\.consumption-table-panel\s*\{[^}]*padding:\s*0;/,
   "desktop Records moves the former table padding to the outer panel without reducing table space");
