@@ -23,6 +23,7 @@ import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
 import { ConsumptionAnalysisPage } from "./ConsumptionAnalysisPage";
 import { AttainmentPage } from "./AttainmentPage";
+import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
 import type { AuthSession } from "../../auth/authSession";
@@ -579,6 +580,7 @@ export function Content({
               ))}
             </div>
           </section>}
+          <HomeConsumptionOverview fiscalYear={fiscalYear} />
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
