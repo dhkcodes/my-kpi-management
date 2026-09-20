@@ -49,6 +49,18 @@ assert.deepEqual(overview.months.map(({ periodKey, kind, amount }) => ({ periodK
 ]);
 assert.equal(overview.months[3].incomplete, true);
 
+const manyAlertsAnalysis = {
+  ...analysis,
+  alerts: Array.from({ length: 12 }, (_, index) => ({
+    ...analysis.alerts[index % analysis.alerts.length],
+    alertId: String(index + 1)
+  }))
+} as ConsumptionAnalysis;
+const overviewWithManyAlerts = buildHomeConsumptionOverview(manyAlertsAnalysis, totals);
+assert.equal(overviewWithManyAlerts.attentionSignalCount, 12);
+assert.equal(overviewWithManyAlerts.alerts.length, 10);
+assert.deepEqual(overviewWithManyAlerts.alerts.map((alert) => alert.alertId), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
+
 const lineMonths: readonly HomeConsumptionMonth[] = [
   { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000, incomplete: false },
   { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, incomplete: false },

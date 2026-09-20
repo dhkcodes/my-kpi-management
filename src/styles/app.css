@@ -3355,7 +3355,7 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__stack-actual { background: #287994; }
 .home-consumption__stack-forecast { background: #8b70b6; }
 .home-consumption__quarter-values { grid-column: 2; display: flex; justify-content: space-between; color: var(--oj-core-text-color-secondary); font-size: .68rem; }
-.home-consumption__alerts ul { display: grid; gap: .2rem; margin: 0; padding: 0; list-style: none; }
+.home-consumption__alerts ul { display: grid; gap: .2rem; height: 18rem; margin: 0; padding: 0 .35rem 0 0; overflow-y: auto; scrollbar-gutter: stable; list-style: none; }
 .home-consumption__alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .7rem 0; border-block-start: 1px solid var(--oj-core-divider-color); }
 .home-consumption__alerts li:first-child { border-block-start: 0; }
 .home-consumption__alerts li > div { display: grid; min-width: 0; }

@@ -92,6 +92,6 @@ export const buildHomeConsumptionOverview = (
         incomplete: incompletePeriods.has(periodKey)
       };
     }),
-    alerts: analysis.alerts.slice(0, 3)
+    alerts: analysis.alerts.slice(0, 10)
   };
 };
