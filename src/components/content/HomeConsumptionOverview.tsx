@@ -164,7 +164,12 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
                     <li key={alert.alertId}>
                       <span class={`home-consumption__grade home-consumption__grade--${alert.grade.toLowerCase()}`}>{alert.grade}</span>
                       <div><strong>{alert.account}</strong><span>{alert.workloadMapped ? alert.workload : "Workload not mapped"} · {alert.periodKey}</span></div>
-                      <div class="home-consumption__alert-value"><strong>{formatAmountK(alert.actualAmount)}</strong><span>{alertLabel(alert.type)}</span></div>
+                      <div class="home-consumption__alert-value">
+                        <strong>{formatAmountK(alert.actualAmount)}</strong>
+                        <span class={`home-consumption__alert-status home-consumption__alert-status--${alert.type.toLowerCase().replaceAll("_", "-")}`}>
+                          {alertLabel(alert.type)}
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -175,6 +180,10 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
           <article class="home-consumption__chart-card home-consumption__monthly">
             <div class="home-consumption__card-heading">
               <div><h3>Actual Continuity into Forecast</h3><p>Monthly Consumption; the divider marks the first Forecast month.</p></div>
+              <div class="home-consumption__monthly-legend" aria-label="Line legend">
+                <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
+                <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
+              </div>
             </div>
             <div class="home-consumption__monthly-chart" role="img" aria-label="Monthly Consumption line chart from Actual into Forecast; an accessible data table follows">
               <svg class="home-consumption__monthly-svg" viewBox={`0 0 ${monthlyChart.width} ${monthlyChart.height}`} aria-hidden="true">
@@ -222,7 +231,6 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
                         </>
                       )}
                       <text class="home-consumption__monthly-month" x={x} y={216}>{monthLabel(month.periodKey)}</text>
-                      <text class="home-consumption__monthly-kind" x={x} y={232}>{month.kind === "ACTUAL" ? "A" : "F"}</text>
                     </g>
                   );
                 })}
