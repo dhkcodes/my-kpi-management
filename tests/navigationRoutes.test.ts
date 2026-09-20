@@ -46,5 +46,6 @@ const appSource = readFileSync("src/components/app.tsx", "utf8");
 assert.match(contentSource, /isKpiActivitiesRoute\(activeRoute\)[\s\S]*kpi-guide-entry-button/, "KPI Guide entry is route-gated");
 assert.match(contentSource, /guideOpen && isKpiActivitiesRoute\(activeRoute\)/, "open guide cannot remain visible outside KPI routes");
 assert.match(appSource, /if \(!isKpiActivitiesRoute\(activeRoute\)\) setGuideOpen\(false\)/, "route changes clear stale guide state");
+assert.match(appSource, /activeRoute\.id === "home" && item\.id === "home"/, "Home is omitted from the navigation menu only on the home route");
 
 console.log("navigationRoutes tests passed");

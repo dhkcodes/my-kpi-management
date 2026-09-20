@@ -543,6 +543,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const savingDialogDesiredRef = useRef(false);
   const savingDialogGenerationRef = useRef(0);
   const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
+  const [apiError, setApiError] = useState("");
   const [reloadVersion, setReloadVersion] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState<Quarter | null>(null);
   const [overviewFilter, setOverviewFilter] = useState<KpiOverviewFilter | null>(null);
@@ -570,6 +571,14 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     ? buildKpiActivitiesOverview(activeRows, fiscalYear, activitySummary, asOf)
     : null, [activeRows, activitySummary, asOf, fiscalYear]);
   const displaySummary = overviewMetrics?.strictSummary ?? activitySummary;
+  const overviewDataState = apiError ? "error" : activeRows.length === 0 ? "empty" : "ready";
+  const portfolioSummary = overviewDataState === "ready" ? displaySummary : null;
+  const overviewValue = (value: string | number) => overviewDataState === "ready"
+    ? value
+    : overviewDataState === "error" ? "Unavailable" : "Not entered";
+  const overviewDetail = (value: string) => overviewDataState === "ready"
+    ? value
+    : overviewDataState === "error" ? "KPI API request failed" : `No KPI activities entered for ${fiscalYear}`;
   const overviewFilteredRows = useMemo(() => activitySummary && overviewFilter
     ? filterKpiOverviewRows(activeRows, fiscalYear, activitySummary, asOf, overviewFilter)
     : [], [activeRows, activitySummary, asOf, fiscalYear, overviewFilter]);
@@ -771,6 +780,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   useEffect(() => {
     let active = true;
     const fiscalYearChanged = loadedFiscalYearRef.current !== fiscalYear;
+    setApiError("");
     if (fiscalYearChanged) {
       setPageLoading(true);
       setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
@@ -778,8 +788,16 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
-      setApiMessage(`${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
-    }).catch(() => { if (active) setApiMessage("KPI API unavailable — no fallback customer data is shown"); })
+      setApiMessage(items.length === 0
+        ? `No KPI activities entered for ${fiscalYear}`
+        : `${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
+    }).catch((error) => {
+      if (!active) return;
+      const message = error instanceof Error ? error.message : "KPI API request failed.";
+      setRows([]); setOverviewItems([]); setActivitySummary(null);
+      setApiError(message);
+      setApiMessage(`KPI API unavailable — ${message}`);
+    })
       .finally(() => {
         if (active) {
           loadedFiscalYearRef.current = fiscalYear;
@@ -1081,32 +1099,33 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
     </header>
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
+    <p class={apiError ? "kpi-api-status kpi-api-status--error" : "kpi-api-status"} role={apiError ? "alert" : "status"}>{apiMessage}</p>
 
     {activeTab === "Overview" ? <Fragment>
       <div class="kpi-overview-metrics" aria-label={`${fiscalYear} KPI activity overview metrics`}>
         <button type="button" class={overviewFilter === "target-achieved" ? "is-selected" : ""} aria-pressed={overviewFilter === "target-achieved"}
           onClick={() => setOverviewFilter((current) => current === "target-achieved" ? null : "target-achieved")}>
           <span>Quarterly Target Achievement</span>
-          <strong>{overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.achieved}/${overviewMetrics.quarterlyTargetAchievement.total}` : "—"}</strong>
-          <small>{overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.rate}% · FY-valid reflected deliveries` : "Loading…"}</small>
+          <strong>{overviewValue(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.achieved}/${overviewMetrics.quarterlyTargetAchievement.total}` : "—")}</strong>
+          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.rate}% · FY-valid reflected deliveries` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "reflected" ? "is-selected" : ""} aria-pressed={overviewFilter === "reflected"}
           onClick={() => setOverviewFilter((current) => current === "reflected" ? null : "reflected")}>
           <span>Reflected Completion</span>
-          <strong>{overviewMetrics ? `${overviewMetrics.reflectedCompletion.reflected}/${overviewMetrics.reflectedCompletion.total}` : "—"}</strong>
-          <small>{overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${fiscalYear} activities` : "Loading…"}</small>
+          <strong>{overviewValue(overviewMetrics ? `${overviewMetrics.reflectedCompletion.reflected}/${overviewMetrics.reflectedCompletion.total}` : "—")}</strong>
+          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${fiscalYear} activities` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "overdue" ? "is-selected" : ""} aria-pressed={overviewFilter === "overdue"}
           onClick={() => setOverviewFilter((current) => current === "overdue" ? null : "overdue")}>
           <span>Overdue Pending</span>
-          <strong>{overviewMetrics?.overduePending.count ?? "—"}</strong>
-          <small>Pending · FY-valid Delivery Date before {asOf}</small>
+          <strong>{overviewValue(overviewMetrics?.overduePending.count ?? "—")}</strong>
+          <small>{overviewDetail(`Pending · FY-valid Delivery Date before ${asOf}`)}</small>
         </button>
         <button type="button" class={overviewFilter === "date-integrity" ? "is-selected" : ""} aria-pressed={overviewFilter === "date-integrity"}
           onClick={() => setOverviewFilter((current) => current === "date-integrity" ? null : "date-integrity")}>
           <span>Date Integrity Exceptions</span>
-          <strong>{overviewMetrics?.dateIntegrity.total ?? "—"}</strong>
-          <small>{overviewMetrics ? `${overviewMetrics.dateIntegrity.missing} missing · ${overviewMetrics.dateIntegrity.invalid} invalid · ${overviewMetrics.dateIntegrity.outOfFiscalYear} out of FY` : "Loading…"}</small>
+          <strong>{overviewValue(overviewMetrics?.dateIntegrity.total ?? "—")}</strong>
+          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.dateIntegrity.missing} missing · ${overviewMetrics.dateIntegrity.invalid} invalid · ${overviewMetrics.dateIntegrity.outOfFiscalYear} out of FY` : "")}</small>
         </button>
       </div>
       {overviewFilter && <section class="kpi-overview-filtered-activities" aria-labelledby="kpiOverviewFilteredTitle">
@@ -1127,7 +1146,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
         {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
       </section>}
       <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(displaySummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => <td key={`${row.code}:${quarters[index]}`}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></td>)}</tr>; })}</tbody></table></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => <td key={`${row.code}:${quarters[index]}`}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></td>)}</tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>

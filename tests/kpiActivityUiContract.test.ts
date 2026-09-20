@@ -3,6 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const page = fs.readFileSync(path.resolve("src/components/content/KpiSpreadsheetPage.tsx"), "utf8");
+assert.match(page, /overviewDataState === "error"[\s\S]*"Unavailable"/, "overview cards expose API failure instead of remaining in loading state");
+assert.match(page, /activeRows\.length === 0 \? "empty"[\s\S]*"Not entered"/, "overview cards distinguish no entered activities from zero-valued activities");
+assert.doesNotMatch(page.slice(page.indexOf('activeTab === "Overview"'), page.indexOf('activeTab === "Overview"') + 8000), /Loading…/, "rendered KPI Performance overview does not retain Loading text after completion");
 const api = fs.readFileSync(path.resolve("src/data/kpiSpreadsheetApi.ts"), "utf8");
 const contract = fs.readFileSync(path.resolve("src/data/kpiSpreadsheet.ts"), "utf8");
 const model = fs.readFileSync(path.resolve("src/data/kpiActivityGridModel.ts"), "utf8");
@@ -164,8 +167,8 @@ assert.match(page, /listKpiSummary/,
 assert.doesNotMatch(page, /<th>Summary model<\/th>/, "KPI Performance removes the Summary model column");
 assert.match(page, /<th>Q1<\/th><th>Q2<\/th><th>Q3<\/th><th>Q4<\/th>/,
   "KPI Performance exposes quarter-specific status columns");
-assert.match(page, /portfolioQuarterStatuses\(displaySummary, row\.code, fiscalYear, asOf\)/,
-  "KPI Performance derives each status from the FY-scoped authoritative target policy");
+assert.match(page, /portfolioQuarterStatuses\(portfolioSummary, row\.code, fiscalYear, asOf\)/,
+  "KPI Performance derives status only when FY-scoped KPI rows exist");
 assert.match(styles, /\.kpi-status-badge--not-started\s*\{[^}]*background:\s*#f5f5f5[^}]*color:\s*#6f6f6f/,
   "future-quarter Not Started badges use an explicit neutral treatment");
 assert.match(page, /Promise\.all\(\[listKpiRows\(fiscalYear\), listKpiOverview\(fiscalYear\), listKpiSummary\(fiscalYear\)\]\)/,
@@ -211,8 +214,8 @@ assert.match(page, /buildKpiActivitiesOverview\(activeRows, fiscalYear, activity
   "Overview metrics use FY-scoped rows and the authoritative target policy");
 assert.match(page, /summary=\{displaySummary\} tab=\{activeTab\}/,
   "detail quarter summaries use the same FY-valid Delivery Date scope as KPI Performance");
-assert.match(page, /portfolioQuarterStatuses\(displaySummary, row\.code, fiscalYear, asOf\)/,
-  "KPI Performance excludes invalid and out-of-FY Delivery Dates");
+assert.match(page, /portfolioQuarterStatuses\(portfolioSummary, row\.code, fiscalYear, asOf\)/,
+  "KPI Performance excludes invalid and out-of-FY Delivery Dates while withholding empty states");
 assert.match(page, /filterKpiOverviewRows\(activeRows, fiscalYear, activitySummary, asOf, overviewFilter\)/,
   "clickable cards drive the filtered Activity list");
 assert.match(page, /Missing date[\s\S]*Invalid date[\s\S]*Outside selected FY/,
