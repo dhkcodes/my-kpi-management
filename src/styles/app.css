@@ -421,6 +421,18 @@ body {
 }
 
 .kpi-content:has(.kpi-spreadsheet-page) { align-content: start; }
+.kpi-content:has(.my-customers-360-page) { align-content: start; }
+
+.kpi-api-status {
+  margin: 0;
+  color: var(--oj-core-text-color-secondary);
+  font-size: 0.82rem;
+}
+
+.kpi-api-status--error {
+  color: var(--oj-core-danger-3, #9b1c1c);
+  font-weight: 600;
+}
 
 .kpi-panel,
 .kpi-fiscal-year-panel {

@@ -32,12 +32,13 @@ export function PageNavigationToolbar({ activeRoute, access: _access, onNavigate
   const path = getPagePath(activeRoute.id);
   if (!path) return null;
   const isHome = path.current.id === "home";
+  if (isHome) return null;
 
   return (
     <nav class="kpi-page-menu kpi-page-path" aria-label="Current page path">
       <oj-toolbar chroming="borderless" aria-label="Current page path">
-        <span class={isHome ? "kpi-page-menu__item is-current" : "kpi-page-menu__item"}>
-          <oj-button chroming="borderless" aria-current={isHome ? "page" : undefined} onojAction={() => onNavigate("home")}>
+        <span class="kpi-page-menu__item">
+          <oj-button chroming="borderless" onojAction={() => onNavigate("home")}>
             Home
           </oj-button>
         </span>

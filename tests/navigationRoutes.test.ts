@@ -51,6 +51,7 @@ assert.match(appSource, /if \(!isKpiActivitiesRoute\(activeRoute\)\) setGuideOpe
 assert.match(toolbarSource, /import \{ navItems, NavigationItem \}/, "the page menu uses the actual navigation definition");
 assert.match(toolbarSource, /<oj-toolbar chroming="borderless"/, "the page menu uses the Oracle JET borderless toolbar pattern");
 assert.match(toolbarSource, /const path = getPagePath\(activeRoute\.id\)/, "the toolbar derives only the active route path");
+assert.match(toolbarSource, /if \(isHome\) return null;/, "the Home path button is omitted only while already on Home");
 assert.match(toolbarSource, /Home[\s\S]*<oj-menu-button[\s\S]*path\.current\.label/, "the current path renders Home, its parent menu, and the current page");
 assert.match(toolbarSource, /onojMenuAction=\{\(event\) => onNavigate\(String\(event\.detail\.selectedValue\)\)\}/, "selecting a submenu route delegates to application navigation");
 assert.match(toolbarSource, /aria-current=\{child\.id === activeRoute\.id \? "page" : undefined\}/, "the current submenu route remains exposed to assistive technology");
