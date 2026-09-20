@@ -1,4 +1,4 @@
-import { Fragment, h } from "preact";
+import { ComponentChildren, Fragment, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
@@ -509,7 +509,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange, breadcrumb }: Readonly<{
   fiscalYear: FiscalYear;
   routeId: string;
   guideDataFiscalYear: FiscalYear | null;
@@ -520,6 +520,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   onNavigate: (routeId: string) => void;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   onWriteStateChange: (active: boolean) => void;
+  breadcrumb?: ComponentChildren;
 }>) {
   const activeTab = getKpiTabForRoute(routeId);
   const tableScopeKey = `${fiscalYear}:${activeTab}`;
@@ -1088,16 +1089,21 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
     void waitForFrame().then(() => cancelDialogRef.current?.open());
   };
 
-  if (pageLoading) return <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="kpiActivitiesLoadingText">
-    <oj-progress-circle value={-1} size="md" aria-label="Loading KPI Activities"></oj-progress-circle>
-    <span id="kpiActivitiesLoadingText">Loading KPI Activities data…</span>
+  const pageHeader = <header class="kpi-spreadsheet-page__header"><div>{breadcrumb}<span class="kpi-eyebrow">KPI Activities / {activeTab}</span>
+    <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2></div>
+  </header>;
+
+  if (pageLoading) return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab}
+    role="status" aria-busy="true" aria-describedby="kpiActivitiesLoadingText">
+    {pageHeader}
+    <div class="kpi-page-loading__body">
+      <oj-progress-circle value={-1} size="md" aria-label="Loading KPI Activities"></oj-progress-circle>
+      <span id="kpiActivitiesLoadingText">Loading KPI Activities data…</span>
+    </div>
   </section>;
 
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
-    <header class="kpi-spreadsheet-page__header"><div><span class="kpi-eyebrow">KPI Activities / {activeTab}</span>
-      <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2></div>
-
-    </header>
+    {pageHeader}
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
     <p class={apiError ? "kpi-api-status kpi-api-status--error" : "kpi-api-status"} role={apiError ? "alert" : "status"}>{apiMessage}</p>
 

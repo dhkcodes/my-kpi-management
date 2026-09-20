@@ -2411,7 +2411,6 @@ h4.weekly-activity-section-label--next-week,
 .consumption-range-apply:disabled { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
 .consumption-range-apply:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
 .consumption-range-apply:disabled { cursor: not-allowed; opacity: .55; }
-.consumption-range-apply--initializing { visibility: hidden; }
 .consumption-record-search { flex: 1 1 18rem; max-width: 32rem; }
 .consumption-range-error { color: var(--kpi-danger); font-size: .78rem; font-weight: 750; }
 .consumption-range-note { color: var(--kpi-muted); font-size: .78rem; }
@@ -2498,7 +2497,7 @@ h4.weekly-activity-section-label--next-week,
   .kpi-shell__body:has(.consumption-page) { flex: 1 1 0; min-height: 0; overflow: hidden; }
   .kpi-content:has(.consumption-page) { grid-template-rows: minmax(0, 1fr); min-height: 0; overflow: hidden; }
   .consumption-page { gap: .5rem; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; min-height: 0; overflow: hidden; padding-block: .45rem; }
-  .consumption-page__header h1 { font-size: 1.6rem; margin: 0; }
+  .consumption-page__header h1 { margin: 0; }
   .consumption-range-bar { padding: .4rem .65rem; }
   .consumption-range-bar select,
   .consumption-range-bar input { min-height: 2.25rem; padding-block: .35rem; }
@@ -2644,7 +2643,7 @@ h4.weekly-activity-section-label--next-week,
   min-width: 0;
   padding: 1rem;
 }
-.consumption-insights-page > .consumption-insights-header { border-bottom: 1px solid #e7e3de; padding-bottom: 1rem; }
+.consumption-insights-page > .consumption-insights-header { border-bottom: 0; padding-bottom: 0; }
 .consumption-insights-page > .kpi-panel {
   background: transparent;
   border: 0;
@@ -2652,6 +2651,14 @@ h4.weekly-activity-section-label--next-week,
   border-radius: 0;
   box-shadow: none;
   padding-inline: 0;
+}
+.consumption-insights-page > .consumption-insights-composition,
+.consumption-insights-page > .consumption-insights-alert-trend {
+  background: #fff;
+  border: 1px solid #d4cec6;
+  border-radius: var(--oj-core-border-radius-md);
+  box-shadow: none;
+  padding: 1rem;
 }
 .consumption-insights-page .consumption-insights-kpis { background: #f8f7f5; border-block: 1px solid #e7e3de; gap: 0; }
 .consumption-insights-page .consumption-insights-kpis .kpi-panel {
@@ -2663,13 +2670,14 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-page .consumption-insights-kpis .kpi-panel + .kpi-panel { border-left: 1px solid #e7e3de; }
 .consumption-insights-page .consumption-insights-performance-grid > .kpi-panel,
 .consumption-insights-page .consumption-insights-composition-grid > .kpi-panel,
-.consumption-insights-page .consumption-insights-alert-trend > .kpi-panel { border-color: #e7e3de; box-shadow: none; }
+.consumption-insights-page .consumption-insights-alert-trend > .kpi-panel { background: #fff; border-color: #d4cec6; box-shadow: none; }
 .consumption-insights-header { align-items: end; }
 .consumption-insights-header p, .consumption-section-heading p { color: var(--kpi-muted); margin: .2rem 0 0; }
 .consumption-insights-header-actions { align-items: end; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; min-width: 0; }
 .consumption-insights-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-pillar .consumption-pillar-selector { margin-top: 0; }
 .consumption-insights-pillar .consumption-pillar-selector button { height: 2.6rem; min-height: 2.6rem; }
+.consumption-insights-export { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-context { align-items: end; display: flex; gap: .75rem; min-width: 0; }
 .consumption-insights-filter { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .25rem; text-transform: uppercase; }
 .consumption-insights-filter > select { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-border-color-enabled); color: var(--oj-core-text-color-primary); min-height: 2.6rem; padding: .45rem 2rem .45rem .65rem; width: max-content; }
@@ -2685,6 +2693,12 @@ h4.weekly-activity-section-label--next-week,
 .consumption-sales-rep-table th:first-child { text-align: left; }
 .consumption-sales-rep-table button { background: transparent; border: 0; color: var(--oj-link-text-color); cursor: pointer; font: inherit; font-weight: 800; padding: 0; }
 .consumption-sales-rep-table tr.is-selected { background: color-mix(in srgb, var(--oj-core-bg-color-selected) 65%, transparent); }
+.consumption-sales-rep-overview .consumption-sales-rep-table thead th {
+  background: #e9eef2;
+  color: #263746;
+  font-size: .82rem;
+  font-weight: 800;
+}
 .consumption-sales-rep-table .is-positive { color: var(--kpi-success); }
 .consumption-sales-rep-table .is-negative { color: var(--kpi-danger); }
 .consumption-sales-account-review { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2703,20 +2717,33 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-options button:hover, .consumption-insights-options button:focus-visible, .consumption-insights-options button.is-active { background: var(--oj-core-bg-color-hover); outline: none; }
 .consumption-insights-options small, .consumption-insights-options p { color: var(--kpi-muted); margin: 0; }
 .consumption-insights-refresh { align-items: center; color: var(--kpi-muted); display: flex; font-size: .78rem; gap: .45rem; min-height: 1.5rem; }
+.consumption-results-refresh { align-items: center; color: var(--kpi-muted); display: flex; font-size: .82rem; gap: .55rem; min-height: 2.25rem; padding: 0 .1rem .55rem; }
 .consumption-insights-kpis { display: grid; gap: .7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .consumption-insights-kpis article { display: grid; gap: .3rem; padding: .9rem; }
 .consumption-insights-kpis article > span { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .consumption-insights-kpis article > strong { font-size: clamp(1.45rem, 2.2vw, 2rem); letter-spacing: -.035em; }
 .consumption-insights-kpis article > small { font-weight: 700; }
+.consumption-metric { font-weight: 800; }
+.consumption-metric.is-actual { color: #315f75; }
+.consumption-metric.is-forecast { color: #2f6f9f; }
+.consumption-metric.is-quarter { color: #614f82; }
+.consumption-metric.is-positive { color: #2f672c; }
+.consumption-metric.is-negative,
+.consumption-metric.is-critical { color: #a3352a; }
+.consumption-metric.is-high { color: #8b5e00; }
 .consumption-insights-performance-grid { display: grid; gap: .85rem; grid-template-columns: minmax(25rem, 1.08fr) minmax(22rem, .92fr); min-width: 0; }
 .consumption-insights-total-regions { display: grid; grid-template-columns: minmax(0, .85fr) 1px minmax(0, 1.15fr); min-width: 0; }
 .consumption-insights-total-regions h3 { color: var(--kpi-muted); font-size: .75rem; margin: 0; text-transform: uppercase; }
 .consumption-insights-fy-total, .consumption-insights-quarter-totals { min-width: 0; padding: .35rem .7rem 0; }
 .consumption-insights-totals-divider { background: var(--kpi-border); height: 100%; }
 .consumption-insights-totals-chart { display: block; height: 16.5rem; width: 100%; }
-.consumption-insights-composition-grid { align-items: stretch; display: grid; gap: .85rem; grid-template-columns: minmax(30rem, 1.2fr) minmax(22rem, .8fr); height: 24rem; min-width: 0; }
+.consumption-insights-composition-grid { align-items: stretch; display: grid; gap: .85rem; grid-template-columns: repeat(2, minmax(0, 1fr)); height: 24rem; min-width: 0; }
 .consumption-insights-composition-chart { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
 .consumption-insights-composition-chart__plot { display: block; height: 100%; min-height: 0; width: 100%; }
+.consumption-insights-composition-legend { align-items: center; display: flex; flex-wrap: wrap; font-size: .72rem; font-weight: 750; gap: .45rem 1rem; justify-content: center; padding-top: .35rem; }
+.consumption-insights-composition-legend span { align-items: center; display: inline-flex; gap: .35rem; }
+.consumption-insights-composition-legend i { background: var(--legend-color); border-radius: 2px; display: inline-block; height: .65rem; width: 1.2rem; }
+.consumption-insights-composition-warning { background: #fff7e1; border-inline-start: 3px solid #8b5e00; color: #5d4714; font-size: .78rem; margin: .25rem 0 .55rem; padding: .45rem .6rem; }
 .consumption-insights-movement-detail { border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; overflow: hidden; padding: .65rem .8rem; }
 .consumption-insights-movement-heading { align-items: end; display: flex; flex: 0 0 auto; gap: .6rem; justify-content: space-between; margin-bottom: .45rem; min-width: 0; }
 .consumption-insights-movement-heading h3 { font-size: .9rem; line-height: 1.2; margin: .12rem 0 0; white-space: nowrap; }
@@ -2738,6 +2765,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-qoq-cards article { border-top: 3px solid var(--oj-palette-success-90, #3b6f36); display: grid; gap: .35rem; min-width: 0; padding: .65rem .5rem; }
 .consumption-insights-qoq-cards article.is-negative { border-top-color: var(--kpi-danger); }
 .consumption-insights-qoq-cards strong { color: var(--oj-palette-success-110, #2f672c); font-size: 1.25rem; }
+.consumption-insights-qoq-cards h3 { color: #614f82; }
 .consumption-insights-qoq-cards .is-negative strong { color: var(--kpi-danger); }
 .consumption-insights-qoq-cards small, .consumption-insights-note { color: var(--kpi-muted); font-size: .66rem; }
 .consumption-insights-alert-trend-grid { align-items: stretch; display: grid; gap: .8rem; grid-template-columns: minmax(17rem, .72fr) minmax(28rem, 1.28fr); min-width: 0; }
@@ -2784,6 +2812,32 @@ h4.weekly-activity-section-label--next-week,
 .consumption-insights-plan-track { background: #ece9e6; height: .55rem; overflow: hidden; width: 100%; }
 .consumption-insights-split-bar { display: flex; height: 100%; overflow: hidden; }
 .consumption-insights-split-bar i.is-actual { background: #315f75; }
+
+/* Keep the wide-screen chart sized to its quarter count. The detail table
+   scrolls within the same bounded row instead of stretching the chart. */
+@media (min-width: 1101px) {
+  .consumption-insights-composition-grid {
+    align-items: start;
+    height: auto;
+  }
+  .consumption-insights-composition-chart {
+    gap: .25rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 18.5rem;
+  }
+  .consumption-insights-composition-legend {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+  .consumption-insights-movement-detail { height: 18.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="1"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="1"] .consumption-insights-movement-detail { height: 12.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="2"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="2"] .consumption-insights-movement-detail { height: 14.5rem; }
+  .consumption-insights-composition-grid[data-quarter-count="3"] .consumption-insights-composition-chart,
+  .consumption-insights-composition-grid[data-quarter-count="3"] .consumption-insights-movement-detail { height: 16.5rem; }
+}
+
 @media (max-width: 1100px) {
   .consumption-insights-performance-grid, .consumption-insights-composition-grid, .consumption-insights-alert-trend-grid, .consumption-insights-contribution-grid { grid-template-columns: minmax(0, 1fr); }
   .consumption-insights-composition-grid { height: auto; }
@@ -2804,6 +2858,18 @@ h4.weekly-activity-section-label--next-week,
   .consumption-insights-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .consumption-insights-total-regions { grid-template-columns: minmax(0, 1fr); }
   .consumption-insights-totals-divider { height: 1px; width: 100%; }
+  .consumption-insights-composition-chart {
+    gap: .25rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 18.5rem;
+  }
+  .consumption-insights-composition-chart[data-quarter-count="1"] { height: 13rem; }
+  .consumption-insights-composition-chart[data-quarter-count="2"] { height: 14.5rem; }
+  .consumption-insights-composition-chart[data-quarter-count="3"] { height: 16.5rem; }
+  .consumption-insights-composition-legend {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
 }
 @media (min-width: 801px) {
   .consumption-sales-account-card { height: 22.5rem; }
@@ -3097,7 +3163,7 @@ h4.weekly-activity-section-label--next-week,
 }
 .attainment-header { align-items: flex-start; }
 .attainment-page > .attainment-header { border-bottom: 1px solid #e7e3de; padding-bottom: 1rem; }
-.attainment-header h1 { margin: .25rem 0; font-size: clamp(1.6rem, 2.6vw, 2.25rem); }
+.attainment-header h1 { margin: .25rem 0; }
 .attainment-header p,
 .attainment-chart-card p,
 .attainment-budget-form p { margin: .25rem 0 0; color: var(--oj-core-text-color-secondary); }
@@ -3108,10 +3174,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-analysis-period { color: var(--oj-core-text-color-secondary, #52606d); font-size: .75rem; line-height: 1.35; }
 .attainment-inline-error { padding: .75rem 1rem; border-radius: .5rem; background: var(--oj-core-danger-1); color: var(--oj-core-danger-3); }
 .attainment-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-.attainment-summary article { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); box-shadow: var(--oj-core-box-shadow-sm); }
+.attainment-summary article { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--oj-core-divider-color); border-radius: var(--oj-core-border-radius-md); background: var(--oj-core-bg-color-content); box-shadow: var(--oj-core-box-shadow-sm); }
 .attainment-summary span { color: var(--oj-core-text-color-secondary); font-size: .82rem; }
 .attainment-summary strong { font-size: 1.35rem; }
-.attainment-fy-hero { display: grid; grid-template-columns: minmax(7rem, .7fr) repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--oj-core-divider-color); border-radius: .85rem; background: var(--oj-core-divider-color); box-shadow: none; }
+.attainment-fy-hero { display: grid; grid-template-columns: minmax(7rem, .7fr) repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--oj-core-divider-color); border-radius: var(--oj-core-border-radius-md); background: var(--oj-core-divider-color); box-shadow: none; }
 .attainment-fy-hero > div { display: grid; align-content: center; gap: .35rem; min-height: 6.75rem; padding: 1rem 1.15rem; background: var(--oj-core-bg-color-content); }
 .attainment-fy-hero small { color: var(--oj-core-text-color-secondary); font-weight: 600; }
 .attainment-fy-hero strong { color: var(--oj-core-text-color-primary); font-size: clamp(1.35rem, 2.2vw, 1.9rem); font-weight: 750; }
@@ -3120,7 +3186,7 @@ h4.weekly-activity-section-label--next-week,
 .attainment-fy-hero__primary { border-block-start: .25rem solid var(--oj-core-focus-border-color); }
 .attainment-fy-hero__primary span { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
 .attainment-quarter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
-.attainment-quarter-card { display: grid; gap: .65rem; min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: .75rem; background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); box-shadow: none; }
+.attainment-quarter-card { display: grid; gap: .65rem; min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: var(--oj-core-border-radius-md); background: var(--oj-core-bg-color-content); color: var(--oj-core-text-color-primary); box-shadow: none; }
 .attainment-quarter-card__heading { display: flex; align-items: center; justify-content: space-between; }
 .attainment-quarter-card__heading strong { font-size: 1.05rem; }
 .attainment-quarter-card__heading b { padding: .3rem .65rem; border: 1px solid #5b9f72; border-radius: 999px; background: #dff4e5; color: #174f2b; font-size: 1rem; font-weight: 800; letter-spacing: .01em; }
@@ -3132,6 +3198,7 @@ h4.weekly-activity-section-label--next-week,
 .attainment-quarter-card__metric strong { color: var(--oj-core-text-color-primary); font-size: 1.15rem; font-weight: 700; }
 .attainment-quarter-card__metric--primary strong { font-size: 1.5rem; font-weight: 800; }
 .attainment-quarter-card__actual { color: var(--oj-core-text-color-primary); font-weight: 650; }
+.attainment-quarter-card__actual { display: flex; flex-wrap: wrap; gap: .15rem; }
 .attainment-quarter-card__basis { font-weight: 650; }
 .attainment-quarter-card__pillars { padding-block-start: .55rem; border-block-start: 1px solid var(--oj-core-divider-color); }
 .attainment-chart-card { min-width: 0; }
@@ -3146,7 +3213,7 @@ h4.weekly-activity-section-label--next-week,
 .attainment-section-heading p { font-size: .82rem; }
 .attainment-chart-card.attainment-chart-card { border-inline-start: .25rem solid color-mix(in srgb, var(--oj-core-focus-border-color) 55%, transparent); }
 .attainment-chart-card.attainment-chart-card.attainment-chart-card + .attainment-chart-card { border-inline-start-color: var(--oj-core-divider-color); }
-.attainment-page > .attainment-chart-card.attainment-chart-card { background: transparent; border: 0; border-top: 1px solid #e7e3de; border-radius: 0; box-shadow: none; padding-inline: 0; }
+.attainment-page > .attainment-chart-card.attainment-chart-card { background: #fff; border: 1px solid #d4cec6; border-radius: var(--oj-core-border-radius-md); box-shadow: none; padding: 1rem; }
 .attainment-budget-form { display: grid; gap: 1rem; min-width: min(30rem, 75vw); }
 .attainment-budget-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
 .attainment-budget-fields label { display: grid; gap: .35rem; color: var(--oj-core-text-color-secondary); font-size: .82rem; font-weight: 600; }
@@ -3166,4 +3233,199 @@ h4.weekly-activity-section-label--next-week,
   .attainment-quarter-grid { grid-template-columns: 1fr; }
   .attainment-budget-fields { grid-template-columns: 1fr; }
   .attainment-budget-form { min-width: 0; }
+}
+
+/* Shared page navigation: Oracle JET borderless toolbar inside every page title surface. */
+.kpi-page-menu {
+  min-width: 0;
+  margin: 0 0 .2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.kpi-page-menu::-webkit-scrollbar { display: none; }
+.kpi-page-menu oj-toolbar {
+  display: inline-flex;
+  min-width: max-content;
+  padding: 0;
+  column-gap: .4rem;
+}
+.kpi-page-menu__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.kpi-page-menu__chevron { align-self: center; color: var(--oj-core-text-color-secondary, #625f5b); font-size: 1rem; padding: 0; }
+.kpi-page-menu__item.is-current {
+  color: var(--oj-core-text-color-primary, #161513);
+  font-weight: 700;
+}
+.kpi-page-menu__separator {
+  align-self: center;
+  margin-inline: .25rem;
+  color: var(--oj-core-text-color-secondary, #625f5b);
+  font-size: .9rem;
+  font-weight: 700;
+}
+.kpi-page-menu + .kpi-eyebrow { display: none; }
+.kpi-page-loading__body {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  justify-content: center;
+  min-height: 16rem;
+}
+
+/* Page title = Accounts & Workloads baseline. */
+.kpi-content :is(.consumption-page__header, .kap-users-header, .kpi-route-page, .my-customers-360-page__header, .accounts-workloads-header, .accounts-pulse-v2__header, .weekly-activities-page__header) :is(h1, h2),
+.accounts-workloads-page h1,
+.weekly-activities-page h1,
+.profile-page h1 {
+  margin-block: .2rem;
+  font-size: clamp(1.4rem, 2vw, 1.65rem);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+/* Section and card headings: same semantic level, same type scale. */
+.kpi-content :is(.consumption-section-heading, .attainment-section-heading) h2,
+.kpi-content .kpi-panel__header h2,
+.kpi-content .kpi-section-header h2 {
+  margin-block: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.kpi-content article h3,
+.kpi-content .kpi-card h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.consumption-export-actions { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; flex-wrap: wrap; }
+.consumption-export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  height: 2.6rem;
+  min-height: 2.6rem;
+  padding: .35rem .7rem;
+  border: 1px solid #b8b2ac;
+  border-radius: .35rem;
+  background: #fff;
+  color: #315f75;
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.consumption-export-actions button:hover:not(:disabled) { background: #f1f6f8; border-color: #315f75; }
+.consumption-export-actions button:disabled { opacity: .55; cursor: wait; }
+.consumption-export-actions oj-progress-circle { width: 1rem; height: 1rem; }
+.consumption-export-error { flex-basis: 100%; color: var(--oj-core-danger-3, #8b1d1d); font-size: .75rem; }
+.consumption-insights-linked-trend h3 { font-size: 1rem; line-height: 1.35; font-weight: 700; }
+.consumption-insights-qoq-cards .consumption-insights-status { justify-self: start; width: fit-content; padding: .18rem .45rem; border-radius: 999px; }
+
+@media (max-width: 700px) {
+  .consumption-export-actions { width: 100%; justify-content: flex-start; }
+  .consumption-export-actions button { flex: 1 1 7rem; justify-content: center; }
+}
+
+/* Home Consumption Overview */
+.home-consumption { display: grid; gap: 1rem; min-width: 0; }
+.home-consumption__header { align-items: flex-start; }
+.home-consumption__header p,
+.home-consumption__card-heading p { margin: .25rem 0 0; color: var(--oj-core-text-color-secondary); font-size: .82rem; }
+.home-consumption__fy { padding: .3rem .65rem; border-radius: 999px; background: var(--oj-palette-neutral-rgb-20, #f5f4f2); color: var(--oj-core-text-color-secondary); font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.home-consumption__state { display: flex; align-items: center; justify-content: center; gap: .65rem; min-height: 8rem; color: var(--oj-core-text-color-secondary); }
+.home-consumption__state--error { justify-content: flex-start; min-height: 0; padding: .8rem 1rem; border-radius: .45rem; background: var(--oj-core-danger-1); color: var(--oj-core-danger-3); }
+.home-consumption__coverage { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem 1.1rem; padding: .65rem .85rem; border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; color: var(--oj-core-text-color-secondary); font-size: .78rem; }
+.home-consumption__coverage span { display: inline-flex; align-items: center; gap: .35rem; }
+.home-consumption__coverage strong { margin-inline-start: auto; color: #8b5f00; }
+.home-consumption__legend { width: .7rem; height: .7rem; border-radius: .2rem; }
+.home-consumption__legend--actual { background: #287994; }
+.home-consumption__legend--forecast { background: #8b70b6; }
+.home-consumption__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
+.home-consumption__metrics article { display: grid; gap: .35rem; min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: var(--oj-core-border-radius-md); background: var(--oj-core-bg-color-content); }
+.home-consumption__metrics span { color: var(--oj-core-text-color-secondary); font-size: .78rem; font-weight: 650; }
+.home-consumption__metrics strong { font-size: clamp(1.35rem, 2.2vw, 1.85rem); line-height: 1.1; }
+.home-consumption__metrics small { overflow: hidden; color: var(--oj-core-text-color-secondary); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.home-consumption__metrics .is-positive { color: #237a45; }
+.home-consumption__metrics .is-negative { color: #a12626; }
+.home-consumption__metrics .is-muted { color: var(--oj-core-text-color-secondary); }
+.home-consumption__analysis-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(18rem, .85fr); gap: 1rem; min-width: 0; }
+.home-consumption__chart-card,
+.home-consumption__alerts { min-width: 0; padding: 1rem; border: 1px solid var(--oj-core-divider-color); border-radius: var(--oj-core-border-radius-md); background: var(--oj-core-bg-color-content); }
+.home-consumption__card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-block-end: .85rem; }
+.home-consumption__card-heading h3 { margin: 0; }
+.home-consumption__quarter-list { display: grid; gap: .85rem; }
+.home-consumption__quarter { display: grid; grid-template-columns: 4.5rem minmax(8rem, 1fr); gap: .35rem .75rem; align-items: center; }
+.home-consumption__quarter-label { display: grid; }
+.home-consumption__quarter-label span { color: var(--oj-core-text-color-secondary); font-size: .72rem; }
+.home-consumption__stack { display: flex; height: .75rem; overflow: hidden; border-radius: 999px; background: #ece9e5; }
+.home-consumption__stack-actual { background: #287994; }
+.home-consumption__stack-forecast { background: #8b70b6; }
+.home-consumption__quarter-values { grid-column: 2; display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem .75rem; color: var(--oj-core-text-color-secondary); font-size: .7rem; }
+.home-consumption__quarter-values span { display: inline-flex; align-items: baseline; gap: .25rem; white-space: nowrap; }
+.home-consumption__quarter-values strong { color: var(--oj-core-text-color-primary); font-size: .84rem; font-weight: 800; line-height: 1.1; }
+.home-consumption__alerts ul { display: grid; gap: .2rem; height: 18rem; margin: 0; padding: 0 .35rem 0 0; overflow-y: auto; scrollbar-gutter: stable; list-style: none; }
+.home-consumption__alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .7rem 0; border-block-start: 1px solid var(--oj-core-divider-color); }
+.home-consumption__alerts li:first-child { border-block-start: 0; }
+.home-consumption__alerts li > div { display: grid; min-width: 0; }
+.home-consumption__alerts li span { overflow: hidden; color: var(--oj-core-text-color-secondary); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.home-consumption__grade { padding: .2rem .4rem; border-radius: 999px; font-size: .62rem !important; font-weight: 750; }
+.home-consumption__grade--critical { background: #f9d8d8; color: #8b1d1d !important; }
+.home-consumption__grade--high { background: #f9e3c4; color: #7d4700 !important; }
+.home-consumption__grade--watch { background: #e6eef7; color: #315f75 !important; }
+.home-consumption__alert-value { justify-items: end; }
+.home-consumption__alert-status { margin-block-start: .2rem; padding: .18rem .45rem; border-radius: 999px; font-size: .64rem !important; font-weight: 750; line-height: 1.25; }
+.home-consumption__alert-status--above-usual { background: #e1f2e8; color: #24623c !important; }
+.home-consumption__alert-status--below-usual { background: #f9d8d8; color: #8b1d1d !important; }
+.home-consumption__alert-status--new-usage { background: #e2edf8; color: #245a7a !important; }
+.home-consumption__empty { padding: 1rem 0; color: var(--oj-core-text-color-secondary); font-size: .82rem; }
+.home-consumption__monthly { overflow: hidden; }
+.home-consumption__monthly-legend { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem .9rem; color: var(--oj-core-text-color-secondary); font-size: .72rem; }
+.home-consumption__monthly-legend span { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
+.home-consumption__monthly-legend-line { display: inline-block; width: 1.7rem; border-block-start: 3px solid #287994; }
+.home-consumption__monthly-legend-line--forecast { border-block-start-color: #8b70b6; border-block-start-style: dashed; }
+.home-consumption__monthly-chart { min-height: 15rem; overflow-x: auto; }
+.home-consumption__monthly-svg { display: block; width: 100%; min-width: 44rem; height: auto; overflow: visible; }
+.home-consumption__monthly-grid { stroke: var(--oj-core-divider-color); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.home-consumption__monthly-line { fill: none; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.home-consumption__monthly-line--actual { stroke: #287994; }
+.home-consumption__monthly-line--forecast { stroke: #8b70b6; stroke-dasharray: 8 6; }
+.home-consumption__monthly-dot { stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.home-consumption__monthly-dot--actual { fill: #287994; stroke: #287994; }
+.home-consumption__monthly-dot--forecast { fill: var(--oj-core-bg-color-content); stroke: #8b70b6; }
+.home-consumption__monthly-value,
+.home-consumption__monthly-month { text-anchor: middle; }
+.home-consumption__monthly-value { fill: var(--oj-core-text-color-primary); font-size: .68rem; font-weight: 700; paint-order: stroke; stroke: var(--oj-core-bg-color-content); stroke-width: 4px; stroke-linejoin: round; }
+.home-consumption__monthly-month { fill: var(--oj-core-text-color-primary); font-size: .78rem; font-weight: 800; letter-spacing: .01em; }
+.home-consumption__forecast-marker line { stroke: #8b70b6; stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.home-consumption__forecast-marker text { fill: #705595; font-size: .65rem; font-weight: 700; }
+.home-consumption__monthly-table-accessible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.home-consumption__footnote { margin: .55rem 0 0; color: #8b5f00; font-size: .72rem; }
+@media (max-width: 1000px) {
+  .home-consumption__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-consumption__analysis-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .home-consumption__header { gap: .5rem; }
+  .home-consumption__fy { align-self: flex-start; }
+  .home-consumption__coverage strong { flex-basis: 100%; margin-inline-start: 0; }
+  .home-consumption__metrics { grid-template-columns: 1fr; }
+  .home-consumption__quarter { grid-template-columns: 3.5rem minmax(8rem, 1fr); }
+  .home-consumption__alerts li { grid-template-columns: auto minmax(0, 1fr); }
+  .home-consumption__alert-value { grid-column: 2; justify-items: start; }
 }

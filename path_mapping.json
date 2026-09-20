@@ -32,6 +32,28 @@
         "path": "styles/quill.snow.css"
       }
     },
+    "html2canvas-pro": {
+      "cwd": "node_modules/html2canvas-pro/dist",
+      "debug": {
+        "src": "html2canvas-pro.js",
+        "path": "libs/html2canvas-pro/html2canvas-pro.js"
+      },
+      "release": {
+        "src": "html2canvas-pro.min.js",
+        "path": "libs/html2canvas-pro/html2canvas-pro.min.js"
+      }
+    },
+    "jspdf": {
+      "cwd": "node_modules/jspdf/dist",
+      "debug": {
+        "src": "jspdf.umd.js",
+        "path": "libs/jspdf/jspdf.umd.js"
+      },
+      "release": {
+        "src": "jspdf.umd.min.js",
+        "path": "libs/jspdf/jspdf.umd.min.js"
+      }
+    },
     "knockout": {
       "cdn": "3rdparty",
       "cwd": "node_modules/knockout/build/output",

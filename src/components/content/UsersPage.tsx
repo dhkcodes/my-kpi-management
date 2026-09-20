@@ -1,3 +1,4 @@
+import { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojdialog";
@@ -22,7 +23,7 @@ const actionUrl = (link: UserActionLink): string => {
   return url.toString();
 };
 
-export function UsersPage({ currentUserKey }: Readonly<{ currentUserKey: string }>) {
+export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUserKey: string; breadcrumb?: ComponentChildren }>) {
   const [users, setUsers] = useState<AuthSession[]>([]);
   const [error, setError] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -115,7 +116,7 @@ export function UsersPage({ currentUserKey }: Readonly<{ currentUserKey: string 
     : dialog?.kind === "invite" ? "Invite user" : dialog?.kind === "reissue" ? "Reissue activation link" : "Create password reset link";
 
   return <section class="kap-account-page users-page">
-    <div class="kap-users-header"><div><span class="kpi-eyebrow">Administration</span><h1>Users</h1><p>Manage application access and credential action links.</p></div>
+    <div class="kap-users-header"><div>{breadcrumb}<span class="kpi-eyebrow">Administration</span><h1>Users</h1><p>Manage application access and credential action links.</p></div>
       <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button></div>
     {error && <div class="kap-error" role="alert">{error}</div>}
     <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>

@@ -62,6 +62,20 @@ assert.equal(countUniqueConsumptionPlans([
   { id: "dp-row", planId: visibilityPlans[1].planId },
   { id: "oci-row", planId: visibilityPlans[1].planId }
 ]), 1, "All counts the same Plan ID once when DP and OCI membership coexist");
+const compositionAccounts = [
+  { account: "Positive Total", totalForecastAmount: 100, newAmount: 0, expansionAmount: 0,
+    reductionAmount: 14085, netMovementAmount: -14085 },
+  { account: "Zero Total Reduction", totalForecastAmount: 0, newAmount: 0, expansionAmount: 0,
+    reductionAmount: 1404, netMovementAmount: -1404 },
+  { account: "Tiny Confirmed Reduction", totalForecastAmount: 0, newAmount: 0, expansionAmount: 0,
+    reductionAmount: 2, netMovementAmount: -2 }
+];
+const allCompositionAccounts = filterForecastCompositionAccounts(compositionAccounts, "All");
+assert.deepEqual(allCompositionAccounts.map((account) => account.account),
+  ["Positive Total", "Zero Total Reduction", "Tiny Confirmed Reduction"],
+  "All composition keeps zero-Total Accounts when they contain a confirmed component");
+assert.equal(allCompositionAccounts.reduce((sum, account) => sum + account.reductionAmount, 0), 15491,
+  "All detail and the Reduction chart use the same confirmed Account rows");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
   ["FY27-NOV", "FY27-OCT", "FY27-SEP"],

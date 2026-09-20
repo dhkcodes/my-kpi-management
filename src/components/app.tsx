@@ -624,7 +624,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
               </oj-button>
             </div>
             <div class="kpi-menu-matrix__rows">
-              {navItems.filter((item) => !(activeRoute.id === "home" && item.id === "home")).map((item) => item.children ? (
+              {navItems.map((item) => item.children ? (
                 <section key={item.id} class="kpi-menu-group" aria-labelledby={`kpi-menu-group-${item.id}`}>
                   <div id={`kpi-menu-group-${item.id}`} class="kpi-menu-group__label">
                     {item.icon && <span class={`kpi-menu-group__icon ${item.icon}`} aria-hidden="true"></span>}

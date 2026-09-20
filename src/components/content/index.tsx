@@ -5,11 +5,12 @@
  * as shown at https://oss.oracle.com/licenses/upl/
  * @ignore
  */
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage } from "../../data/kpiMockData";
 import { formatAmountK } from "../../data/kpiCalculations";
-import { isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
+import { getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
+import { PageNavigationToolbar } from "../PageNavigationToolbar";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
@@ -22,6 +23,7 @@ import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
 import { ConsumptionAnalysisPage } from "./ConsumptionAnalysisPage";
 import { AttainmentPage } from "./AttainmentPage";
+import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
 import type { AuthSession } from "../../auth/authSession";
@@ -219,9 +221,10 @@ const overviewTooltip = (dataset: FiscalYearDataset, rowCode: string, quarter: s
 
 const isHomeRoute = (route: NavigationRouteDefinition) => route.module === "home";
 
-function EmptyRoutePage({ route }: Readonly<{ route: NavigationRouteDefinition }>) {
+function EmptyRoutePage({ route, breadcrumb }: Readonly<{ route: NavigationRouteDefinition; breadcrumb?: ComponentChildren }>) {
   return (
     <section id="routePage" class="kpi-panel kpi-route-page" aria-labelledby="routePageTitle" data-route-id={route.id}>
+      {breadcrumb}
       <span class="kpi-eyebrow">Page</span>
       <h2 id="routePageTitle">{route.pageTitle}</h2>
     </section>
@@ -417,6 +420,7 @@ export function Content({
   const openAccountWorkloads = (account: string) => {
     onOpenAccountWorkloads(account);
   };
+  const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} access={profile.access} onNavigate={onNavigate} />;
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
@@ -471,9 +475,9 @@ export function Content({
       )}
 
       {activeRoute.module === "profile" ? (
-        <ProfilePage profile={profile} />
+        <ProfilePage profile={profile} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "users" ? (
-        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} /> : <section class="kap-empty-state" role="alert"><h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
+        profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageNavigation} /> : <section class="kap-empty-state" role="alert">{pageNavigation}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (
         <>
           <AccountsWorkloadsPulseV2
@@ -484,6 +488,7 @@ export function Content({
             loading={accountsWorkloadsLoading}
             dataSource={accountsWorkloadsDataSource}
             onOpenAccount={openAccountWorkloads}
+            breadcrumb={pageNavigation}
           />
           {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
@@ -575,15 +580,17 @@ export function Content({
               ))}
             </div>
           </section>}
+          <HomeConsumptionOverview fiscalYear={fiscalYear} />
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
-          onWriteStateChange={onKpiWriteStateChange} />
+          onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "myCustomers360" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
+            {pageNavigation}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Account Portfolio"></oj-progress-circle>
             <span id="accountPortfolioLoadingText">Loading Account Portfolio data…</span>
           </section>
@@ -593,11 +600,13 @@ export function Content({
             rows={accountsWorkloadsRows}
             dataAvailable={accountsWorkloadsDatasetAvailable}
             onOpenAccount={openAccountWorkloads}
+            breadcrumb={pageNavigation}
           />
         )
       ) : activeRoute.module === "accountsWorkloads" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">
+            {pageNavigation}
             <oj-progress-circle value={-1} size="md" aria-label="Loading Accounts and Workloads"></oj-progress-circle>
             <span id="accountsWorkloadsLoadingText">Loading Accounts &amp; Workloads data…</span>
           </section>
@@ -617,21 +626,23 @@ export function Content({
             onRefresh={onAccountsWorkloadsRefresh}
             onDraftStateChange={onAccountsWorkloadsDraftStateChange}
             onRowsChange={onAccountsWorkloadsRowsChange}
+            breadcrumb={pageNavigation}
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} />
+        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
-        <ConsumptionAnalysisPage fiscalYear={fiscalYear} />
+        <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAttainment" ? (
-        <AttainmentPage fiscalYear={fiscalYear} />
+        <AttainmentPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
           fiscalYear={fiscalYear}
           onNavigationGuardChange={onKpiNavigationGuardChange}
+          breadcrumb={pageNavigation}
         />
       ) : (
-        <EmptyRoutePage route={activeRoute} />
+        <EmptyRoutePage route={activeRoute} breadcrumb={pageNavigation} />
       )}
 
       {guideOpen && isKpiActivitiesRoute(activeRoute) && (

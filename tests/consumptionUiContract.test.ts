@@ -7,11 +7,14 @@ const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx",
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
+const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
+const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
-assert.match(insightsPage, /consumption-initial-loading[\s\S]*불러오는 중/, "Analysis initial loading is compact and uses simple Korean");
-assert.doesNotMatch(insightsPage, /Loading Consumption Analysis|consumption-insights-loading/, "Analysis does not render the former large loading panel");
+assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
+assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
+assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
 assert.doesNotMatch(attainmentPage, /Closed months use Actual|fiscal-period completeness|unopened-period status|complete full-year outlook/i, "Attainment removes standing implementation disclaimers");
 
@@ -47,6 +50,14 @@ const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 assert.match(styles,
   /\.kpi-content:has\(\.consumption-insights-page\),\s*\.kpi-content:has\(\.attainment-page\)\s*\{[^}]*align-content:\s*start;[^}]*grid-auto-rows:\s*max-content;/,
   "Analysis and Attainment keep short initial loading content directly below the fiscal-year panel");
+assert.match(styles, /\.kpi-page-menu oj-toolbar\s*\{[^}]*column-gap:\s*\.4rem;/,
+  "all breadcrumb segments use one common left/right gap");
+assert.match(styles, /\.kpi-page-menu__chevron\s*\{[^}]*padding:\s*0;/,
+  "breadcrumb chevrons do not use route-specific padding");
+assert.match(styles, /\.kpi-page-loading__body\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/,
+  "only the loading body is centered so the page header does not move");
+assert.match(pageNavigation, /kpi-page-menu__chevron[\s\S]*kpi-page-menu__item is-section[\s\S]*kpi-page-menu__chevron[\s\S]*kpi-page-menu__current-label/,
+  "every breadcrumb level uses the same separator element");
 assert.match(styles,
   /\.consumption-insights-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
   "Consumption Analysis is one Redwood-aligned white outer panel");
@@ -54,17 +65,20 @@ assert.match(styles,
   /\.consumption-insights-page > \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
   "top-level Analysis sections use separators instead of nested cards");
 assert.match(styles,
+  /\.consumption-insights-page > \.consumption-insights-composition,\s*\.consumption-insights-page > \.consumption-insights-alert-trend\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*padding:\s*1rem;/,
+  "Forecast composition and Alerts/Trend keep their headings and related content inside matching Analysis cards");
+assert.match(styles,
   /\.consumption-insights-page \.consumption-insights-kpis \.kpi-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*none;/,
   "KPI summary cells form one continuous band without nested shadows");
 assert.match(styles,
   /\.attainment-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*padding:\s*1rem;/,
   "Consumption Attainment is one Redwood-aligned white outer panel, including its initial state");
 assert.match(styles,
-  /\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*box-shadow:\s*none;/,
-  "Attainment quarter comparisons retain boundaries without nested shadows");
+  /\.attainment-fy-hero\s*\{[^}]*border-radius:\s*var\(--oj-core-border-radius-md\)[\s\S]*\.attainment-quarter-card\s*\{[^}]*border:\s*1px solid var\(--oj-core-divider-color\);[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*box-shadow:\s*none;/,
+  "Attainment summary and quarter boxes use the Analysis-level corner radius without nested shadows");
 assert.match(styles,
-  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*border-top:\s*1px solid #e7e3de;[^}]*box-shadow:\s*none;[^}]*padding-inline:\s*0;/,
-  "Attainment charts become separated sections instead of nested cards");
+  /\.attainment-page > \.attainment-chart-card\.attainment-chart-card\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #d4cec6;[^}]*border-radius:\s*var\(--oj-core-border-radius-md\);[^}]*box-shadow:\s*none;/,
+  "Attainment charts use the Analysis-level corner radius and Redwood-neutral boundary without shadow");
 assert.match(styles,
   /\.consumption-page\s*\{[^}]*background:\s*#fff;[^}]*border:\s*1px solid #dedad4;[^}]*border-radius:\s*12px;[^}]*box-shadow:\s*0 1px 2px rgba\(0, 0, 0, \.06\);[^}]*box-sizing:\s*border-box;[^}]*padding:\s*\.75rem;/,
   "Consumption Records follows the Accounts and Workloads single-panel workspace pattern");
@@ -74,6 +88,7 @@ assert.match(styles,
 assert.match(styles,
   /\.consumption-table-scroll\s*\{[^}]*border:\s*1px solid var\(--kpi-border\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*auto;/,
   "Records preserves the table scroll boundary and both scroll axes");
+assert.match(recordsPage, /Account \/ Plan Consumption/, "Records uses the Account / Plan Consumption title");
 assert.match(styles,
   /@media \(min-width: 64rem\)[\s\S]*\.consumption-page\s*\{[^}]*padding-block:\s*\.45rem;[^}]*\}[\s\S]*\.consumption-table-panel\s*\{[^}]*padding:\s*0;/,
   "desktop Records moves the former table padding to the outer panel without reducing table space");
@@ -89,7 +104,18 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords'\]\.includes\(
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
-assert.match(insightsPage, /analysisResponse\.fiscalYear === fiscalYear[\s\S]*analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "Analysis renders only when the response FY and Account match the requested context");
+assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
+assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
+assert.match(insightsPage, /aria-busy=\{loading \? "true" : "false"\}/, "Analysis exposes refresh state without replacing its mounted page shell");
+assert.match(insightsPage, /const hasStaleFiscalYearResponse = analysisResponse !== null && analysisResponse\.fiscalYear !== fiscalYear/, "Analysis recognizes a previous-FY response before the next request effect runs");
+const analysisBlockingLoadingStart = insightsPage.indexOf("if (!analysis && (loading || hasStaleFiscalYearResponse))");
+const analysisBlockingLoadingEnd = insightsPage.indexOf("const messages:", analysisBlockingLoadingStart);
+const analysisBlockingLoadingBranch = insightsPage.slice(analysisBlockingLoadingStart, analysisBlockingLoadingEnd);
+assert.ok(analysisBlockingLoadingStart >= 0 && analysisBlockingLoadingEnd > analysisBlockingLoadingStart, "Analysis has an isolated initial/FY-transition loading branch");
+assert.match(analysisBlockingLoadingBranch, /class="accounts-workloads-page accounts-workloads-loading"[\s\S]*Loading Consumption Analysis\.\.\./, "Analysis blocking loading uses the Attainment loading presentation");
+assert.doesNotMatch(analysisBlockingLoadingBranch, /consumption-page__header|Consumption \/ Analysis|<h1>/, "Analysis title and breadcrumb stay hidden during initial and FY-transition loading");
+assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
+assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
@@ -133,11 +159,11 @@ assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights
 assert.doesNotMatch(styles, /\.consumption-insights-trend-periods/, "obsolete duplicate-list styling is removed");
 assert.match(apiSource, /URLSearchParams\(\{ fiscalYear: query\.fiscalYear, search: query\.search, account: query\.account, salesRep: query\.salesRep \?\? "" \}\)/, "Analysis client sends the FY, candidate search, selected Account, and Sales Rep query");
 assert.match(apiSource, /accountCandidates[\s\S]*workloads[\s\S]*planIds/, "Analysis candidate data has a strict searchable Account\/Workload\/Plan ID contract");
-assert.match(insightsPage, /포함기간 \{periodRange\(analysis\.periodCoverage\.includedPeriods\)\} · K USD/, "Analysis keeps period and unit as compact header context");
+assert.doesNotMatch(insightsPage, /포함기간|FY\d+-[A-Z]{3}–FY\d+-[A-Z]{3} Actual \+ Forecast/, "Analysis removes visible period guidance without changing calculations");
 assert.doesNotMatch(insightsPage, /About current ownership and unavailable comparisons|Why YoY is unavailable|Why the YoY rate is unavailable/, "Analysis removes standing explanatory disclosures");
 assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A/, "explicit prior zero preserves the amount and presents the unavailable rate concisely");
 assert.doesNotMatch(insightsPage, /rate N\/A \(prior Actual 0\)|<small>\{row\.yoyUnavailableReason/, "long N/A reasons are not rendered inline in Sales Rep cells");
-assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*All filtered Accounts total/, "Forecast Composition All includes a bottom total row sourced from the full API account set");
+assert.match(insightsPage, /selectedMovement\.category === "All" \? <tfoot><tr><th>Total<\/th>/, "Forecast Composition All uses the concise Total label");
 assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
 assert.doesNotMatch(attainmentPage, /included-period results|not asserted to be a complete full-year outlook/, "Attainment removes the standing technical completeness disclaimer");
 
@@ -158,7 +184,7 @@ assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
 assert.match(insightsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)/, "Insights uses the same All-versus-typed DC presentation");
-assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{selectedPillar\}/, "Plan Contribution uses the scoped DC total");
+assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <InsightsDataCenter plan=\{plan\} selectedPillar=\{analysis\.selectedPillar\}/, "Plan Contribution uses the completed response's scoped DC total during refresh");
 assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Consumption Analysis omits DP + OCI breakdown and duplicate warnings");
 
 // Consumption Records remains the mutable Data workspace and excludes analysis duplication.
@@ -191,7 +217,18 @@ assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*N
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompositionCategory \} \| null>/, "Forecast composition supports All and each classified drill category");
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
-assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total \(K\)<\/th><th>New \(K\)<\/th><th>Expansion \(K\)<\/th><th>Reduction \(K\)<\/th>/, "All detail distinguishes Total and every stored composition amount");
+assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
+assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
+assert.match(insightsPage, /consumption-insights-export[\s\S]*<span>Export<\/span>[\s\S]*downloadCanvas\("png"\)[\s\S]*downloadCanvas\("pdf"\)/, "PNG and PDF controls have one aligned Export field label");
+assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
+assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
+assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
+assert.doesNotMatch(insightsPage, /미분류 포함|consumption-insights-composition-warning/, "Forecast composition does not warn about normal natural movement");
+assert.doesNotMatch(insightsPage, /All is Total Forecast|not a full breakdown of Total/, "Forecast chart does not render replacement explanatory copy or its spacing");
+assert.match(insightsPage, /Forecast signals by quarter<\/h2><\/div><\/div>/, "Forecast heading ends after the title without an explanatory paragraph");
+assert.doesNotMatch(insightsPage, /Some quarters include unclassified Forecast|Confirmed New, Expansion, and Reduction amounts are shown|Total Forecast remains unchanged/, "the long explanatory composition message is removed from the chart surface");
+assert.match(attainmentPage, /attainment-quarter-card__actual[\s\S]*consumption-metric is-actual[\s\S]*consumption-metric is-forecast/, "Attainment uses the same semantic Actual and Forecast emphasis");
+assert.match(styles, /\.consumption-sales-rep-overview \.consumption-sales-rep-table thead th \{[\s\S]*font-size: \.82rem;[\s\S]*background: #e9eef2|\.consumption-sales-rep-overview \.consumption-sales-rep-table thead th \{[\s\S]*background: #e9eef2;[\s\S]*font-size: \.82rem;/, "Sales Rep Overview header uses a larger readable Redwood-compatible treatment");
 assert.match(insightsPage, /consumption-insights-movement-list[\s\S]*<thead>[\s\S]*<th>Account<\/th>/, "the account table is isolated in its own scroll region with a retained header");
 assert.doesNotMatch(insightsPage, />Close<\/button>/, "composition detail no longer has a Close button");
 assert.match(styles, /\.consumption-insights-movement-detail \{[^}]*height: 100%;[^}]*overflow: hidden;[\s\S]*\.consumption-insights-movement-list \{[^}]*overflow: auto;[\s\S]*\.consumption-insights-movement-detail thead th \{[^}]*position: sticky;/, "detail matches the chart height and scrolls only the list while keeping the header");
@@ -202,8 +239,13 @@ assert.doesNotMatch(insightsPage, /if \(point\.totalForecastAmount === null\) re
 assert.match(insightsPage, /const all = point\.totalForecastAmount === null \? null[\s\S]*return all === null \? components : \[all, \.\.\.components\]/, "All is omitted independently when unavailable while New, Expansion, and Reduction remain chartable");
 assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMovementPoint\.accounts, selectedMovement\.category\)/, "composition detail applies Forecast Total for All and component criteria for category tabs");
 assert.match(insightsPage, /consumption-insights-composition-grid[\s\S]*consumption-insights-composition-chart__plot[\s\S]*consumption-insights-movement-detail/, "Forecast composition chart and detail share an independent responsive section");
-assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:[^}]*1\.2fr[^}]*\.8fr[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses two columns on desktop and one column on narrower screens");
-assert.match(insightsPage, /Forecast composition by quarter/);
+assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses balanced columns on desktop and one column on narrower screens");
+assert.match(insightsPage, /consumption-insights-composition-chart" data-quarter-count=\{analysis\.movementBridge\.length\}/, "mobile chart receives the displayed quarter count for content-sized height");
+assert.match(insightsPage, /consumption-insights-composition-grid" data-quarter-count=\{analysis\.movementBridge\.length\}/, "desktop chart and detail share the displayed quarter count");
+assert.match(styles, /@media \(min-width: 1101px\)[\s\S]*composition-grid \{[^}]*align-items: start;[^}]*height: auto;[\s\S]*composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\);[^}]*height: 18\.5rem;[\s\S]*data-quarter-count="1"[\s\S]*height: 12\.5rem;[\s\S]*data-quarter-count="3"[\s\S]*height: 16\.5rem;/, "wide Forecast composition aligns to the top and sizes both chart and detail by quarter count");
+assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\)[^}]*height: 18\.5rem[^}]*[\s\S]*data-quarter-count="1"[^}]*height: 13rem[^}]*[\s\S]*data-quarter-count="2"[^}]*height: 14\.5rem[^}]*[\s\S]*data-quarter-count="3"[^}]*height: 16\.5rem/, "mobile Forecast legend precedes a quarter-count-sized plot without the inherited fixed 24rem gap");
+assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
+assert.match(insightsPage, /Forecast signals by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, /oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "actions are ordered Forecast Import, Forecast Export, Actual Import, Actual Export with matching upload/download icons");
 assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*onojAction=\{\(\) => void exportForecastCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*onojAction=\{\(\) => fileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*onojAction=\{\(\) => void exportImportCompatibleCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "each ordered action remains connected to its matching Forecast/Actual import/export handler");
@@ -239,7 +281,8 @@ assert.match(recordsPage, /onCompositionStart[\s\S]*setSearchComposing\(true\)[\
 assert.match(recordsPage, /submitRecordsQuery[\s\S]*fromQuarter[\s\S]*toQuarter[\s\S]*draftSearch\.trim\(\)[\s\S]*loadRecordsPage\(false, query\)/, "Apply submits quarter and search atomically");
 assert.match(recordsPage, /event\.key === "Enter"[\s\S]*!event\.isComposing[\s\S]*submitRecordsQuery/, "Enter submits the same atomic records query after IME composition");
 assert.match(recordsPage, /initialConsumptionRecordsBatchSize\(window\.innerHeight\)/, "the initial records request is sized to the viewport");
-assert.match(recordsPage, /type RecordsLoadingPhase = "idle" \| "initial" \| "query" \| "append"[\s\S]*blockingRecordsLoading = recordsLoadingPhase === "initial" \|\| recordsLoadingPhase === "query"/, "records loading distinguishes blocking initialization and query work from background append work");
+assert.match(recordsPage, /type RecordsLoadingPhase = "idle" \| "initial" \| "query" \| "append"[\s\S]*blockingRecordsLoading = recordsLoadingPhase === "initial"/, "only initial records loading replaces the page shell");
+assert.match(recordsPage, /recordsLoadingPhase === "query"[\s\S]*consumption-results-refresh[\s\S]*Refreshing results/, "replacement queries retain the Records header and controls while the results region refreshes");
 assert.match(recordsPage, /if \(append && \(recordsLoadingRef\.current[\s\S]*generation !== recordsRequestGeneration\.current/, "new search or sort requests supersede in-flight replacements while stale results are ignored");
 assert.match(recordsPage, /const requestQuery(?:: RecordsQuery)? = append \? recordsQueryRef\.current[\s\S]*offset: append \? recordsNextOffset : 0/, "append requests retain the last applied filter snapshot instead of unsubmitted draft controls");
 const recordsFetchIndex = recordsPage.indexOf("const page = await fetchConsumptionRecords");
@@ -285,7 +328,7 @@ assert.doesNotMatch(recordsPage, /missingForecastLabel|Forecast membership unava
 assert.doesNotMatch(recordsPage, /<small>ACCOUNT · \{selectedPillar === "DP" \? "DP" : "OCI-OTHER"\}<\/small>/, "Account Forecast cells omit redundant Pillar helper text");
 assert.match(recordsPage, /currency\.format\(summary\.total \?\? 0\)[\s\S]*summary\.preQGap === null \? "—"/, "quarter totals render zero for missing values while a missing prior quarter keeps Pre-Q Gap unavailable");
 assert.match(recordsPage, /Actual values are read-only and are never imported by Forecast Import[\s\S]*referenceNotice \?\? ""/, "Forecast preview always labels Actual reference columns as read-only even without a backend notice");
-assert.match(recordsPage, /Reduction \$\{composition\.reductionAmount[\s\S]*previous Total minus current Total[\s\S]*Previous source/, "Consumption Records Forecast tooltip exposes the complete composition and Total-only Reduction basis");
+assert.match(recordsPage, /Reduction \$\{composition\.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" \? "비교 기준 없음"[\s\S]*composition\.reductionAmount[\s\S]*previous Total minus current Total[\s\S]*Previous source/, "Consumption Records Forecast tooltip distinguishes a missing comparison basis from a calculated zero Reduction");
 assert.doesNotMatch(recordsPage, /this legacy scalar Forecast does not include movement components/, "normal legacy scalar Forecasts do not emit a repeated Consumption Records warning");
 assert.match(recordsPage, /composition\.compositionStatus === "UNCLASSIFIED"[\s\S]*return null/, "legacy scalar Forecast composition is intentionally omitted from Consumption Records");
 assert.match(recordsPage, /compositionStatus === "UNAVAILABLE"[\s\S]*Forecast composition unavailable/, "actual missing Forecast composition still has an explicit unavailable message");
@@ -343,8 +386,7 @@ assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-in
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
-assert.match(recordsPage, /class=\{`consumption-range-apply\$\{dataMode === "loading" \? " consumption-range-apply--initializing" : ""\}`\}/, "Apply stays explicitly hidden while the first Consumption Records request initializes");
-assert.match(styles, /\.consumption-range-apply--initializing\s*\{[^}]*visibility:\s*hidden/, "the initializing Apply state preserves its layout slot without flashing");
+assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Records uses the full Accounts & Workloads loader instead of flashing an initializing Apply control");
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
 assert.match(styles, /\.consumption-range-apply:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--oj-core-focus-border-color, #0572ce\)[^}]*outline-offset:\s*2px/, "Apply retains a distinct accessible focus ring without replacing its fill color");
 assert.doesNotMatch(styles, /\.consumption-range-apply[^\n]*#194f63/, "Apply never changes permanently to the legacy teal interaction color");
@@ -354,5 +396,14 @@ assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*min
 assert.match(styles, /\.consumption-range-bar\s*\{[^}]*padding:\s*\.5rem \.75rem[^}]*row-gap:\s*\.5rem/, "the compact Records range bar has equal vertical padding and row spacing");
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-main > span:not\(\.consumption-signal-badges\)[^}]*font-size:\s*\.88rem[\s\S]*\.consumption-insights-linked-trend > div > p[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-contribution-list button > span[^}]*font-size:\s*1rem[\s\S]*\.consumption-insights-plan-list article small b[^}]*font-size:\s*\.9rem/, "alert workload, trend context, Account, Workload, and Plan labels use prominent typography");
 assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\s*calc\(100dvh[^}]*env\(safe-area-inset-bottom\)[^}]*top:\s*calc\(5rem \+ env\(safe-area-inset-top\)\)/, "mobile side navigation starts below the header and remains reachable with safe-area-aware dynamic height");
+
+// Export follow-up: modern CSS colors must be handled inside the capture engine and progress is explicit.
+assert.match(insightsPage, /import html2canvasPro = require\("html2canvas-pro"\)/, "the export-only renderer supports modern CSS color() values without changing the live design");
+assert.match(insightsPage, /html2canvasModule\.default \?\? html2canvasModule\.html2canvas/, "the renderer is resolved from its AMD module shape");
+assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PNG 생성 중…/, "PNG export shows an immediate spinner and progress label");
+assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PDF 생성 중…/, "PDF export shows an immediate spinner and progress label");
+assert.match(insightsPage, /disabled=\{loading \|\| !!exporting\}/, "both export buttons reject duplicate clicks while either export is active");
+assert.match(insightsPage, /finally\s*\{[\s\S]*setExporting\(""\)/, "export controls recover after both success and failure");
+assert.match(styles, /\.consumption-insights-linked-trend h3\s*\{[^}]*font-size:\s*1rem[^}]*font-weight:\s*700/, "ACTUAL Trend matches the card-heading hierarchy rather than inheriting an oversized title");
 
 console.log("consumptionUiContract tests passed");

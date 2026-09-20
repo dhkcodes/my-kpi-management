@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
   createWeeklyActivity,
@@ -67,9 +67,10 @@ function ActivityContent({ html, label, onDblClick }: Readonly<{ html: string; l
 type WeeklyActivitiesPageProps = Readonly<{
   fiscalYear: FiscalYear;
   onDirtyStateChange?: (active: boolean) => void;
+  breadcrumb?: ComponentChildren;
 }>;
 
-export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyActivitiesPageProps) {
+export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrumb }: WeeklyActivitiesPageProps) {
   const defaultRange = getWeeklyActivityFiscalYearRange(fiscalYear);
   const [filters, setFilters] = useState({ ...defaultRange, search: "" });
   const [query, setQuery] = useState<WeeklyActivitiesQuery>({ ...defaultRange, search: "", page: 0, size: PAGE_SIZE });
@@ -444,6 +445,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange }: WeeklyA
     <section id="weeklyActivitiesPage" class="weekly-activities-page" aria-labelledby="weeklyActivitiesTitle">
       <header class="weekly-activities-page__header">
         <div>
+          {breadcrumb}
           <span class="kpi-eyebrow">Activity planning</span>
           <h2 id="weeklyActivitiesTitle">Weekly Activities</h2>
 
