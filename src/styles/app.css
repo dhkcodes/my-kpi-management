@@ -3354,7 +3354,9 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__stack { display: flex; height: .75rem; overflow: hidden; border-radius: 999px; background: #ece9e5; }
 .home-consumption__stack-actual { background: #287994; }
 .home-consumption__stack-forecast { background: #8b70b6; }
-.home-consumption__quarter-values { grid-column: 2; display: flex; justify-content: space-between; color: var(--oj-core-text-color-secondary); font-size: .68rem; }
+.home-consumption__quarter-values { grid-column: 2; display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem .75rem; color: var(--oj-core-text-color-secondary); font-size: .7rem; }
+.home-consumption__quarter-values span { display: inline-flex; align-items: baseline; gap: .25rem; white-space: nowrap; }
+.home-consumption__quarter-values strong { color: var(--oj-core-text-color-primary); font-size: .84rem; font-weight: 800; line-height: 1.1; }
 .home-consumption__alerts ul { display: grid; gap: .2rem; height: 18rem; margin: 0; padding: 0 .35rem 0 0; overflow-y: auto; scrollbar-gutter: stable; list-style: none; }
 .home-consumption__alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .7rem 0; border-block-start: 1px solid var(--oj-core-divider-color); }
 .home-consumption__alerts li:first-child { border-block-start: 0; }
@@ -3366,9 +3368,9 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__grade--watch { background: #e6eef7; color: #315f75 !important; }
 .home-consumption__alert-value { justify-items: end; }
 .home-consumption__alert-status { margin-block-start: .2rem; padding: .18rem .45rem; border-radius: 999px; font-size: .64rem !important; font-weight: 750; line-height: 1.25; }
-.home-consumption__alert-status--above-usual { background: #f9d8d8; color: #8b1d1d !important; }
-.home-consumption__alert-status--below-usual { background: #e6eef7; color: #315f75 !important; }
-.home-consumption__alert-status--new-usage { background: #e1f2e8; color: #24623c !important; }
+.home-consumption__alert-status--above-usual { background: #e1f2e8; color: #24623c !important; }
+.home-consumption__alert-status--below-usual { background: #f9d8d8; color: #8b1d1d !important; }
+.home-consumption__alert-status--new-usage { background: #e2edf8; color: #245a7a !important; }
 .home-consumption__empty { padding: 1rem 0; color: var(--oj-core-text-color-secondary); font-size: .82rem; }
 .home-consumption__monthly { overflow: hidden; }
 .home-consumption__monthly-legend { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem .9rem; color: var(--oj-core-text-color-secondary); font-size: .72rem; }
@@ -3387,7 +3389,7 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__monthly-value,
 .home-consumption__monthly-month { text-anchor: middle; }
 .home-consumption__monthly-value { fill: var(--oj-core-text-color-primary); font-size: .68rem; font-weight: 700; paint-order: stroke; stroke: var(--oj-core-bg-color-content); stroke-width: 4px; stroke-linejoin: round; }
-.home-consumption__monthly-month { fill: var(--oj-core-text-color-primary); font-size: .7rem; font-weight: 700; }
+.home-consumption__monthly-month { fill: var(--oj-core-text-color-primary); font-size: .78rem; font-weight: 800; letter-spacing: .01em; }
 .home-consumption__forecast-marker line { stroke: #8b70b6; stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .home-consumption__forecast-marker text { fill: #705595; font-size: .65rem; font-weight: 700; }
 .home-consumption__monthly-table-accessible {
