@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import type { ConsumptionAnalysis, ConsumptionRecordsTotals } from "../src/data/consumptionApi";
-import { buildHomeConsumptionOverview } from "../src/data/homeConsumptionOverview";
+import {
+  buildHomeConsumptionLineEdges,
+  buildHomeConsumptionOverview,
+  type HomeConsumptionMonth
+} from "../src/data/homeConsumptionOverview";
 
 const analysis = {
   fiscalYear: "FY27",
@@ -44,4 +48,17 @@ assert.deepEqual(overview.months.map(({ periodKey, kind, amount }) => ({ periodK
   { periodKey: "FY27-SEP", kind: "FORECAST", amount: 4000 }
 ]);
 assert.equal(overview.months[3].incomplete, true);
-console.log("home consumption overview aggregation: ok");
+
+const lineMonths: readonly HomeConsumptionMonth[] = [
+  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000, incomplete: false },
+  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, incomplete: false },
+  { periodKey: "FY27-AUG", kind: "FORECAST", amount: 3000, incomplete: false },
+  { periodKey: "FY27-SEP", kind: "FORECAST", amount: null, incomplete: true },
+  { periodKey: "FY27-OCT", kind: "FORECAST", amount: 5000, incomplete: false },
+  { periodKey: "FY27-DEC", kind: "FORECAST", amount: 6000, incomplete: false }
+];
+assert.deepEqual(buildHomeConsumptionLineEdges(lineMonths), [
+  { kind: "ACTUAL", fromIndex: 0, toIndex: 1 },
+  { kind: "FORECAST", fromIndex: 1, toIndex: 2 }
+]);
+console.log("home consumption overview aggregation and line continuity: ok");

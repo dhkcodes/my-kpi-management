@@ -6,6 +6,7 @@ import {
   type ConsumptionAnalysis
 } from "../../data/consumptionApi";
 import {
+  buildHomeConsumptionLineEdges,
   buildHomeConsumptionOverview,
   type HomeConsumptionOverviewData
 } from "../../data/homeConsumptionOverview";
@@ -26,6 +27,14 @@ const periodRange = (periods: readonly string[]) => {
   return `${periods[0]} – ${periods[periods.length - 1]}`;
 };
 const alertLabel = (type: string) => type.split("_").map((token) => token.charAt(0) + token.slice(1).toLowerCase()).join(" ");
+
+const monthlyChart = Object.freeze({ width: 960, height: 240, left: 42, right: 934, top: 36, bottom: 190 });
+const monthlyChartX = (index: number, count: number) => count <= 1
+  ? (monthlyChart.left + monthlyChart.right) / 2
+  : monthlyChart.left + (index / (count - 1)) * (monthlyChart.right - monthlyChart.left);
+const monthlyChartY = (amount: number, maximum: number) => maximum <= 0
+  ? monthlyChart.bottom
+  : monthlyChart.bottom - (Math.max(0, amount) / maximum) * (monthlyChart.bottom - monthlyChart.top);
 
 export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: string }>) {
   const [data, setData] = useState<HomeConsumptionOverviewData | null>(null);
@@ -59,6 +68,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
   }, [fiscalYear]);
 
   const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.map((month) => month.amount ?? 0) ?? [])), [data]);
+  const monthlyEdges = useMemo(() => buildHomeConsumptionLineEdges(data?.months ?? []), [data]);
   const firstForecastIndex = data?.months.findIndex((month) => month.kind === "FORECAST") ?? -1;
 
   return (
@@ -166,23 +176,74 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
             <div class="home-consumption__card-heading">
               <div><h3>Actual Continuity into Forecast</h3><p>Monthly Consumption; the divider marks the first Forecast month.</p></div>
             </div>
-            <div class="home-consumption__monthly-chart" role="img" aria-label="Monthly Consumption from Actual into Forecast">
-              {data.months.map((month, index) => {
-                const height = monthlyMax > 0 && month.amount !== null ? Math.max(3, (month.amount / monthlyMax) * 100) : 0;
-                const transition = index === firstForecastIndex;
-                return (
-                  <div class={`home-consumption__month${transition ? " is-transition" : ""}`} key={month.periodKey}>
-                    {transition && <span class="home-consumption__transition-label">Forecast starts</span>}
-                    <span class="home-consumption__month-value">{formatAmountK(month.amount)}{month.incomplete ? "*" : ""}</span>
-                    <div class="home-consumption__month-track">
-                      <span class={`home-consumption__month-bar home-consumption__month-bar--${month.kind.toLowerCase()}`} style={`height:${height}%`}></span>
-                    </div>
-                    <strong>{monthLabel(month.periodKey)}</strong>
-                    <small>{month.kind === "ACTUAL" ? "A" : "F"}</small>
-                  </div>
-                );
-              })}
+            <div class="home-consumption__monthly-chart" role="img" aria-label="Monthly Consumption line chart from Actual into Forecast; an accessible data table follows">
+              <svg class="home-consumption__monthly-svg" viewBox={`0 0 ${monthlyChart.width} ${monthlyChart.height}`} aria-hidden="true">
+                {[monthlyChart.top, (monthlyChart.top + monthlyChart.bottom) / 2, monthlyChart.bottom].map((y) => (
+                  <line class="home-consumption__monthly-grid" x1={monthlyChart.left} y1={y} x2={monthlyChart.right} y2={y} key={y}></line>
+                ))}
+                {firstForecastIndex >= 0 && (
+                  <g class="home-consumption__forecast-marker">
+                    <line
+                      x1={monthlyChartX(firstForecastIndex, data.months.length)}
+                      y1={20}
+                      x2={monthlyChartX(firstForecastIndex, data.months.length)}
+                      y2={monthlyChart.bottom}
+                    ></line>
+                    <text x={monthlyChartX(firstForecastIndex, data.months.length) + 6} y={16}>Forecast starts</text>
+                  </g>
+                )}
+                {monthlyEdges.map((edge) => {
+                  const from = data.months[edge.fromIndex];
+                  const to = data.months[edge.toIndex];
+                  return (
+                    <line
+                      class={`home-consumption__monthly-line home-consumption__monthly-line--${edge.kind.toLowerCase()}`}
+                      x1={monthlyChartX(edge.fromIndex, data.months.length)}
+                      y1={monthlyChartY(from.amount as number, monthlyMax)}
+                      x2={monthlyChartX(edge.toIndex, data.months.length)}
+                      y2={monthlyChartY(to.amount as number, monthlyMax)}
+                      key={`${from.periodKey}-${to.periodKey}`}
+                    ></line>
+                  );
+                })}
+                {data.months.map((month, index) => {
+                  const x = monthlyChartX(index, data.months.length);
+                  const y = month.amount === null ? null : monthlyChartY(month.amount, monthlyMax);
+                  return (
+                    <g class="home-consumption__monthly-point" key={month.periodKey}>
+                      {y !== null && (
+                        <>
+                          <circle class={`home-consumption__monthly-dot home-consumption__monthly-dot--${month.kind.toLowerCase()}`} cx={x} cy={y} r={5}>
+                            <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : "Forecast"}: ${formatAmountK(month.amount)}`}</title>
+                          </circle>
+                          <text class="home-consumption__monthly-value" x={x} y={Math.max(18, y - 12)}>
+                            {formatAmountK(month.amount)}{month.incomplete ? "*" : ""}
+                          </text>
+                        </>
+                      )}
+                      <text class="home-consumption__monthly-month" x={x} y={216}>{monthLabel(month.periodKey)}</text>
+                      <text class="home-consumption__monthly-kind" x={x} y={232}>{month.kind === "ACTUAL" ? "A" : "F"}</text>
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
+            <table class="home-consumption__monthly-table-accessible">
+              <caption>Monthly Consumption values in K USD</caption>
+              <thead>
+                <tr><th scope="col">Month</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Coverage</th></tr>
+              </thead>
+              <tbody>
+                {data.months.map((month) => (
+                  <tr key={month.periodKey}>
+                    <th scope="row">{month.periodKey}</th>
+                    <td>{month.kind === "ACTUAL" ? "Actual" : "Forecast"}</td>
+                    <td>{month.amount === null ? "Unavailable" : formatAmountK(month.amount)}</td>
+                    <td>{month.incomplete ? "Partial or incomplete" : "Complete"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             {data.months.some((month) => month.incomplete) && <p class="home-consumption__footnote">* Partial or incomplete source coverage; value should not be treated as a complete month.</p>}
           </article>
         </>

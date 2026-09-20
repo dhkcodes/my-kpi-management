@@ -8,6 +8,34 @@ export type HomeConsumptionMonth = Readonly<{
   incomplete: boolean;
 }>;
 
+export type HomeConsumptionLineEdge = Readonly<{
+  kind: "ACTUAL" | "FORECAST";
+  fromIndex: number;
+  toIndex: number;
+}>;
+
+const homeConsumptionFiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"] as const;
+
+const homeConsumptionPeriodOrder = (periodKey: string): number | null => {
+  const match = /^FY(\d{2})-([A-Z]{3})$/.exec(periodKey);
+  if (!match) return null;
+  const monthIndex = homeConsumptionFiscalMonths.indexOf(match[2] as typeof homeConsumptionFiscalMonths[number]);
+  return monthIndex < 0 ? null : Number(match[1]) * 12 + monthIndex;
+};
+
+export const buildHomeConsumptionLineEdges = (
+  months: readonly HomeConsumptionMonth[]
+): readonly HomeConsumptionLineEdge[] => months.slice(1).flatMap((month, offset) => {
+  const toIndex = offset + 1;
+  const previous = months[offset];
+  const previousOrder = homeConsumptionPeriodOrder(previous.periodKey);
+  const currentOrder = homeConsumptionPeriodOrder(month.periodKey);
+  const consecutive = previousOrder !== null && currentOrder !== null && currentOrder - previousOrder === 1;
+  const compatibleKinds = month.kind === "FORECAST" || previous.kind === "ACTUAL";
+  if (previous.amount === null || month.amount === null || !consecutive || !compatibleKinds) return [];
+  return [{ kind: month.kind, fromIndex: offset, toIndex }];
+});
+
 export type HomeConsumptionOverviewData = Readonly<{
   actualAmount: number | null;
   expectedAmount: number | null;
