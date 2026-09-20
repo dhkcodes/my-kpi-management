@@ -145,7 +145,10 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
                         <span class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></span>
                         <span class="home-consumption__stack-forecast" style={`width:${forecastWidth}%`}></span>
                       </div>
-                      <div class="home-consumption__quarter-values"><span>Actual {formatAmountK(quarter.actualAmount)}</span><span>Forecast {formatAmountK(quarter.forecastAmount)}</span></div>
+                      <div class="home-consumption__quarter-values">
+                        <span>Actual <strong>{formatAmountK(quarter.actualAmount)}</strong></span>
+                        <span>Forecast <strong>{formatAmountK(quarter.forecastAmount)}</strong></span>
+                      </div>
                     </div>
                   );
                 })}
