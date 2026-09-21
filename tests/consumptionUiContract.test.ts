@@ -9,6 +9,7 @@ const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
 const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
+const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
@@ -16,6 +17,10 @@ assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
+assert.match(homeConsumption, /확정 업로드 필요/, "Home guides users when a previous MTD remains unresolved");
+assert.match(homeConsumption, />MTD \(잠정\)</, "Home labels current-month MTD as provisional rather than Actual");
+assert.match(homeConsumption, /month\.kind === "ACTUAL" \? "Actual" : month\.kind === "MTD" \? "MTD \(잠정\)" : "Forecast"/,
+  "the accessible monthly chart never classifies MTD as Actual");
 assert.doesNotMatch(attainmentPage, /Closed months use Actual|fiscal-period completeness|unopened-period status|complete full-year outlook/i, "Attainment removes standing implementation disclaimers");
 
 assert.match(recordsPage,

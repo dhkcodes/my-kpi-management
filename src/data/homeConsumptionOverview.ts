@@ -3,13 +3,13 @@ import { sortConsumptionMonths } from "./consumptionData";
 
 export type HomeConsumptionMonth = Readonly<{
   periodKey: string;
-  kind: "ACTUAL" | "FORECAST";
+  kind: "ACTUAL" | "MTD" | "FORECAST";
   amount: number | null;
   incomplete: boolean;
 }>;
 
 export type HomeConsumptionLineEdge = Readonly<{
-  kind: "ACTUAL" | "FORECAST";
+  kind: HomeConsumptionMonth["kind"];
   fromIndex: number;
   toIndex: number;
 }>;
@@ -49,16 +49,29 @@ export type HomeConsumptionOverviewData = Readonly<{
   partialPeriod: boolean;
   quarters: ConsumptionAnalysis["quarters"];
   months: readonly HomeConsumptionMonth[];
+  finalUploadRequiredPeriods: readonly string[];
   alerts: ConsumptionAnalysis["alerts"];
 }>;
 
 export const buildHomeConsumptionOverview = (
   analysis: ConsumptionAnalysis,
-  totals: ConsumptionRecordsTotals
+  totals: ConsumptionRecordsTotals,
+  currentFiscalMonth?: string
 ): HomeConsumptionOverviewData => {
   const actualSet = new Set(analysis.periodCoverage.actualPeriods);
   const forecastPeriods = analysis.periodCoverage.forecastPeriods.filter((period) => !actualSet.has(period));
-  const includedPeriods = sortConsumptionMonths([...analysis.periodCoverage.actualPeriods, ...forecastPeriods]);
+  const finalUploadRequiredPeriods = sortConsumptionMonths(Object.entries(totals.mtdStatusByPeriod ?? {})
+    .filter(([, status]) => status === "FINAL_UPLOAD_REQUIRED")
+    .map(([period]) => period));
+  const finalUploadRequiredSet = new Set(finalUploadRequiredPeriods);
+  const hasCurrentMtd = currentFiscalMonth !== undefined
+    && totals.mtdStatusByPeriod?.[currentFiscalMonth] === "PROVISIONAL"
+    && Object.prototype.hasOwnProperty.call(totals.mtdByPeriod ?? {}, currentFiscalMonth);
+  const includedPeriods = sortConsumptionMonths([...new Set([
+    ...analysis.periodCoverage.actualPeriods,
+    ...forecastPeriods,
+    ...(hasCurrentMtd ? [currentFiscalMonth] : [])
+  ])]).filter((period) => !finalUploadRequiredSet.has(period));
   const incompletePeriods = new Set(totals.incompletePeriods);
   const hasActual = analysis.periodCoverage.actualPeriods.length > 0;
   const hasExpected = includedPeriods.length > 0;
@@ -83,15 +96,20 @@ export const buildHomeConsumptionOverview = (
     partialPeriod: includedPeriods.length > 0 && includedPeriods.length < 12,
     quarters: analysis.quarters,
     months: includedPeriods.map((periodKey) => {
-      const kind = actualSet.has(periodKey) ? "ACTUAL" as const : "FORECAST" as const;
-      const source = kind === "ACTUAL" ? totals.actualByPeriod : totals.appliedForecastByPeriod;
+      const kind: HomeConsumptionMonth["kind"] = periodKey === currentFiscalMonth && hasCurrentMtd
+        ? "MTD"
+        : actualSet.has(periodKey) ? "ACTUAL" : "FORECAST";
+      const source = kind === "ACTUAL" ? totals.actualByPeriod
+        : kind === "MTD" ? totals.mtdByPeriod ?? {}
+          : totals.appliedForecastByPeriod;
       return {
         periodKey,
         kind,
         amount: Object.prototype.hasOwnProperty.call(source, periodKey) ? source[periodKey] : null,
-        incomplete: incompletePeriods.has(periodKey)
+        incomplete: kind === "MTD" || incompletePeriods.has(periodKey)
       };
     }),
+    finalUploadRequiredPeriods,
     alerts: analysis.alerts.slice(0, 10)
   };
 };

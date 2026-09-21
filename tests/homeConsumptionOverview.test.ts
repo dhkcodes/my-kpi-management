@@ -49,6 +49,30 @@ assert.deepEqual(overview.months.map(({ periodKey, kind, amount }) => ({ periodK
 ]);
 assert.equal(overview.months[3].incomplete, true);
 
+const mtdAnalysis = {
+  ...analysis,
+  periodCoverage: {
+    ...analysis.periodCoverage,
+    includedPeriods: ["FY27-JUN", "FY27-AUG", "FY27-SEP"],
+    actualPeriods: ["FY27-JUN"],
+    forecastPeriods: ["FY27-AUG", "FY27-SEP"]
+  }
+} as ConsumptionAnalysis;
+const mtdOverview = buildHomeConsumptionOverview(mtdAnalysis, {
+  ...totals,
+  mtdByPeriod: { "FY27-AUG": 1250, "FY27-JUL": 1950 },
+  mtdStatusByPeriod: { "FY27-AUG": "PROVISIONAL", "FY27-JUL": "FINAL_UPLOAD_REQUIRED" }
+}, "FY27-AUG");
+assert.deepEqual(mtdOverview.months.map(({ periodKey, kind, amount }) => ({ periodKey, kind, amount })), [
+  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000 },
+  { periodKey: "FY27-AUG", kind: "MTD", amount: 1250 },
+  { periodKey: "FY27-SEP", kind: "FORECAST", amount: 4000 }
+]);
+assert.deepEqual(mtdOverview.finalUploadRequiredPeriods, ["FY27-JUL"],
+  "a previous unresolved MTD is guidance only and omitted from the chart");
+assert.deepEqual(mtdOverview.actualPeriods, mtdAnalysis.periodCoverage.actualPeriods,
+  "provisional MTD must not be classified as official Actual");
+
 const manyAlertsAnalysis = {
   ...analysis,
   alerts: Array.from({ length: 12 }, (_, index) => ({
@@ -71,6 +95,14 @@ const lineMonths: readonly HomeConsumptionMonth[] = [
 ];
 assert.deepEqual(buildHomeConsumptionLineEdges(lineMonths), [
   { kind: "ACTUAL", fromIndex: 0, toIndex: 1 },
+  { kind: "FORECAST", fromIndex: 1, toIndex: 2 }
+]);
+assert.deepEqual(buildHomeConsumptionLineEdges([
+  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, incomplete: false },
+  { periodKey: "FY27-AUG", kind: "MTD", amount: 1250, incomplete: true },
+  { periodKey: "FY27-SEP", kind: "FORECAST", amount: 4000, incomplete: false }
+]), [
+  { kind: "MTD", fromIndex: 0, toIndex: 1 },
   { kind: "FORECAST", fromIndex: 1, toIndex: 2 }
 ]);
 console.log("home consumption overview aggregation and line continuity: ok");
