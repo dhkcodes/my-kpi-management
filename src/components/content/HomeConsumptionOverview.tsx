@@ -58,7 +58,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
         pillar: "ALL"
       })
     ]).then(([analysis, records]) => {
-      if (active) setData(buildHomeConsumptionOverview(analysis, records.totals));
+      if (active) setData(buildHomeConsumptionOverview(analysis, records.totals, records.currentFiscalMonth));
     }).catch((reason: unknown) => {
       if (active) setError(reason instanceof Error ? reason.message : "Consumption Overview could not be loaded.");
     }).finally(() => {
@@ -77,7 +77,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
         <div>
           <span class="kpi-eyebrow">Consumption</span>
           <h2 id="consumptionOverviewTitle">Consumption Overview</h2>
-          <p>Actual periods are closed results; Forecast begins only after the last provided Actual period.</p>
+          <p>Actual periods are closed results; current-month MTD is tentative and Forecast remains separate.</p>
         </div>
         <span class="home-consumption__fy">{fiscalYear} · K USD</span>
       </div>
@@ -91,15 +91,21 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
         <div class="home-consumption__state home-consumption__state--error" role="alert">
           Consumption data is unavailable. {error}
         </div>
-      ) : !data || data.includedPeriodCount === 0 ? (
+      ) : !data || (data.includedPeriodCount === 0 && data.finalUploadRequiredPeriods.length === 0) ? (
         <div class="home-consumption__state">No Consumption data is available for {fiscalYear}.</div>
       ) : (
         <>
           <div class="home-consumption__coverage" role="note">
             <span><i class="home-consumption__legend home-consumption__legend--actual"></i>Actual {periodRange(data.actualPeriods)}</span>
+            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD (잠정)</span>}
             <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Forecast {periodRange(data.forecastPeriods)}</span>
             {data.partialPeriod && <strong>Partial coverage · {data.includedPeriodCount}/12 months</strong>}
           </div>
+          {data.finalUploadRequiredPeriods.length > 0 && (
+            <p class="home-consumption__mtd-guidance" role="note">
+              <strong>확정 업로드 필요</strong> · {data.finalUploadRequiredPeriods.join(", ")} MTD는 확정 Actual 업로드 전까지 차트에서 제외됩니다.
+            </p>
+          )}
 
           <div class="home-consumption__metrics">
             <article>
@@ -182,9 +188,10 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
 
           <article class="home-consumption__chart-card home-consumption__monthly">
             <div class="home-consumption__card-heading">
-              <div><h3>Actual Continuity into Forecast</h3><p>Monthly Consumption; the divider marks the first Forecast month.</p></div>
+              <div><h3>Tentative Monthly Consumption</h3><p>Current-month MTD is provisional; the divider marks the first Forecast month.</p></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
+                <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--mtd"></i>MTD (잠정)</span>
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
               </div>
             </div>
@@ -226,7 +233,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
                       {y !== null && (
                         <>
                           <circle class={`home-consumption__monthly-dot home-consumption__monthly-dot--${month.kind.toLowerCase()}`} cx={x} cy={y} r={5}>
-                            <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : "Forecast"}: ${formatAmountK(month.amount)}`}</title>
+                            <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}: ${formatAmountK(month.amount)}`}</title>
                           </circle>
                           <text class="home-consumption__monthly-value" x={x} y={Math.max(18, y - 12)}>
                             {formatAmountK(month.amount)}{month.incomplete ? "*" : ""}
@@ -248,7 +255,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
                 {data.months.map((month) => (
                   <tr key={month.periodKey}>
                     <th scope="row">{month.periodKey}</th>
-                    <td>{month.kind === "ACTUAL" ? "Actual" : "Forecast"}</td>
+                    <td>{month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}</td>
                     <td>{month.amount === null ? "Unavailable" : formatAmountK(month.amount)}</td>
                     <td>{month.incomplete ? "Partial or incomplete" : "Complete"}</td>
                   </tr>
@@ -256,6 +263,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
               </tbody>
             </table>
             {data.months.some((month) => month.incomplete) && <p class="home-consumption__footnote">* Partial or incomplete source coverage; value should not be treated as a complete month.</p>}
+            {data.months.some((month) => month.kind === "MTD") && <p class="home-consumption__footnote">MTD (잠정) is provisional and is not included in official Actual totals or exports.</p>}
           </article>
         </>
       )}

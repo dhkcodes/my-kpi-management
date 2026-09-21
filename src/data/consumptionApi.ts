@@ -91,6 +91,8 @@ export type ConsumptionRecordsTotals = Readonly<{
   appliedForecastByPeriod: Readonly<Record<string, number>>;
   outlookByPeriod: Readonly<Record<string, number>>;
   incompletePeriods: readonly string[];
+  mtdByPeriod?: Readonly<Record<string, number>>;
+  mtdStatusByPeriod?: Readonly<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>;
 }>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
   accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
@@ -815,8 +817,21 @@ const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   };
   if (!Array.isArray(raw.incompletePeriods) || raw.incompletePeriods.some((period) => typeof period !== "string"))
     throw new Error("Malformed Consumption records totals");
-  return { actualByPeriod: decodeMap(raw.actualByPeriod), appliedForecastByPeriod: decodeMap(raw.appliedForecastByPeriod),
-    outlookByPeriod: decodeMap(raw.outlookByPeriod), incompletePeriods: raw.incompletePeriods as string[] };
+  const decoded: ConsumptionRecordsTotals = {
+    actualByPeriod: decodeMap(raw.actualByPeriod),
+    appliedForecastByPeriod: decodeMap(raw.appliedForecastByPeriod),
+    outlookByPeriod: decodeMap(raw.outlookByPeriod),
+    incompletePeriods: raw.incompletePeriods as string[],
+    ...(raw.mtdByPeriod === undefined ? {} : { mtdByPeriod: decodeMap(raw.mtdByPeriod) })
+  };
+  if (raw.mtdStatusByPeriod === undefined) return decoded;
+  if (typeof raw.mtdStatusByPeriod !== "object" || raw.mtdStatusByPeriod === null || Array.isArray(raw.mtdStatusByPeriod))
+    throw new Error("Malformed Consumption records totals");
+  const statuses = Object.entries(raw.mtdStatusByPeriod as Record<string, unknown>);
+  if (statuses.some(([period, status]) => !/^FY\d{2}-[A-Z]{3}$/.test(period)
+      || (status !== "PROVISIONAL" && status !== "FINAL_UPLOAD_REQUIRED")))
+    throw new Error("Malformed Consumption records totals");
+  return { ...decoded, mtdStatusByPeriod: Object.fromEntries(statuses) as Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED"> };
 };
 
 export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {

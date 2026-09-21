@@ -83,7 +83,9 @@ void (async () => {
         outlookByPeriod: { "FY27-AUG": 100, "FY27-OCT": 20 }, incompletePeriods: ["FY27-SEP"]
       } }], totalAccounts: 11, nextOffset: 11, hasMore: false,
       totals: { actualByPeriod: { "FY27-AUG": 300 }, appliedForecastByPeriod: { "FY27-OCT": 40 },
-        outlookByPeriod: { "FY27-AUG": 300, "FY27-OCT": 40 }, incompletePeriods: ["FY27-SEP"] }
+        outlookByPeriod: { "FY27-AUG": 300, "FY27-OCT": 40 }, incompletePeriods: ["FY27-SEP"],
+        mtdByPeriod: { "FY27-SEP": 175 },
+        mtdStatusByPeriod: { "FY27-SEP": "PROVISIONAL", "FY27-AUG": "FINAL_UPLOAD_REQUIRED" } }
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"records-header\"' } });
   };
   const records = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "database",
@@ -95,6 +97,9 @@ void (async () => {
   assert.equal(records.totals.actualByPeriod["FY27-AUG"], 300, "server total covers the full filtered result, not only the loaded page");
   assert.equal(records.accountGroups[0].totals.outlookByPeriod["FY27-OCT"], 20);
   assert.deepEqual(records.totals.incompletePeriods, ["FY27-SEP"]);
+  assert.deepEqual(records.totals.mtdByPeriod, { "FY27-SEP": 175 });
+  assert.deepEqual(records.totals.mtdStatusByPeriod,
+    { "FY27-SEP": "PROVISIONAL", "FY27-AUG": "FINAL_UPLOAD_REQUIRED" });
 
   runtime.fetch = async (input) => {
     assert.match(String(input), /offset=11&limit=10$/);
