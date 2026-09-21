@@ -553,6 +553,14 @@ export const saveAccountsWorkloadsBatch = async (
   fetchImpl: FetchLike = fetch,
   permanentDeleteIds: string[] = []
 ): Promise<AccountsWorkloadsBatchSaveResponse> => {
+  const invalidDateRow = draftRows.find((row) => row.startDate && row.endDate && row.startDate > row.endDate);
+  if (invalidDateRow) {
+    throw new AccountsWorkloadsApiError(
+      400,
+      "VALIDATION_ERROR",
+      `Account '${invalidDateRow.account}', workload '${invalidDateRow.workloadName}' has a start date after its end date`
+    );
+  }
   const changes = collectPendingChanges(savedRows, draftRows, permanentDeleteIds);
   const mutationRef = (change: PendingChange) => ({
     commitmentId: change.saved?.commitmentId,

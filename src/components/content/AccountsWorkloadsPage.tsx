@@ -196,7 +196,7 @@ const formatAccountsWorkloadsSaveError = (error: unknown) => {
   if (error instanceof AccountsWorkloadsNetworkError) return `The API could not be reached. ${retry}`;
   if (error instanceof AccountsWorkloadsApiError) {
     if (error.status === 409) return `Another user changed this data. Reload the latest data before saving again. ${retry}`;
-    if (error.code === "VALIDATION_ERROR" || error.status === 400) return `Validation failed (${error.code}). Check required values. ${retry}`;
+    if (error.code === "VALIDATION_ERROR" || error.status === 400) return `Validation failed: ${error.message}. ${retry}`;
     if (error.code === "PERSISTENCE_ERROR" || error.status >= 500) return `The database rejected the save (${error.code}). ${retry}`;
     return `The save request was rejected (${error.code}). ${retry}`;
   }

@@ -13,6 +13,7 @@ import {
   restoreAccountWorkload,
   saveAccountsWorkloadsBatch,
   AccountsWorkloadsPersistenceError,
+  AccountsWorkloadsApiError,
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloadsClonePreview,
   cloneAccountsWorkloadsPreviousFiscalYear
@@ -120,6 +121,25 @@ async function run() {
   assert.deepEqual(atomicBody.fxRate, { fxRateId: 9, versionNo: 4, rateValue: 1390 });
   assert.equal(atomicResult.items[0].versionNo, 4, "authoritative rows win");
   assert.equal(atomicResult.fxRate?.versionNo, 5, "authoritative FX/version wins");
+
+  let invalidDateFetches = 0;
+  await assert.rejects(
+    saveAccountsWorkloadsBatch(
+      [saved],
+      [{ ...saved, startDate: "2027-09-01", endDate: "2027-08-01" }],
+      { fiscalYear: "FY27" },
+      undefined,
+      async () => {
+        invalidDateFetches += 1;
+        return response({ items: [], total: 0 });
+      }
+    ),
+    (error: unknown) => error instanceof AccountsWorkloadsApiError
+      && error.status === 400
+      && error.code === "VALIDATION_ERROR"
+      && error.message.includes("Demo Account")
+  );
+  assert.equal(invalidDateFetches, 0, "invalid date drafts remain local and are not sent to the API");
 
   const rowOnlyResult = await saveAccountsWorkloadsBatch(
     [saved],
