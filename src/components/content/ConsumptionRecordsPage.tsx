@@ -1204,14 +1204,16 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         const resolution = accountResolutions[month];
         return editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
       }))
-    } : { ...series, forecasts: {} };
-    const accountMtd = accountLevel && "plans" in series ? serverAccountMtdTotals[series.customer] ?? {} : {};
-    const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(accountMtd, currentMtdPeriod);
-    const displaySeries = accountLevel && showMtd && currentMtdPeriod ? {
+    } : { ...series };
+    const currentMtd = accountLevel && "plans" in series
+      ? serverAccountMtdTotals[series.customer] ?? {}
+      : "mtds" in series ? series.mtds ?? {} : {};
+    const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(currentMtd, currentMtdPeriod);
+    const displaySeries = showMtd && currentMtdPeriod ? {
       ...baseDisplaySeries,
       actuals: {
         ...baseDisplaySeries.actuals,
-        ...(hasCurrentMtd ? { [currentMtdPeriod]: accountMtd[currentMtdPeriod] } : {})
+        ...(hasCurrentMtd ? { [currentMtdPeriod]: currentMtd[currentMtdPeriod] } : {})
       },
       forecasts: Object.fromEntries(Object.entries(baseDisplaySeries.forecasts).filter(([period]) => period !== currentMtdPeriod))
     } : baseDisplaySeries;
@@ -1226,7 +1228,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
-          const mtd = accountLevel && showMtd && month === currentMtdPeriod;
+          const mtd = showMtd && month === currentMtdPeriod;
           const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month) && !mtd;
           const value = editable
             ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
@@ -1251,7 +1253,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             const dirty = draftForecastCompositions.has(forecastDraftKey(series.customer, month));
             if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
               class="consumption-value-cell consumption-mtd-cell">
-              <span>{hasCurrentMtd ? currency.format(accountMtd[month]) : "—"}<small>{hasCurrentMtd ? "MTD · provisional" : "MTD unavailable"}</small></span>
+              <span>{hasCurrentMtd ? currency.format(currentMtd[month]) : "—"}<small>{hasCurrentMtd ? "MTD · provisional" : "MTD unavailable"}</small></span>
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
