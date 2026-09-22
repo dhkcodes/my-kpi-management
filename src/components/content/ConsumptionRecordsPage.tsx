@@ -94,8 +94,11 @@ const forecastCompositionUnavailable = (composition: ConsumptionAccountForecast)
   composition.compositionStatus === "UNAVAILABLE"
     ? "Forecast composition unavailable for this period."
     : null;
-const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: ConsumptionAccountForecast }>) => {
-  if (composition.compositionStatus === "UNCLASSIFIED") return null;
+const ForecastCompositionTooltip = ({ composition, children }: Readonly<{
+  composition: ConsumptionAccountForecast;
+  children: ComponentChildren;
+}>) => {
+  if (composition.compositionStatus === "UNCLASSIFIED") return <>{children}</>;
   const unavailable = forecastCompositionUnavailable(composition);
   const accessibleText = unavailable ?? [
     `Total ${currency.format(composition.totalAmount)}`,
@@ -105,7 +108,7 @@ const ForecastCompositionTooltip = ({ composition }: Readonly<{ composition: Con
     `Previous source ${composition.previousSource}${composition.previousAmount === null ? "" : ` ${currency.format(composition.previousAmount)}`}`
   ].join("; ");
   return <span class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}>
-    <span class="oj-ux-ico-information-s" aria-hidden="true"></span>
+    {children}
     <span class="consumption-forecast-tooltip__content" role="tooltip">
       {unavailable ? <>{unavailable}</> : <dl>
         <div><dt>Total</dt><dd>{currency.format(composition.totalAmount)}</dd></div>
@@ -1251,10 +1254,15 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
               onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, value)}>
-              <span>{value === null ? currency.format(0) : currency.format(value)}{displayedComposition && <ForecastCompositionTooltip composition={displayedComposition} />}{dirty && <small>draft</small>}
+              {displayedComposition ? <ForecastCompositionTooltip composition={displayedComposition}>
+                <span>{value === null ? currency.format(0) : currency.format(value)}{dirty && <small>draft</small>}
+                  {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
+                    Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
+                  </small>}</span>
+              </ForecastCompositionTooltip> : <span>{value === null ? currency.format(0) : currency.format(value)}{dirty && <small>draft</small>}
                 {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
                   Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
-                </small>}</span>
+                </small>}</span>}
             </td>;
           }
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>{value === null ? "—" : currency.format(value)}</td>;
@@ -1546,11 +1554,13 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>}
         <div class="consumption-section-heading consumption-table-heading">
           <div class="consumption-table-toggle">
+            <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
+              disabled={dataMode !== "backend" || !currentMtdPeriod}
+              onClick={() => setShowMtd((current) => !current)}>
+              <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+            </button>
             <span><span class="kpi-section-label">Actual + Forecast</span>
               <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></span>
-            <label class="consumption-mtd-toggle"><input type="checkbox" checked={showMtd}
-              disabled={dataMode !== "backend" || !currentMtdPeriod}
-              onChange={(event) => setShowMtd(event.currentTarget.checked)} /> Show MTD</label>
           </div>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">

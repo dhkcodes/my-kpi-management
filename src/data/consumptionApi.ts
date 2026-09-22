@@ -150,6 +150,7 @@ export type ConsumptionAnalysis = Readonly<{
     coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
   }>;
+  mtdSummary: Readonly<{ periodKey: string; amount: number; asOf: string | null }> | null;
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
@@ -499,6 +500,14 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !nearlyEqual(portfolioRaw.priorTotalAmount, portfolioRaw.priorActualAmount + portfolioRaw.priorForecastAmount)
     || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
     || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
+  let mtdSummary: ConsumptionAnalysis["mtdSummary"] = null;
+  if (raw.mtdSummary !== null && raw.mtdSummary !== undefined) {
+    if (typeof raw.mtdSummary !== "object") return malformedAnalysis();
+    const mtd = raw.mtdSummary as Record<string, unknown>;
+    if (!isPeriodKey(mtd.periodKey) || !isFiniteNumber(mtd.amount)
+      || !(mtd.asOf === null || typeof mtd.asOf === "string")) return malformedAnalysis();
+    mtdSummary = { periodKey: mtd.periodKey, amount: mtd.amount, asOf: mtd.asOf as string | null };
+  }
   const quarters = raw.quarters.map((value) => {
     const split = parseAmountSplit(value, quarterAmountStatuses); const quarter = value as Record<string, unknown>;
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)
@@ -590,7 +599,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
       priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, quarters, accountCandidates, contextActualTrend, alerts, accounts,
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, quarters, accountCandidates, contextActualTrend, alerts, accounts,
     organicConsumptionGrowthProxy, movementBridge };
 };
 

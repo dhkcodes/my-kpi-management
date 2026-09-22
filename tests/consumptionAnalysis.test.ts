@@ -110,6 +110,18 @@ void (async () => {
   assert.deepEqual(getAlertActualTrend(decoded.accounts[0].workloads[0].plans[0].actualTrend, "FY27-AUG").map((point) => point.periodKey),
     ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
     "the selected alert base month anchors the preceding five ACTUAL months");
+  assert.equal(decoded.mtdSummary, null, "an OFF response has no provisional MTD summary");
+
+  runtime.fetch = async (input) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=&includeMtd=true");
+    return new Response(JSON.stringify({ ...analysis,
+      mtdSummary: { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" }
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const withMtd = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", includeMtd: true });
+  assert.deepEqual(withMtd.mtdSummary,
+    { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" },
+    "MTD stays separate from FINAL amount splits so strict totals remain valid");
 
   runtime.fetch = async () => new Response(JSON.stringify(deployedNonComparableAnalysis),
     { status: 200, headers: { "Content-Type": "application/json" } });
