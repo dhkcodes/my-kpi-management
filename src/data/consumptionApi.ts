@@ -169,7 +169,7 @@ export type ConsumptionSalesRepOverview = Readonly<{
   forecastAmount: number; fyExpectedAmount: number; accountCount: number;
   topThreeConcentrationPercent: number; attentionAccountCount: number;
 }>;
-export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; salesRep?: string; pillar?: ConsumptionPillar }>;
+export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; salesRep?: string; pillar?: ConsumptionPillar; includeMtd?: boolean }>;
 export type ConsumptionControlForecastUpdate = Readonly<{
   account: string;
   periodKey: string;
@@ -892,6 +892,7 @@ export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery):
     || typeof (query.salesRep ?? "") !== "string" || (query.salesRep ?? "").length > 160) throw new Error("Invalid Consumption analysis query");
   const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account, salesRep: query.salesRep ?? "" });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
+  if (query.includeMtd !== undefined) parameters.set("includeMtd", String(query.includeMtd));
   const { payload } = await request(`/consumption/analysis?${parameters}`);
   const decoded = parseConsumptionAnalysis(payload);
   const expectedPriorFiscalYear = `FY${String((Number(query.fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;

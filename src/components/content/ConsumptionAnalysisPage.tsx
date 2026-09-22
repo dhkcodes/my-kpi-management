@@ -97,6 +97,7 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
 
 export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
+  const [includeMtd, setIncludeMtd] = useState(false);
   const [selectedSalesRep, setSelectedSalesRep] = useState("");
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,7 +137,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     const generation = ++requestGeneration.current;
     setLoading(true);
     setError("");
-    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, salesRep: selectedSalesRep, pillar: selectedPillar })
+    void fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext, salesRep: selectedSalesRep, pillar: selectedPillar, includeMtd })
       .then((value) => {
         if (!active || generation !== requestGeneration.current) return;
         if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
@@ -168,7 +169,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       })
       .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, selectedAccountContext, selectedPillar, selectedSalesRep]);
+  }, [debouncedCandidateSearch, fiscalYear, includeMtd, selectedAccountContext, selectedPillar, selectedSalesRep]);
 
   // Keep the last completed response mounted while same-FY filters refresh.
   // The refresh indicator makes that transition explicit; replacing the
@@ -302,6 +303,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
+  const mtdAsOfPeriod = analysis.periodCoverage.includedPeriods[analysis.periodCoverage.includedPeriods.length - 1] ?? "current period";
 
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmount: total.totalForecastAmount + account.totalForecastAmount,
@@ -370,6 +372,11 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     <header class="consumption-page__header consumption-insights-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
+        <label class="consumption-mtd-toggle">
+          <input type="checkbox" role="switch" checked={includeMtd}
+            onChange={(event) => { setLoading(true); setIncludeMtd(event.currentTarget.checked); }} />
+          <span>Include MTD</span>
+        </label>
         <div class="consumption-insights-export">
           <span>Export</span>
           <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
@@ -433,6 +440,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </header>
 
     <ConsumptionMessageBanner messages={messages} />
+    {includeMtd && <p class="consumption-mtd-disclosure" role="status">
+      FINAL + current MTD (provisional) is included in monetary summaries and basic totals charts as of {mtdAsOfPeriod}. Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based.
+    </p>}
     {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> 불러오는 중</div>}
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
@@ -451,7 +461,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small><span class="consumption-metric is-actual">ACTUAL {currency.format(analysis.portfolio.actualAmount)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {currency.format(analysis.portfolio.forecastAmount)}</span></small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small><span class="consumption-metric is-actual">{includeMtd ? "FINAL + MTD" : "ACTUAL"} {currency.format(analysis.portfolio.actualAmount)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {currency.format(analysis.portfolio.forecastAmount)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? compactCurrency.format(latestCompleteQuarter.totalAmount) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={(latestCompleteQuarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}>{signedPercent(latestCompleteQuarter.qoqChangePercent)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
       <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposure.toFixed(1)}%</strong><small><span class="consumption-metric is-forecast">{currency.format(analysis.portfolio.forecastAmount)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
@@ -459,7 +469,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
     <section class="consumption-insights-performance-grid">
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
-        <div class="consumption-section-heading"><div><span class="kpi-section-label">Actual + Forecast</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>ACTUAL <i class="is-forecast"></i>FORECAST</span></div>
+        <div class="consumption-section-heading"><div><span class="kpi-section-label">{includeMtd ? "FINAL + current MTD + Forecast" : "Actual + Forecast"}</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>{includeMtd ? "FINAL + MTD (provisional)" : "ACTUAL"} <i class="is-forecast"></i>FORECAST</span></div>
         <div class="consumption-insights-total-regions">
           <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendDataLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
