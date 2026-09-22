@@ -420,7 +420,7 @@ export function Content({
   const openAccountWorkloads = (account: string) => {
     onOpenAccountWorkloads(account);
   };
-  const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} access={profile.access} onNavigate={onNavigate} />;
+  const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} profile={profile} onNavigate={onNavigate} />;
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">

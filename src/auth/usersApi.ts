@@ -1,5 +1,5 @@
 import { apiFetch } from "./apiFetch";
-import { parseAuthProfile, type AuthSession, type UserAccess } from "./authSession";
+import { parseAuthProfile, type AuthSession, type MenuPermissionMap, type UserAccess } from "./authSession";
 import type { CredentialActionPurpose } from "./authApi";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -75,6 +75,14 @@ const linkAction = async (userKey: string, action: "reissue" | "reset-password",
 const stateAction = async (userKey: string, action: string, fetchImpl: FetchLike) => {
   await request(`/${encodeURIComponent(userKey)}/${action}`, { method: "POST", body: JSON.stringify({}) }, fetchImpl);
 };
+
+export async function updateUserMenuPermissions(userKey: string, menuPermissions: MenuPermissionMap, fetchImpl: FetchLike = fetch): Promise<AuthSession> {
+  const response = await request(`/${encodeURIComponent(userKey)}/menu-permissions`, {
+    method: "PUT",
+    body: JSON.stringify({ menuPermissions })
+  }, fetchImpl);
+  return parseAuthProfile(await response.json());
+}
 
 export const reissueUserInvite = (key: string, fetchImpl: FetchLike = fetch) => linkAction(key, "reissue", fetchImpl);
 export const resetUserPassword = (key: string, fetchImpl: FetchLike = fetch) => linkAction(key, "reset-password", fetchImpl);
