@@ -177,8 +177,12 @@ assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)
 assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
 assert.equal(recordsPage.includes("MTD · provisional"), true, "Current-period MTD is labelled provisional");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
-assert.match(insightsPage, /role="switch" aria-checked=\{includeMtd\} class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
-assert.match(recordsPage, /role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"[\s\S]*Account \/ Plan Consumption/, "Records places the switch before the table title");
+assert.match(recordsPage, /actuals: showMtd && currentMtdPeriod[\s\S]*hasCurrentMtd \? \{ \[currentMtdPeriod\]: serverMtdTotals\[currentMtdPeriod\] \}[\s\S]*forecasts: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
+  "portfolio MTD is represented separately from Forecast and never falls back to the current-period Forecast");
+assert.match(recordsPage, /actuals: \{[\s\S]*baseDisplaySeries\.actuals[\s\S]*hasCurrentMtd \? \{ \[currentMtdPeriod\]: accountMtd\[currentMtdPeriod\] \}[\s\S]*forecasts: Object\.fromEntries\(Object\.entries\(baseDisplaySeries\.forecasts\)\.filter\(\(\[period\]\) => period !== currentMtdPeriod\)\)/,
+  "account MTD participates in current-mode totals without being stored or classified as Forecast");
+assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
+assert.match(recordsPage, /Account \/ Plan Consumption[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"/, "Records places Show MTD at the right side of the table heading");
 assert.doesNotMatch(recordsPage, /oj-ux-ico-information-s/, "Forecast composition no longer depends on an information icon");
 assert.match(recordsPage, /ForecastCompositionTooltip composition=\{displayedComposition\}>[\s\S]*currency\.format\(value\)/, "hovering the amount area owns the composition tooltip");
 assert.match(styles, /\.consumption-forecast-tooltip\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/, "the composition hover target fills the amount cell");

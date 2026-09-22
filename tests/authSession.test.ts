@@ -6,7 +6,8 @@ const session: AuthSession = {
   displayName: "KPI Owner",
   loginId: "owner@example.com",
   access: "Admin",
-  status: "ACTIVE"
+  status: "ACTIVE",
+  menuPermissions: {}
 };
 assert.equal(session.loginId, "owner@example.com");
 assert.equal(getProfileInitials(session.displayName), "KO");

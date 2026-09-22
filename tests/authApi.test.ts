@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { authenticateUser, getAuthenticatedSession, logoutUser } from "../src/auth/authApi";
 
-const profile = { userKey: "user-1", displayName: "Owner", loginId: "owner@example.com", access: "Admin" as const, status: "ACTIVE" as const };
+const profile = { userKey: "user-1", displayName: "Owner", loginId: "owner@example.com", access: "Admin" as const, status: "ACTIVE" as const, menuPermissions: {} };
 
 async function main() {
   let capturedUrl = "";

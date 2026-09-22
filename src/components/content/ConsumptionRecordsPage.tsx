@@ -640,12 +640,14 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const allAccountsTotal = useMemo(() => {
     if (serverActualTotals === null) return null;
     const total = aggregateConsumptionActualTotals(draftPlans);
+    const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(serverMtdTotals, currentMtdPeriod);
     return {
       ...total,
-      actuals: serverActualTotals,
+      actuals: showMtd && currentMtdPeriod
+        ? { ...serverActualTotals, ...(hasCurrentMtd ? { [currentMtdPeriod]: serverMtdTotals[currentMtdPeriod] } : {}) }
+        : serverActualTotals,
       forecasts: showMtd && currentMtdPeriod
-        ? { ...Object.fromEntries(Object.entries(total.forecasts).filter(([period]) => period !== currentMtdPeriod)),
-          ...(Object.prototype.hasOwnProperty.call(serverMtdTotals, currentMtdPeriod) ? { [currentMtdPeriod]: serverMtdTotals[currentMtdPeriod] } : {}) }
+        ? Object.fromEntries(Object.entries(total.forecasts).filter(([period]) => period !== currentMtdPeriod))
         : total.forecasts
     };
   }, [currentMtdPeriod, draftPlans, serverActualTotals, serverMtdTotals, showMtd]);
@@ -1207,10 +1209,11 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
     const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(accountMtd, currentMtdPeriod);
     const displaySeries = accountLevel && showMtd && currentMtdPeriod ? {
       ...baseDisplaySeries,
-      forecasts: {
-        ...Object.fromEntries(Object.entries(baseDisplaySeries.forecasts).filter(([period]) => period !== currentMtdPeriod)),
+      actuals: {
+        ...baseDisplaySeries.actuals,
         ...(hasCurrentMtd ? { [currentMtdPeriod]: accountMtd[currentMtdPeriod] } : {})
-      }
+      },
+      forecasts: Object.fromEntries(Object.entries(baseDisplaySeries.forecasts).filter(([period]) => period !== currentMtdPeriod))
     } : baseDisplaySeries;
     return buildDisplayQuarterSummaries({
       ...displaySeries,
@@ -1325,7 +1328,9 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           </oj-button>
         </div>
       </header>
-      <ConsumptionMessageBanner messages={pageMessages} />
+      <ConsumptionMessageBanner messages={pageMessages} onClose={(messageId) => {
+        if (messageId === "records-operation-error") setImportError("");
+      }} />
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">
@@ -1553,22 +1558,22 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           <span>Refreshing results…</span>
         </div>}
         <div class="consumption-section-heading consumption-table-heading">
-          <div class="consumption-table-toggle">
+          <div><span class="kpi-section-label">Actual + Forecast</span>
+            <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></div>
+          <div class="consumption-table-heading__actions">
             <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
               disabled={dataMode !== "backend" || !currentMtdPeriod}
               onClick={() => setShowMtd((current) => !current)}>
               <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
             </button>
-            <span><span class="kpi-section-label">Actual + Forecast</span>
-              <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></span>
+            {hasDraftChanges && (
+              <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
+                <span>Draft changes</span>
+                <oj-button chroming="callToAction" disabled={isSaving} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
+                <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
+              </div>
+            )}
           </div>
-          {hasDraftChanges && (
-            <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
-              <span>Draft changes</span>
-              <oj-button chroming="callToAction" disabled={isSaving} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
-              <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
-            </div>
-          )}
         </div>
         <div id="consumptionTableContent" class="consumption-table-content">
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
@@ -1588,7 +1593,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
                   ...sortConsumptionMonthsNewestFirst(getQuarterMonths(quarter)).map((month) => {
-                    const status = editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
+                    const status = showMtd && month === currentMtdPeriod ? "MTD" : editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
                     return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
                   }),
                   <th key={`${quarter}-total`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-quarter-total is-forecast" : "consumption-quarter-total"}>Quarter Total</th>,

@@ -15,7 +15,6 @@ import {
   consumptionPillarOptions,
   filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
-  getFiscalQuarter,
   getAlertActualTrend,
   isUnmappedConsumptionLabel
 } from "../../data/consumptionData";
@@ -237,7 +236,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
   const fiscalTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
-    const displayedActualAmount = analysis.portfolio.actualAmount + (analysis.mtdSummary?.amount ?? 0);
+    const displayedActualAmount = analysis.portfolio.actualAmount;
     const rows = [
       { label: analysis.fiscalYear, actualAmount: displayedActualAmount, forecastAmount: analysis.portfolio.forecastAmount },
       { label: analysis.priorFiscalYear, actualAmount: analysis.portfolio.priorActualAmount, forecastAmount: analysis.portfolio.priorForecastAmount }
@@ -249,9 +248,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
-    const mtdQuarter = analysis.mtdSummary ? getFiscalQuarter(analysis.mtdSummary.periodKey).slice(-2) : null;
     return chart(analysis.quarters.flatMap((quarter) => {
-      const actualAmount = quarter.actualAmount + (quarter.quarter === mtdQuarter ? analysis.mtdSummary?.amount ?? 0 : 0);
+      const actualAmount = quarter.actualAmount;
       return [
       { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: actualAmount, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${currency.format(actualAmount)}` },
       { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmount, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${currency.format(quarter.forecastAmount)}` }
@@ -293,7 +291,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     : [];
   if (!analysis) return <section class="consumption-insights-page consumption-initial-state">
     <header class="consumption-page__header consumption-insights-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
-    <ConsumptionMessageBanner messages={messages} />
+    <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
   </section>;
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
@@ -309,7 +307,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
   const mtdAsOfPeriod = analysis.mtdSummary?.periodKey ?? "current period";
-  const displayedActualAmount = analysis.portfolio.actualAmount + (analysis.mtdSummary?.amount ?? 0);
+  const displayedActualAmount = analysis.portfolio.actualAmount;
 
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmount: total.totalForecastAmount + account.totalForecastAmount,
@@ -378,10 +376,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     <header class="consumption-page__header consumption-insights-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-        <button type="button" role="switch" aria-checked={includeMtd} class="consumption-mtd-switch"
-          onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
-          <span>Include MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-        </button>
+        <div class="consumption-analysis-mtd-control">
+          <span class="kpi-section-label">MTD</span>
+          <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd} class="consumption-mtd-switch"
+            onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
+            <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+          </button>
+        </div>
         <div class="consumption-insights-export">
           <span>Export</span>
           <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
@@ -444,7 +445,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       </div>
     </header>
 
-    <ConsumptionMessageBanner messages={messages} />
+    <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
     {includeMtd && <p class="consumption-mtd-disclosure" role="status">
       {analysis.mtdSummary
         ? <>FINAL + {mtdAsOfPeriod} MTD {currency.format(analysis.mtdSummary.amount)} (provisional) is included in monetary summaries and basic totals charts. Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based.</>
