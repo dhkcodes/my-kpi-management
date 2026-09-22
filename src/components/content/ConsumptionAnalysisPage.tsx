@@ -297,7 +297,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
-  const forecastExposure = analysis.portfolio.totalAmount === 0 ? 0 : analysis.portfolio.forecastAmount / analysis.portfolio.totalAmount * 100;
+  const forecastExposureBase = Math.max(0, analysis.portfolio.totalAmount - (analysis.mtdSummary?.amount ?? 0));
+  const forecastExposure = forecastExposureBase === 0 ? 0 : analysis.portfolio.forecastAmount / forecastExposureBase * 100;
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
   const selectedMovementPoint = selectedMovement ? analysis.movementBridge.find((point) => point.quarter === selectedMovement.quarter) ?? null : null;
@@ -307,7 +308,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
-  const mtdAsOfPeriod = analysis.mtdSummary?.periodKey ?? "current period";
   const displayedActualAmount = analysis.portfolio.actualAmount;
   const actualLabel = includeMtd && analysis.mtdSummary !== null ? "Actual (MTD 포함)" : "Actual";
 
@@ -448,11 +448,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </header>
 
     <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
-    {includeMtd && <p class="consumption-mtd-disclosure" role="status">
-      {analysis.mtdSummary
-        ? <>FINAL + {mtdAsOfPeriod} MTD {currency.format(analysis.mtdSummary.amount)} (provisional) is included in monetary summaries and basic totals charts. Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based.</>
-        : <>No current-period MTD snapshot is available for this view. FINAL-based values remain unchanged.</>}
-    </p>}
     {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> 불러오는 중</div>}
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
@@ -572,7 +567,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
             class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
             onClick={() => setSelectedAccountName(account.account)}>
-            <span>{account.account} · {account.salesRep}</span><strong>{amountK(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)} · {account.forecastEntryStatus === "MISSING" ? "Forecast missing" : account.forecastEntryStatus === "ZERO" ? "Forecast 0 entered" : "Forecast entered"}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
+            <span>{account.account} · {account.salesRep}</span><strong>{amountK(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)}{account.forecastEntryStatus === "MISSING" ? " · Forecast missing" : account.forecastEntryStatus === "ZERO" ? " · Forecast 0 entered" : ""}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
           </button>)}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"}</p></div></div>

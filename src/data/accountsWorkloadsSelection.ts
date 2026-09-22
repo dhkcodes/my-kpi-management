@@ -2,7 +2,7 @@ import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
 
 export const ACCOUNT_WORKLOAD_EDITABLE_FIELDS = [
   "planNumber", "account", "workloadName", "opptyNo", "startDate", "endDate",
-  "arrUsd", "arrKrw", "acrUsd", "acrKrw", "target", "winProbability", "latestUpdate", "notes"
+  "arrUsd", "arrKrw", "acrUsd", "acrKrw", "target", "winProbability", "revenueType", "latestUpdate", "notes"
 ] as const satisfies readonly (keyof AccountWorkloadRow)[];
 
 const comparable = (value: unknown) => value ?? "";

@@ -94,6 +94,8 @@ assert.match(styles,
   /\.consumption-table-scroll\s*\{[^}]*border:\s*1px solid var\(--kpi-border\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*auto;/,
   "Records preserves the table scroll boundary and both scroll axes");
 assert.match(recordsPage, /Account \/ Plan Consumption/, "Records uses the Account / Plan Consumption title");
+assert.doesNotMatch(recordsPage, /<span class="kpi-section-label">Actual \+ Forecast<\/span>/,
+  "Records omits the redundant Actual + Forecast title prefix");
 assert.match(styles,
   /@media \(min-width: 64rem\)[\s\S]*\.consumption-page\s*\{[^}]*padding-block:\s*\.45rem;[^}]*\}[\s\S]*\.consumption-table-panel\s*\{[^}]*padding:\s*0;/,
   "desktop Records moves the former table padding to the outer panel without reducing table space");
@@ -127,6 +129,10 @@ assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Acc
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
 assert.match(insightsPage, /\{analysis\.fiscalYear\} Mixed quarter consumption/, "FY fact-cell quarter totals use the selected fiscal-year title");
+assert.doesNotMatch(insightsPage, /FINAL \+ \{mtdAsOfPeriod\} MTD|Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based/,
+  "Analysis removes the long MTD implementation notice");
+assert.doesNotMatch(insightsPage, /Forecast \{account\.forecastEntryStatus\.toLowerCase\(\)\}/,
+  "Account Contribution omits the redundant Forecast entered message");
 assert.match(insightsPage, /Quarter-over-quarter[\s\S]*qoqChangePercent/, "QoQ values render as decision cards");
 assert.match(insightsPage, /const selectedAlert = analysis\?\.alerts\.find[^\n]+\?\? null/, "alerts start and remain unselected without falling back to the first alert");
 assert.match(insightsPage, /const trendPoints[\s\S]*selectedAlert[\s\S]*getAlertActualTrend[\s\S]*analysis\?\.contextActualTrend/, "unselected Trend uses the backend current-context ACTUAL trend");

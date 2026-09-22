@@ -1560,7 +1560,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           <span>Refreshing results…</span>
         </div>}
         <div class="consumption-section-heading consumption-table-heading">
-          <div><span class="kpi-section-label">Actual + Forecast</span>
+          <div>
             <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></div>
           <div class="consumption-table-heading__actions">
             <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
