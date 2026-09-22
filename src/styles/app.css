@@ -3459,3 +3459,17 @@ h4.weekly-activity-section-label--next-week,
   .home-consumption__alerts li { grid-template-columns: auto minmax(0, 1fr); }
   .home-consumption__alert-value { grid-column: 2; justify-items: start; }
 }
+
+.kap-login-native-submit {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.kap-menu-permissions { display: grid; gap: .35rem; min-width: 15rem; }
+.kap-menu-permissions label { display: grid; grid-template-columns: minmax(9rem, 1fr) 6rem; gap: .5rem; align-items: center; }

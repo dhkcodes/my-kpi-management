@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojformlayout";
 import "ojs/ojinputtext";
@@ -48,6 +48,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [successMessage, setSuccessMessage] = useState("");
   const [resetLink, setResetLink] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     if (!initialAction) return;
@@ -93,7 +95,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
 
   const submit = async (event: Event) => {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setError("");
     setSuccessMessage("");
     setIsSubmitting(true);
@@ -120,6 +123,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Credential request failed.");
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -145,7 +149,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         <div class="kap-login-warning" role="note"><strong>Keep this link private.</strong> Anyone with this link can reset the password until it is used or expires.</div></>}
     </div>}
 
-    {(mode === "signIn" || mode === "forgot" || mode === "action") && <form class="kap-login-form" onSubmit={submit} noValidate>
+    {(mode === "signIn" || mode === "forgot" || mode === "action") && <form ref={formRef} class="kap-login-form" onSubmit={submit} noValidate>
       <oj-form-layout maxColumns={1} direction="row">
         {(mode === "signIn" || mode === "forgot") && <oj-input-text id="kapLoginUserId" labelHint="Login ID" value={loginId} autocomplete="username" required
           onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text>}
@@ -160,7 +164,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         </>}
       </oj-form-layout>
       {error && <div class="kap-login-error" role="alert">{error}</div>}
-      <oj-button id="kapLoginSubmit" chroming="callToAction" disabled={isSubmitting} onojAction={(event: Event) => void submit(event)}>
+      <button type="submit" class="kap-login-native-submit" aria-hidden="true" tabIndex={-1}></button>
+      <oj-button id="kapLoginSubmit" chroming="callToAction" disabled={isSubmitting} onojAction={() => formRef.current?.requestSubmit()}>
         {isSubmitting ? "Please wait…" : mode === "signIn" ? "Sign in" : mode === "forgot" ? "Request reset link" : actionLabel}
       </oj-button>
     </form>}

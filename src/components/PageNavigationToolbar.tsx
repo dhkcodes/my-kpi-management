@@ -1,5 +1,6 @@
 import { h } from "preact";
 import type { AuthSession } from "../auth/authSession";
+import { filterNavigationItems } from "../auth/menuPermissions";
 import { navItems, NavigationItem } from "../data/kpiMockData";
 import type { NavigationRouteDefinition } from "./navigationRoutes";
 import "ojs/ojbutton";
@@ -9,7 +10,7 @@ import "ojs/ojtoolbar";
 
 type Props = Readonly<{
   activeRoute: NavigationRouteDefinition;
-  access: AuthSession["access"];
+  profile: AuthSession;
   onNavigate: (navigationId: string) => void;
 }>;
 
@@ -18,9 +19,9 @@ type PagePath = Readonly<{
   current: NavigationItem;
 }>;
 
-export function getPagePath(activeRouteId: string): PagePath | null {
+export function getPagePath(activeRouteId: string, items: NavigationItem[] = navItems): PagePath | null {
   if (activeRouteId === "profile" || activeRouteId === "users") return null;
-  for (const item of navItems) {
+  for (const item of items) {
     if (item.id === activeRouteId) return { parent: null, current: item };
     const child = item.children?.find((candidate) => candidate.id === activeRouteId);
     if (child) return { parent: item, current: child };
@@ -28,8 +29,8 @@ export function getPagePath(activeRouteId: string): PagePath | null {
   return null;
 }
 
-export function PageNavigationToolbar({ activeRoute, access: _access, onNavigate }: Props) {
-  const path = getPagePath(activeRoute.id);
+export function PageNavigationToolbar({ activeRoute, profile, onNavigate }: Props) {
+  const path = getPagePath(activeRoute.id, filterNavigationItems(navItems, profile));
   if (!path) return null;
   const isHome = path.current.id === "home";
   if (isHome) return null;

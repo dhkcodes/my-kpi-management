@@ -9,12 +9,16 @@ import type { InputTextElement } from "ojs/ojinputtext";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import {
   cancelUserInvite, deleteUser, disableUser, enableUser, inviteUser, listUsers, lockUser,
-  reissueUserInvite, resetUserPassword, unlockUser, type UserActionLink
+  reissueUserInvite, resetUserPassword, unlockUser, updateUserMenuPermissions, type UserActionLink
 } from "../../auth/usersApi";
-import type { AuthSession, UserAccess } from "../../auth/authSession";
+import { menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPermission, type MenuPermissionMap, type UserAccess } from "../../auth/authSession";
 
 type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthSession }> | null;
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
+const menuLabels: Record<MenuPermissionId, string> = {
+  "kpis-overview": "KPI", "weekly-activities": "Weekly", "customers-overview": "Customer 360", "accounts-workloads": "Accounts & Workloads",
+  analysis: "Consumption Analysis", attainment: "Consumption Attainment", records: "Consumption Records"
+};
 
 const actionUrl = (link: UserActionLink): string => {
   const path = link.purpose === "ACTIVATION" ? "/activate" : "/reset-password";
@@ -92,6 +96,25 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     catch (cause) { setError(cause instanceof Error ? cause.message : "User action failed."); }
     finally { setBusy(false); }
   };
+  const changePermission = (userKey: string, menu: MenuPermissionId, value: MenuPermission) => {
+    setUsers((current) => current.map((user) => {
+      if (user.userKey !== userKey) return user;
+      const menuPermissions = Object.fromEntries(menuPermissionIds.map((id) => [id, id === menu ? value : user.menuPermissions[id] ?? "NONE"])) as MenuPermissionMap;
+      return { ...user, menuPermissions };
+    }));
+  };
+  const savePermissions = async (user: AuthSession) => {
+    if (busy || user.access === "Admin") return;
+    const requested = Object.fromEntries(menuPermissionIds.map((menu) => [menu, user.menuPermissions[menu] ?? "NONE"])) as MenuPermissionMap;
+    try {
+      setBusy(true);
+      const updated = await updateUserMenuPermissions(user.userKey, requested);
+      setUsers((current) => current.map((candidate) => candidate.userKey === updated.userKey ? updated : candidate));
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to save menu permissions.");
+    } finally { setBusy(false); }
+  };
   const openDeleteDialog = (user: AuthSession) => {
     if (busy || user.userKey === currentUserKey) return;
     setDeleteError("");
@@ -119,8 +142,16 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     <div class="kap-users-header"><div>{breadcrumb}<span class="kpi-eyebrow">Administration</span><h1>Users</h1><p>Manage application access and credential action links.</p></div>
       <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button></div>
     {error && <div class="kap-error" role="alert">{error}</div>}
-    <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Actions"><div class="kap-user-actions">
+    <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Menu permissions</th><th>Actions</th></tr></thead>
+      <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Menu permissions">
+        {user.access === "Admin" ? <span>Default WRITE</span> : <div class="kap-menu-permissions">
+          {menuPermissionIds.map((menu) => <label key={menu}><span>{menuLabels[menu]}</span><select disabled={busy} value={user.menuPermissions[menu] ?? "NONE"}
+            onChange={(event) => changePermission(user.userKey, menu, (event.currentTarget as HTMLSelectElement).value as MenuPermission)}>
+            <option value="NONE">None</option><option value="READ">Read</option><option value="WRITE">Write</option>
+          </select></label>)}
+          <oj-button chroming="outlined" disabled={busy} onojAction={() => void savePermissions(user)}>Save permissions</oj-button>
+        </div>}
+      </td><td data-label="Actions"><div class="kap-user-actions">
         {user.status === "INVITED" && <><oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reissue", user })}>Reissue</oj-button><oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Cancel invitation for ${user.loginId}?`, () => cancelUserInvite(user.userKey))}>Cancel invite</oj-button></>}
         {user.status === "ACTIVE" && <oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reset", user })}>Reset password</oj-button>}
         {user.status === "ACTIVE" && <oj-button chroming="borderless" disabled={busy || user.access === "Admin"} title={user.access === "Admin" ? "Admin accounts cannot be locked" : "Lock user"} onojAction={() => void confirmAction(`Lock ${user.loginId}?`, () => lockUser(user.userKey))}>Lock</oj-button>}

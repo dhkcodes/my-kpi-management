@@ -59,6 +59,7 @@ import {
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import type { AuthSession } from "../auth/authSession";
+import { canAccessRoute, filterNavigationItems } from "../auth/menuPermissions";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
 import { subscribeAuthRequired } from "../auth/apiFetch";
 import "ojs/ojbutton";
@@ -105,9 +106,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const requestedInitialRoute = typeof window === "undefined"
       ? getNavigationRoute("home")
       : getNavigationRouteFromPath(window.location.pathname);
-    const initialRoute = requestedInitialRoute.module === "users" && profile.access !== "Admin"
-      ? getNavigationRoute("home")
-      : requestedInitialRoute;
+    const initialRoute = canAccessRoute(profile, requestedInitialRoute)
+      ? requestedInitialRoute
+      : getNavigationRoute("home");
+    const visibleNavItems = filterNavigationItems(navItems, profile);
     const [navigationOpen, setNavigationOpen] = useState(false);
     const navigationIntentOpenRef = useRef(false);
     const navigationPopupRef = useRef<ojPopup | null>(null);
@@ -173,7 +175,13 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       Object.fromEntries(fallbackFiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
     );
 
+    const canReadKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
+    const canReadCustomers = canAccessRoute(profile, getNavigationRoute("customers-overview"));
+    const canReadAccounts = canAccessRoute(profile, getNavigationRoute("accounts-workloads"));
+    const needsAccountData = canReadCustomers || canReadAccounts;
+
     useEffect(() => {
+      if (!needsAccountData) return;
       let active = true;
       void fetchAccountsWorkloadsFiscalYears()
         .then(({ fiscalYears: years }) => {
@@ -188,7 +196,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           setAccountsWorkloadsLoadError(error instanceof Error ? error.message : "Fiscal-year API request failed.");
         });
       return () => { active = false; };
-    }, []);
+    }, [needsAccountData]);
 
 
     useEffect(() => {
@@ -234,6 +242,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     }, [activeRoute.module, fiscalYear, guideOpen]);
 
     useEffect(() => {
+      if (!needsAccountData) return;
       let active = true;
       setFxRate(null);
       setFxLoading(true);
@@ -243,10 +252,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         .catch((error) => { if (active) setFxError(error instanceof Error ? error.message : "FX Rate API request failed."); })
         .finally(() => { if (active) setFxLoading(false); });
       return () => { active = false; };
-    }, [fiscalYear]);
+    }, [fiscalYear, needsAccountData]);
 
     useEffect(() => {
-      if (activeRoute.module !== "home") return;
+      if (activeRoute.module !== "home" || !canReadKpis) return;
       let active = true;
       setLiveKpiDataset(null);
       setKpiDatasetLoading(true);
@@ -256,9 +265,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         .catch((error) => { if (active) setKpiDatasetError(error instanceof Error ? error.message : "KPI Overview API request failed."); })
         .finally(() => { if (active) setKpiDatasetLoading(false); });
       return () => { active = false; };
-    }, [activeRoute.module, fiscalYear]);
+    }, [activeRoute.module, fiscalYear, canReadKpis]);
 
     useEffect(() => {
+      if (!needsAccountData || !["home", "myCustomers360", "accountsWorkloads"].includes(activeRoute.module)) return;
       let active = true;
       const requestId = ++accountsWorkloadsRequestIdRef.current;
       const tableRoute = activeRoute.module === "accountsWorkloads";
@@ -303,7 +313,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         active = false;
         window.clearTimeout(timer);
       };
-    }, [activeRoute.module, fiscalYear]);
+    }, [activeRoute.module, fiscalYear, needsAccountData]);
 
     const confirmWeeklyActivitiesNavigation = (
       route: NavigationRouteDefinition,
@@ -624,7 +634,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
               </oj-button>
             </div>
             <div class="kpi-menu-matrix__rows">
-              {navItems.map((item) => item.children ? (
+              {visibleNavItems.map((item) => item.children ? (
                 <section key={item.id} class="kpi-menu-group" aria-labelledby={`kpi-menu-group-${item.id}`}>
                   <div id={`kpi-menu-group-${item.id}`} class="kpi-menu-group__label">
                     {item.icon && <span class={`kpi-menu-group__icon ${item.icon}`} aria-hidden="true"></span>}
