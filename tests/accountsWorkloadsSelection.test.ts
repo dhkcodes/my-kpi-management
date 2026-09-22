@@ -62,6 +62,8 @@ assert.deepEqual(selection, ["1"], "restore must not mutate selection");
 
 const editedRows = [{ ...savedRows[0], account: "Edited Account", isImportant: true }, savedRows[1]];
 assert.equal(hasEditableAccountWorkloadChanges(savedRows, editedRows), true, "a changed editable cell is dirty");
+assert.equal(hasEditableAccountWorkloadChanges(savedRows, [{ ...savedRows[0], revenueType: "Expansion" }, savedRows[1]]), true,
+  "Revenue Type alone is edit-dirty and enables Save");
 assert.equal(hasEditableAccountWorkloadChanges(savedRows, [{ ...savedRows[0], isImportant: true }, savedRows[1]]), false,
   "Highlight is not edit-dirty");
 assert.equal(hasEditableAccountWorkloadChanges(savedRows, [{ ...savedRows[0], isDeleted: true }, savedRows[1]]), false,
@@ -72,6 +74,11 @@ const authoritativeAfterHighlight = [{ ...savedRows[0], isImportant: false }, sa
 const mergedAfterHighlight = overlayEditableAccountWorkloadChanges(authoritativeAfterHighlight, editedRows);
 assert.equal(mergedAfterHighlight[0].account, "Edited Account", "an immediate action preserves another editable draft");
 assert.equal(mergedAfterHighlight[0].isImportant, false, "authoritative action state is not overwritten by a stale draft");
+const mergedRevenueType = overlayEditableAccountWorkloadChanges(
+  authoritativeAfterHighlight,
+  [{ ...savedRows[0], revenueType: "New" }, savedRows[1]]
+);
+assert.equal(mergedRevenueType[0].revenueType, "New", "Revenue Type survives authoritative refresh overlay before save");
 assert.deepEqual(classifyAccountDeleteTargets(savedRows, ["new-1", "1", "2"], "new-1"), {
   draftIds: ["new-1"], activeIds: ["1"], permanentIds: ["2"]
 }, "draft, saved active, and saved deleted targets are distinguished before confirmation");
