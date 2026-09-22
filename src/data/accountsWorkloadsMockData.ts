@@ -1,5 +1,7 @@
 import { FiscalYear } from "./kpiMockData";
 
+export type RevenueType = "New" | "Expansion";
+
 export type AccountWorkloadRow = {
   id: string;
   commitmentId?: number;
@@ -8,6 +10,7 @@ export type AccountWorkloadRow = {
   planNumber: string;
   account: string;
   workloadName: string;
+  revenueType?: RevenueType | null;
   opptyNo: string;
   startDate: string;
   endDate: string;
@@ -64,6 +67,7 @@ const buildSyntheticRows = (): AccountWorkloadRow[] =>
       planNumber: rowNumber % 4 === 0 ? `PAYG 9${String(rowNumber).padStart(7, "0")}` : `UCM 9${String(rowNumber).padStart(7, "0")}`,
       account: `Demo Account ${String(Math.floor(index / 4) + 1).padStart(2, "0")}`,
       workloadName: `Synthetic Workload ${String(rowNumber).padStart(2, "0")}`,
+      revenueType: null,
       opptyNo: `D${String(70000 + rowNumber)}`,
       startDate: isoDate(index),
       endDate: isoDate(index, 1),

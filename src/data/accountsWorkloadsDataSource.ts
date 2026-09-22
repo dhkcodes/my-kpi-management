@@ -2,6 +2,7 @@ import {
   AccountWorkloadMetadata,
   AccountWorkloadRow,
   AccountWorkloadStateSeed,
+  RevenueType,
   accountWorkloadSeed
 } from "./accountsWorkloadsMockData";
 import { FiscalYear } from "./kpiMockData";
@@ -29,6 +30,12 @@ const stringValue = (value: unknown, field: string, required = false) => {
 const nullableString = (value: unknown, field: string) => {
   if (value === null) return null;
   return stringValue(value, field);
+};
+
+const nullableRevenueType = (value: unknown, field: string): RevenueType | null => {
+  if (value === null || value === undefined) return null;
+  if (value === "New" || value === "Expansion") return value;
+  throw new Error(`Invalid ${field}`);
 };
 
 const finiteNumber = (value: unknown, field: string, nullable = false) => {
@@ -83,6 +90,7 @@ const normalizeRow = (value: unknown, index: number): AccountWorkloadRow => {
     planNumber: stringValue(value.planNumber, `row ${index + 1} plan number`),
     account: stringValue(value.account, `row ${index + 1} account`, true),
     workloadName: stringValue(value.workloadName, `row ${index + 1} workload name`),
+    revenueType: nullableRevenueType(value.revenueType, `row ${index + 1} revenue type`),
     opptyNo: stringValue(value.opptyNo, `row ${index + 1} opportunity number`),
     startDate: isoDateValue(value.startDate, `row ${index + 1} start date`),
     endDate: isoDateValue(value.endDate, `row ${index + 1} end date`),

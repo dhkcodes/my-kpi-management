@@ -22,6 +22,7 @@ const fixture = {
     planNumber: " UCM TEST ",
     account: " Test Account ",
     workloadName: " Test Workload ",
+    revenueType: null,
     opptyNo: " TEST01 ",
     startDate: "2026-01-01",
     endDate: "2026-12-31",
@@ -47,6 +48,11 @@ async function run() {
   assert.equal(normalized.rows[0].account, "Test Account");
   assert.equal(normalized.rows[0].planNumber, "UCM TEST");
   assert.equal(normalized.rows[0].latestUpdate, "Ready");
+  assert.equal(normalized.rows[0].revenueType, null, "legacy rows must remain unclassified");
+  assert.throws(
+    () => normalizeAccountWorkloadStateSeed({ ...fixture, rows: [{ ...fixture.rows[0], revenueType: "Renewal" }] }),
+    /revenue type/i
+  );
   assert.notEqual(normalized.rows, fixture.rows, "normalization must return a defensive row collection");
   assert.throws(
     () => normalizeAccountWorkloadStateSeed({ ...fixture, rows: [{ ...fixture.rows[0], account: "" }] }),
