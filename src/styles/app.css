@@ -2431,8 +2431,33 @@ h4.weekly-activity-section-label--next-week,
 .consumption-disclosure { align-items: center; background: transparent; border: 0; color: var(--kpi-ink); cursor: pointer; display: flex; font: inherit; gap: .55rem; padding: .25rem 0; text-align: left; }
 .consumption-disclosure:hover, .consumption-disclosure:focus-visible { color: var(--kpi-brand); outline: none; }
 .consumption-pulse-toggle { font-size: 1.05rem; font-weight: 850; }
+.consumption-table-toggle { align-items: center; display: flex; gap: .65rem; }
 .consumption-table-toggle > span:last-child { display: grid; gap: .15rem; }
 .consumption-table-toggle .consumption-table-title { display: block; }
+.consumption-mtd-switch {
+  align-items: center;
+  background: var(--oj-button-outlined-chrome-bg-color, #fff);
+  border: 1px solid var(--oj-button-outlined-chrome-border-color, #8b8580);
+  border-radius: .375rem;
+  color: var(--oj-button-outlined-chrome-text-color, #312d2a);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  gap: .55rem;
+  justify-content: space-between;
+  min-height: 2.5rem;
+  padding: 0 .7rem;
+  white-space: nowrap;
+}
+.consumption-mtd-switch:hover:not(:disabled) { background: var(--oj-button-outlined-chrome-bg-color-hover, #f5f4f2); }
+.consumption-mtd-switch:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
+.consumption-mtd-switch:disabled { cursor: not-allowed; opacity: .5; }
+.consumption-mtd-switch__track { background: #aca8a4; border-radius: 999px; display: inline-flex; height: 1.2rem; padding: .125rem; transition: background-color .15s ease; width: 2.15rem; }
+.consumption-mtd-switch__track > span { background: #fff; border-radius: 50%; box-shadow: 0 1px 2px rgb(0 0 0 / 25%); height: .95rem; transform: translateX(0); transition: transform .15s ease; width: .95rem; }
+.consumption-mtd-switch[aria-checked="true"] .consumption-mtd-switch__track { background: var(--oj-core-brand-color-1, #0572ce); }
+.consumption-mtd-switch[aria-checked="true"] .consumption-mtd-switch__track > span { transform: translateX(.95rem); }
 .consumption-signal-panel, .consumption-trend-panel, .consumption-table-panel { margin: 0; min-width: 0; }
 .consumption-section-heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: .65rem; }
 .consumption-section-heading h2 { font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.02em; margin: .15rem 0 0; }
@@ -3108,9 +3133,9 @@ h4.weekly-activity-section-label--next-week,
 }
 .consumption-forecast-tooltip {
   position: relative;
-  display: inline-flex;
-  margin-inline-start: .35rem;
-  color: var(--oj-core-text-color-secondary);
+  display: flex;
+  width: 100%;
+  color: inherit;
   cursor: help;
   outline-offset: 2px;
 }

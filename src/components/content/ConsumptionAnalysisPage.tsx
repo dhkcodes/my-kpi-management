@@ -15,6 +15,7 @@ import {
   consumptionPillarOptions,
   filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
+  getFiscalQuarter,
   getAlertActualTrend,
   isUnmappedConsumptionLabel
 } from "../../data/consumptionData";
@@ -236,8 +237,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
   const fiscalTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
+    const displayedActualAmount = analysis.portfolio.actualAmount + (analysis.mtdSummary?.amount ?? 0);
     const rows = [
-      { label: analysis.fiscalYear, actualAmount: analysis.portfolio.actualAmount, forecastAmount: analysis.portfolio.forecastAmount },
+      { label: analysis.fiscalYear, actualAmount: displayedActualAmount, forecastAmount: analysis.portfolio.forecastAmount },
       { label: analysis.priorFiscalYear, actualAmount: analysis.portfolio.priorActualAmount, forecastAmount: analysis.portfolio.priorForecastAmount }
     ];
     return chart(rows.flatMap((row) => [
@@ -247,10 +249,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
-    return chart(analysis.quarters.flatMap((quarter) => [
-      { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: quarter.actualAmount, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${currency.format(quarter.actualAmount)}` },
+    const mtdQuarter = analysis.mtdSummary ? getFiscalQuarter(analysis.mtdSummary.periodKey).slice(-2) : null;
+    return chart(analysis.quarters.flatMap((quarter) => {
+      const actualAmount = quarter.actualAmount + (quarter.quarter === mtdQuarter ? analysis.mtdSummary?.amount ?? 0 : 0);
+      return [
+      { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: actualAmount, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${currency.format(actualAmount)}` },
       { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmount, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${currency.format(quarter.forecastAmount)}` }
-    ]));
+    ]; }));
   }, [analysis]);
   const movementChart = useMemo(() => {
     if (!analysis) return chart([]);
@@ -303,7 +308,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
-  const mtdAsOfPeriod = analysis.periodCoverage.includedPeriods[analysis.periodCoverage.includedPeriods.length - 1] ?? "current period";
+  const mtdAsOfPeriod = analysis.mtdSummary?.periodKey ?? "current period";
+  const displayedActualAmount = analysis.portfolio.actualAmount + (analysis.mtdSummary?.amount ?? 0);
 
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmount: total.totalForecastAmount + account.totalForecastAmount,
@@ -372,11 +378,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     <header class="consumption-page__header consumption-insights-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
-        <label class="consumption-mtd-toggle">
-          <input type="checkbox" role="switch" checked={includeMtd}
-            onChange={(event) => { setLoading(true); setIncludeMtd(event.currentTarget.checked); }} />
-          <span>Include MTD</span>
-        </label>
+        <button type="button" role="switch" aria-checked={includeMtd} class="consumption-mtd-switch"
+          onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
+          <span>Include MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+        </button>
         <div class="consumption-insights-export">
           <span>Export</span>
           <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
@@ -441,7 +446,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
     <ConsumptionMessageBanner messages={messages} />
     {includeMtd && <p class="consumption-mtd-disclosure" role="status">
-      FINAL + current MTD (provisional) is included in monetary summaries and basic totals charts as of {mtdAsOfPeriod}. Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based.
+      {analysis.mtdSummary
+        ? <>FINAL + {mtdAsOfPeriod} MTD {currency.format(analysis.mtdSummary.amount)} (provisional) is included in monetary summaries and basic totals charts. Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based.</>
+        : <>No current-period MTD snapshot is available for this view. FINAL-based values remain unchanged.</>}
     </p>}
     {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> 불러오는 중</div>}
 
@@ -461,7 +468,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small><span class="consumption-metric is-actual">{includeMtd ? "FINAL + MTD" : "ACTUAL"} {currency.format(analysis.portfolio.actualAmount)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {currency.format(analysis.portfolio.forecastAmount)}</span></small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{compactCurrency.format(analysis.portfolio.totalAmount)}</strong><small><span class="consumption-metric is-actual">{includeMtd ? "FINAL + MTD" : "ACTUAL"} {currency.format(displayedActualAmount)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {currency.format(analysis.portfolio.forecastAmount)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? compactCurrency.format(latestCompleteQuarter.totalAmount) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={(latestCompleteQuarter.qoqChangePercent ?? 0) < 0 ? "is-negative" : "is-positive"}>{signedPercent(latestCompleteQuarter.qoqChangePercent)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
       <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposure.toFixed(1)}%</strong><small><span class="consumption-metric is-forecast">{currency.format(analysis.portfolio.forecastAmount)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
