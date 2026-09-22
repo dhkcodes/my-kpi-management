@@ -170,8 +170,14 @@ assert.match(insightsPage, /PRIOR_PERIOD_ZERO[\s\S]*rate N\/A/, "explicit prior 
 assert.doesNotMatch(insightsPage, /rate N\/A \(prior Actual 0\)|<small>\{row\.yoyUnavailableReason/, "long N/A reasons are not rendered inline in Sales Rep cells");
 assert.match(insightsPage, /selectedMovement\.category === "All" \? <tfoot><tr><th>Total<\/th>/, "Forecast Composition All uses the concise Total label");
 assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
+assert.equal(insightsPage.includes("const [includeMtd, setIncludeMtd] = useState(false)"), true, "Include MTD is default OFF");
+assert.equal(insightsPage.includes("includeMtd"), true, "Analysis request includes the MTD mode");
+assert.equal(insightsPage.includes("Include MTD"), true, "Analysis exposes the Include MTD toggle");
+assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
+assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
+assert.equal(recordsPage.includes("MTD · provisional"), true, "Current-period MTD is labelled provisional");
+assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
 assert.doesNotMatch(attainmentPage, /included-period results|not asserted to be a complete full-year outlook/, "Attainment removes the standing technical completeness disclaimer");
-
 // PILLAR is an explicit, accessible page context on both Consumption leaves.
 assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*selectPillar\(option\.value\)/, "Consumption Records exposes the shared compact All, DP, OCI selector");
 assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Consumption Analysis exposes the shared compact All, DP, OCI selector");

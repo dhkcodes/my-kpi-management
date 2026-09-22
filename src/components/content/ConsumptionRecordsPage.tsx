@@ -366,6 +366,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
   const [serverActualTotals, setServerActualTotals] = useState<Record<string, number> | null>(null);
   const [serverAccountActualTotals, setServerAccountActualTotals] = useState<Record<string, Record<string, number>>>({});
+  const [serverMtdTotals, setServerMtdTotals] = useState<Record<string, number>>({});
+  const [serverMtdStatuses, setServerMtdStatuses] = useState<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>({});
+  const [serverAccountMtdTotals, setServerAccountMtdTotals] = useState<Record<string, Record<string, number>>>({});
+  const [showMtd, setShowMtd] = useState(false);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("idle");
@@ -517,9 +521,16 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
       setCurrentFiscalMonth(page.currentFiscalMonth);
       setRecordsTotalAccounts(page.totalAccounts);
       setServerActualTotals({ ...page.totals.actualByPeriod });
+      setServerMtdTotals({ ...(page.totals.mtdByPeriod ?? {}) });
+      setServerMtdStatuses({ ...(page.totals.mtdStatusByPeriod ?? {}) });
       setServerAccountActualTotals((current) => {
         const next = append ? { ...current } : {};
         page.accountGroups.forEach((group) => { next[group.account] = { ...group.totals.actualByPeriod }; });
+        return next;
+      });
+      setServerAccountMtdTotals((current) => {
+        const next = append ? { ...current } : {};
+        page.accountGroups.forEach((group) => { next[group.account] = { ...(group.totals.mtdByPeriod ?? {}) }; });
         return next;
       });
       setRecordsNextOffset(page.nextOffset);
@@ -571,6 +582,9 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
         setServerActualTotals(null);
         setServerAccountActualTotals({});
+        setServerMtdTotals({});
+        setServerMtdStatuses({});
+        setServerAccountMtdTotals({});
         setRecordAccountNames(aggregateConsumptionAccounts(fallbackPlans).map((account) => account.customer));
         setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);
         setRecordsHasMore(false);
@@ -612,6 +626,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
     }));
   }, [visiblePlans, recordAccountNames, draftControlTotals, serverAccountActualTotals]);
   const renderedRecordAccounts = accounts;
+  const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
+  const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
+    ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
+  const staleMtdPeriods = Object.keys(serverMtdStatuses).filter((period) => serverMtdStatuses[period] === "FINAL_UPLOAD_REQUIRED");
   const loadedAccountCount = renderedRecordAccounts.length;
   const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
@@ -619,8 +637,15 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const allAccountsTotal = useMemo(() => {
     if (serverActualTotals === null) return null;
     const total = aggregateConsumptionActualTotals(draftPlans);
-    return { ...total, actuals: serverActualTotals };
-  }, [draftPlans, serverActualTotals]);
+    return {
+      ...total,
+      actuals: serverActualTotals,
+      forecasts: showMtd && currentMtdPeriod
+        ? { ...Object.fromEntries(Object.entries(total.forecasts).filter(([period]) => period !== currentMtdPeriod)),
+          ...(Object.prototype.hasOwnProperty.call(serverMtdTotals, currentMtdPeriod) ? { [currentMtdPeriod]: serverMtdTotals[currentMtdPeriod] } : {}) }
+        : total.forecasts
+    };
+  }, [currentMtdPeriod, draftPlans, serverActualTotals, serverMtdTotals, showMtd]);
   const selectedPlan = selectedSeriesId === "__all__"
     ? allAccountsTotal
     : draftPlans.find((plan) => plan.id === selectedSeriesId) ?? allAccountsTotal;
@@ -1164,7 +1189,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
       const manual = controlValue(draftControlTotals, series.customer, month);
       return [month, resolveConsumptionControlTotal(series.plans, month, manual)];
     })) : {};
-    const displaySeries: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number] = accountLevel && "plans" in series ? {
+    const baseDisplaySeries: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number] = accountLevel && "plans" in series ? {
       ...series,
       actuals: Object.fromEntries(allMonths.flatMap((month) => {
         const resolution = accountResolutions[month];
@@ -1175,6 +1200,15 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         return editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
       }))
     } : { ...series, forecasts: {} };
+    const accountMtd = accountLevel && "plans" in series ? serverAccountMtdTotals[series.customer] ?? {} : {};
+    const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(accountMtd, currentMtdPeriod);
+    const displaySeries = accountLevel && showMtd && currentMtdPeriod ? {
+      ...baseDisplaySeries,
+      forecasts: {
+        ...Object.fromEntries(Object.entries(baseDisplaySeries.forecasts).filter(([period]) => period !== currentMtdPeriod)),
+        ...(hasCurrentMtd ? { [currentMtdPeriod]: accountMtd[currentMtdPeriod] } : {})
+      }
+    } : baseDisplaySeries;
     return buildDisplayQuarterSummaries({
       ...displaySeries,
       actuals: Object.fromEntries(Object.entries(displaySeries.actuals).filter(([month]) =>
@@ -1186,7 +1220,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
-          const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month);
+          const mtd = accountLevel && showMtd && month === currentMtdPeriod;
+          const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month) && !mtd;
           const value = editable
             ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
             : actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
@@ -1208,6 +1243,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
               compositionStatus: "CLASSIFIED" as const
             } : composition;
             const dirty = draftForecastCompositions.has(forecastDraftKey(series.customer, month));
+            if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
+              class="consumption-value-cell consumption-mtd-cell">
+              <span>{hasCurrentMtd ? currency.format(accountMtd[month]) : "—"}<small>{hasCurrentMtd ? "MTD · provisional" : "MTD unavailable"}</small></span>
+            </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
@@ -1236,6 +1275,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   if (rangeInitialized && rangeTouched && !rangeValid) pageMessages.push({ id: "records-range", severity: "warning", summary: "조회기간을 확인해 주세요.", detail: "시작 분기는 종료 분기보다 늦을 수 없습니다." });
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
+  if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.` });
 
   if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
@@ -1508,6 +1548,9 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           <div class="consumption-table-toggle">
             <span><span class="kpi-section-label">Actual + Forecast</span>
               <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></span>
+            <label class="consumption-mtd-toggle"><input type="checkbox" checked={showMtd}
+              disabled={dataMode !== "backend" || !currentMtdPeriod}
+              onChange={(event) => setShowMtd(event.currentTarget.checked)} /> Show MTD</label>
           </div>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
