@@ -42,6 +42,7 @@ export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
   dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
   percentage: number;
+  forecastEntryStatus: "PROVIDED" | "UNAVAILABLE";
   actualTrend: readonly ConsumptionActualTrendPoint[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
@@ -76,6 +77,7 @@ export type ConsumptionPlan = Readonly<{
   workload?: string;
   planType: string;
   actuals: Record<string, number>;
+  mtds?: Record<string, number>;
   forecasts: Record<string, number>;
   serverPlanId?: number;
   versions?: Record<string, number>;

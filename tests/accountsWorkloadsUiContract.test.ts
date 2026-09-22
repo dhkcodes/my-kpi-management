@@ -150,8 +150,8 @@ assert.match(page, /const cancelCurrentCell[\s\S]*editEntrySnapshotRef\.current[
   "Escape restores only the active row snapshot and exits cell editing");
 assert.match(page, /const editorKeyDown[\s\S]*event\.isComposing \|\| event\.keyCode === 229[\s\S]*event\.key === "Escape"[\s\S]*onCancel\(\)[\s\S]*event\.key === "Enter"/,
   "all saved-row editors ignore IME command keys and share Escape/Enter behavior");
-assert.equal((page.match(/onKeyDown=\{editorKeyDown\}/g) ?? []).length, 5,
-  "text, textarea, number, oj-input-date, and select saved-row editors share the keyboard contract");
+assert.equal((page.match(/onKeyDown=\{editorKeyDown\}/g) ?? []).length, 6,
+  "text, textarea, number, oj-input-date, and both select saved-row editors share the keyboard contract");
 assert.match(page, /onDblClick=\{\(event\) => \{[\s\S]*closest\("\.accounts-workloads-edit-field"\)[\s\S]*return;[\s\S]*editEntrySnapshotRef\.current = \{ \.\.\.row \}[\s\S]*setEditCell\(\{ id: row\.id, field \}\)/,
   "cell double-click starts one snapshot session without blocking native editor double-click selection");
 assert.match(page, /const addRowEditorKeyDown[\s\S]*event\.isComposing \|\| event\.keyCode === 229[\s\S]*event\.key !== "Escape"[\s\S]*setAddingRow\(null\)/,
@@ -170,6 +170,18 @@ assert.match(page, /if \(field === "target"\)[\s\S]*<select[\s\S]*targetOptions\
   "Add Account Target uses the same constrained SelectBox options as saved-row editing");
 assert.doesNotMatch(page, /renderAddInput\("target", "FY27 Q1"\)/,
   "Add Account Target is not rendered as the legacy free-text input");
+assert.match(page, /revenueType: "Revenue Type"/,
+  "Revenue Type is a visible Accounts & Workloads column");
+assert.match(page, /const revenueTypeOptions: readonly RevenueType\[\] = \["New", "Expansion"\]/,
+  "Revenue Type options are constrained to the backend contract");
+assert.match(page, /if \(field === "revenueType"\)[\s\S]*<select[\s\S]*revenueTypeOptions\.map/,
+  "saved-row Revenue Type editing uses a SelectBox");
+assert.match(page, /renderAddInput\("revenueType", "Revenue Type"\)/,
+  "Add Account renders a Revenue Type editor");
+assert.match(page, /revenueType: "New"/,
+  "new Accounts default Revenue Type to New");
+assert.match(page, /renderEditableCell\(row, "revenueType", row\.revenueType \|\| "—"\)/,
+  "legacy null Revenue Type is displayed as an em dash rather than auto-classified");
 
 assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
   "the common App shell owns short-content Footer placement for every route");

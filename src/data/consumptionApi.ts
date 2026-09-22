@@ -20,7 +20,7 @@ const apiBase = () => {
   return "/api/v1";
 };
 
-type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number; pillar?: unknown }>;
+type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number; actualState?: unknown; pillar?: unknown }>;
 type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; dataCenterBreakdown?: unknown; dpDataCenterCount?: unknown; ociDataCenterCount?: unknown; workload?: string | null; facts: RawFact[] }>;
 type RawSignalPoint = Readonly<{ periodKey: string; actualAmount: number }>;
 type RawSignal = Readonly<{
@@ -408,11 +408,13 @@ const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>
 const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string>) => {
   const split = parseAmountSplit(value);
   const raw = value as Record<string, unknown>;
+  const forecastEntryStatus = (raw.forecastEntryStatus ?? "PROVIDED") as "PROVIDED" | "UNAVAILABLE";
   if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
-    || !isFiniteNumber(raw.percentage)) return malformedAnalysis();
+    || !isFiniteNumber(raw.percentage) || !["PROVIDED", "UNAVAILABLE"].includes(String(forecastEntryStatus))) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
     dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociDataCenterCount),
-    percentage: raw.percentage, actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
+    percentage: raw.percentage, forecastEntryStatus,
+    actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const organicGrowthCategories: readonly ConsumptionOrganicGrowthCategory[] = [
   "NEW", "EXPANSION", "RETURNING_REACTIVATED", "CONTRACTION", "STABLE", "UNCLASSIFIED_INCOMPLETE"
@@ -674,21 +676,25 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     if (seenPlanIds.has(plan.planId) || seenStableKeys.has(plan.stableKey)) throw new Error("Malformed Consumption plan response");
     seenPlanIds.add(plan.planId); seenStableKeys.add(plan.stableKey);
     const actuals: Record<string, number> = {};
+    const mtds: Record<string, number> = {};
     const forecasts: Record<string, number> = {};
     const versions: Record<string, number> = {};
     plan.facts.forEach((fact) => {
+      const actualState = fact?.actualState ?? "FINAL";
       if (!isPeriodKey(fact?.periodKey) || !isNullableFiniteNumber(fact?.actualAmount)
         || !isNullableFiniteNumber(fact?.forecastAmount) || !isNonNegativeInteger(fact?.versionNo)
+        || (fact.actualAmount !== null && actualState !== "FINAL" && actualState !== "MTD")
         ||(expectedPillar!==undefined&&(fact.actualAmount!==null?normalizeConsumptionPillar(fact.pillar)!==selectedPillar:fact.pillar!=null))) throw new Error("Malformed Consumption fact response");
       if (Object.prototype.hasOwnProperty.call(versions, fact.periodKey)) throw new Error("Malformed Consumption fact response");
       versions[fact.periodKey] = fact.versionNo;
-      // Actual is the visible effective value, but the finalized forecast is retained for audit and exact replay.
-      if (fact.actualAmount !== null) actuals[fact.periodKey] = fact.actualAmount;
+      // Keep provisional MTD separate from finalized Actual all the way to the view model.
+      if (fact.actualAmount !== null && actualState === "FINAL") actuals[fact.periodKey] = fact.actualAmount;
+      if (fact.actualAmount !== null && actualState === "MTD") mtds[fact.periodKey] = fact.actualAmount;
       if (fact.forecastAmount !== null) forecasts[fact.periodKey] = fact.forecastAmount;
     });
     const dataCenterBreakdown = parseDataCenterBreakdown(plan.dataCenterBreakdown, plan.dpDataCenterCount, plan.ociDataCenterCount);
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
-      dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI", actuals, forecasts, serverPlanId: plan.planId, versions };
+      dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI", actuals, mtds, forecasts, serverPlanId: plan.planId, versions };
   });
   const metadataMissing = !raw.currentFiscalMonth && !raw.fromQuarter && !raw.toQuarter
     && (!raw.editablePeriodIds || raw.editablePeriodIds.length === 0)

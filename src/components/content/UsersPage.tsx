@@ -40,8 +40,13 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
   const [copied, setCopied] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<AuthSession | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [permissionCandidate, setPermissionCandidate] = useState<AuthSession | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<MenuPermissionMap>(() =>
+    Object.fromEntries(menuPermissionIds.map((menu) => [menu, "NONE"])) as MenuPermissionMap);
+  const [permissionError, setPermissionError] = useState("");
   const dialogRef = useRef<DialogElement>(null);
   const deleteDialogRef = useRef<DialogElement>(null);
+  const permissionDialogRef = useRef<DialogElement>(null);
   const accessProvider = useMemo(() => new ArrayDataProvider(accessOptions, { keyAttributes: "value" }), []);
 
   const reload = async () => {
@@ -51,6 +56,7 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
   useEffect(() => { void reload(); }, []);
   useEffect(() => { if (dialog) dialogRef.current?.open(); }, [dialog]);
   useEffect(() => { if (deleteCandidate) deleteDialogRef.current?.open(); }, [deleteCandidate]);
+  useEffect(() => { if (permissionCandidate) permissionDialogRef.current?.open(); }, [permissionCandidate]);
 
   const openDialog = (next: Exclude<DialogState, null>) => {
     if (busy) return;
@@ -96,23 +102,30 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     catch (cause) { setError(cause instanceof Error ? cause.message : "User action failed."); }
     finally { setBusy(false); }
   };
-  const changePermission = (userKey: string, menu: MenuPermissionId, value: MenuPermission) => {
-    setUsers((current) => current.map((user) => {
-      if (user.userKey !== userKey) return user;
-      const menuPermissions = Object.fromEntries(menuPermissionIds.map((id) => [id, id === menu ? value : user.menuPermissions[id] ?? "NONE"])) as MenuPermissionMap;
-      return { ...user, menuPermissions };
-    }));
-  };
-  const savePermissions = async (user: AuthSession) => {
+  const openPermissionDialog = (user: AuthSession) => {
     if (busy || user.access === "Admin") return;
-    const requested = Object.fromEntries(menuPermissionIds.map((menu) => [menu, user.menuPermissions[menu] ?? "NONE"])) as MenuPermissionMap;
+    setPermissionError("");
+    setPermissionDraft(Object.fromEntries(menuPermissionIds.map((menu) => [menu, user.menuPermissions[menu] ?? "NONE"])) as MenuPermissionMap);
+    setPermissionCandidate(user);
+  };
+  const changePermission = (menu: MenuPermissionId, level: "READ" | "WRITE", checked: boolean) => {
+    const current = permissionDraft[menu] ?? "NONE";
+    const next: MenuPermission = level === "WRITE"
+      ? checked ? "WRITE" : current === "WRITE" ? "READ" : current
+      : checked ? current === "WRITE" ? "WRITE" : "READ" : "NONE";
+    setPermissionDraft({ ...permissionDraft, [menu]: next });
+  };
+  const savePermissions = async () => {
+    if (busy || !permissionCandidate || permissionCandidate.access === "Admin") return;
     try {
       setBusy(true);
-      const updated = await updateUserMenuPermissions(user.userKey, requested);
+      const updated = await updateUserMenuPermissions(permissionCandidate.userKey, permissionDraft);
       setUsers((current) => current.map((candidate) => candidate.userKey === updated.userKey ? updated : candidate));
-      setError("");
+      setPermissionError("");
+      setPermissionCandidate(null);
+      permissionDialogRef.current?.close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save menu permissions.");
+      setPermissionError(cause instanceof Error ? cause.message : "Unable to save menu permissions.");
     } finally { setBusy(false); }
   };
   const openDeleteDialog = (user: AuthSession) => {
@@ -144,13 +157,8 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     {error && <div class="kap-error" role="alert">{error}</div>}
     <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Menu permissions</th><th>Actions</th></tr></thead>
       <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Menu permissions">
-        {user.access === "Admin" ? <span>Default WRITE</span> : <div class="kap-menu-permissions">
-          {menuPermissionIds.map((menu) => <label key={menu}><span>{menuLabels[menu]}</span><select disabled={busy} value={user.menuPermissions[menu] ?? "NONE"}
-            onChange={(event) => changePermission(user.userKey, menu, (event.currentTarget as HTMLSelectElement).value as MenuPermission)}>
-            <option value="NONE">None</option><option value="READ">Read</option><option value="WRITE">Write</option>
-          </select></label>)}
-          <oj-button chroming="outlined" disabled={busy} onojAction={() => void savePermissions(user)}>Save permissions</oj-button>
-        </div>}
+        {user.access === "Admin" ? <span>Default WRITE</span> : <oj-button chroming="outlined" disabled={busy}
+          onojAction={() => openPermissionDialog(user)}>Edit permissions</oj-button>}
       </td><td data-label="Actions"><div class="kap-user-actions">
         {user.status === "INVITED" && <><oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reissue", user })}>Reissue</oj-button><oj-button chroming="borderless" disabled={busy} onojAction={() => void confirmAction(`Cancel invitation for ${user.loginId}?`, () => cancelUserInvite(user.userKey))}>Cancel invite</oj-button></>}
         {user.status === "ACTIVE" && <oj-button chroming="outlined" disabled={busy} onojAction={() => openDialog({ kind: "reset", user })}>Reset password</oj-button>}
@@ -187,6 +195,31 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
       <div slot="footer">
         {issuedLink ? <><oj-button onojAction={() => void copyLink()}>Copy link</oj-button><oj-button chroming="callToAction" onojAction={() => dialogRef.current?.close()}>Done</oj-button></>
           : <><oj-button disabled={busy} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Creating..." : "Create link"}</oj-button></>}
+      </div>
+    </oj-dialog>
+    <oj-dialog ref={permissionDialogRef} initialVisibility="hide" dialogTitle="Menu permissions"
+      cancelBehavior={busy ? "none" : "icon"}
+      onojClose={() => { if (!busy) { setPermissionCandidate(null); setPermissionError(""); } }}
+      class="kap-user-dialog kap-permission-dialog">
+      <div slot="body" class="kap-dialog-body">
+        {permissionCandidate && <p><strong>{permissionCandidate.displayName}</strong> ({permissionCandidate.loginId})</p>}
+        <div class="kap-permission-table-wrap"><table class="kap-permission-table">
+          <thead><tr><th>Menu</th><th>Read</th><th>Write</th></tr></thead>
+          <tbody>{menuPermissionIds.map((menu) => {
+            const access = permissionDraft[menu] ?? "NONE";
+            return <tr key={menu}><th scope="row">{menuLabels[menu]}</th>
+              <td><input type="checkbox" aria-label={`${menuLabels[menu]} read`} checked={access === "READ" || access === "WRITE"}
+                disabled={busy} onChange={(event) => changePermission(menu, "READ", event.currentTarget.checked)} /></td>
+              <td><input type="checkbox" aria-label={`${menuLabels[menu]} write`} checked={access === "WRITE"}
+                disabled={busy} onChange={(event) => changePermission(menu, "WRITE", event.currentTarget.checked)} /></td></tr>;
+          })}</tbody>
+        </table></div>
+        <p class="kap-field__hint">Write permission includes read access. KPI and Weekly remain limited to each user's own data.</p>
+        {permissionError && <div class="kap-error" role="alert">{permissionError}</div>}
+      </div>
+      <div slot="footer">
+        <oj-button disabled={busy} onojAction={() => permissionDialogRef.current?.close()}>Cancel</oj-button>
+        <oj-button chroming="callToAction" disabled={busy} onojAction={() => void savePermissions()}>{busy ? "Saving…" : "Save permissions"}</oj-button>
       </div>
     </oj-dialog>
     <oj-dialog ref={deleteDialogRef} initialVisibility="hide" dialogTitle="Permanently delete user"

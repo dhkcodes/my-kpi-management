@@ -28,6 +28,7 @@ const saved: AccountWorkloadRow = {
   planNumber: "UCM 1",
   account: "Demo Account",
   workloadName: "Demo Workload",
+  revenueType: "New",
   opptyNo: "D100",
   startDate: "2026-08-01",
   endDate: "2027-08-01",
@@ -113,6 +114,7 @@ async function run() {
   );
   assert.equal(atomicBody.creates.length, 1);
   assert.equal(atomicBody.creates[0].account, "Atomic New");
+  assert.equal(atomicBody.creates[0].revenueType, "New", "atomic Add Account must send the selected revenue type");
   assert.equal(atomicBody.creates[0].fiscalYear, "FY27", "atomic Add Account must satisfy the backend create DTO");
   assert.deepEqual(atomicBody.patches, []);
   assert.deepEqual(atomicBody.deletes, [{ commitmentId: 41, versionNo: 3 }]);
@@ -150,16 +152,22 @@ async function run() {
   );
   assert.equal(rowOnlyResult.fxRate, undefined, "row-only Save accepts the backend's optional null FX field");
 
-  const changed = { ...saved, notes: "changed", winProbability: null };
+  const changed = { ...saved, notes: "changed", winProbability: null, revenueType: "Expansion" as const };
   assert.deepEqual(buildAccountWorkloadPatch(saved, changed), {
     versionNo: 3,
     notes: "changed",
-    winProbability: null
+    winProbability: null,
+    revenueType: "Expansion"
   });
 
   await patchAccountWorkload(41, buildAccountWorkloadPatch(saved, changed), fetchImpl);
   assert.equal(calls[1].init?.method, "PATCH");
-  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { versionNo: 3, notes: "changed", winProbability: null });
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), {
+    versionNo: 3,
+    notes: "changed",
+    winProbability: null,
+    revenueType: "Expansion"
+  });
 
   await createAccountWorkload({ ...saved, id: "new-1", commitmentId: undefined, versionNo: undefined }, "FY27", fetchImpl);
   assert.equal(calls[2].init?.method, "POST");
@@ -168,6 +176,7 @@ async function run() {
   assert.equal("id" in createBody, false);
   assert.equal("commitmentId" in createBody, false);
   assert.equal("versionNo" in createBody, false);
+  assert.equal(createBody.revenueType, "New", "single-create requests must send revenue type");
 
   await deleteAccountWorkload(41, 4, fetchImpl);
   assert.equal(calls[3].url, "/api/v1/accounts-workloads/41?versionNo=4");
@@ -273,7 +282,8 @@ async function run() {
     ["negative ARR USD", { arrUsd: -1 }],
     ["negative ARR KRW", { arrKrw: -1 }],
     ["negative ACR USD", { acrUsd: -1 }],
-    ["negative ACR KRW", { acrKrw: -1 }]
+    ["negative ACR KRW", { acrKrw: -1 }],
+    ["unknown revenue type", { revenueType: "Renewal" as AccountWorkloadRow["revenueType"] }]
   ];
   for (const [label, override] of invalidRowCases) {
     await assert.rejects(
@@ -288,7 +298,8 @@ async function run() {
   for (const validOverride of [
     { startDate: "", endDate: "" },
     { startDate: null, endDate: null },
-    { winProbability: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null }
+    { winProbability: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null },
+    { revenueType: null }
   ]) {
     const validList = await fetchAccountsWorkloads(
       { fiscalYear: "FY27" },
@@ -296,6 +307,11 @@ async function run() {
     );
     assert.equal(validList.items.length, 1);
   }
+  const nullRevenueTypeList = await fetchAccountsWorkloads(
+    { fiscalYear: "FY27" },
+    async () => response({ items: [{ ...saved, revenueType: null }], total: 1 })
+  );
+  assert.equal(nullRevenueTypeList.items[0].revenueType, null, "legacy null revenue types must remain unclassified");
 
   const invalidSummaryCases: Array<[string, Record<string, unknown>]> = [
     ["fractional account count", { activeAccounts: 1.5 }],

@@ -16,7 +16,8 @@ import {
 } from "../../data/accountsWorkloadsSelection";
 import {
   AccountWorkloadMetadata,
-  AccountWorkloadRow
+  AccountWorkloadRow,
+  RevenueType
 } from "../../data/accountsWorkloadsMockData";
 import "ojs/ojbutton";
 import "ojs/ojswitch";
@@ -30,6 +31,7 @@ type EditableField = keyof Pick<
   | "planNumber"
   | "account"
   | "workloadName"
+  | "revenueType"
   | "opptyNo"
   | "startDate"
   | "endDate"
@@ -78,6 +80,7 @@ const editableFields: EditableField[] = [
   "planNumber",
   "account",
   "workloadName",
+  "revenueType",
   "opptyNo",
   "startDate",
   "endDate",
@@ -95,6 +98,7 @@ const centerAlignedFields = new Set<EditableField>([
   "startDate",
   "endDate",
   "opptyNo",
+  "revenueType",
   "target",
   "winProbability"
 ]);
@@ -112,6 +116,7 @@ const columnLabels: Record<EditableField | "rowNo" | "isImportant", string> = {
   planNumber: "Plan Number",
   account: "Account",
   workloadName: "Workload",
+  revenueType: "Revenue Type",
   opptyNo: "Oppty No",
   startDate: "Start Date",
   endDate: "End Date",
@@ -137,6 +142,7 @@ const currencyKrwFormatter = new Intl.NumberFormat("ko-KR", {
 const formatUsd = (value: number | null) => (value === null ? "—" : `$${currencyUsdFormatter.format(value)}`);
 const formatKrw = (value: number | null) => (value === null ? "—" : `₩${currencyKrwFormatter.format(Math.round(value))}`);
 const formatProbability = (value: number | null) => (value === null ? "—" : `${value}%`);
+const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion"];
 
 const comparableValue = (value: unknown) => value ?? "";
 
@@ -174,6 +180,7 @@ const createEmptyRow = (fiscalYear: FiscalYear): AccountWorkloadRow => ({
   planNumber: "",
   account: "",
   workloadName: "",
+  revenueType: "New",
   opptyNo: "",
   startDate: "",
   endDate: "",
@@ -294,6 +301,21 @@ function EditableCell({
         autofocus>
         <option value="">—</option>
         {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    );
+  }
+
+  if (field === "revenueType") {
+    return (
+      <select
+        id={inputId}
+        class="accounts-workloads-edit-field"
+        value={`${value ?? ""}`}
+        onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLSelectElement).value)}
+        onKeyDown={editorKeyDown}
+        autofocus>
+        <option value="">—</option>
+        {revenueTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     );
   }
@@ -906,6 +928,15 @@ export function AccountsWorkloadsPage({
         </select>
       );
     }
+    if (field === "revenueType") {
+      return (
+        <select class="accounts-workloads-edit-field" value={`${value ?? ""}`}
+          aria-label="Revenue Type" onKeyDown={addRowEditorKeyDown}
+          onChange={(event) => updateAddRowCell(field, (event.currentTarget as HTMLSelectElement).value)}>
+          {revenueTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      );
+    }
     if (type === "date") {
       return (
         <oj-input-date
@@ -1170,6 +1201,7 @@ export function AccountsWorkloadsPage({
                 <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
                 <td class="accounts-workloads-cell--left">{renderAddInput("account", "Account *")}</td>
                 <td class="accounts-workloads-cell--left">{renderAddInput("workloadName", "Workload *")}</td>
+                <td class="accounts-workloads-cell--center">{renderAddInput("revenueType", "Revenue Type")}</td>
                 <td class="accounts-workloads-cell--center">{renderAddInput("opptyNo", "Oppty")}</td>
                 <td class="accounts-workloads-cell--center">{renderAddInput("startDate", "Start", "date")}</td>
                 <td class="accounts-workloads-cell--center">{renderAddInput("endDate", "End", "date")}</td>
@@ -1193,6 +1225,7 @@ export function AccountsWorkloadsPage({
                 {renderEditableCell(row, "planNumber", row.planNumber || "—")}
                 {renderEditableCell(row, "account", row.account)}
                 {renderEditableCell(row, "workloadName", row.workloadName)}
+                {renderEditableCell(row, "revenueType", row.revenueType || "—")}
                 {renderEditableCell(row, "opptyNo", row.opptyNo || "—")}
                 {renderEditableCell(row, "startDate", row.startDate || "—")}
                 {renderEditableCell(row, "endDate", row.endDate || "—")}
@@ -1208,7 +1241,7 @@ export function AccountsWorkloadsPage({
             ))}
             {visibleRows.length === 0 && !addingRow && (
               <tr class="is-empty-row">
-                <td colSpan={17}>No accounts or workloads match the current filters.</td>
+                <td colSpan={18}>No accounts or workloads match the current filters.</td>
               </tr>
             )}
 

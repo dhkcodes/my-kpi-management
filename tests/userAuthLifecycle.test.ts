@@ -19,7 +19,8 @@ const profile = {
   displayName: "Ada Admin",
   loginId: "ada@example.com",
   access: "Admin" as const,
-  status: "ACTIVE" as const
+  status: "ACTIVE" as const,
+  menuPermissions: {}
 };
 const action = { user: profile, actionToken: "signed.action-token", expiresAt: "2026-08-27T00:00:00Z", purpose: "ACTIVATION" as const };
 

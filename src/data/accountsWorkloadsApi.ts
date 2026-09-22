@@ -1,4 +1,4 @@
-import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
+import { AccountWorkloadRow, RevenueType } from "./accountsWorkloadsMockData";
 import { FiscalYear } from "./kpiMockData";
 import { FxRateRecord } from "./kpiConfigurationApi";
 import { apiFetch } from "../auth/apiFetch";
@@ -130,6 +130,8 @@ const isNullableNonnegativeNumber = (value: unknown): value is number | null =>
 const isNullableProbability = (value: unknown): value is number | null =>
   value === null || (isFiniteNumber(value) && value >= 0 && value <= 100);
 const isNullableString = (value: unknown): value is string | null => value === null || typeof value === "string";
+const isNullableRevenueType = (value: unknown): value is RevenueType | null =>
+  value === undefined || value === null || value === "New" || value === "Expansion";
 const textOrEmpty = (value: string | null) => value ?? "";
 const isRealIsoDate = (value: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -150,6 +152,7 @@ const parseAccountWorkloadRow = (value: unknown): AccountWorkloadRow | null => {
     typeof row.id !== "string" ||
     !isPositiveInteger(row.commitmentId) || !isPositiveInteger(row.versionNo) || !isPositiveInteger(row.sourceRowNumber) ||
     typeof row.account !== "string" || typeof row.workloadName !== "string" ||
+    !isNullableRevenueType(row.revenueType) ||
     !isNullableString(row.planNumber) || !isNullableString(row.opptyNo) ||
     !isNullableIsoDateOrEmpty(row.startDate) || !isNullableIsoDateOrEmpty(row.endDate) ||
     !isNullableNonnegativeNumber(row.arrUsd) || !isNullableNonnegativeNumber(row.arrKrw) ||
@@ -167,6 +170,7 @@ const parseAccountWorkloadRow = (value: unknown): AccountWorkloadRow | null => {
     planNumber: textOrEmpty(row.planNumber),
     account: row.account,
     workloadName: row.workloadName,
+    revenueType: row.revenueType ?? null,
     opptyNo: textOrEmpty(row.opptyNo),
     startDate: textOrEmpty(row.startDate),
     endDate: textOrEmpty(row.endDate),
@@ -327,7 +331,7 @@ export const fetchAccountsWorkloadsFiscalYears = async (
 };
 
 const mutableFields: Array<keyof AccountWorkloadRow> = [
-  "planNumber", "account", "workloadName", "opptyNo", "startDate", "endDate",
+  "planNumber", "account", "workloadName", "revenueType", "opptyNo", "startDate", "endDate",
   "arrUsd", "arrKrw", "acrUsd", "acrKrw", "target", "winProbability",
   "latestUpdate", "notes", "isImportant"
 ];
