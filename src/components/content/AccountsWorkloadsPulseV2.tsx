@@ -23,9 +23,9 @@ const urgencyLabels: Record<PulseUrgencyLevel, string> = {
 };
 
 const urgencyDays: Record<PulseUrgencyLevel, string> = {
-  critical: "0–90d",
-  attention: "91–180d",
-  upcoming: "181–270d"
+  critical: "0–30d",
+  attention: "31–60d",
+  upcoming: "61–90d"
 };
 
 const barColors = ["#c74634", "#d77b20", "#417590", "#756f69"];
@@ -82,7 +82,7 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
             {count.items.map((item) => (
               <li key={item.id}>
                 <button type="button" onClick={() => onOpenAccount(item.account)}>
-                  <strong>{item.workloadName}</strong><span>{item.account}</span>
+                  <strong>{item.account}</strong><span>{item.workloadName}</span>
                 </button>
               </li>
             ))}

@@ -339,6 +339,7 @@ export function Content({
   const canReadHomeKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
   const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"));
   const canReadHomeConsumptionRecords = canAccessRoute(profile, getNavigationRoute("records"));
+  const canEditKpiGuide = profile.access === "Admin";
   const writePermissionMessage = "Write permission is required.";
   const guideItems = dataset.guides;
   const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
@@ -362,8 +363,8 @@ export function Content({
     }));
   };
   const startGuideEdit = () => {
-    if (!canWrite) {
-      setGuideSaveError(writePermissionMessage);
+    if (!canEditKpiGuide) {
+      setGuideSaveError("Admin permission is required.");
       return;
     }
     setDraftGuideDetails((current) => ({
@@ -395,8 +396,8 @@ export function Content({
     setGuideEditMode(false);
   }, [guideRecords, fiscalYear]);
   const saveGuideEdit = async () => {
-    if (!canWrite) {
-      setGuideSaveError("Write permission is required. Your unsaved KPI Guide changes were kept.");
+    if (!canEditKpiGuide) {
+      setGuideSaveError("Admin permission is required. Your unsaved KPI Guide changes were kept.");
       return;
     }
     const record = guideRecords.find((item) => item.kpiCode === selectedGuide.code);
@@ -509,6 +510,10 @@ export function Content({
             onOpenAccount={openAccountWorkloads}
             breadcrumb={pageNavigation}
           />}
+          {canReadHomeConsumption && <HomeConsumptionOverview
+            fiscalYear={fiscalYear}
+            canReadRecords={canReadHomeConsumptionRecords}
+          />}
           {canReadHomeKpis && (kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
           : kpiDataset && <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
@@ -599,10 +604,6 @@ export function Content({
               ))}
             </div>
           </section>}
-          {canReadHomeConsumption && <HomeConsumptionOverview
-            fiscalYear={fiscalYear}
-            canReadRecords={canReadHomeConsumptionRecords}
-          />}
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
@@ -681,14 +682,14 @@ export function Content({
               <div class="kpi-guide-dialog__actions">
                 {guideEditMode ? (
                   <>
-                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" disabled={guideSaving || !canWrite}
-                      title={!canWrite ? writePermissionMessage : undefined} onClick={() => void saveGuideEdit()}>{guideSaving ? "Saving…" : "Save"}</button>
+                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" disabled={guideSaving || !canEditKpiGuide}
+                      title={!canEditKpiGuide ? "Admin permission is required." : undefined} onClick={() => void saveGuideEdit()}>{guideSaving ? "Saving…" : "Save"}</button>
                     <button type="button" id="kpiGuideCancelButton" class="kpi-guide-edit-button" disabled={guideSaving} onClick={cancelGuideEdit}>Cancel</button>
                   </>
-                ) : (
-                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" disabled={guideLoading || guideRecords.length === 0 || !canWrite}
-                    title={!canWrite ? writePermissionMessage : undefined} onClick={startGuideEdit}>Edit</button>
-                )}
+                ) : canEditKpiGuide ? (
+                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" disabled={guideLoading || guideRecords.length === 0}
+                    onClick={startGuideEdit}>Edit</button>
+                ) : null}
                 <oj-button chroming="borderless" display="icons" aria-label="Close KPI Guide" onojAction={onCloseGuide}>
                   <span slot="startIcon" class="oj-ux-ico-close"></span>
                   Close

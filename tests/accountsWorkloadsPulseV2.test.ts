@@ -36,8 +36,8 @@ const row = (
 
 const rows: AccountWorkloadRow[] = [
   row("r1", "Account A", { target: "FY27 Q1", endDate: "2026-08-20", isImportant: true, arrUsd: 1_000, acrUsd: 2_000 }),
-  row("r2", "Account A", { target: "FY27 Q2", endDate: "2026-12-01", arrUsd: 2_000, acrUsd: 3_000 }),
-  row("r3", "Account B", { endDate: "2027-03-01", arrUsd: null, acrUsd: 4_000 }),
+  row("r2", "Account A", { target: "FY27 Q2", endDate: "2026-09-19", arrUsd: 2_000, acrUsd: 3_000 }),
+  row("r3", "Account B", { endDate: "2026-10-19", arrUsd: null, acrUsd: 4_000 }),
   row("r4", "Account C", { startDate: "", endDate: "", target: "FY27 Q2", isImportant: true, arrUsd: 4_000, acrUsd: null }),
   row("r5", "Account D", { endDate: "", target: "FY27 Q1", arrUsd: 5_000, acrUsd: 6_000 }),
   row("r6", "Deleted Account", { isDeleted: true, startDate: "", endDate: "2026-08-10", target: "FY27 Q3", arrUsd: 99_999, acrUsd: 99_999 }),
@@ -93,7 +93,7 @@ assert.deepEqual(pulse.topRenewalAction, {
 
 assert.deepEqual(urgencyCounts(pulse.newCommit), {
   critical: { accounts: 1, workloads: 1 },
-  attention: { accounts: 1, workloads: 1 },
+  attention: { accounts: 0, workloads: 0 },
   upcoming: { accounts: 0, workloads: 0 }
 });
 assert.deepEqual(pulse.topNewCommitReview, {
@@ -106,7 +106,7 @@ assert.deepEqual(pulse.topNewCommitReview, {
 assert.equal(
   calculateAccountsWorkloadsPulseV2([rows[6]], "FY27", "2026-08-05").topRenewalAction,
   null,
-  "renewal top action must stay within the 270-day action window"
+  "renewal top action must stay within the 90-day action window"
 );
 
 const emptyUrgencyExpected = {
@@ -117,23 +117,23 @@ const emptyUrgencyExpected = {
 
 const boundaryRows = [
   row("b-overdue", "Boundary Overdue", { endDate: "2026-08-01" }),
+  row("b-30", "Boundary 30", { endDate: "2026-09-04" }),
+  row("b-31", "Boundary 31", { endDate: "2026-09-05" }),
+  row("b-60", "Boundary 60", { endDate: "2026-10-04" }),
+  row("b-61", "Boundary 61", { endDate: "2026-10-05" }),
   row("b-90", "Boundary 90", { endDate: "2026-11-03" }),
   row("b-91", "Boundary 91", { endDate: "2026-11-04" }),
-  row("b-180", "Boundary 180", { endDate: "2027-02-01" }),
-  row("b-181", "Boundary 181", { endDate: "2027-02-02" }),
-  row("b-270", "Boundary 270", { endDate: "2027-05-02" }),
-  row("b-271", "Boundary 271", { endDate: "2027-05-03" }),
   row("b-deleted", "Boundary Deleted", { endDate: "2026-08-01", isDeleted: true })
 ];
 
 assert.deepEqual(
   urgencyCounts(calculateAccountsWorkloadsPulseV2(boundaryRows, "FY27", "2026-08-05").renewalExpand),
   {
-    critical: { accounts: 2, workloads: 2 },
+    critical: { accounts: 1, workloads: 1 },
     attention: { accounts: 2, workloads: 2 },
     upcoming: { accounts: 2, workloads: 2 }
   },
-  "renewal bands must include overdue and exact upper boundaries while excluding day 271 and soft-deleted rows"
+  "renewal bands must use 0–30, 31–60, and 61–90 days while excluding overdue, day 91, and soft-deleted rows"
 );
 
 const renewalAt = (endDate: string, isDeleted = false) =>
@@ -143,13 +143,13 @@ const renewalAt = (endDate: string, isDeleted = false) =>
     "2026-08-05"
   ).renewalExpand;
 
-assert.equal(renewalAt("2026-08-01").critical.workloads, 1, "overdue End Date remains Critical");
-assert.equal(renewalAt("2026-11-03").critical.workloads, 1, "renewal day 90 is Critical");
-assert.equal(renewalAt("2026-11-04").attention.workloads, 1, "renewal day 91 is Attention");
-assert.equal(renewalAt("2027-02-01").attention.workloads, 1, "renewal day 180 is Attention");
-assert.equal(renewalAt("2027-02-02").upcoming.workloads, 1, "renewal day 181 is Upcoming");
-assert.equal(renewalAt("2027-05-02").upcoming.workloads, 1, "renewal day 270 is Upcoming");
-assert.deepEqual(urgencyCounts(renewalAt("2027-05-03")), emptyUrgencyExpected, "renewal day 271 is outside the summary window");
+assert.deepEqual(urgencyCounts(renewalAt("2026-08-01")), emptyUrgencyExpected, "overdue End Date is outside the forward-looking summary");
+assert.equal(renewalAt("2026-09-04").critical.workloads, 1, "renewal day 30 is Critical");
+assert.equal(renewalAt("2026-09-05").attention.workloads, 1, "renewal day 31 is Attention");
+assert.equal(renewalAt("2026-10-04").attention.workloads, 1, "renewal day 60 is Attention");
+assert.equal(renewalAt("2026-10-05").upcoming.workloads, 1, "renewal day 61 is Upcoming");
+assert.equal(renewalAt("2026-11-03").upcoming.workloads, 1, "renewal day 90 is Upcoming");
+assert.deepEqual(urgencyCounts(renewalAt("2026-11-04")), emptyUrgencyExpected, "renewal day 91 is outside the summary window");
 assert.deepEqual(urgencyCounts(renewalAt("2026-08-01", true)), emptyUrgencyExpected, "soft-deleted renewal rows are excluded");
 
 const newCommitBoundaryRow = row("new-boundary", "New Boundary", {
@@ -160,16 +160,16 @@ const newCommitBoundaryRow = row("new-boundary", "New Boundary", {
 const newCommitAt = (asOf: string) =>
   calculateAccountsWorkloadsPulseV2([newCommitBoundaryRow], "FY27", asOf).newCommit;
 
-assert.equal(newCommitAt("2026-09-01").critical.workloads, 1, "overdue Target Quarter remains Critical");
-assert.equal(newCommitAt("2026-06-02").critical.workloads, 1, "day 90 is Critical");
-assert.equal(newCommitAt("2026-06-01").attention.workloads, 1, "day 91 is Attention");
-assert.equal(newCommitAt("2026-03-04").attention.workloads, 1, "day 180 is Attention");
-assert.equal(newCommitAt("2026-03-03").upcoming.workloads, 1, "day 181 is Upcoming");
-assert.equal(newCommitAt("2025-12-04").upcoming.workloads, 1, "day 270 is Upcoming");
+assert.deepEqual(urgencyCounts(newCommitAt("2026-09-01")), emptyUrgencyExpected, "overdue Target Quarter is outside the forward-looking summary");
+assert.equal(newCommitAt("2026-08-01").critical.workloads, 1, "day 30 is Critical");
+assert.equal(newCommitAt("2026-07-31").attention.workloads, 1, "day 31 is Attention");
+assert.equal(newCommitAt("2026-07-02").attention.workloads, 1, "day 60 is Attention");
+assert.equal(newCommitAt("2026-07-01").upcoming.workloads, 1, "day 61 is Upcoming");
+assert.equal(newCommitAt("2026-06-02").upcoming.workloads, 1, "day 90 is Upcoming");
 assert.deepEqual(
-  urgencyCounts(newCommitAt("2025-12-03")),
+  urgencyCounts(newCommitAt("2026-06-01")),
   emptyUrgencyExpected,
-  "day 271 is outside the New Commit summary window"
+  "day 91 is outside the New Commit action window"
 );
 
 console.log("accountsWorkloadsPulseV2 tests passed");

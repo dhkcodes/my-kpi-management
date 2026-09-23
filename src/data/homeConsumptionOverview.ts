@@ -5,6 +5,7 @@ export type HomeConsumptionMonth = Readonly<{
   periodKey: string;
   kind: "ACTUAL" | "MTD" | "FORECAST";
   amount: number | null;
+  replacedForecastAmount?: number;
   incomplete: boolean;
 }>;
 
@@ -106,6 +107,7 @@ export const buildHomeConsumptionOverview = (
         periodKey,
         kind,
         amount: Object.prototype.hasOwnProperty.call(source, periodKey) ? source[periodKey] : null,
+        replacedForecastAmount: kind === "MTD" ? Math.max(0, totals.appliedForecastByPeriod[periodKey] ?? 0) : 0,
         incomplete: kind === "MTD" || incompletePeriods.has(periodKey)
       };
     }),

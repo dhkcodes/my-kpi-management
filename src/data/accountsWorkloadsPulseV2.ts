@@ -105,9 +105,9 @@ const daysBetween = (fromIso: string, toIso: string) => {
 };
 
 const urgencyForDays = (days: number | null): PulseUrgencyLevel | null => {
-  if (days === null || days > 270) return null;
-  if (days <= 90) return "critical";
-  if (days <= 180) return "attention";
+  if (days === null || days < 0 || days > 90) return null;
+  if (days <= 30) return "critical";
+  if (days <= 60) return "attention";
   return "upcoming";
 };
 

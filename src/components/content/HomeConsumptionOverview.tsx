@@ -6,6 +6,7 @@ import {
   type ConsumptionAnalysis,
   type ConsumptionRecordsTotals
 } from "../../data/consumptionApi";
+import type { ConsumptionPillar } from "../../data/consumptionData";
 import {
   buildHomeConsumptionLineEdges,
   buildHomeConsumptionOverview,
@@ -28,6 +29,11 @@ const periodRange = (periods: readonly string[]) => {
   return `${periods[0]} – ${periods[periods.length - 1]}`;
 };
 const alertLabel = (type: string) => type.split("_").map((token) => token.charAt(0) + token.slice(1).toLowerCase()).join(" ");
+const quarterForPeriod = (periodKey: string) => {
+  const month = periodKey.split("-")[1];
+  const index = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"].indexOf(month);
+  return index < 0 ? null : `Q${Math.floor(index / 3) + 1}`;
+};
 
 const monthlyChart = Object.freeze({ width: 960, height: 240, left: 42, right: 934, top: 36, bottom: 190 });
 const monthlyChartX = (index: number, count: number) => count <= 1
@@ -51,13 +57,14 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
   const [data, setData] = useState<HomeConsumptionOverviewData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pillar, setPillar] = useState<ConsumptionPillar>("ALL");
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
     Promise.all([
-      fetchConsumptionAnalysis({ fiscalYear, search: "", account: "", salesRep: "", pillar: "ALL" }),
+      fetchConsumptionAnalysis({ fiscalYear, search: "", account: "", salesRep: "", pillar }),
       canReadRecords ? fetchConsumptionRecords({
         fromQuarter: `${fiscalYear}-Q1`,
         toQuarter: `${fiscalYear}-Q4`,
@@ -66,7 +73,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
         direction: "ASC",
         offset: 0,
         limit: 1,
-        pillar: "ALL"
+        pillar
       }) : Promise.resolve(null)
     ]).then(([analysis, records]) => {
       if (active) setData(buildHomeConsumptionOverview(
@@ -80,7 +87,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [fiscalYear, canReadRecords]);
+  }, [fiscalYear, canReadRecords, pillar]);
 
   const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.map((month) => month.amount ?? 0) ?? [])), [data]);
   const monthlyEdges = useMemo(() => buildHomeConsumptionLineEdges(data?.months ?? []), [data]);
@@ -94,7 +101,13 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
           <h2 id="consumptionOverviewTitle">Consumption Overview</h2>
           <p>Actual periods are closed results; current-month MTD is tentative and Forecast remains separate.</p>
         </div>
-        <span class="home-consumption__fy">{fiscalYear} · K USD</span>
+        <div>
+          <div class="home-consumption__pillar-filter" role="group" aria-label="Consumption pillar">
+            {(["ALL", "DP", "OCI"] as const).map((option) => <button type="button" class={pillar === option ? "is-active" : ""}
+              aria-pressed={pillar === option} onClick={() => setPillar(option)}>{option === "ALL" ? "All" : option}</button>)}
+          </div>
+          <span class="home-consumption__fy">{fiscalYear} · K USD</span>
+        </div>
       </div>
 
       {loading ? (
@@ -156,19 +169,25 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
               </div>
               <div class="home-consumption__quarter-list">
                 {data.quarters.map((quarter) => {
-                  const total = quarter.actualAmount + quarter.forecastAmount;
+                  const mtd = data.months.find((month) => month.kind === "MTD" && quarterForPeriod(month.periodKey) === quarter.quarter);
+                  const mtdAmount = mtd?.amount ?? 0;
+                  const forecastAmount = Math.max(0, quarter.forecastAmount - (mtd?.replacedForecastAmount ?? 0));
+                  const total = quarter.actualAmount + mtdAmount + forecastAmount;
                   const actualWidth = total > 0 ? (quarter.actualAmount / total) * 100 : 0;
-                  const forecastWidth = total > 0 ? (quarter.forecastAmount / total) * 100 : 0;
+                  const mtdWidth = total > 0 ? (mtdAmount / total) * 100 : 0;
+                  const forecastWidth = total > 0 ? (forecastAmount / total) * 100 : 0;
                   return (
                     <div class="home-consumption__quarter" key={quarter.quarter}>
                       <div class="home-consumption__quarter-label"><strong>{quarter.quarter}</strong><span>{formatAmountK(total)}</span></div>
-                      <div class="home-consumption__stack" aria-label={`${quarter.quarter}: Actual ${formatAmountK(quarter.actualAmount)}, Forecast ${formatAmountK(quarter.forecastAmount)}`}>
+                      <div class="home-consumption__stack" aria-label={`${quarter.quarter}: Actual ${formatAmountK(quarter.actualAmount)}, MTD ${formatAmountK(mtdAmount)}, Forecast ${formatAmountK(forecastAmount)}`}>
                         <span class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></span>
+                        {mtdAmount > 0 && <span class="home-consumption__stack-mtd" style={`width:${mtdWidth}%`}></span>}
                         <span class="home-consumption__stack-forecast" style={`width:${forecastWidth}%`}></span>
                       </div>
                       <div class="home-consumption__quarter-values">
                         <span>Actual <strong>{formatAmountK(quarter.actualAmount)}</strong></span>
-                        <span>Forecast <strong>{formatAmountK(quarter.forecastAmount)}</strong></span>
+                        {mtdAmount > 0 && <span>MTD (잠정) <strong>{formatAmountK(mtdAmount)}</strong></span>}
+                        <span>Forecast <strong>{formatAmountK(forecastAmount)}</strong></span>
                       </div>
                     </div>
                   );
@@ -206,7 +225,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
               <div><h3>Tentative Monthly Consumption</h3><p>Current-month MTD is provisional; the divider marks the first Forecast month.</p></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
-                <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--mtd"></i>MTD (잠정)</span>
+                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--mtd"></i>MTD (잠정)</span>}
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
               </div>
             </div>
