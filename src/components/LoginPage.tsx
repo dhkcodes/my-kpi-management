@@ -33,6 +33,13 @@ const requestedAction = (): InitialRoute => {
   };
 };
 
+type JetCredentialInput = InputTextElement | InputPasswordElement;
+
+// Oracle JET commits `value` after its internal Enter handling. Native form
+// submit runs first, while `rawValue` already contains the focused input text.
+const readCurrentJetValue = (input: JetCredentialInput | null, fallback: string): string =>
+  String(input?.rawValue ?? input?.value ?? fallback);
+
 export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const initialRoute = useMemo(requestedAction, []);
   const initialAction = initialRoute.action;
@@ -106,11 +113,11 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     setIsSubmitting(true);
     try {
       if (mode === "signIn") {
-        const submittedLoginId = String(usernameInputRef.current?.value ?? loginId).trim();
-        const submittedPassword = String(passwordInputRef.current?.value ?? password);
+        const submittedLoginId = readCurrentJetValue(usernameInputRef.current, loginId).trim();
+        const submittedPassword = readCurrentJetValue(passwordInputRef.current, password);
         onAuthenticated(await authenticateUser(submittedLoginId, submittedPassword));
       } else if (mode === "forgot") {
-        const submittedLoginId = String(usernameInputRef.current?.value ?? loginId).trim();
+        const submittedLoginId = readCurrentJetValue(usernameInputRef.current, loginId).trim();
         if (!submittedLoginId) throw new Error("Enter your Login ID.");
         const reset = await requestPasswordReset(submittedLoginId);
         setResetLink(reset.resetLink ?? "");
@@ -119,8 +126,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           : "Reset request accepted. If the account is eligible, an administrator can provide a one-time reset link through the approved secure channel.");
         setMode("success");
       } else if (mode === "action" && initialAction && actionContext) {
-        const submittedNewPassword = String(newPasswordInputRef.current?.value ?? newPassword);
-        const submittedConfirmPassword = String(confirmPasswordInputRef.current?.value ?? confirmPassword);
+        const submittedNewPassword = readCurrentJetValue(newPasswordInputRef.current, newPassword);
+        const submittedConfirmPassword = readCurrentJetValue(confirmPasswordInputRef.current, confirmPassword);
         const policyError = validatePasswordPolicy(submittedNewPassword);
         if (policyError) throw new Error(policyError);
         if (submittedNewPassword !== submittedConfirmPassword) throw new Error("New passwords do not match.");
