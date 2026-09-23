@@ -18,11 +18,17 @@ assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back r
 assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="kapLoginSubmit"/, "the Redwood sign-in form exposes stable controls");
 assert.match(login, /role="alert"/, "credential failures are announced");
 assert.match(login, /authenticateUser\(submittedLoginId, submittedPassword\)/, "the sign-in form delegates live credentials to the Backend auth API");
-assert.match(login, /usernameInputRef[\s\S]*passwordInputRef[\s\S]*usernameInputRef\.current\?\.value[\s\S]*passwordInputRef\.current\?\.value/,
-  "Enter submit reads live Oracle JET input values before using the same login request path as the Sign in button");
+assert.match(login, /const readCurrentJetValue[\s\S]*\.rawValue[\s\S]*\.value/,
+  "submit reads Oracle JET rawValue before committed value because Enter submits before valueChanged");
+assert.match(login, /input\?\.rawValue \?\? input\?\.value \?\? fallback/,
+  "an explicitly cleared JET rawValue remains empty instead of restoring stale committed or React state");
+assert.doesNotMatch(login, /input\?\.rawValue\s*\|\|/,
+  "JET rawValue never uses truthy fallback because empty text is meaningful");
+assert.match(login, /mode === "signIn"[\s\S]*readCurrentJetValue\(usernameInputRef\.current, loginId\)[\s\S]*readCurrentJetValue\(passwordInputRef\.current, password\)[\s\S]*authenticateUser\(submittedLoginId, submittedPassword\)/,
+  "Enter submit sends the current uncommitted JET credentials through the same login request path as the Sign in button");
 assert.match(login, /isSubmitting[\s\S]*disabled=\{isSubmitting\}/, "duplicate login submissions are locked while authentication is pending");
-assert.match(login, /mode === "forgot"[\s\S]*usernameInputRef\.current\?\.value[\s\S]*requestPasswordReset\(submittedLoginId\)[\s\S]*setResetLink\(reset\.resetLink \?\? ""\)/, "password-reset request submits the live JET Login ID and renders only a trusted API reset link");
-assert.match(login, /mode === "action"[\s\S]*newPasswordInputRef\.current\?\.value[\s\S]*confirmPasswordInputRef\.current\?\.value[\s\S]*validatePasswordPolicy\(submittedNewPassword\)[\s\S]*completeCredentialAction\([\s\S]*submittedNewPassword,[\s\S]*submittedConfirmPassword/, "activation and reset completion validate and submit live JET password values");
+assert.match(login, /mode === "forgot"[\s\S]*readCurrentJetValue\(usernameInputRef\.current, loginId\)[\s\S]*requestPasswordReset\(submittedLoginId\)[\s\S]*setResetLink\(reset\.resetLink \?\? ""\)/, "password-reset request submits the current JET Login ID and renders only a trusted API reset link");
+assert.match(login, /mode === "action"[\s\S]*readCurrentJetValue\(newPasswordInputRef\.current, newPassword\)[\s\S]*readCurrentJetValue\(confirmPasswordInputRef\.current, confirmPassword\)[\s\S]*validatePasswordPolicy\(submittedNewPassword\)[\s\S]*completeCredentialAction\([\s\S]*submittedNewPassword,[\s\S]*submittedConfirmPassword/, "activation and reset completion validate and submit current uncommitted JET password values");
 assert.match(login, /href=\{resetLink\}[\s\S]*Reset password now/, "forgot-password completion renders the actual reset link as a clickable anchor");
 assert.match(login, /kap-login-warning[\s\S]*Anyone with this link/, "the sensitive-link warning is explicit and announced with improved contrast");
 assert.match(login, /history\.replaceState\(null, "", window\.location\.pathname\)/, "captured action tokens are removed from the visible URL and browser history");

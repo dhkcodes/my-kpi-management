@@ -20,6 +20,11 @@ const menuLabels: Record<MenuPermissionId, string> = {
   analysis: "Consumption Analysis", attainment: "Consumption Attainment", records: "Consumption Records"
 };
 
+// `rawValue` is current even when Enter submits before JET commits `value`.
+// Nullish fallback is intentional: an empty rawValue means the user cleared it.
+const readCurrentTextValue = (input: InputTextElement | null, fallback: string): string =>
+  String(input?.rawValue ?? input?.value ?? fallback);
+
 const actionUrl = (link: UserActionLink): string => {
   const path = link.purpose === "ACTIVATION" ? "/activate" : "/reset-password";
   const url = new URL(path, window.location.origin);
@@ -79,8 +84,9 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     actionSubmitLockRef.current = true;
     setDialogError(""); setBusy(true);
     try {
-      const submittedDisplayName = String(displayNameInputRef.current?.value ?? displayName).trim();
-      const submittedLoginId = String(loginIdInputRef.current?.value ?? loginId).trim();
+      const submittedDisplayName = readCurrentTextValue(displayNameInputRef.current, displayName).trim();
+      const submittedLoginId = readCurrentTextValue(loginIdInputRef.current, loginId).trim();
+      // Access is a selection rather than editable text, so read its selected value.
       const submittedAccess = accessInputRef.current?.value ?? access;
       if (dialog.kind === "invite" && !submittedDisplayName) throw new Error("Enter a display name.");
       if (dialog.kind === "invite" && !submittedLoginId) throw new Error("Enter a Login ID.");

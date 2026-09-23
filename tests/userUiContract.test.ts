@@ -57,7 +57,9 @@ assert.match(users, /No email was sent[\s\S]*approved secure channel/, "the UI d
 assert.match(users, /navigator\.clipboard\.writeText[\s\S]*Expires/, "Admin can copy the link and see its expiry");
 assert.match(users, /works once|used only once/, "one-time use is explicit");
 assert.match(users, /<form ref=\{actionFormRef\}[\s\S]*onSubmit=\{submitDialog\}[\s\S]*type="submit"[\s\S]*onojAction=\{\(\) => actionFormRef\.current\?\.requestSubmit\(\)\}/, "Invite Enter and JET button use one native form submission path");
-assert.match(users, /displayNameInputRef\.current\?\.value[\s\S]*loginIdInputRef\.current\?\.value[\s\S]*accessInputRef\.current\?\.value/, "Invite submission reads live Oracle JET field values");
+assert.match(users, /const readCurrentTextValue[\s\S]*input\?\.rawValue \?\? input\?\.value \?\? fallback/, "Invite text submission reads uncommitted JET text and preserves an explicitly cleared empty value");
+assert.match(users, /readCurrentTextValue\(displayNameInputRef\.current, displayName\)[\s\S]*readCurrentTextValue\(loginIdInputRef\.current, loginId\)[\s\S]*accessInputRef\.current\?\.value \?\? access/, "Invite reads current text rawValue while Access remains a selected value");
+assert.doesNotMatch(users, /input\?\.rawValue\s*\|\|/, "Invite text rawValue never revives stale text through truthy fallback");
 assert.match(users, /Enter a display name\.[\s\S]*Enter a Login ID\./, "Invite validates required values before issuing a link");
 assert.match(users, /const actionSubmitLockRef = useRef\(false\);[\s\S]*if \(!dialog \|\| issuedLink \|\| actionSubmitLockRef\.current\) return;[\s\S]*actionSubmitLockRef\.current = true;[\s\S]*finally[\s\S]*actionSubmitLockRef\.current = false;/, "Invite and admin link creation synchronously block duplicate submissions");
 assert.match(users, /window\.confirm|confirmAction/, "destructive state changes require confirmation");
