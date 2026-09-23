@@ -66,6 +66,15 @@ const koreaBusinessDate = (): string => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
 }).format(new Date());
 
+export const consumptionRecordsOperationError = (error: unknown, fallback: string): string => {
+  if (!(error instanceof ConsumptionApiError)) return error instanceof Error ? error.message : fallback;
+  if (error.status === 401) return "로그인 세션이 만료되었습니다. 다시 로그인한 후 저장해 주세요.";
+  if (error.status === 403) return "Consumption Records 쓰기 권한이 없습니다. 관리자에게 Records WRITE 권한을 요청해 주세요.";
+  if (error.status === 400 || error.status === 422) return `저장할 데이터가 유효하지 않습니다. 입력값을 확인해 주세요. (${error.message})`;
+  if (error.status >= 500) return "서버 오류로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return error.message || fallback;
+};
+
 const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
     ...plan,
@@ -1009,7 +1018,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         setConflictWorkspace(error.current);
         setImportError("Forecast Save conflicted with a newer server version. Compare values below.");
       } else {
-        setImportError(error instanceof Error ? error.message : "Consumption Forecast could not be saved.");
+        setImportError(consumptionRecordsOperationError(error, "Consumption Forecast could not be saved."));
       }
     } finally {
       setIsSaving(false);
@@ -1047,7 +1056,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
       setPendingForecastImport({ file, preview });
       setForecastImportPhase("preview");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Forecast CSV could not be previewed.";
+      const message = consumptionRecordsOperationError(error, "Forecast CSV could not be previewed.");
       setImportError(message);
       setForecastImportResult(message);
       setForecastImportPhase("error");
@@ -1073,7 +1082,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         setImportError(`반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Forecast CSV could not be applied.";
+      const message = consumptionRecordsOperationError(error, "Forecast CSV could not be applied.");
       setImportError(message);
       setForecastImportResult(`반영 실패: ${message}`);
       setForecastImportPhase("error");
@@ -1101,7 +1110,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
       setPendingImport({ files, preview });
       setImportPhase("preview");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Consumption CSV files could not be previewed.";
+      const message = consumptionRecordsOperationError(error, "Consumption CSV files could not be previewed.");
       setImportError(message);
       setImportResult(message);
       setImportPhase("error");
@@ -1135,7 +1144,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
       setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Consumption CSV files could not be imported.";
+      const message = consumptionRecordsOperationError(error, "Consumption CSV files could not be imported.");
       const confirmedRequestFailure = error instanceof ConsumptionApiError && error.status >= 400 && error.status < 500;
       const resultMessage = confirmedRequestFailure
         ? `Actual Import에 실패했습니다. ${message}`

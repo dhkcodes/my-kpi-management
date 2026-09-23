@@ -21,6 +21,12 @@ assert.match(recordsPage, /if \(messageId === "records-operation-error"\) \{\s*s
   "closing an operation error clears only that current message so a later failure can be shown again");
 assert.doesNotMatch(recordsPage, /onClose=\{\(messageId\) => \{[\s\S]{0,260}set(?:DraftPlans|DraftControlTotals)/,
   "closing a Consumption notice does not discard draft edits");
+assert.match(recordsPage, /error\.status === 403[\s\S]*Consumption Records 쓰기 권한이 없습니다[\s\S]*Records WRITE 권한/,
+  "Consumption Records explains the exact permission required for a rejected save");
+assert.match(recordsPage, /error\.status === 400 \|\| error\.status === 422[\s\S]*입력값을 확인/,
+  "Consumption Records separates invalid input from authorization failures");
+assert.match(recordsPage, /error\.status >= 500[\s\S]*서버 오류로 저장하지 못했습니다/,
+  "Consumption Records distinguishes server failures from permission and input failures");
 assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
