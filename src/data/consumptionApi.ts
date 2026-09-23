@@ -375,12 +375,13 @@ const hasValidYoyResult = (amount: unknown, percent: unknown, status: unknown, r
     || !(reason === null || isNonEmptyString(reason))) return false;
   return amount !== null || (percent === null && isNonEmptyString(reason));
 };
-const parseAmountSplit = (value: unknown, allowedStatuses: ReadonlySet<string> = amountStatuses): ConsumptionAmountSplit => {
+const parseAmountSplit = (value: unknown, allowedStatuses: ReadonlySet<string> = amountStatuses,
+  requireAdditiveTotal = true): ConsumptionAmountSplit => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
   if (!isFiniteNumber(raw.actualAmount) || !isFiniteNumber(raw.forecastAmount)
     || !isFiniteNumber(raw.totalAmount) || typeof raw.status !== "string" || !allowedStatuses.has(raw.status)
-    || !nearlyEqual(raw.totalAmount, raw.actualAmount + raw.forecastAmount)) return malformedAnalysis();
+    || (requireAdditiveTotal && !nearlyEqual(raw.totalAmount, raw.actualAmount + raw.forecastAmount))) return malformedAnalysis();
   return { actualAmount: raw.actualAmount, forecastAmount: raw.forecastAmount, totalAmount: raw.totalAmount,
     status: raw.status as ConsumptionAmountSplit["status"] };
 };
@@ -494,14 +495,6 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !(coverageRaw.comparisonUnavailableReason === null || isNonEmptyString(coverageRaw.comparisonUnavailableReason))) return malformedAnalysis();
   const periodCoverage: ConsumptionAnalysisPeriodCoverage = coverageRaw as unknown as ConsumptionAnalysisPeriodCoverage;
   const allowedTrendYears = new Set([raw.priorFiscalYear, raw.fiscalYear]);
-  const portfolioSplit = parseAmountSplit(raw.portfolio);
-  const portfolioRaw = raw.portfolio as Record<string, unknown>;
-  if (!isFiniteNumber(portfolioRaw.priorActualAmount)
-    || !isFiniteNumber(portfolioRaw.priorForecastAmount)
-    || !isFiniteNumber(portfolioRaw.priorTotalAmount)
-    || !nearlyEqual(portfolioRaw.priorTotalAmount, portfolioRaw.priorActualAmount + portfolioRaw.priorForecastAmount)
-    || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
-    || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   let mtdSummary: ConsumptionAnalysis["mtdSummary"] = null;
   if (raw.mtdSummary !== null && raw.mtdSummary !== undefined) {
     if (typeof raw.mtdSummary !== "object") return malformedAnalysis();
@@ -510,8 +503,20 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
       || !(mtd.asOf === null || typeof mtd.asOf === "string")) return malformedAnalysis();
     mtdSummary = { periodKey: mtd.periodKey, amount: mtd.amount, asOf: mtd.asOf as string | null };
   }
+  // With MTD enabled, the API keeps the saved current-period Forecast visible while Total excludes
+  // the overlapping Forecast. Portfolio and quarter splits are therefore intentionally non-additive.
+  const requireAdditiveDisplayTotal = mtdSummary === null;
+  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, requireAdditiveDisplayTotal);
+  const portfolioRaw = raw.portfolio as Record<string, unknown>;
+  if (!isFiniteNumber(portfolioRaw.priorActualAmount)
+    || !isFiniteNumber(portfolioRaw.priorForecastAmount)
+    || !isFiniteNumber(portfolioRaw.priorTotalAmount)
+    || !nearlyEqual(portfolioRaw.priorTotalAmount, portfolioRaw.priorActualAmount + portfolioRaw.priorForecastAmount)
+    || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
+    || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   const quarters = raw.quarters.map((value) => {
-    const split = parseAmountSplit(value, quarterAmountStatuses); const quarter = value as Record<string, unknown>;
+    const split = parseAmountSplit(value, quarterAmountStatuses, requireAdditiveDisplayTotal);
+    const quarter = value as Record<string, unknown>;
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)
       || !isNullableFiniteNumber(quarter.qoqChangeAmount)
       || !isNullableFiniteNumber(quarter.qoqChangePercent)
