@@ -330,11 +330,12 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
+  canWrite: boolean;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, breadcrumb }: Props) {
+export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuardChange, breadcrumb }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -918,6 +919,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   }, [forecastEditor?.account, forecastEditor?.month, forecastEditor?.pillar, forecastEditor?.anchor, forecastEditor?.error]);
 
   const beginControlEdit = (anchor: HTMLElement, account: string, month: string, value: number | null) => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     if (selectedPillar === "ALL" || isSaving || recordsLoading || dataMode !== "backend") return;
     const key = forecastDraftKey(account, month);
     const draft = draftForecastCompositions.get(key);
@@ -939,6 +941,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const applyForecastComposition = () => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     if (!forecastEditor) return;
     const parsed = parseForecastCompositionK(forecastEditor.total, forecastEditor.newValue, forecastEditor.expansion);
     if (typeof parsed === "string") {
@@ -964,6 +967,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const cancelForecastComposition = () => setForecastEditor(null);
 
   const saveForecasts = async () => {
+    if (!canWrite) { setImportError("Write permission is required. Your forecast changes were kept."); return; }
     if (selectedPillar === "ALL" || isSaving || recordsLoading) return;
     setEditCell(null);
     editEntryValueRef.current = null;
@@ -1042,6 +1046,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   }, [forecastImportPhase]);
 
   const handleForecastCsvFile = async (event: Event) => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     const file = files[0];
@@ -1064,6 +1069,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const applyPendingForecastImport = async () => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     if (forecastApplyingRef.current || !pendingForecastImport || forecastImportPhase !== "preview" || pendingForecastImport.preview.hasBlockedErrors) return;
     forecastApplyingRef.current = true;
     setForecastImportPhase("applying");
@@ -1092,6 +1098,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const handleCsvFiles = async (event: Event) => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = "";
@@ -1118,6 +1125,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   };
 
   const applyPendingImport = async () => {
+    if (!canWrite) { setImportError("Write permission is required."); return; }
     if (!pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts
       || isExactReplayPreview(pendingImport.preview)) return;
     setImportPhase("applying");
@@ -1259,7 +1267,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             const variance = forecastVariances.find((item) => item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const composition = selectedPillar === "ALL" ? undefined : accountForecasts.find((item) =>
               item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
-            const canEditControl = editable;
+            const canEditControl = canWrite && editable;
             const compositionDraft = draftForecastCompositions.get(forecastDraftKey(series.customer, month));
             const displayedComposition = compositionDraft && composition ? {
               ...composition,
@@ -1326,10 +1334,10 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
-            disabled={hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
+            disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
-            disabled={hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
-          <oj-button chroming="outlined" title={`Import ${forecastFileName}`} disabled={hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+            disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
+          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : `Import ${forecastFileName}`} disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>
@@ -1339,7 +1347,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button chroming="outlined" disabled={hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
@@ -1473,7 +1481,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>
         <div slot="footer">
           {importPhase === "preview" && pendingImport && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
+            disabled={!canWrite || pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
+            title={!canWrite ? "Write permission is required." : undefined}
             onojAction={() => void applyPendingImport()}>{pendingImport.preview.hasConflicts ? "Resolve errors"
               : isExactReplayPreview(pendingImport.preview) ? "Already imported"
                 : pendingImport.preview.insertFactCount + pendingImport.preview.overwriteCount === 0 ? "Apply metadata refresh"
@@ -1525,7 +1534,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>
         <div slot="footer">
           {forecastImportPhase === "preview" && pendingForecastImport && <><oj-button chroming="outlined" onojAction={() => forecastImportDialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={pendingForecastImport.preview.hasBlockedErrors}
+            disabled={!canWrite || pendingForecastImport.preview.hasBlockedErrors}
+            title={!canWrite ? "Write permission is required." : undefined}
             onojAction={() => void applyPendingForecastImport()}>{`Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
         </div>
@@ -1545,18 +1555,18 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
               <small class="consumption-forecast-composition-unit">K</small>
             </header>
             <div class="consumption-forecast-composition-fields">
-              <label><span>Total</span><input type="text" inputMode="decimal" value={forecastEditor.total}
+              <label><span>Total</span><input type="text" inputMode="decimal" value={forecastEditor.total} disabled={!canWrite}
                 ref={selectForecastEditor(`${forecastEditor.account}:${forecastEditor.month}`)}
                 aria-invalid={forecastEditor.error && !validForecastKInput(forecastEditor.total) ? "true" : "false"}
                 onInput={(event) => updateForecastEditor("total", event.currentTarget.value)} />
                 {forecastEditor.error && !validForecastKInput(forecastEditor.total) && <small role="alert">Required · 0+ · max 2 decimals</small>}
               </label>
-              <label><span>New</span><input type="text" inputMode="decimal" value={forecastEditor.newValue}
+              <label><span>New</span><input type="text" inputMode="decimal" value={forecastEditor.newValue} disabled={!canWrite}
                 aria-invalid={forecastEditor.error && !validForecastKInput(forecastEditor.newValue) ? "true" : "false"}
                 onInput={(event) => updateForecastEditor("newValue", event.currentTarget.value)} />
                 {forecastEditor.error && !validForecastKInput(forecastEditor.newValue) && <small role="alert">Required · 0+ · max 2 decimals</small>}
               </label>
-              <label><span>Expansion</span><input type="text" inputMode="decimal" value={forecastEditor.expansion}
+              <label><span>Expansion</span><input type="text" inputMode="decimal" value={forecastEditor.expansion} disabled={!canWrite}
                 aria-invalid={forecastEditor.error ? "true" : "false"}
                 onInput={(event) => updateForecastEditor("expansion", event.currentTarget.value)} />
                 {forecastEditor.error && (!validForecastKInput(forecastEditor.expansion)
@@ -1566,7 +1576,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             </div>
             <footer>
               <button type="button" class="is-secondary" onClick={cancelForecastComposition}>취소</button>
-              <button type="submit" class="is-primary">적용</button>
+              <button type="submit" class="is-primary" disabled={!canWrite} title={!canWrite ? "Write permission is required." : undefined}>적용</button>
             </footer>
           </form>
         </div>, document.body)}
@@ -1597,7 +1607,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
             {hasDraftChanges && (
               <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
                 <span>Draft changes</span>
-                <oj-button chroming="callToAction" disabled={isSaving} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
+                <oj-button chroming="callToAction" disabled={!canWrite || isSaving} title={!canWrite ? "Write permission is required." : undefined} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
                 <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
               </div>
             )}

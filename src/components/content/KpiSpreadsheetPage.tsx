@@ -509,9 +509,10 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   </div>;
 }
 
-export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange, breadcrumb }: Readonly<{
+export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFiscalYear, guideRecords, guideLoading, guideError, onNavigate, onNavigationGuardChange, onWriteStateChange, breadcrumb }: Readonly<{
   fiscalYear: FiscalYear;
   routeId: string;
+  canWrite: boolean;
   guideDataFiscalYear: FiscalYear | null;
   guideRecords: KpiGuideRecord[];
   guideLoading: boolean;
@@ -669,6 +670,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   }, [draftById, drafts, reconcileDraft, rows]);
 
   const beginEditing = useCallback((row: KpiSpreadsheetRow, field: KpiField, element: HTMLElement) => {
+    if (!canWrite) {
+      setApiMessage("Write permission is required.");
+      return;
+    }
     if (saving || editStateRef.current.phase === "saving" || editStateRef.current.phase === "cancelling") return;
     if (field.type === "manageTime") return;
     if (editStateRef.current.cell?.rowId === row.id && editStateRef.current.cell.field === field.key) return;
@@ -684,7 +689,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
         ? joinTargetPeriod(latest.targetFiscalYear, latest.targetQuarter)
         : latest[field.key] === null ? "" : String(latest[field.key])
     }));
-  }, [draftById, saving]);
+  }, [canWrite, draftById, saving]);
 
   useEffect(() => {
     const rowId = pendingAutoEditRowIdRef.current;
@@ -849,6 +854,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   };
 
   const applyManaged = (managed: boolean) => {
+    if (!canWrite) { setApiMessage("Write permission is required."); return; }
     if (saving || selectedRows.length === 0) return;
     finishEditing();
     const selected = selectedRows.map((row) => row.id);
@@ -906,7 +912,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
   const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected
     && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
-  const saveDisabled = drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
+  const saveDisabled = !canWrite || drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
   const salesSummary = activeTab === "D1";
   const activityTab = activeTab as SpreadsheetKpiCode;
 
@@ -927,6 +933,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   }));
 
   const addDraft = () => {
+    if (!canWrite) { setApiMessage("Write permission is required."); return; }
     if (saving || drafts.length > 0 || editState.cell || activeTab === "Overview") return;
     const draft = createEmptyKpiRow(activeTab as SpreadsheetKpiCode, fiscalYear);
     pendingAutoEditRowIdRef.current = draft.id;
@@ -1002,6 +1009,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
 
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
+    if (!canWrite) {
+      setApiMessage("Write permission is required. Your unsaved KPI changes were kept.");
+      return false;
+    }
     if (saving || saveDisabled) return false;
     finishEditing();
     const startedAt = performance.now();
@@ -1045,6 +1056,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
   };
 
   const removeSelected = async () => {
+    if (!canWrite) { setApiMessage("Write permission is required. Selected rows were not deleted."); return; }
     if (saving || selectedRows.length === 0) return;
     const rowsToDelete = [...selectedRows];
     const deleteSession = sessionVersion.current;
@@ -1156,7 +1168,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
-        <div class="kpi-activity-toolbar__left"><button type="button" disabled={saving || drafts.length > 0 || editState.cell !== null} onClick={addDraft}>Add KPI Activity</button>
+        <div class="kpi-activity-toolbar__left"><button type="button" disabled={!canWrite || saving || drafts.length > 0 || editState.cell !== null}
+          title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>
           {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>
@@ -1167,12 +1180,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
-          {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={saving}
-            title={reflectedAction.label} aria-label={reflectedAction.label}
+          {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || saving}
+            title={!canWrite ? "Write permission is required." : reflectedAction.label} aria-label={reflectedAction.label}
             onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
-          {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={saving} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
+          {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={!canWrite || saving}
+            title={!canWrite ? "Write permission is required." : undefined} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
         </div>
       </div>
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
@@ -1255,7 +1269,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
       onojOpen={() => cancelKeepButtonRef.current?.focus()}>
       <div slot="body"><p>You have unsaved KPI changes. Choose whether to save them, discard them, or keep editing.</p></div>
       <div slot="footer" class="kpi-dialog-actions">
-        <oj-button disabled={saving || saveDisabled} onojAction={() => { void (async () => {
+        <oj-button disabled={!canWrite || saving || saveDisabled} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => { void (async () => {
           if (!await settleDialogClosed(cancelDialogRef.current)) { setApiMessage("Dialog could not close. Keep editing and retry."); return; }
           await saveDrafts();
         })(); }}>Save changes</oj-button>
@@ -1271,7 +1285,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
           if (!await settleDialogClosed(navigationDialogRef.current)) { setApiMessage("Dialog could not close. Stay on this KPI and retry."); return; }
           setPendingNavigation(null);
         })(); }}>Stay</oj-button>
-        <oj-button disabled={saving || saveDisabled} onojAction={() => { const action = pendingNavigation?.action; void (async () => {
+        <oj-button disabled={!canWrite || saving || saveDisabled} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => { const action = pendingNavigation?.action; void (async () => {
           if (!await settleDialogClosed(navigationDialogRef.current)) { setApiMessage("Dialog could not close. Navigation was cancelled."); return; }
           setPendingNavigation(null); if (await saveDrafts()) action?.();
         })(); }}>Save and Continue</oj-button>
@@ -1287,7 +1301,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, guideDataFiscalYear, g
         <oj-button ref={deleteCancelButtonRef} disabled={saving} onojAction={() => { void (async () => {
           if (!await settleDialogClosed(deleteDialogRef.current)) setApiMessage("Dialog could not close. Delete was cancelled.");
         })(); }}>Cancel</oj-button>
-        <oj-button chroming="danger" disabled={saving} onojAction={() => { void (async () => {
+        <oj-button chroming="danger" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => { void (async () => {
           if (!await settleDialogClosed(deleteDialogRef.current)) { setApiMessage("Dialog could not close. Delete was cancelled."); return; }
           await removeSelected();
         })(); }}>Delete</oj-button>

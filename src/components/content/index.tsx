@@ -27,6 +27,7 @@ import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
 import type { AuthSession } from "../../auth/authSession";
+import { canWriteRoute } from "../../auth/menuPermissions";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -333,6 +334,8 @@ export function Content({
   onKpiWriteStateChange
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
+  const canWrite = canWriteRoute(profile, activeRoute);
+  const writePermissionMessage = "Write permission is required.";
   const guideItems = dataset.guides;
   const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
     Object.fromEntries(dataset.guides.map((guide) => [guide.code, getGuideDetails(guide)])) as Record<string, GuideDetails>
@@ -355,6 +358,10 @@ export function Content({
     }));
   };
   const startGuideEdit = () => {
+    if (!canWrite) {
+      setGuideSaveError(writePermissionMessage);
+      return;
+    }
     setDraftGuideDetails((current) => ({
       ...current,
       [selectedGuide.code]: { ...savedGuideDetails[selectedGuide.code] }
@@ -384,6 +391,10 @@ export function Content({
     setGuideEditMode(false);
   }, [guideRecords, fiscalYear]);
   const saveGuideEdit = async () => {
+    if (!canWrite) {
+      setGuideSaveError("Write permission is required. Your unsaved KPI Guide changes were kept.");
+      return;
+    }
     const record = guideRecords.find((item) => item.kpiCode === selectedGuide.code);
     if (!record) {
       setGuideSaveError("The selected KPI Guide record is not available from the database.");
@@ -462,6 +473,10 @@ export function Content({
           <span class="kpi-guide-entry-button__label">KPI Guide</span>
         </button>}
       </section>}
+
+      {!canWrite && ["kpiPage", "weeklyActivities", "accountsWorkloads", "consumptionAttainment", "consumptionRecords"].includes(activeRoute.module) && (
+        <div class="accounts-workloads-source-status" role="status"><strong>Read-only access.</strong> Write permission is required to add, edit, delete, save, clone, restore, or import data.</div>
+      )}
 
       {!['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
@@ -584,6 +599,7 @@ export function Content({
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
+          canWrite={canWrite}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
           onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageNavigation} />
@@ -614,6 +630,7 @@ export function Content({
           <AccountsWorkloadsPage
             key={fiscalYear}
             fiscalYear={fiscalYear}
+            canWrite={canWrite}
             rows={accountsWorkloadsRows}
             metadata={accountWorkloadMetadata}
             query={accountsWorkloadsQuery}
@@ -630,14 +647,15 @@ export function Content({
           />
         )
       ) : activeRoute.module === "weeklyActivities" ? (
-        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
+        <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
         <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAttainment" ? (
-        <AttainmentPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
+        <AttainmentPage fiscalYear={fiscalYear} canWrite={canWrite} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
           fiscalYear={fiscalYear}
+          canWrite={canWrite}
           onNavigationGuardChange={onKpiNavigationGuardChange}
           breadcrumb={pageNavigation}
         />
@@ -656,11 +674,13 @@ export function Content({
               <div class="kpi-guide-dialog__actions">
                 {guideEditMode ? (
                   <>
-                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" disabled={guideSaving} onClick={() => void saveGuideEdit()}>{guideSaving ? "Saving…" : "Save"}</button>
+                    <button type="button" id="kpiGuideSaveButton" class="kpi-guide-edit-button is-active" disabled={guideSaving || !canWrite}
+                      title={!canWrite ? writePermissionMessage : undefined} onClick={() => void saveGuideEdit()}>{guideSaving ? "Saving…" : "Save"}</button>
                     <button type="button" id="kpiGuideCancelButton" class="kpi-guide-edit-button" disabled={guideSaving} onClick={cancelGuideEdit}>Cancel</button>
                   </>
                 ) : (
-                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" disabled={guideLoading || guideRecords.length === 0} onClick={startGuideEdit}>Edit</button>
+                  <button type="button" id="kpiGuideEditButton" class="kpi-guide-edit-button" disabled={guideLoading || guideRecords.length === 0 || !canWrite}
+                    title={!canWrite ? writePermissionMessage : undefined} onClick={startGuideEdit}>Edit</button>
                 )}
                 <oj-button chroming="borderless" display="icons" aria-label="Close KPI Guide" onojAction={onCloseGuide}>
                   <span slot="startIcon" class="oj-ux-ico-close"></span>

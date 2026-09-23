@@ -62,7 +62,7 @@ function QuarterCard({ quarter }: Readonly<{ quarter: AttainmentQuarterRecord }>
   </div>;
 }
 
-export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
+export function AttainmentPage({ fiscalYear, canWrite, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; canWrite: boolean; breadcrumb?: ComponentChildren }>) {
   const [dashboard, setDashboard] = useState<AttainmentDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -84,10 +84,12 @@ export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear
   }, [fiscalYear]);
 
   const openBudgetDialog = () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     if (!dashboard) return;
     setDraft(draftFromDashboard(dashboard)); setSaveError(""); dialogRef.current?.open();
   };
   const saveBudget = async () => {
+    if (!canWrite) { setSaveError("Write permission is required. Your budget changes were kept."); return; }
     const payload = budgetPayload(draft);
     if (Object.values(payload).some((value) => value !== null && (!Number.isFinite(value) || value < 0))) {
       setSaveError("Enter nonnegative amounts or leave a quarter blank."); return;
@@ -132,7 +134,7 @@ export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear
   return <section class="attainment-page" aria-labelledby="attainmentTitle" data-fiscal-year={fiscalYear}>
     <header class="consumption-page__header attainment-header">
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Attainment</span><h1 id="attainmentTitle">Consumption Attainment</h1></div>
-      <oj-button chroming="outlined" onojAction={openBudgetDialog}>Budget</oj-button>
+      <oj-button chroming="outlined" disabled={!canWrite} title={!canWrite ? "Write permission is required." : undefined} onojAction={openBudgetDialog}>Budget</oj-button>
     </header>
     <ConsumptionMessageBanner messages={messages} />
 
@@ -160,8 +162,8 @@ export function AttainmentPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear
     </section>
 
     <oj-dialog ref={dialogRef} dialogTitle={`Budget · ${fiscalYear}`} cancelBehavior={saving ? "none" : "icon"} class="attainment-budget-dialog">
-      <div slot="body" class="attainment-budget-form"><p>분기별 예산을 K 단위로 입력하세요. 비워 두면 미설정으로 저장됩니다.</p><div class="attainment-budget-fields">{quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={saving} onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}</div><div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>{saveError && <div role="alert" class="attainment-inline-error">저장하지 못했습니다. 입력값을 확인해 주세요.</div>}</div>
-      <div slot="footer"><oj-button disabled={saving} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void saveBudget()}>{saving ? "Saving…" : "Save budget"}</oj-button></div>
+      <div slot="body" class="attainment-budget-form"><p>분기별 예산을 K 단위로 입력하세요. 비워 두면 미설정으로 저장됩니다.</p><div class="attainment-budget-fields">{quarterKeys.map((key, index) => <label key={key}><span>{`Q${index + 1} budget (K)`}</span><input type="number" min="0" step="0.0001" inputMode="decimal" value={draft[key]} disabled={!canWrite || saving} onInput={(event) => setDraft((current) => ({ ...current, [key]: (event.currentTarget as HTMLInputElement).value }))} /></label>)}</div><div class="attainment-budget-total"><span>FY total</span><strong>{formatBudget(draftTotal(draft))}</strong></div>{saveError && <div role="alert" class="attainment-inline-error">저장하지 못했습니다. 입력값을 확인해 주세요.</div>}</div>
+      <div slot="footer"><oj-button disabled={saving} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void saveBudget()}>{saving ? "Saving…" : "Save budget"}</oj-button></div>
     </oj-dialog>
   </section>;
 }
