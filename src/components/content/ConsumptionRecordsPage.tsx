@@ -341,6 +341,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(() => new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
   const [importError, setImportError] = useState("");
+  const [dismissedMessageIds, setDismissedMessageIds] = useState<Set<string>>(() => new Set());
   const [apiEtag, setApiEtag] = useState("");
   const [dataMode, setDataMode] = useState<"loading" | "backend" | "fallback" | "error">("loading");
   const [isSaving, setIsSaving] = useState(false);
@@ -404,6 +405,16 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
   const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals) || draftForecastCompositions.size > 0;
   const hasDraftChanges = hasControlDraftChanges;
+
+  useEffect(() => {
+    if (hasDraftChanges || !dismissedMessageIds.has("records-draft")) return;
+    setDismissedMessageIds((current) => {
+      if (!current.has("records-draft")) return current;
+      const next = new Set(current);
+      next.delete("records-draft");
+      return next;
+    });
+  }, [hasDraftChanges, dismissedMessageIds]);
 
   const adoptWorkspace = (workspace: ConsumptionApiWorkspace) => {
     const visiblePlans = filterVisibleConsumptionPlans(workspace.plans, workspace.fromQuarter, workspace.toQuarter);
@@ -1289,6 +1300,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다." });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.` });
+  const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
 
   if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
@@ -1330,9 +1342,8 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
           </oj-button>
         </div>
       </header>
-      <ConsumptionMessageBanner messages={pageMessages} onClose={(messageId) => {
-        if (messageId === "records-operation-error") setImportError("");
-      }} />
+      <ConsumptionMessageBanner messages={visiblePageMessages}
+        onClose={(messageId) => setDismissedMessageIds((current) => new Set(current).add(messageId))} />
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">

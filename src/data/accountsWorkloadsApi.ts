@@ -350,6 +350,13 @@ export const buildAccountWorkloadPatch = (
   return patch as AccountWorkloadPatch;
 };
 
+const serializeAccountWorkloadPatch = (patch: AccountWorkloadPatch): AccountWorkloadPatch => ({
+  ...patch,
+  ...(Object.prototype.hasOwnProperty.call(patch, "revenueType")
+    ? { revenueType: patch.revenueType ?? null }
+    : {})
+});
+
 export const createAccountWorkload = async (
   row: AccountWorkloadRow,
   fiscalYear: FiscalYear,
@@ -582,7 +589,10 @@ export const saveAccountsWorkloadsBatch = async (
       ...createPayload(change.draft),
       fiscalYear: query.fiscalYear
     })),
-    patches: changes.filter((change) => change.kind === "patch").map((change) => ({ ...mutationRef(change), ...change.patch })),
+    patches: changes.filter((change) => change.kind === "patch").map((change) => ({
+      ...mutationRef(change),
+      ...serializeAccountWorkloadPatch(change.patch!)
+    })),
     deletes: changes.filter((change) => change.kind === "delete").map(mutationRef),
     restores: changes.filter((change) => change.kind === "restore").map(mutationRef),
     permanentDeletes: changes.filter((change) => change.kind === "permanent").map(mutationRef),
