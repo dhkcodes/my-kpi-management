@@ -16,7 +16,8 @@ import {
   filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
   getAlertActualTrend,
-  isUnmappedConsumptionLabel
+  isUnmappedConsumptionLabel,
+  shouldRefreshConsumptionAnalysisContext
 } from "../../data/consumptionData";
 import "ojs/ojprogress-circle";
 import "ojs/ojchart";
@@ -204,8 +205,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     workload.plans.map((plan) => ({ workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
 
   const selectAccountContext = (account: string) => {
-    setLoading(true);
-    setSelectedAccountContext(account);
+    const refreshRequired = shouldRefreshConsumptionAnalysisContext(selectedAccountContext, account, debouncedCandidateSearch);
+    if (refreshRequired) setLoading(true);
+    if (!refreshRequired) setLoading(false);
+    setSelectedAccountContext(account.trim());
     setCandidateSearch("");
     setDebouncedCandidateSearch("");
     setComboboxOpen(false);

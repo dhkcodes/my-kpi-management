@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionAnalysisAccount, ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRefreshConsumptionAnalysisContext, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -226,6 +226,12 @@ void (async () => {
   assert.equal(shouldRestartConsumptionRecordsPage(true, "\"v1\"", "\"v2\""), true, "append pages cannot cross ETag snapshots");
   assert.equal(shouldRestartConsumptionRecordsPage(true, "\"v1\"", "\"v1\""), false);
   assert.equal(shouldRestartConsumptionRecordsPage(false, "\"v1\"", "\"v2\""), false);
+  assert.equal(shouldRefreshConsumptionAnalysisContext("", "", ""), false,
+    "selecting All Accounts Total again is a no-op and must not strand loading");
+  assert.equal(shouldRefreshConsumptionAnalysisContext("Acme", "", ""), true,
+    "clearing an active account refreshes the portfolio aggregate");
+  assert.equal(shouldRefreshConsumptionAnalysisContext("", "", "ac"), true,
+    "clearing an active candidate search refreshes the full portfolio aggregate");
 
   const plan = (id: string, actuals: Record<string, number>, forecasts: Record<string, number>): ConsumptionPlan => ({
     id, customer: "Acme", endUser: id, planId: id, dataCenter: "IAD", planType: "OCI", actuals, forecasts

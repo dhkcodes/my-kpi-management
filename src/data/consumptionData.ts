@@ -341,6 +341,12 @@ export const shouldRestartConsumptionRecordsPage = (
   nextEtag: string
 ): boolean => append && currentEtag.length > 0 && currentEtag !== nextEtag;
 
+export const shouldRefreshConsumptionAnalysisContext = (
+  currentAccount: string,
+  nextAccount: string,
+  debouncedCandidateSearch: string
+): boolean => currentAccount.trim() !== nextAccount.trim() || debouncedCandidateSearch.trim() !== "";
+
 const previousFiscalMonth = (month: string): string | null => {
   const match = /^FY(\d{2})-([A-Z]{3})$/.exec(month);
   if (!match) return null;
