@@ -207,7 +207,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const selectAccountContext = (account: string) => {
     const refreshRequired = shouldRefreshConsumptionAnalysisContext(selectedAccountContext, account, debouncedCandidateSearch);
     if (refreshRequired) setLoading(true);
-    if (!refreshRequired) setLoading(false);
     setSelectedAccountContext(account.trim());
     setCandidateSearch("");
     setDebouncedCandidateSearch("");
