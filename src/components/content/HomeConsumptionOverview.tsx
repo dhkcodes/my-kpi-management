@@ -89,9 +89,9 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
     return () => { active = false; };
   }, [fiscalYear, canReadRecords, pillar]);
 
-  const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.map((month) => month.amount ?? 0) ?? [])), [data]);
+  const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.flatMap((month) => [month.amount ?? 0, month.forecastAmount ?? 0]) ?? [])), [data]);
   const monthlyEdges = useMemo(() => buildHomeConsumptionLineEdges(data?.months ?? []), [data]);
-  const firstForecastIndex = data?.months.findIndex((month) => month.kind === "FORECAST") ?? -1;
+  const firstForecastIndex = data?.months.findIndex((month) => month.periodKey === data.forecastStartPeriod) ?? -1;
 
   return (
     <section id="consumptionOverview" class="kpi-panel kpi-dashboard-section home-consumption" aria-labelledby="consumptionOverviewTitle">
@@ -171,18 +171,18 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                 {data.quarters.map((quarter) => {
                   const mtd = data.months.find((month) => month.kind === "MTD" && quarterForPeriod(month.periodKey) === quarter.quarter);
                   const mtdAmount = mtd?.amount ?? 0;
-                  const forecastAmount = Math.max(0, quarter.forecastAmount - (mtd?.replacedForecastAmount ?? 0));
-                  const total = quarter.actualAmount + mtdAmount + forecastAmount;
-                  const actualWidth = total > 0 ? (quarter.actualAmount / total) * 100 : 0;
-                  const mtdWidth = total > 0 ? (mtdAmount / total) * 100 : 0;
-                  const forecastWidth = total > 0 ? (forecastAmount / total) * 100 : 0;
+                  const forecastAmount = quarter.forecastAmount;
+                  const scale = Math.max(quarter.actualAmount, mtdAmount, forecastAmount, 1);
+                  const actualWidth = (quarter.actualAmount / scale) * 100;
+                  const mtdWidth = (mtdAmount / scale) * 100;
+                  const forecastWidth = (forecastAmount / scale) * 100;
                   return (
                     <div class="home-consumption__quarter" key={quarter.quarter}>
-                      <div class="home-consumption__quarter-label"><strong>{quarter.quarter}</strong><span>{formatAmountK(total)}</span></div>
+                      <div class="home-consumption__quarter-label"><strong>{quarter.quarter}</strong><span>Separate values</span></div>
                       <div class="home-consumption__stack" aria-label={`${quarter.quarter}: Actual ${formatAmountK(quarter.actualAmount)}, MTD ${formatAmountK(mtdAmount)}, Forecast ${formatAmountK(forecastAmount)}`}>
-                        <span class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></span>
-                        {mtdAmount > 0 && <span class="home-consumption__stack-mtd" style={`width:${mtdWidth}%`}></span>}
-                        <span class="home-consumption__stack-forecast" style={`width:${forecastWidth}%`}></span>
+                        <span class="home-consumption__stack-row"><i class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></i></span>
+                        <span class="home-consumption__stack-row"><i class="home-consumption__stack-mtd" style={`width:${mtdWidth}%`}></i></span>
+                        <span class="home-consumption__stack-row"><i class="home-consumption__stack-forecast" style={`width:${forecastWidth}%`}></i></span>
                       </div>
                       <div class="home-consumption__quarter-values">
                         <span>Actual <strong>{formatAmountK(quarter.actualAmount)}</strong></span>
@@ -252,9 +252,9 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                     <line
                       class={`home-consumption__monthly-line home-consumption__monthly-line--${edge.kind.toLowerCase()}`}
                       x1={monthlyChartX(edge.fromIndex, data.months.length)}
-                      y1={monthlyChartY(from.amount as number, monthlyMax)}
+                      y1={monthlyChartY(edge.fromAmount, monthlyMax)}
                       x2={monthlyChartX(edge.toIndex, data.months.length)}
-                      y2={monthlyChartY(to.amount as number, monthlyMax)}
+                      y2={monthlyChartY(edge.toAmount, monthlyMax)}
                       key={`${from.periodKey}-${to.periodKey}`}
                     ></line>
                   );
@@ -262,6 +262,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                 {data.months.map((month, index) => {
                   const x = monthlyChartX(index, data.months.length);
                   const y = month.amount === null ? null : monthlyChartY(month.amount, monthlyMax);
+                  const forecastY = month.forecastAmount === null ? null : monthlyChartY(month.forecastAmount, monthlyMax);
                   return (
                     <g class="home-consumption__monthly-point" key={month.periodKey}>
                       {y !== null && (
@@ -271,6 +272,16 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                           </circle>
                           <text class="home-consumption__monthly-value" x={x} y={Math.max(18, y - 12)}>
                             {formatAmountK(month.amount)}{month.incomplete ? "*" : ""}
+                          </text>
+                        </>
+                      )}
+                      {forecastY !== null && (
+                        <>
+                          <circle class="home-consumption__monthly-dot home-consumption__monthly-dot--forecast" cx={x} cy={forecastY} r={5}>
+                            <title>{`${month.periodKey} Forecast: ${formatAmountK(month.forecastAmount)}`}</title>
+                          </circle>
+                          <text class="home-consumption__monthly-value home-consumption__monthly-value--forecast" x={x} y={Math.min(204, forecastY + 18)}>
+                            {formatAmountK(month.forecastAmount)}
                           </text>
                         </>
                       )}
@@ -286,14 +297,22 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                 <tr><th scope="col">Month</th><th scope="col">Type</th><th scope="col">Value</th><th scope="col">Coverage</th></tr>
               </thead>
               <tbody>
-                {data.months.map((month) => (
-                  <tr key={month.periodKey}>
+                {data.months.flatMap((month) => [
+                  <tr key={`${month.periodKey}-${month.kind}`}>
                     <th scope="row">{month.periodKey}</th>
                     <td>{month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}</td>
                     <td>{month.amount === null ? "Unavailable" : formatAmountK(month.amount)}</td>
                     <td>{month.incomplete ? "Partial or incomplete" : "Complete"}</td>
-                  </tr>
-                ))}
+                  </tr>,
+                  ...(month.forecastAmount === null ? [] : [
+                    <tr key={`${month.periodKey}-FORECAST`}>
+                      <th scope="row">{month.periodKey}</th>
+                      <td>Forecast</td>
+                      <td>{formatAmountK(month.forecastAmount)}</td>
+                      <td>Monthly full Forecast</td>
+                    </tr>
+                  ])
+                ])}
               </tbody>
             </table>
             {data.months.some((month) => month.incomplete) && <p class="home-consumption__footnote">* Partial or incomplete source coverage; value should not be treated as a complete month.</p>}

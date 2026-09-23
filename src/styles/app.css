@@ -3416,7 +3416,9 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__quarter { display: grid; grid-template-columns: 4.5rem minmax(8rem, 1fr); gap: .35rem .75rem; align-items: center; }
 .home-consumption__quarter-label { display: grid; }
 .home-consumption__quarter-label span { color: var(--oj-core-text-color-secondary); font-size: .72rem; }
-.home-consumption__stack { display: flex; height: .75rem; overflow: hidden; border-radius: 999px; background: #ece9e5; }
+.home-consumption__stack { display: grid; gap: .15rem; }
+.home-consumption__stack-row { display: block; height: .28rem; overflow: hidden; border-radius: 999px; background: #ece9e5; }
+.home-consumption__stack-row i { display: block; height: 100%; border-radius: inherit; }
 .home-consumption__stack-actual { background: #287994; }
 .home-consumption__stack-mtd { background: #c77700; }
 .home-consumption__stack-forecast { background: #8b70b6; }
