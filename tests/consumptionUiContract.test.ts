@@ -141,8 +141,8 @@ assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
-assert.match(insightsPage, /shouldRefreshConsumptionAnalysisContext\(selectedAccountContext, account, debouncedCandidateSearch\)[\s\S]*if \(!refreshRequired\) setLoading\(false\)/,
-  "selecting All Accounts Total while already active cannot strand the Analysis refresh state");
+assert.doesNotMatch(insightsPage, /shouldRefreshConsumptionAnalysisContext\(selectedAccountContext, account, debouncedCandidateSearch\)[\s\S]*if \(!refreshRequired\) setLoading\(false\)/,
+  "selecting the current All Accounts context does not end a different request's active loading state");
 assert.match(insightsPage, /\{analysis\.fiscalYear\} Mixed quarter consumption/, "FY fact-cell quarter totals use the selected fiscal-year title");
 assert.doesNotMatch(insightsPage, /FINAL \+ \{mtdAsOfPeriod\} MTD|Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based/,
   "Analysis removes the long MTD implementation notice");

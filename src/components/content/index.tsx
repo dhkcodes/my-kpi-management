@@ -337,8 +337,8 @@ export function Content({
   const canWrite = canWriteRoute(profile, activeRoute);
   const canReadHomeAccounts = canAccessRoute(profile, getNavigationRoute("accounts-workloads"));
   const canReadHomeKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
-  const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"))
-    && canAccessRoute(profile, getNavigationRoute("records"));
+  const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"));
+  const canReadHomeConsumptionRecords = canAccessRoute(profile, getNavigationRoute("records"));
   const writePermissionMessage = "Write permission is required.";
   const guideItems = dataset.guides;
   const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
@@ -599,7 +599,10 @@ export function Content({
               ))}
             </div>
           </section>}
-          {canReadHomeConsumption && <HomeConsumptionOverview fiscalYear={fiscalYear} />}
+          {canReadHomeConsumption && <HomeConsumptionOverview
+            fiscalYear={fiscalYear}
+            canReadRecords={canReadHomeConsumptionRecords}
+          />}
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
