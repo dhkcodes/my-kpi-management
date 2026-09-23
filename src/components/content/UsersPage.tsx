@@ -45,6 +45,11 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     Object.fromEntries(menuPermissionIds.map((menu) => [menu, "NONE"])) as MenuPermissionMap);
   const [permissionError, setPermissionError] = useState("");
   const dialogRef = useRef<DialogElement>(null);
+  const actionFormRef = useRef<HTMLFormElement>(null);
+  const displayNameInputRef = useRef<InputTextElement | null>(null);
+  const loginIdInputRef = useRef<InputTextElement | null>(null);
+  const accessInputRef = useRef<(EventTarget & { value: UserAccess | null }) | null>(null);
+  const actionSubmitLockRef = useRef(false);
   const deleteDialogRef = useRef<DialogElement>(null);
   const permissionDialogRef = useRef<DialogElement>(null);
   const accessProvider = useMemo(() => new ArrayDataProvider(accessOptions, { keyAttributes: "value" }), []);
@@ -68,12 +73,19 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     setDialog(null); setDialogError(""); setIssuedLink(null); setCopied(false);
     setDisplayName(""); setLoginId(""); setAccess("User");
   };
-  const submitDialog = async () => {
-    if (!dialog || busy) return;
+  const submitDialog = async (event?: Event) => {
+    event?.preventDefault();
+    if (!dialog || issuedLink || actionSubmitLockRef.current) return;
+    actionSubmitLockRef.current = true;
     setDialogError(""); setBusy(true);
     try {
+      const submittedDisplayName = String(displayNameInputRef.current?.value ?? displayName).trim();
+      const submittedLoginId = String(loginIdInputRef.current?.value ?? loginId).trim();
+      const submittedAccess = accessInputRef.current?.value ?? access;
+      if (dialog.kind === "invite" && !submittedDisplayName) throw new Error("Enter a display name.");
+      if (dialog.kind === "invite" && !submittedLoginId) throw new Error("Enter a Login ID.");
       const result = dialog.kind === "invite"
-        ? await inviteUser({ displayName: displayName.trim(), loginId, access })
+        ? await inviteUser({ displayName: submittedDisplayName, loginId: submittedLoginId, access: submittedAccess })
         : dialog.kind === "reissue" && dialog.user
           ? await reissueUserInvite(dialog.user.userKey)
           : dialog.kind === "reset" && dialog.user
@@ -84,7 +96,10 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
       await reload();
     } catch (cause) {
       setDialogError(cause instanceof Error ? cause.message : "User action failed.");
-    } finally { setBusy(false); }
+    } finally {
+      actionSubmitLockRef.current = false;
+      setBusy(false);
+    }
   };
   const copyLink = async () => {
     if (!issuedLink) return;
@@ -172,7 +187,7 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
       </div></td></tr>)}</tbody></table></div>
 
     <oj-dialog ref={dialogRef} initialVisibility="hide" dialogTitle={title} cancelBehavior={busy ? "none" : "icon"} onojClose={() => { if (!busy) clearDialog(); }} class="kap-user-dialog">
-      <div slot="body" class="kap-dialog-body">
+      <form ref={actionFormRef} slot="body" class="kap-dialog-body" onSubmit={submitDialog}>
         {issuedLink ? <>
           <p>No email was sent. Copy this one-time link and deliver it to <strong>{issuedLink.user.loginId}</strong> through an approved secure channel.</p>
           <label class="kap-field"><span>{issuedLink.purpose === "ACTIVATION" ? "Activation URL" : "Password reset URL"}</span>
@@ -182,19 +197,20 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
           {copied && <div class="kap-success" role="status">Link copied.</div>}
         </> : <>
           {dialog?.kind === "invite" ? <>
-            <label class="kap-field"><span>Display name</span><oj-input-text value={displayName} onvalueChanged={(event: InputTextElement.valueChanged) => setDisplayName(String(event.detail.value ?? ""))}></oj-input-text></label>
-            <label class="kap-field"><span>Login ID</span><oj-input-text value={loginId} onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text></label>
-            <label class="kap-field"><span>Access</span><oj-select-single data={accessProvider} value={access} onvalueChanged={(event: CustomEvent<{ value: UserAccess | null }>) => setAccess(event.detail.value ?? "User")}></oj-select-single></label>
+            <label class="kap-field"><span>Display name</span><oj-input-text ref={displayNameInputRef} value={displayName} required onvalueChanged={(event: InputTextElement.valueChanged) => setDisplayName(String(event.detail.value ?? ""))}></oj-input-text></label>
+            <label class="kap-field"><span>Login ID</span><oj-input-text ref={loginIdInputRef} value={loginId} required onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text></label>
+            <label class="kap-field"><span>Access</span><oj-select-single ref={accessInputRef} data={accessProvider} value={access} onvalueChanged={(event: CustomEvent<{ value: UserAccess | null }>) => setAccess(event.detail.value ?? "User")}></oj-select-single></label>
             <p class="kap-field__hint">Submitting creates an activation URL. It does not send email.</p>
           </> : <p>{dialog?.kind === "reissue"
             ? `Create a new activation link for ${dialog.user?.loginId}? Any previous activation link will stop working.`
             : `Create a one-time password reset link for ${dialog?.user?.loginId}? The current password remains valid until the link is used.`}</p>}
         </>}
         {dialogError && <div class="kap-error" role="alert">{dialogError}</div>}
-      </div>
+        <button type="submit" hidden disabled={busy || Boolean(issuedLink)}>Submit</button>
+      </form>
       <div slot="footer">
         {issuedLink ? <><oj-button onojAction={() => void copyLink()}>Copy link</oj-button><oj-button chroming="callToAction" onojAction={() => dialogRef.current?.close()}>Done</oj-button></>
-          : <><oj-button disabled={busy} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => void submitDialog()}>{busy ? "Creating..." : "Create link"}</oj-button></>}
+          : <><oj-button disabled={busy} onojAction={() => dialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction" disabled={busy} onojAction={() => actionFormRef.current?.requestSubmit()}>{busy ? "Creating..." : "Create link"}</oj-button></>}
       </div>
     </oj-dialog>
     <oj-dialog ref={permissionDialogRef} initialVisibility="hide" dialogTitle="Menu permissions"
