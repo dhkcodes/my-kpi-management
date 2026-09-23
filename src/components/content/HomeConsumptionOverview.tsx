@@ -126,7 +126,6 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
             <span><i class="home-consumption__legend home-consumption__legend--actual"></i>Actual {periodRange(data.actualPeriods)}</span>
             {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD (잠정)</span>}
             <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Forecast {periodRange(data.forecastPeriods)}</span>
-            {data.partialPeriod && <strong>Partial coverage · {data.includedPeriodCount}/12 months</strong>}
           </div>
           {data.finalUploadRequiredPeriods.length > 0 && (
             <p class="home-consumption__mtd-guidance" role="note">
@@ -143,7 +142,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
             <article>
               <span>FY Expected</span>
               <strong>{formatAmountK(data.expectedAmount)}</strong>
-              <small>Actual + non-overlapping Forecast</small>
+              <small>Actual + Forecast</small>
             </article>
             <article>
               <span>Actual YoY</span>
