@@ -113,15 +113,25 @@ void (async () => {
   assert.equal(decoded.mtdSummary, null, "an OFF response has no provisional MTD summary");
 
   runtime.fetch = async (input) => {
-    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=&includeMtd=true");
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=&pillar=OCI&includeMtd=true");
     return new Response(JSON.stringify({ ...analysis,
+      selectedPillar: "OCI",
+      portfolio: { ...analysis.portfolio, actualAmount: 1850, forecastAmount: 960, totalAmount: 2510 },
+      quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
+        ? { ...quarter, actualAmount: 1700, forecastAmount: 960, totalAmount: 2360 }
+        : quarter),
       mtdSummary: { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" }
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
-  const withMtd = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", includeMtd: true });
+  const withMtd = await fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
+  });
+  assert.equal(withMtd.selectedPillar, "OCI", "MTD responses preserve the selected OCI pillar");
   assert.deepEqual(withMtd.mtdSummary,
     { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" },
-    "MTD stays separate from FINAL amount splits so strict totals remain valid");
+    "MTD responses accept display Forecast while Total excludes the overlapping current-period Forecast");
+  assert.equal(withMtd.portfolio.totalAmount, 2510);
+  assert.equal(withMtd.quarters[1].totalAmount, 2360);
 
   runtime.fetch = async () => new Response(JSON.stringify(deployedNonComparableAnalysis),
     { status: 200, headers: { "Content-Type": "application/json" } });
