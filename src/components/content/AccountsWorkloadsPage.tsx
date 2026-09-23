@@ -61,6 +61,7 @@ type DeleteTargets = Readonly<{
 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
+  canWrite: boolean;
   rows: AccountWorkloadRow[];
   metadata: AccountWorkloadMetadata;
   query: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
@@ -335,6 +336,7 @@ function EditableCell({
 
 export function AccountsWorkloadsPage({
   fiscalYear,
+  canWrite,
   rows,
   metadata,
   query,
@@ -615,6 +617,7 @@ export function AccountsWorkloadsPage({
   };
 
   const saveGridChanges = async () => {
+    if (!canWrite) { setSaveError("Write permission is required. Your unsaved changes were kept."); return; }
     const rowsToSave = addingRow ? [...draftRows, addingRow] : draftRows;
     if (addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim())) return;
     const draftFxRate = fxRate && exchangeRate !== savedExchangeRate
@@ -655,10 +658,12 @@ export function AccountsWorkloadsPage({
   };
 
   const addRow = () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     setAddingRow(createEmptyRow(fiscalYear));
   };
 
   const runImmediateRowsAction = async (nextRows: AccountWorkloadRow[], permanentIds: string[] = []) => {
+    if (!canWrite) { setSaveError("Write permission is required. Your unsaved changes were kept."); return null; }
     setSaving(true);
     setSaveError("");
     try {
@@ -674,6 +679,7 @@ export function AccountsWorkloadsPage({
   };
 
   const highlightSelected = async () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     const savedIds = new Set(selectedSavedRowIds);
     const nextRows = rows.map((row) => savedIds.has(row.id) ? { ...row, isImportant: !row.isImportant } : row);
     const success = savedIds.size === 0 || await runImmediateRowsAction(nextRows);
@@ -698,6 +704,7 @@ export function AccountsWorkloadsPage({
   }, 0);
 
   const requestDelete = async () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     const targets = classifyAccountDeleteTargets(rows, selectedActionIds, addingRow?.id);
     if (targets.draftIds.length + targets.activeIds.length + targets.permanentIds.length === 0) return;
     if (targets.draftIds.length > 0) {
@@ -731,6 +738,7 @@ export function AccountsWorkloadsPage({
   };
 
   const confirmDelete = async () => {
+    if (!canWrite) { setSaveError("Write permission is required. Nothing was deleted."); return; }
     if (!deleteTargets) return;
     const { draftIds, activeIds, permanentIds, baseRows } = deleteTargets;
     const nextRows = applyDraftDelete(baseRows, activeIds, "current-user", new Date().toISOString());
@@ -742,6 +750,7 @@ export function AccountsWorkloadsPage({
   };
 
   const restoreSelected = async () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     const restored = applyDraftRestore(rows, selectedSavedRowIds, rows);
     const success = await runImmediateRowsAction(restored);
     if (success) setSelectedRowIds([]);
@@ -750,6 +759,7 @@ export function AccountsWorkloadsPage({
   const deleteDialogMessage = "Saved deleted rows will be permanently removed. This action cannot be undone.";
 
   const applyExchangeRate = () => {
+    if (!canWrite) { setSaveError("Write permission is required."); return; }
     const parsed = numberFromInput(draftExchangeRate);
     if (parsed === null || parsed <= 0 || !fxRate) return;
     setExchangeRate(parsed);
@@ -798,6 +808,7 @@ export function AccountsWorkloadsPage({
   };
 
   const openClonePreviousFiscalYear = async () => {
+    if (!canWrite) { setCloneError("Write permission is required."); return; }
     if (draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api") return;
     const generation = ++cloneGenerationRef.current;
     cloneContextFiscalYearRef.current = fiscalYear;
@@ -840,6 +851,7 @@ export function AccountsWorkloadsPage({
   };
 
   const executeClonePreviousFiscalYear = async () => {
+    if (!canWrite) { setCloneError("Write permission is required."); return; }
     if (cloneSubmitInFlightRef.current || cloneExecuting || !clonePreview || cloneSelection.length === 0) return;
     const targetFiscalYear = clonePreview.targetFiscalYear;
     if (targetFiscalYear !== fiscalYear || targetFiscalYear !== cloneContextFiscalYearRef.current) return;
@@ -894,6 +906,7 @@ export function AccountsWorkloadsPage({
     return (
       <td data-account-field={field} class={cellClass || undefined}
         onDblClick={(event) => {
+          if (!canWrite) { setSaveError("Write permission is required."); return; }
           if ((event.target as Element).closest(".accounts-workloads-edit-field")) return;
           event.preventDefault();
           event.stopPropagation();
@@ -989,7 +1002,9 @@ export function AccountsWorkloadsPage({
 
         </div>
         <div class="accounts-workloads-fx">
-          <button type="button" class="accounts-workloads-fx__button" onClick={() => setFxPopoverOpen((value) => !value)} aria-expanded={fxPopoverOpen ? "true" : "false"}>
+          <button type="button" class="accounts-workloads-fx__button" disabled={!canWrite}
+            title={!canWrite ? "Write permission is required." : undefined}
+            onClick={() => setFxPopoverOpen((value) => !value)} aria-expanded={fxPopoverOpen ? "true" : "false"}>
             <span>Exchange Rate (USD to KRW)</span>
             <strong>1 USD = KRW {currencyKrwFormatter.format(exchangeRate)}</strong>
           </button>
@@ -1007,7 +1022,8 @@ export function AccountsWorkloadsPage({
               {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
               {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
               <div class="accounts-workloads-popover-actions">
-                <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={fxLoading || !fxRate} onClick={applyExchangeRate}>Apply</button>
+                <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || fxLoading || !fxRate}
+                  title={!canWrite ? "Write permission is required." : undefined} onClick={applyExchangeRate}>Apply</button>
                 <button type="button" class="accounts-workloads-button" onClick={cancelExchangeRateEdit}>Cancel</button>
               </div>
             </div>
@@ -1056,21 +1072,26 @@ export function AccountsWorkloadsPage({
           </oj-switch>
         </label>
         <div class="accounts-workloads-actions accounts-workloads-actions--compact">
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api"} onojAction={() => void openClonePreviousFiscalYear()}>Clone Previous FY</oj-button>
-          <oj-button ref={addButtonRef} class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title="Add Account" disabled={saving} onojAction={addRow}>Add Account</oj-button>
+          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api"}
+            title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void openClonePreviousFiscalYear()}>Clone Previous FY</oj-button>
+          <oj-button ref={addButtonRef} class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title={!canWrite ? "Write permission is required." : "Add Account"} disabled={!canWrite || saving} onojAction={addRow}>Add Account</oj-button>
           {showEditActions && (
             <>
-              <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={saving || Boolean(addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim()))} onClick={() => void saveGridChanges()}>Save</button>
+              <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || saving || Boolean(addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim()))}
+                title={!canWrite ? "Write permission is required." : undefined} onClick={() => void saveGridChanges()}>Save</button>
               <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>
             </>
           )}
           {selectedCount > 0 && (
             <>
-              <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={saving} onojAction={() => void highlightSelected()}>Highlight</oj-button>
+              <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || saving}
+                title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void highlightSelected()}>Highlight</oj-button>
               {selectedHasDeletedRows && (
-                <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={saving} onojAction={() => void restoreSelected()}>Restore</oj-button>
+                <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || saving}
+                  title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void restoreSelected()}>Restore</oj-button>
               )}
-              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={saving} onojAction={() => void requestDelete()}>Delete</oj-button>
+              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={!canWrite || saving}
+                title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void requestDelete()}>Delete</oj-button>
             </>
           )}
           <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing || saving} onojAction={onRefresh}>Refresh</oj-button>
@@ -1103,7 +1124,8 @@ export function AccountsWorkloadsPage({
         <div class="accounts-workloads-delete-content">
           <p>{deleteDialogMessage}</p>
           <div class="accounts-workloads-save-actions">
-            <oj-button chroming="danger" disabled={saving} onojAction={() => void confirmDelete()}>Delete</oj-button>
+            <oj-button chroming="danger" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined}
+              onojAction={() => void confirmDelete()}>Delete</oj-button>
             <oj-button ref={deleteCancelButtonRef} chroming="outlined" disabled={saving} onojAction={cancelDelete}>Cancel</oj-button>
           </div>
         </div>
@@ -1152,8 +1174,8 @@ export function AccountsWorkloadsPage({
                 })}
               </div>
               <div class="accounts-workloads-save-actions">
-                <oj-button chroming="callToAction" disabled={cloneSelection.length === 0 || cloneExecuting || cloneLoading || draftActive || saving || accountsWorkloadsRefreshing || clonePreview.targetFiscalYear !== fiscalYear}
-                  onojAction={() => void executeClonePreviousFiscalYear()}>Clone selected</oj-button>
+                <oj-button chroming="callToAction" disabled={!canWrite || cloneSelection.length === 0 || cloneExecuting || cloneLoading || draftActive || saving || accountsWorkloadsRefreshing || clonePreview.targetFiscalYear !== fiscalYear}
+                  title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void executeClonePreviousFiscalYear()}>Clone selected</oj-button>
                 <oj-button chroming="outlined" disabled={cloneExecuting} onojAction={cancelClone}>Cancel</oj-button>
               </div>
             </>

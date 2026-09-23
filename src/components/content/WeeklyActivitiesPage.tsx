@@ -60,17 +60,20 @@ const formatWeekDate = (value: string) => {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 };
 
-function ActivityContent({ html, label, onDblClick }: Readonly<{ html: string; label: string; onDblClick: () => void }>) {
-  return <div class="weekly-activity-card__rich-text weekly-activity-card__rich-text--editable" aria-label={label} title="Double-click to edit" onDblClick={onDblClick} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(html) }}></div>;
+function ActivityContent({ html, label, editable, onDblClick }: Readonly<{ html: string; label: string; editable: boolean; onDblClick: () => void }>) {
+  return <div class={`weekly-activity-card__rich-text${editable ? " weekly-activity-card__rich-text--editable" : ""}`}
+    aria-label={label} title={editable ? "Double-click to edit" : undefined}
+    onDblClick={() => { if (editable) onDblClick(); }} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(html) }}></div>;
 }
 
 type WeeklyActivitiesPageProps = Readonly<{
   fiscalYear: FiscalYear;
+  canWrite: boolean;
   onDirtyStateChange?: (active: boolean) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrumb }: WeeklyActivitiesPageProps) {
+export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange, breadcrumb }: WeeklyActivitiesPageProps) {
   const defaultRange = getWeeklyActivityFiscalYearRange(fiscalYear);
   const [filters, setFilters] = useState({ ...defaultRange, search: "" });
   const [query, setQuery] = useState<WeeklyActivitiesQuery>({ ...defaultRange, search: "", page: 0, size: PAGE_SIZE });
@@ -201,6 +204,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   };
 
   const startAdd = () => {
+    if (!canWrite) { setEditError("Write permission is required."); return; }
     setEditError("");
     setRowError(null);
     const currentWeekDate = getDefaultWeeklyActivityRange().toDate;
@@ -221,6 +225,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   };
 
   const startEdit = (record: WeeklyActivityRecord, initialTarget: WeeklyActivityTarget = "thisWeek") => {
+    if (!canWrite) { setEditError("Write permission is required."); return; }
     setEditError("");
     setRowError(null);
     setExpanded((current) => {
@@ -261,6 +266,10 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   const save = async () => {
     const session = editSession;
     if (!session) return;
+    if (!canWrite) {
+      setEditError("Write permission is required. Your unsaved Weekly Activity changes were kept.");
+      return;
+    }
     const flushedDrafts = editorFlushRef.current?.() ?? session.drafts;
     const normalizedDrafts = {
       thisWeekHtml: promoteWeeklyActivityListMarkerStyles(sanitizeWeeklyActivityHtml(flushedDrafts.thisWeekHtml)),
@@ -333,6 +342,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   };
 
   const requestDelete = (record: WeeklyActivityRecord) => {
+    if (!canWrite) { setMutationWarning("Write permission is required."); return; }
     setPendingDelete(record);
     setRowError(null);
     requestAnimationFrame(() => deleteDialogRef.current?.open());
@@ -348,6 +358,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   const confirmDelete = async () => {
     const record = pendingDelete;
     if (!record) return;
+    if (!canWrite) { setMutationWarning("Write permission is required. Nothing was deleted."); return; }
     const focusActivityId = resolveFocusAfterRemoval(items, record.activityId);
     setDeleting(true);
     setRowError(null);
@@ -430,7 +441,8 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
       {editError && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{editError}</div>}
       <div class="weekly-activity-inline-editor__actions">
         <oj-button chroming="outlined" disabled={saving} onojAction={cancelEdit}>Cancel</oj-button>
-        <oj-button chroming="callToAction" disabled={saving} onojAction={() => void save()}>{saving ? "Saving…" : "Save"}</oj-button>
+        <oj-button chroming="callToAction" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined}
+          onojAction={() => void save()}>{saving ? "Saving…" : "Save"}</oj-button>
       </div>
     </section>
   );
@@ -438,7 +450,7 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
   const renderViewContent = (record: WeeklyActivityRecord, target: WeeklyActivityTarget) => {
     const html = target === "thisWeek" ? record.thisWeekHtml : record.nextWeekHtml;
     const label = target === "thisWeek" ? "This Week activities" : "Next Week activities";
-    return <ActivityContent html={html} label={label} onDblClick={() => startEdit(record, target)} />;
+    return <ActivityContent html={html} label={label} editable={canWrite} onDblClick={() => startEdit(record, target)} />;
   };
 
   return (
@@ -450,7 +462,8 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
           <h2 id="weeklyActivitiesTitle">Weekly Activities</h2>
 
         </div>
-        <oj-button ref={(element: EventTarget | null) => { addTriggerRef.current = element as HTMLElement | null; }} id="weeklyActivityAddButton" chroming="callToAction" disabled={Boolean(editSession) || controlsBusy} onojAction={startAdd}>
+        <oj-button ref={(element: EventTarget | null) => { addTriggerRef.current = element as HTMLElement | null; }} id="weeklyActivityAddButton" chroming="callToAction"
+          disabled={!canWrite || Boolean(editSession) || controlsBusy} title={!canWrite ? "Write permission is required." : undefined} onojAction={startAdd}>
           <span slot="startIcon" class="oj-ux-ico-plus" aria-hidden="true"></span>
           Add Activity
         </oj-button>
@@ -509,13 +522,14 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
                     {isEditing ? (
                       <>
                         <oj-button key={`cancel-${record.activityId}`} chroming="outlined" disabled={saving} onojAction={cancelEdit}>Cancel</oj-button>
-                        <oj-button key={`save-${record.activityId}`} chroming="callToAction" disabled={saving} onojAction={() => void save()}>{saving ? "Saving…" : "Save"}</oj-button>
+                        <oj-button key={`save-${record.activityId}`} chroming="callToAction" disabled={!canWrite || saving}
+                          title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void save()}>{saving ? "Saving…" : "Save"}</oj-button>
                       </>
                     ) : (
-                      <>
+                      canWrite ? <>
                         <oj-button key={`edit-${record.activityId}`} ref={(element: EventTarget | null) => { const trigger = element as HTMLElement | null; trigger ? editTriggerRefs.current.set(record.activityId, trigger) : editTriggerRefs.current.delete(record.activityId); }} chroming="borderless" aria-label={`Edit ${formatWeekDate(record.weekOfDate)}`} disabled={Boolean(editSession) || controlsBusy} onojAction={() => startEdit(record)}><span slot="startIcon" class="oj-ux-ico-edit" aria-hidden="true"></span></oj-button>
                         <oj-button key={`delete-${record.activityId}`} ref={(element: EventTarget | null) => { const trigger = element as HTMLElement | null; trigger ? deleteTriggerRefs.current.set(record.activityId, trigger) : deleteTriggerRefs.current.delete(record.activityId); }} chroming="borderless" aria-label={`Delete ${formatWeekDate(record.weekOfDate)}`} disabled={Boolean(editSession) || controlsBusy || staleDeleteIds.has(record.activityId)} onojAction={() => requestDelete(record)}><span slot="startIcon" class="oj-ux-ico-trash" aria-hidden="true"></span></oj-button>
-                      </>
+                      </> : null
                     )}
                   </div>
                 </header>
@@ -556,7 +570,8 @@ export function WeeklyActivitiesPage({ fiscalYear, onDirtyStateChange, breadcrum
           <p>{pendingDelete ? `${formatWeekDate(pendingDelete.weekOfDate)} and both activity columns will be permanently deleted. This action cannot be undone.` : "This action cannot be undone."}</p>
           <div class="weekly-activity-delete-actions">
             <oj-button chroming="outlined" disabled={deleting} onojAction={closeDeleteDialog}>Cancel</oj-button>
-            <oj-button chroming="danger" disabled={deleting} onojAction={() => void confirmDelete()}>{deleting ? "Deleting…" : "Delete"}</oj-button>
+            <oj-button chroming="danger" disabled={!canWrite || deleting} title={!canWrite ? "Write permission is required." : undefined}
+              onojAction={() => void confirmDelete()}>{deleting ? "Deleting…" : "Delete"}</oj-button>
           </div>
         </div>
       </oj-dialog>
