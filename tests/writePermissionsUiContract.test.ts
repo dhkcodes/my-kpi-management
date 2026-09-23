@@ -35,8 +35,14 @@ assert.match(homeConsumption, /canReadRecords \? fetchConsumptionRecords[\s\S]*:
   "home Consumption Overview never calls the Records API without Records read access");
 assert.match(homeConsumption, /records\?\.totals \?\? emptyRecordsTotals/,
   "Analysis readers still receive Analysis-backed home consumption data without Records access");
-assert.match(content, /saveGuideEdit[\s\S]{0,180}if \(!canWrite\)[\s\S]{0,180}unsaved KPI Guide changes were kept/,
+assert.match(content, /const canEditKpiGuide = profile\.access === "Admin"/,
+  "KPI Guide edit capability is restricted to Admin sessions");
+assert.match(content, /saveGuideEdit[\s\S]{0,180}if \(!canEditKpiGuide\)[\s\S]{0,180}unsaved KPI Guide changes were kept/,
   "KPI Guide blocks late saves without discarding a draft");
+assert.match(content, /\) : canEditKpiGuide \? \(/,
+  "KPI Guide renders the edit action only for Admin sessions");
+assert.match(content, /id="kpiGuideEditButton"/,
+  "KPI Guide retains the Admin edit action");
 
 for (const [name, source] of [["KPI", kpi], ["Weekly", weekly], ["Accounts", accounts], ["Attainment", attainment], ["Records", records]] as const) {
   assert.match(source, /canWrite: boolean/, `${name} accepts explicit write capability`);

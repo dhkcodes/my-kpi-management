@@ -5,6 +5,7 @@ export type HomeConsumptionMonth = Readonly<{
   periodKey: string;
   kind: "ACTUAL" | "MTD" | "FORECAST";
   amount: number | null;
+  forecastAmount: number | null;
   incomplete: boolean;
 }>;
 
@@ -12,7 +13,13 @@ export type HomeConsumptionLineEdge = Readonly<{
   kind: HomeConsumptionMonth["kind"];
   fromIndex: number;
   toIndex: number;
+  fromAmount: number;
+  toAmount: number;
 }>;
+
+const graphForecastAmount = (month: HomeConsumptionMonth): number | null => month.kind === "FORECAST"
+  ? month.amount
+  : month.forecastAmount;
 
 const homeConsumptionFiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"] as const;
 
@@ -25,15 +32,26 @@ const homeConsumptionPeriodOrder = (periodKey: string): number | null => {
 
 export const buildHomeConsumptionLineEdges = (
   months: readonly HomeConsumptionMonth[]
-): readonly HomeConsumptionLineEdge[] => months.slice(1).flatMap((month, offset) => {
+): readonly HomeConsumptionLineEdge[] => months.slice(1).flatMap<HomeConsumptionLineEdge>((month, offset): readonly HomeConsumptionLineEdge[] => {
   const toIndex = offset + 1;
   const previous = months[offset];
   const previousOrder = homeConsumptionPeriodOrder(previous.periodKey);
   const currentOrder = homeConsumptionPeriodOrder(month.periodKey);
   const consecutive = previousOrder !== null && currentOrder !== null && currentOrder - previousOrder === 1;
-  const compatibleKinds = month.kind === "FORECAST" || previous.kind === "ACTUAL";
-  if (previous.amount === null || month.amount === null || !consecutive || !compatibleKinds) return [];
-  return [{ kind: month.kind, fromIndex: offset, toIndex }];
+  if (!consecutive) return [];
+  if (previous.kind === "ACTUAL" && month.kind === "ACTUAL" && previous.amount !== null && month.amount !== null) {
+    return [{ kind: "ACTUAL" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: month.amount }];
+  }
+  if (previous.kind === "ACTUAL" && previous.amount !== null) {
+    const currentForecast = graphForecastAmount(month);
+    if (currentForecast !== null) {
+      return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: currentForecast }];
+    }
+  }
+  const previousForecast = graphForecastAmount(previous);
+  const currentForecast = graphForecastAmount(month);
+  if (previousForecast === null || currentForecast === null) return [];
+  return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex, fromAmount: previousForecast, toAmount: currentForecast }];
 });
 
 export type HomeConsumptionOverviewData = Readonly<{
@@ -45,6 +63,7 @@ export type HomeConsumptionOverviewData = Readonly<{
   attentionAccountCount: number;
   actualPeriods: readonly string[];
   forecastPeriods: readonly string[];
+  forecastStartPeriod: string | null;
   includedPeriodCount: number;
   partialPeriod: boolean;
   quarters: ConsumptionAnalysis["quarters"];
@@ -73,9 +92,17 @@ export const buildHomeConsumptionOverview = (
     ...(hasCurrentMtd ? [currentFiscalMonth] : [])
   ])]).filter((period) => !finalUploadRequiredSet.has(period));
   const incompletePeriods = new Set(totals.incompletePeriods);
+  const sortedActualPeriods = sortConsumptionMonths(analysis.periodCoverage.actualPeriods);
+  const lastActualPeriod = sortedActualPeriods[sortedActualPeriods.length - 1];
+  const lastActualOrder = lastActualPeriod === undefined ? null : homeConsumptionPeriodOrder(lastActualPeriod);
+  const forecastStartPeriod = sortConsumptionMonths(includedPeriods).find((period) => {
+    const order = homeConsumptionPeriodOrder(period);
+    return order !== null && (lastActualOrder === null || order > lastActualOrder)
+      && Object.prototype.hasOwnProperty.call(totals.appliedForecastByPeriod, period);
+  }) ?? null;
   const hasActual = analysis.periodCoverage.actualPeriods.length > 0;
   const hasExpected = includedPeriods.length > 0;
-  const comparisonAvailable = analysis.periodCoverage.comparisonStatus === "AVAILABLE"
+  const comparisonAvailable = analysis.periodCoverage.comparisonStatus === "COMPARABLE"
     && analysis.portfolio.priorActualAmount !== 0;
   const actualYoYPercent = comparisonAvailable
     ? ((analysis.portfolio.actualAmount - analysis.portfolio.priorActualAmount) / Math.abs(analysis.portfolio.priorActualAmount)) * 100
@@ -92,6 +119,7 @@ export const buildHomeConsumptionOverview = (
     attentionAccountCount: new Set(analysis.alerts.map((alert) => alert.account)).size,
     actualPeriods: analysis.periodCoverage.actualPeriods,
     forecastPeriods,
+    forecastStartPeriod,
     includedPeriodCount: includedPeriods.length,
     partialPeriod: includedPeriods.length > 0 && includedPeriods.length < 12,
     quarters: analysis.quarters,
@@ -106,6 +134,9 @@ export const buildHomeConsumptionOverview = (
         periodKey,
         kind,
         amount: Object.prototype.hasOwnProperty.call(source, periodKey) ? source[periodKey] : null,
+        forecastAmount: kind === "MTD" && Object.prototype.hasOwnProperty.call(totals.appliedForecastByPeriod, periodKey)
+          ? totals.appliedForecastByPeriod[periodKey]
+          : null,
         incomplete: kind === "MTD" || incompletePeriods.has(periodKey)
       };
     }),

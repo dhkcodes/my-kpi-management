@@ -14,7 +14,7 @@ const analysis = {
     actualPeriods: ["FY27-JUN", "FY27-JUL"],
     forecastPeriods: ["FY27-JUL", "FY27-AUG", "FY27-SEP"],
     priorComparisonPeriods: ["FY26-JUN", "FY26-JUL"],
-    comparisonStatus: "AVAILABLE",
+    comparisonStatus: "COMPARABLE",
     comparisonUnavailableReason: null,
     incompletePeriods: ["FY27-SEP"]
   },
@@ -53,25 +53,52 @@ const mtdAnalysis = {
   ...analysis,
   periodCoverage: {
     ...analysis.periodCoverage,
-    includedPeriods: ["FY27-JUN", "FY27-AUG", "FY27-SEP"],
-    actualPeriods: ["FY27-JUN"],
-    forecastPeriods: ["FY27-AUG", "FY27-SEP"]
+    includedPeriods: ["FY27-JUN", "FY27-JUL", "FY27-AUG", "FY27-SEP"],
+    actualPeriods: ["FY27-JUN", "FY27-JUL", "FY27-AUG"],
+    forecastPeriods: ["FY27-SEP"]
   }
 } as ConsumptionAnalysis;
 const mtdOverview = buildHomeConsumptionOverview(mtdAnalysis, {
   ...totals,
-  mtdByPeriod: { "FY27-AUG": 1250, "FY27-JUL": 1950 },
-  mtdStatusByPeriod: { "FY27-AUG": "PROVISIONAL", "FY27-JUL": "FINAL_UPLOAD_REQUIRED" }
-}, "FY27-AUG");
-assert.deepEqual(mtdOverview.months.map(({ periodKey, kind, amount }) => ({ periodKey, kind, amount })), [
-  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000 },
-  { periodKey: "FY27-AUG", kind: "MTD", amount: 1250 },
-  { periodKey: "FY27-SEP", kind: "FORECAST", amount: 4000 }
+  mtdByPeriod: { "FY27-SEP": 1250 },
+  mtdStatusByPeriod: { "FY27-SEP": "PROVISIONAL" }
+}, "FY27-SEP");
+assert.deepEqual(mtdOverview.months.map(({ periodKey, kind, amount, forecastAmount }) => ({ periodKey, kind, amount, forecastAmount })), [
+  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000, forecastAmount: null },
+  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, forecastAmount: null },
+  { periodKey: "FY27-AUG", kind: "ACTUAL", amount: 9999, forecastAmount: null },
+  { periodKey: "FY27-SEP", kind: "MTD", amount: 1250, forecastAmount: 4000 }
 ]);
-assert.deepEqual(mtdOverview.finalUploadRequiredPeriods, ["FY27-JUL"],
-  "a previous unresolved MTD is guidance only and omitted from the chart");
+assert.equal(mtdOverview.forecastStartPeriod, "FY27-SEP",
+  "Forecast starts in the month after the last completed Actual, regardless of MTD");
+assert.equal(mtdOverview.months.find((month) => month.periodKey === "FY27-SEP")?.forecastAmount, 4000,
+  "same-month graph Forecast must preserve the source Forecast without MTD replacement or subtraction");
+assert.equal(mtdOverview.months.find((month) => month.periodKey === "FY27-SEP")?.amount, 1250,
+  "same-month graph MTD remains an independent provisional value");
+assert.deepEqual(mtdOverview.finalUploadRequiredPeriods, []);
 assert.deepEqual(mtdOverview.actualPeriods, mtdAnalysis.periodCoverage.actualPeriods,
   "provisional MTD must not be classified as official Actual");
+
+const lineMonths: readonly HomeConsumptionMonth[] = [
+  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000, forecastAmount: null, incomplete: false },
+  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, forecastAmount: null, incomplete: false },
+  { periodKey: "FY27-AUG", kind: "FORECAST", amount: 3000, forecastAmount: null, incomplete: false },
+  { periodKey: "FY27-SEP", kind: "FORECAST", amount: null, forecastAmount: null, incomplete: true },
+  { periodKey: "FY27-OCT", kind: "FORECAST", amount: 5000, forecastAmount: null, incomplete: false },
+  { periodKey: "FY27-DEC", kind: "FORECAST", amount: 6000, forecastAmount: null, incomplete: false }
+];
+assert.deepEqual(buildHomeConsumptionLineEdges(lineMonths), [
+  { kind: "ACTUAL", fromIndex: 0, toIndex: 1, fromAmount: 1000, toAmount: 2000 },
+  { kind: "FORECAST", fromIndex: 1, toIndex: 2, fromAmount: 2000, toAmount: 3000 }
+]);
+assert.deepEqual(buildHomeConsumptionLineEdges([
+  { periodKey: "FY27-AUG", kind: "ACTUAL", amount: 2000, forecastAmount: null, incomplete: false },
+  { periodKey: "FY27-SEP", kind: "MTD", amount: 1250, forecastAmount: 4000, incomplete: true },
+  { periodKey: "FY27-OCT", kind: "FORECAST", amount: 5000, forecastAmount: null, incomplete: false }
+]), [
+  { kind: "FORECAST", fromIndex: 0, toIndex: 1, fromAmount: 2000, toAmount: 4000 },
+  { kind: "FORECAST", fromIndex: 1, toIndex: 2, fromAmount: 4000, toAmount: 5000 }
+]);
 
 const manyAlertsAnalysis = {
   ...analysis,
@@ -85,24 +112,5 @@ assert.equal(overviewWithManyAlerts.attentionSignalCount, 12);
 assert.equal(overviewWithManyAlerts.alerts.length, 10);
 assert.deepEqual(overviewWithManyAlerts.alerts.map((alert) => alert.alertId), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]);
 
-const lineMonths: readonly HomeConsumptionMonth[] = [
-  { periodKey: "FY27-JUN", kind: "ACTUAL", amount: 1000, incomplete: false },
-  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, incomplete: false },
-  { periodKey: "FY27-AUG", kind: "FORECAST", amount: 3000, incomplete: false },
-  { periodKey: "FY27-SEP", kind: "FORECAST", amount: null, incomplete: true },
-  { periodKey: "FY27-OCT", kind: "FORECAST", amount: 5000, incomplete: false },
-  { periodKey: "FY27-DEC", kind: "FORECAST", amount: 6000, incomplete: false }
-];
-assert.deepEqual(buildHomeConsumptionLineEdges(lineMonths), [
-  { kind: "ACTUAL", fromIndex: 0, toIndex: 1 },
-  { kind: "FORECAST", fromIndex: 1, toIndex: 2 }
-]);
-assert.deepEqual(buildHomeConsumptionLineEdges([
-  { periodKey: "FY27-JUL", kind: "ACTUAL", amount: 2000, incomplete: false },
-  { periodKey: "FY27-AUG", kind: "MTD", amount: 1250, incomplete: true },
-  { periodKey: "FY27-SEP", kind: "FORECAST", amount: 4000, incomplete: false }
-]), [
-  { kind: "MTD", fromIndex: 0, toIndex: 1 },
-  { kind: "FORECAST", fromIndex: 1, toIndex: 2 }
-]);
+
 console.log("home consumption overview aggregation and line continuity: ok");
