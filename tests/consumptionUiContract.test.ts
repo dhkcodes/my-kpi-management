@@ -17,8 +17,10 @@ assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the 
 assert.match(styles, /\.consumption-message-region\s*\{[^}]*position:\s*fixed[^}]*top:[^;}]+[^}]*right:[^;}]+[^}]*z-index:[^;}]+/, "Consumption notices are a top-right fixed overlay and do not shift page layout");
 assert.match(recordsPage, /const \[dismissedMessageIds, setDismissedMessageIds\] = useState<Set<string>>[\s\S]*pageMessages\.filter\(\(message\) => !dismissedMessageIds\.has\(message\.id\)\)[\s\S]*setDismissedMessageIds\(\(current\) => new Set\(current\)\.add\(messageId\)\)/,
   "closing a Consumption notice only dismisses that overlay message");
-assert.doesNotMatch(recordsPage, /onClose=\{\(messageId\) => \{[\s\S]{0,160}set(?:DraftPlans|DraftControlTotals|ImportError)/,
-  "closing a Consumption notice does not discard drafts or mutate the operation state");
+assert.match(recordsPage, /if \(messageId === "records-operation-error"\) \{\s*setImportError\(""\);\s*return;/,
+  "closing an operation error clears only that current message so a later failure can be shown again");
+assert.doesNotMatch(recordsPage, /onClose=\{\(messageId\) => \{[\s\S]{0,260}set(?:DraftPlans|DraftControlTotals)/,
+  "closing a Consumption notice does not discard draft edits");
 assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");

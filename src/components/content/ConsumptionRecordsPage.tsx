@@ -1343,7 +1343,13 @@ export function ConsumptionRecordsPage({ fiscalYear, onNavigationGuardChange, br
         </div>
       </header>
       <ConsumptionMessageBanner messages={visiblePageMessages}
-        onClose={(messageId) => setDismissedMessageIds((current) => new Set(current).add(messageId))} />
+        onClose={(messageId) => {
+          if (messageId === "records-operation-error") {
+            setImportError("");
+            return;
+          }
+          setDismissedMessageIds((current) => new Set(current).add(messageId));
+        }} />
 
       <section class="consumption-range-bar" aria-label="Consumption quarter range">
         <div class="consumption-range-pillar">
