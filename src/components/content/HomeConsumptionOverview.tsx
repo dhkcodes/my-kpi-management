@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import {
   fetchConsumptionAnalysis,
   fetchConsumptionRecords,
-  type ConsumptionAnalysis
+  type ConsumptionAnalysis,
+  type ConsumptionRecordsTotals
 } from "../../data/consumptionApi";
 import {
   buildHomeConsumptionLineEdges,
@@ -36,7 +37,17 @@ const monthlyChartY = (amount: number, maximum: number) => maximum <= 0
   ? monthlyChart.bottom
   : monthlyChart.bottom - (Math.max(0, amount) / maximum) * (monthlyChart.bottom - monthlyChart.top);
 
-export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: string }>) {
+const emptyRecordsTotals: ConsumptionRecordsTotals = Object.freeze({
+  actualByPeriod: {},
+  appliedForecastByPeriod: {},
+  outlookByPeriod: {},
+  incompletePeriods: []
+});
+
+export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly<{
+  fiscalYear: string;
+  canReadRecords: boolean;
+}>) {
   const [data, setData] = useState<HomeConsumptionOverviewData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -47,7 +58,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
     setError("");
     Promise.all([
       fetchConsumptionAnalysis({ fiscalYear, search: "", account: "", salesRep: "", pillar: "ALL" }),
-      fetchConsumptionRecords({
+      canReadRecords ? fetchConsumptionRecords({
         fromQuarter: `${fiscalYear}-Q1`,
         toQuarter: `${fiscalYear}-Q4`,
         search: "",
@@ -56,16 +67,20 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
         offset: 0,
         limit: 1,
         pillar: "ALL"
-      })
+      }) : Promise.resolve(null)
     ]).then(([analysis, records]) => {
-      if (active) setData(buildHomeConsumptionOverview(analysis, records.totals, records.currentFiscalMonth));
+      if (active) setData(buildHomeConsumptionOverview(
+        analysis,
+        records?.totals ?? emptyRecordsTotals,
+        records?.currentFiscalMonth ?? analysis.mtdSummary?.periodKey
+      ));
     }).catch((reason: unknown) => {
       if (active) setError(reason instanceof Error ? reason.message : "Consumption Overview could not be loaded.");
     }).finally(() => {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [fiscalYear]);
+  }, [fiscalYear, canReadRecords]);
 
   const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.map((month) => month.amount ?? 0) ?? [])), [data]);
   const monthlyEdges = useMemo(() => buildHomeConsumptionLineEdges(data?.months ?? []), [data]);
@@ -186,7 +201,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
             </article>
           </div>
 
-          <article class="home-consumption__chart-card home-consumption__monthly">
+          {canReadRecords && <article class="home-consumption__chart-card home-consumption__monthly">
             <div class="home-consumption__card-heading">
               <div><h3>Tentative Monthly Consumption</h3><p>Current-month MTD is provisional; the divider marks the first Forecast month.</p></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
@@ -264,7 +279,7 @@ export function HomeConsumptionOverview({ fiscalYear }: Readonly<{ fiscalYear: s
             </table>
             {data.months.some((month) => month.incomplete) && <p class="home-consumption__footnote">* Partial or incomplete source coverage; value should not be treated as a complete month.</p>}
             {data.months.some((month) => month.kind === "MTD") && <p class="home-consumption__footnote">MTD (잠정) is provisional and is not included in official Actual totals or exports.</p>}
-          </article>
+          </article>}
         </>
       )}
     </section>

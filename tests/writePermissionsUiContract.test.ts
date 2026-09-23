@@ -10,6 +10,7 @@ const weekly = read("src/components/content/WeeklyActivitiesPage.tsx");
 const accounts = read("src/components/content/AccountsWorkloadsPage.tsx");
 const attainment = read("src/components/content/AttainmentPage.tsx");
 const records = read("src/components/content/ConsumptionRecordsPage.tsx");
+const homeConsumption = read("src/components/content/HomeConsumptionOverview.tsx");
 
 assert.match(content, /const canWrite = canWriteRoute\(profile, activeRoute\)/,
   "the active route permission is resolved once and passed to content pages");
@@ -26,8 +27,14 @@ assert.match(content, /canReadHomeAccounts[\s\S]*accounts-workloads[\s\S]*canRea
   "home Accounts & Workloads is visible when that shared-data menu is readable");
 assert.match(content, /canReadHomeKpis[\s\S]*kpis-overview[\s\S]*canReadHomeKpis && \(kpiDatasetLoading[\s\S]*canReadHomeKpis && kpiDataset && <section id="pipeline"/,
   "home KPI Overview and New Workload are gated by KPI read access");
-assert.match(content, /canReadHomeConsumption[\s\S]*analysis[\s\S]*records[\s\S]*canReadHomeConsumption && <HomeConsumptionOverview/,
-  "home Consumption Overview is loaded only when both required shared-data APIs are readable");
+assert.match(content, /canReadHomeConsumption = canAccessRoute\(profile, getNavigationRoute\("analysis"\)\)/,
+  "home Consumption Overview follows Analysis read access without requiring Records access");
+assert.match(content, /canReadHomeConsumptionRecords = canAccessRoute\(profile, getNavigationRoute\("records"\)\)[\s\S]*canReadRecords=\{canReadHomeConsumptionRecords\}/,
+  "home Consumption Overview passes Records access separately instead of widening either menu permission");
+assert.match(homeConsumption, /canReadRecords \? fetchConsumptionRecords[\s\S]*: Promise\.resolve\(null\)/,
+  "home Consumption Overview never calls the Records API without Records read access");
+assert.match(homeConsumption, /records\?\.totals \?\? emptyRecordsTotals/,
+  "Analysis readers still receive Analysis-backed home consumption data without Records access");
 assert.match(content, /saveGuideEdit[\s\S]{0,180}if \(!canWrite\)[\s\S]{0,180}unsaved KPI Guide changes were kept/,
   "KPI Guide blocks late saves without discarding a draft");
 
