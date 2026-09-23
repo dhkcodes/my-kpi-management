@@ -27,7 +27,7 @@ import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
 import type { AuthSession } from "../../auth/authSession";
-import { canWriteRoute } from "../../auth/menuPermissions";
+import { canAccessRoute, canWriteRoute } from "../../auth/menuPermissions";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 
@@ -335,6 +335,10 @@ export function Content({
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const canWrite = canWriteRoute(profile, activeRoute);
+  const canReadHomeAccounts = canAccessRoute(profile, getNavigationRoute("accounts-workloads"));
+  const canReadHomeKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
+  const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"))
+    && canAccessRoute(profile, getNavigationRoute("records"));
   const writePermissionMessage = "Write permission is required.";
   const guideItems = dataset.guides;
   const [savedGuideDetails, setSavedGuideDetails] = useState<Record<string, GuideDetails>>(() =>
@@ -474,16 +478,16 @@ export function Content({
         </button>}
       </section>}
 
-      {!canWrite && ["kpiPage", "weeklyActivities", "accountsWorkloads", "consumptionAttainment", "consumptionRecords"].includes(activeRoute.module) && (
+      {!canWrite && ["kpiPage", "weeklyActivities", "consumptionAttainment"].includes(activeRoute.module) && (
         <div class="accounts-workloads-source-status" role="status"><strong>Read-only access.</strong> Write permission is required to add, edit, delete, save, clone, restore, or import data.</div>
       )}
 
-      {!['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
+      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
           <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
         </div>
       )}
-      {!['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
@@ -495,7 +499,7 @@ export function Content({
         profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageNavigation} /> : <section class="kap-empty-state" role="alert">{pageNavigation}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (
         <>
-          <AccountsWorkloadsPulseV2
+          {canReadHomeAccounts && <AccountsWorkloadsPulseV2
             fiscalYear={fiscalYear}
             rows={accountsWorkloadsRows}
             asOf={accountsWorkloadsAsOf}
@@ -504,8 +508,8 @@ export function Content({
             dataSource={accountsWorkloadsDataSource}
             onOpenAccount={openAccountWorkloads}
             breadcrumb={pageNavigation}
-          />
-          {kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
+          />}
+          {canReadHomeKpis && (kpiDatasetLoading ? <section class="kpi-panel" role="status">Loading KPI Overview data…</section>
           : kpiDatasetError ? <section class="kpi-panel" role="alert">KPI Overview data is unavailable. {kpiDatasetError}</section>
           : kpiDataset && <section id="activities" class="kpi-panel kpi-dashboard-section" aria-labelledby="kpiOverviewTitle">
             <div class="kpi-panel__header">
@@ -558,9 +562,9 @@ export function Content({
               </table>
             </div>
 
-          </section>}
+          </section>)}
 
-          {kpiDataset && <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
+          {canReadHomeKpis && kpiDataset && <section id="pipeline" class="kpi-panel kpi-dashboard-section kpi-new-workload-section" aria-labelledby="newWorkloadTitle">
             <div class="kpi-panel__header">
               <div>
                 <h2 id="newWorkloadTitle">New Workload</h2>
@@ -595,7 +599,7 @@ export function Content({
               ))}
             </div>
           </section>}
-          <HomeConsumptionOverview fiscalYear={fiscalYear} />
+          {canReadHomeConsumption && <HomeConsumptionOverview fiscalYear={fiscalYear} />}
         </>
       ) : activeRoute.module === "kpiPage" ? (
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}

@@ -49,6 +49,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [resetLink, setResetLink] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const usernameInputRef = useRef<InputTextElement | null>(null);
+  const passwordInputRef = useRef<InputPasswordElement | null>(null);
   const submitLockRef = useRef(false);
 
   useEffect(() => {
@@ -102,7 +104,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     setIsSubmitting(true);
     try {
       if (mode === "signIn") {
-        onAuthenticated(await authenticateUser(loginId, password));
+        const submittedLoginId = String(usernameInputRef.current?.value ?? loginId).trim();
+        const submittedPassword = String(passwordInputRef.current?.value ?? password);
+        onAuthenticated(await authenticateUser(submittedLoginId, submittedPassword));
       } else if (mode === "forgot") {
         if (!loginId.trim()) throw new Error("Enter your Login ID.");
         const reset = await requestPasswordReset(loginId);
@@ -151,9 +155,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
 
     {(mode === "signIn" || mode === "forgot" || mode === "action") && <form ref={formRef} class="kap-login-form" onSubmit={submit} noValidate>
       <oj-form-layout maxColumns={1} direction="row">
-        {(mode === "signIn" || mode === "forgot") && <oj-input-text id="kapLoginUserId" labelHint="Login ID" value={loginId} autocomplete="username" required
+        {(mode === "signIn" || mode === "forgot") && <oj-input-text ref={usernameInputRef} id="kapLoginUserId" labelHint="Login ID" value={loginId} autocomplete="username" required
           onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text>}
-        {mode === "signIn" && <oj-input-password id="kapLoginPassword" labelHint="Password" value={password} autocomplete="current-password" required
+        {mode === "signIn" && <oj-input-password ref={passwordInputRef} id="kapLoginPassword" labelHint="Password" value={password} autocomplete="current-password" required
           onvalueChanged={(event: InputPasswordElement.valueChanged) => setPassword(String(event.detail.value ?? ""))}></oj-input-password>}
         {mode === "action" && <>
           <oj-input-password id="kapNewPassword" labelHint="New password" value={newPassword} autocomplete="new-password" required

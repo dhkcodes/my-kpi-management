@@ -906,7 +906,7 @@ export function AccountsWorkloadsPage({
     return (
       <td data-account-field={field} class={cellClass || undefined}
         onDblClick={(event) => {
-          if (!canWrite) { setSaveError("Write permission is required."); return; }
+          if (!canWrite) return;
           if ((event.target as Element).closest(".accounts-workloads-edit-field")) return;
           event.preventDefault();
           event.stopPropagation();

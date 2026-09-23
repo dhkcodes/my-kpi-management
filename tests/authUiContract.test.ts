@@ -17,7 +17,9 @@ assert.doesNotMatch(app, /logoutUser\(\)\.finally/, "failed logout cannot appear
 assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back remains guarded after logout");
 assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="kapLoginSubmit"/, "the Redwood sign-in form exposes stable controls");
 assert.match(login, /role="alert"/, "credential failures are announced");
-assert.match(login, /authenticateUser\(loginId, password\)/, "the sign-in form delegates credentials to the Backend auth API");
+assert.match(login, /authenticateUser\(submittedLoginId, submittedPassword\)/, "the sign-in form delegates live credentials to the Backend auth API");
+assert.match(login, /usernameInputRef[\s\S]*passwordInputRef[\s\S]*usernameInputRef\.current\?\.value[\s\S]*passwordInputRef\.current\?\.value/,
+  "Enter submit reads live Oracle JET input values before using the same login request path as the Sign in button");
 assert.match(login, /isSubmitting[\s\S]*disabled=\{isSubmitting\}/, "duplicate login submissions are locked while authentication is pending");
 assert.match(login, /const reset = await requestPasswordReset\(loginId\)[\s\S]*setResetLink\(reset\.resetLink \?\? ""\)/, "forgot password can render a reset link only when a trusted API flow supplies one");
 assert.match(login, /href=\{resetLink\}[\s\S]*Reset password now/, "forgot-password completion renders the actual reset link as a clickable anchor");
