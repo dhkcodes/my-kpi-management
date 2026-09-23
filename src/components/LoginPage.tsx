@@ -51,6 +51,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const usernameInputRef = useRef<InputTextElement | null>(null);
   const passwordInputRef = useRef<InputPasswordElement | null>(null);
+  const newPasswordInputRef = useRef<InputPasswordElement | null>(null);
+  const confirmPasswordInputRef = useRef<InputPasswordElement | null>(null);
   const submitLockRef = useRef(false);
 
   useEffect(() => {
@@ -108,18 +110,21 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         const submittedPassword = String(passwordInputRef.current?.value ?? password);
         onAuthenticated(await authenticateUser(submittedLoginId, submittedPassword));
       } else if (mode === "forgot") {
-        if (!loginId.trim()) throw new Error("Enter your Login ID.");
-        const reset = await requestPasswordReset(loginId);
+        const submittedLoginId = String(usernameInputRef.current?.value ?? loginId).trim();
+        if (!submittedLoginId) throw new Error("Enter your Login ID.");
+        const reset = await requestPasswordReset(submittedLoginId);
         setResetLink(reset.resetLink ?? "");
         setSuccessMessage(reset.resetLink
           ? "Reset link created. Use the one-time link below to choose a new password. No temporary password is created."
           : "Reset request accepted. If the account is eligible, an administrator can provide a one-time reset link through the approved secure channel.");
         setMode("success");
       } else if (mode === "action" && initialAction && actionContext) {
-        const policyError = validatePasswordPolicy(newPassword);
+        const submittedNewPassword = String(newPasswordInputRef.current?.value ?? newPassword);
+        const submittedConfirmPassword = String(confirmPasswordInputRef.current?.value ?? confirmPassword);
+        const policyError = validatePasswordPolicy(submittedNewPassword);
         if (policyError) throw new Error(policyError);
-        if (newPassword !== confirmPassword) throw new Error("New passwords do not match.");
-        await completeCredentialAction(actionContext.purpose, initialAction.token, newPassword, confirmPassword);
+        if (submittedNewPassword !== submittedConfirmPassword) throw new Error("New passwords do not match.");
+        await completeCredentialAction(actionContext.purpose, initialAction.token, submittedNewPassword, submittedConfirmPassword);
         setSuccessMessage("Password set successfully. Sign in with your new password.");
         setMode("success");
         window.history.replaceState(null, "", "/");
@@ -160,9 +165,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         {mode === "signIn" && <oj-input-password ref={passwordInputRef} id="kapLoginPassword" labelHint="Password" value={password} autocomplete="current-password" required
           onvalueChanged={(event: InputPasswordElement.valueChanged) => setPassword(String(event.detail.value ?? ""))}></oj-input-password>}
         {mode === "action" && <>
-          <oj-input-password id="kapNewPassword" labelHint="New password" value={newPassword} autocomplete="new-password" required
+          <oj-input-password ref={newPasswordInputRef} id="kapNewPassword" labelHint="New password" value={newPassword} autocomplete="new-password" required
             onvalueChanged={(event: InputPasswordElement.valueChanged) => setNewPassword(String(event.detail.value ?? ""))}></oj-input-password>
-          <oj-input-password id="kapConfirmPassword" labelHint="Confirm new password" value={confirmPassword} autocomplete="new-password" required
+          <oj-input-password ref={confirmPasswordInputRef} id="kapConfirmPassword" labelHint="Confirm new password" value={confirmPassword} autocomplete="new-password" required
             onvalueChanged={(event: InputPasswordElement.valueChanged) => setConfirmPassword(String(event.detail.value ?? ""))}></oj-input-password>
           <p class="kap-password-policy-hint">{PASSWORD_POLICY_HINT}</p>
         </>}

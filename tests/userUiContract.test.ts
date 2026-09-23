@@ -20,7 +20,7 @@ assert.match(login, /inspectCredentialAction[\s\S]*completeCredentialAction/, "l
 assert.doesNotMatch(login, /temporaryPassword/, "activation and reset never request a temporary password");
 assert.match(login, /oj-input-password/, "credential values use masked JET inputs");
 assert.match(passwordPolicy, /at least 8 characters/, "activation, reset, and profile changes enforce the server minimum before submission");
-assert.match(login, /validatePasswordPolicy\(newPassword\)/, "activation and reset share the client password policy");
+assert.match(login, /validatePasswordPolicy\(submittedNewPassword\)/, "activation and reset validate the live submitted password");
 assert.match(login, /mode === "success"[\s\S]*Password set successfully[\s\S]*Sign in/, "activation/reset completion offers sign-in only after success");
 assert.doesNotMatch(login, /onAuthenticated\(await completeCredentialAction/, "credential completion does not silently sign the user in");
 assert.match(login, /invalid, expired, or already used[\s\S]*Request a new link/, "invalid action states are explicit and route to link replacement");
@@ -56,7 +56,10 @@ assert.match(users, /dialogError[\s\S]*role="alert"/, "Invite failures remain vi
 assert.match(users, /No email was sent[\s\S]*approved secure channel/, "the UI does not falsely claim that invitation delivery is automated");
 assert.match(users, /navigator\.clipboard\.writeText[\s\S]*Expires/, "Admin can copy the link and see its expiry");
 assert.match(users, /works once|used only once/, "one-time use is explicit");
-assert.match(users, /onojAction=\{\(\) => void submitDialog\(\)\}/, "JET Submit explicitly invokes the user action");
+assert.match(users, /<form ref=\{actionFormRef\}[\s\S]*onSubmit=\{submitDialog\}[\s\S]*type="submit"[\s\S]*onojAction=\{\(\) => actionFormRef\.current\?\.requestSubmit\(\)\}/, "Invite Enter and JET button use one native form submission path");
+assert.match(users, /displayNameInputRef\.current\?\.value[\s\S]*loginIdInputRef\.current\?\.value[\s\S]*accessInputRef\.current\?\.value/, "Invite submission reads live Oracle JET field values");
+assert.match(users, /Enter a display name\.[\s\S]*Enter a Login ID\./, "Invite validates required values before issuing a link");
+assert.match(users, /const actionSubmitLockRef = useRef\(false\);[\s\S]*if \(!dialog \|\| issuedLink \|\| actionSubmitLockRef\.current\) return;[\s\S]*actionSubmitLockRef\.current = true;[\s\S]*finally[\s\S]*actionSubmitLockRef\.current = false;/, "Invite and admin link creation synchronously block duplicate submissions");
 assert.match(users, /window\.confirm|confirmAction/, "destructive state changes require confirmation");
 assert.match(content, /<UsersPage currentUserKey=\{profile\.userKey\}/, "Users receives the signed-in identity for self-delete protection");
 assert.match(users, /import "ojs\/ojdialog"[\s\S]*deleteDialogRef[\s\S]*initialVisibility="hide"[\s\S]*Permanently delete user/, "permanent deletion uses a mounted Redwood JET confirmation dialog");
