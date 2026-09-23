@@ -42,6 +42,12 @@ export const buildHomeConsumptionLineEdges = (
   if (previous.kind === "ACTUAL" && month.kind === "ACTUAL" && previous.amount !== null && month.amount !== null) {
     return [{ kind: "ACTUAL" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: month.amount }];
   }
+  if (previous.kind === "ACTUAL" && previous.amount !== null) {
+    const currentForecast = graphForecastAmount(month);
+    if (currentForecast !== null) {
+      return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: currentForecast }];
+    }
+  }
   const previousForecast = graphForecastAmount(previous);
   const currentForecast = graphForecastAmount(month);
   if (previousForecast === null || currentForecast === null) return [];

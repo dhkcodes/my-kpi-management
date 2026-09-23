@@ -99,7 +99,6 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
         <div>
           <span class="kpi-eyebrow">Consumption</span>
           <h2 id="consumptionOverviewTitle">Consumption Overview</h2>
-          <p>Actual periods are closed results; current-month MTD is tentative and Forecast remains separate.</p>
         </div>
         <div>
           <div class="home-consumption__pillar-filter" role="group" aria-label="Consumption pillar">
@@ -165,28 +164,35 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
           <div class="home-consumption__analysis-grid">
             <article class="home-consumption__chart-card">
               <div class="home-consumption__card-heading">
-                <div><h3>Quarterly Actual / Forecast</h3><p>Actual and Forecast remain separate within each quarter.</p></div>
+                <div><h3>Quarterly Actual / Forecast</h3></div>
               </div>
               <div class="home-consumption__quarter-list">
                 {data.quarters.map((quarter) => {
                   const mtd = data.months.find((month) => month.kind === "MTD" && quarterForPeriod(month.periodKey) === quarter.quarter);
                   const mtdAmount = mtd?.amount ?? 0;
+                  const showActual = quarter.actualAmount !== 0;
+                  const showMtd = !showActual && mtd?.amount !== null && mtd?.amount !== undefined;
                   const forecastAmount = quarter.forecastAmount;
-                  const scale = Math.max(quarter.actualAmount, mtdAmount, forecastAmount, 1);
+                  const scale = Math.max(showActual ? quarter.actualAmount : 0, showMtd ? mtdAmount : 0, forecastAmount, 1);
                   const actualWidth = (quarter.actualAmount / scale) * 100;
                   const mtdWidth = (mtdAmount / scale) * 100;
                   const forecastWidth = (forecastAmount / scale) * 100;
+                  const displayedValues = [
+                    ...(showActual ? [`Actual ${formatAmountK(quarter.actualAmount)}`] : []),
+                    ...(showMtd ? [`MTD ${formatAmountK(mtdAmount)}`] : []),
+                    `Forecast ${formatAmountK(forecastAmount)}`
+                  ].join(", ");
                   return (
                     <div class="home-consumption__quarter" key={quarter.quarter}>
-                      <div class="home-consumption__quarter-label"><strong>{quarter.quarter}</strong><span>Separate values</span></div>
-                      <div class="home-consumption__stack" aria-label={`${quarter.quarter}: Actual ${formatAmountK(quarter.actualAmount)}, MTD ${formatAmountK(mtdAmount)}, Forecast ${formatAmountK(forecastAmount)}`}>
-                        <span class="home-consumption__stack-row"><i class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></i></span>
-                        <span class="home-consumption__stack-row"><i class="home-consumption__stack-mtd" style={`width:${mtdWidth}%`}></i></span>
+                      <div class="home-consumption__quarter-label"><strong>{quarter.quarter}</strong></div>
+                      <div class="home-consumption__stack" aria-label={`${quarter.quarter}: ${displayedValues}`}>
+                        {showActual && <span class="home-consumption__stack-row"><i class="home-consumption__stack-actual" style={`width:${actualWidth}%`}></i></span>}
+                        {showMtd && <span class="home-consumption__stack-row"><i class="home-consumption__stack-mtd" style={`width:${mtdWidth}%`}></i></span>}
                         <span class="home-consumption__stack-row"><i class="home-consumption__stack-forecast" style={`width:${forecastWidth}%`}></i></span>
                       </div>
                       <div class="home-consumption__quarter-values">
-                        <span>Actual <strong>{formatAmountK(quarter.actualAmount)}</strong></span>
-                        {mtdAmount > 0 && <span>MTD (잠정) <strong>{formatAmountK(mtdAmount)}</strong></span>}
+                        {showActual && <span>Actual <strong>{formatAmountK(quarter.actualAmount)}</strong></span>}
+                        {showMtd && <span>MTD (잠정) <strong>{formatAmountK(mtdAmount)}</strong></span>}
                         <span>Forecast <strong>{formatAmountK(forecastAmount)}</strong></span>
                       </div>
                     </div>
@@ -222,10 +228,10 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
 
           {canReadRecords && <article class="home-consumption__chart-card home-consumption__monthly">
             <div class="home-consumption__card-heading">
-              <div><h3>Tentative Monthly Consumption</h3><p>Current-month MTD is provisional; the divider marks the first Forecast month.</p></div>
+              <div><h3>Tentative Monthly Consumption</h3></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
-                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--mtd"></i>MTD (잠정)</span>}
+                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd"></i>MTD (잠정)</span>}
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
               </div>
             </div>
@@ -271,7 +277,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                             <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}: ${formatAmountK(month.amount)}`}</title>
                           </circle>
                           <text class="home-consumption__monthly-value" x={x} y={Math.max(18, y - 12)}>
-                            {formatAmountK(month.amount)}{month.incomplete ? "*" : ""}
+                            {formatAmountK(month.amount)}
                           </text>
                         </>
                       )}
@@ -315,8 +321,6 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                 ])}
               </tbody>
             </table>
-            {data.months.some((month) => month.incomplete) && <p class="home-consumption__footnote">* Partial or incomplete source coverage; value should not be treated as a complete month.</p>}
-            {data.months.some((month) => month.kind === "MTD") && <p class="home-consumption__footnote">MTD (잠정) is provisional and is not included in official Actual totals or exports.</p>}
           </article>}
         </>
       )}

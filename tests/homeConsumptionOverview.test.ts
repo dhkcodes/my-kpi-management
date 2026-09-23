@@ -88,13 +88,15 @@ const lineMonths: readonly HomeConsumptionMonth[] = [
   { periodKey: "FY27-DEC", kind: "FORECAST", amount: 6000, forecastAmount: null, incomplete: false }
 ];
 assert.deepEqual(buildHomeConsumptionLineEdges(lineMonths), [
-  { kind: "ACTUAL", fromIndex: 0, toIndex: 1, fromAmount: 1000, toAmount: 2000 }
+  { kind: "ACTUAL", fromIndex: 0, toIndex: 1, fromAmount: 1000, toAmount: 2000 },
+  { kind: "FORECAST", fromIndex: 1, toIndex: 2, fromAmount: 2000, toAmount: 3000 }
 ]);
 assert.deepEqual(buildHomeConsumptionLineEdges([
   { periodKey: "FY27-AUG", kind: "ACTUAL", amount: 2000, forecastAmount: null, incomplete: false },
   { periodKey: "FY27-SEP", kind: "MTD", amount: 1250, forecastAmount: 4000, incomplete: true },
   { periodKey: "FY27-OCT", kind: "FORECAST", amount: 5000, forecastAmount: null, incomplete: false }
 ]), [
+  { kind: "FORECAST", fromIndex: 0, toIndex: 1, fromAmount: 2000, toAmount: 4000 },
   { kind: "FORECAST", fromIndex: 1, toIndex: 2, fromAmount: 4000, toAmount: 5000 }
 ]);
 

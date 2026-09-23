@@ -3444,7 +3444,7 @@ h4.weekly-activity-section-label--next-week,
 .home-consumption__monthly-legend { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem .9rem; color: var(--oj-core-text-color-secondary); font-size: .72rem; }
 .home-consumption__monthly-legend span { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
 .home-consumption__monthly-legend-line { display: inline-block; width: 1.7rem; border-block-start: 3px solid #287994; }
-.home-consumption__monthly-legend-line--mtd { border-block-start-color: #c77700; border-block-start-style: dotted; }
+.home-consumption__monthly-legend-dot { display: inline-block; width: .55rem; height: .55rem; border: 2px solid #c77700; border-radius: 50%; background: #fff8e5; }
 .home-consumption__monthly-legend-line--forecast { border-block-start-color: #8b70b6; border-block-start-style: dashed; }
 .home-consumption__monthly-chart { min-height: 15rem; overflow-x: auto; }
 .home-consumption__monthly-svg { display: block; width: 100%; min-width: 44rem; height: auto; overflow: visible; }
