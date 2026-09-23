@@ -124,6 +124,27 @@ async function run() {
   assert.equal(atomicResult.items[0].versionNo, 4, "authoritative rows win");
   assert.equal(atomicResult.fxRate?.versionNo, 5, "authoritative FX/version wins");
 
+  const secondSaved = { ...saved, id: "42", commitmentId: 42, account: "Second Account", revenueType: "Expansion" as const };
+  const revenueTypeCalls: Array<{ url: string; init?: RequestInit }> = [];
+  await saveAccountsWorkloadsBatch(
+    [saved, secondSaved],
+    [
+      { ...saved, revenueType: "Expansion" },
+      { ...secondSaved, revenueType: undefined }
+    ],
+    { fiscalYear: "FY27" },
+    undefined,
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      revenueTypeCalls.push({ url: String(input), init });
+      return response({ items: [saved, secondSaved], total: 2, fxRate: null });
+    }
+  );
+  const revenueTypeBody = JSON.parse(String(revenueTypeCalls[0].init?.body));
+  assert.deepEqual(revenueTypeBody.patches, [
+    { commitmentId: 41, versionNo: 3, revenueType: "Expansion" },
+    { commitmentId: 42, versionNo: 3, revenueType: null }
+  ], "all Revenue Type edits are serialized in one batch request without dropping a row");
+
   let invalidDateFetches = 0;
   await assert.rejects(
     saveAccountsWorkloadsBatch(

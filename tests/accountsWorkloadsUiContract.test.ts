@@ -194,6 +194,14 @@ assert.doesNotMatch(styles, /:has\(\.kpi-spreadsheet-page\)[^{]*\.kpi-footer/,
 
 assert.match(page, /formatAccountsWorkloadsSaveError\(error\)/,
   "Save failures must preserve and safely surface the Backend error category");
+assert.match(page, /error\.status === 401 \|\| error\.status === 403[\s\S]*permission/i,
+  "401 and 403 save failures are identified as permission failures");
+assert.match(page, /error\.status === 409[\s\S]*changed this data/i,
+  "409 save failures are identified as conflicts");
+assert.match(page, /error\.status === 400 \|\| error\.status === 422[\s\S]*Validation failed/i,
+  "400 and 422 save failures are identified as validation failures");
+assert.match(page, /error\.status >= 500[\s\S]*server/i,
+  "5xx save failures are identified as server failures");
 assert.doesNotMatch(page, /check the API connection and try again/,
   "validation and DB failures must not be mislabeled as generic connectivity errors");
 

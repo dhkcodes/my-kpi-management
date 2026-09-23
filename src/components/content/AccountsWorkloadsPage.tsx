@@ -202,9 +202,10 @@ const formatAccountsWorkloadsSaveError = (error: unknown) => {
   const retry = "Your drafts are unchanged and can be retried.";
   if (error instanceof AccountsWorkloadsNetworkError) return `The API could not be reached. ${retry}`;
   if (error instanceof AccountsWorkloadsApiError) {
+    if (error.status === 401 || error.status === 403) return `You do not have permission to save these changes. ${retry}`;
     if (error.status === 409) return `Another user changed this data. Reload the latest data before saving again. ${retry}`;
-    if (error.code === "VALIDATION_ERROR" || error.status === 400) return `Validation failed: ${error.message}. ${retry}`;
-    if (error.code === "PERSISTENCE_ERROR" || error.status >= 500) return `The database rejected the save (${error.code}). ${retry}`;
+    if (error.status === 400 || error.status === 422 || error.code === "VALIDATION_ERROR") return `Validation failed: ${error.message}. ${retry}`;
+    if (error.status >= 500) return `The server could not save the changes (${error.code}). ${retry}`;
     return `The save request was rejected (${error.code}). ${retry}`;
   }
   return `The changes could not be saved. ${retry}`;

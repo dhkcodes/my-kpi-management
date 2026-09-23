@@ -10,9 +10,15 @@ const content = readFileSync("src/components/content/index.tsx", "utf8");
 const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
 const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
 const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
+const styles = readFileSync("src/styles/app.css", "utf8");
 
 assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
+assert.match(styles, /\.consumption-message-region\s*\{[^}]*position:\s*fixed[^}]*top:[^;}]+[^}]*right:[^;}]+[^}]*z-index:[^;}]+/, "Consumption notices are a top-right fixed overlay and do not shift page layout");
+assert.match(recordsPage, /const \[dismissedMessageIds, setDismissedMessageIds\] = useState<Set<string>>[\s\S]*pageMessages\.filter\(\(message\) => !dismissedMessageIds\.has\(message\.id\)\)[\s\S]*setDismissedMessageIds\(\(current\) => new Set\(current\)\.add\(messageId\)\)/,
+  "closing a Consumption notice only dismisses that overlay message");
+assert.doesNotMatch(recordsPage, /onClose=\{\(messageId\) => \{[\s\S]{0,160}set(?:DraftPlans|DraftControlTotals|ImportError)/,
+  "closing a Consumption notice does not discard drafts or mutate the operation state");
 assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
 assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
 assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
@@ -49,7 +55,6 @@ assert.match(recordsPage, /처리 결과를 확인하지 못했습니다\. 반�
   "ambiguous Actual apply results must explicitly require a data-state check");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
-const styles = readFileSync("src/styles/app.css", "utf8");
 const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 
 assert.match(styles,
