@@ -504,9 +504,17 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     mtdSummary = { periodKey: mtd.periodKey, amount: mtd.amount, asOf: mtd.asOf as string | null };
   }
   // With MTD enabled, the API keeps the saved current-period Forecast visible while Total excludes
-  // the overlapping Forecast. Portfolio and quarter splits are therefore intentionally non-additive.
-  const requireAdditiveDisplayTotal = mtdSummary === null;
-  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, requireAdditiveDisplayTotal);
+  // the overlapping Forecast. Portfolio and that fiscal quarter are therefore intentionally non-additive.
+  let mtdQuarter: string | null = null;
+  if (mtdSummary !== null) {
+    try {
+      mtdQuarter = getFiscalQuarter(mtdSummary.periodKey);
+    } catch {
+      return malformedAnalysis();
+    }
+    if (!mtdQuarter.startsWith(`${raw.fiscalYear}-`)) return malformedAnalysis();
+  }
+  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, mtdSummary === null);
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
   if (!isFiniteNumber(portfolioRaw.priorActualAmount)
     || !isFiniteNumber(portfolioRaw.priorForecastAmount)
@@ -515,8 +523,9 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
     || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   const quarters = raw.quarters.map((value) => {
-    const split = parseAmountSplit(value, quarterAmountStatuses, requireAdditiveDisplayTotal);
     const quarter = value as Record<string, unknown>;
+    const split = parseAmountSplit(value, quarterAmountStatuses,
+      mtdQuarter === null || `${raw.fiscalYear}-${String(quarter.quarter)}` !== mtdQuarter);
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)
       || !isNullableFiniteNumber(quarter.qoqChangeAmount)
       || !isNullableFiniteNumber(quarter.qoqChangePercent)

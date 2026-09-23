@@ -112,16 +112,17 @@ void (async () => {
     "the selected alert base month anchors the preceding five ACTUAL months");
   assert.equal(decoded.mtdSummary, null, "an OFF response has no provisional MTD summary");
 
+  const mtdAnalysis = { ...analysis,
+    selectedPillar: "OCI",
+    portfolio: { ...analysis.portfolio, actualAmount: 1850, forecastAmount: 960, totalAmount: 2510 },
+    quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
+      ? { ...quarter, actualAmount: 1700, forecastAmount: 960, totalAmount: 2360 }
+      : quarter),
+    mtdSummary: { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" }
+  };
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=&pillar=OCI&includeMtd=true");
-    return new Response(JSON.stringify({ ...analysis,
-      selectedPillar: "OCI",
-      portfolio: { ...analysis.portfolio, actualAmount: 1850, forecastAmount: 960, totalAmount: 2510 },
-      quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
-        ? { ...quarter, actualAmount: 1700, forecastAmount: 960, totalAmount: 2360 }
-        : quarter),
-      mtdSummary: { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" }
-    }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(mtdAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const withMtd = await fetchConsumptionAnalysis({
     fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
@@ -132,6 +133,22 @@ void (async () => {
     "MTD responses accept display Forecast while Total excludes the overlapping current-period Forecast");
   assert.equal(withMtd.portfolio.totalAmount, 2510);
   assert.equal(withMtd.quarters[1].totalAmount, 2360);
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...mtdAnalysis,
+    quarters: mtdAnalysis.quarters.map((quarter) => quarter.quarter === "Q1"
+      ? { ...quarter, totalAmount: quarter.totalAmount + 1 }
+      : quarter)
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
+  }), /Malformed Consumption analysis/, "MTD only relaxes additivity for its current fiscal quarter");
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...mtdAnalysis,
+    accounts: [{ ...analysis.accounts[0], totalAmount: analysis.accounts[0].totalAmount + 1 }]
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
+  }), /Malformed Consumption analysis/, "MTD does not relax Account, Workload, or Plan amount splits");
 
   runtime.fetch = async () => new Response(JSON.stringify(deployedNonComparableAnalysis),
     { status: 200, headers: { "Content-Type": "application/json" } });
