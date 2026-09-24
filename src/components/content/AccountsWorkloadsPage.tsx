@@ -1,4 +1,4 @@
-import { ComponentChildren, h } from "preact";
+import { ComponentChildren, Fragment, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
@@ -13,8 +13,10 @@ import {
   DealWrite,
   ForecastCandidate,
   WorkloadPlanWrite,
+  filterForecastCandidates,
   fetchAccountsWorkloadsHierarchy,
   fetchForecastCandidates,
+  forecastCandidateKey,
   saveAccountsWorkloadsHierarchy
 } from "../../data/accountsWorkloadsApi";
 
@@ -27,15 +29,27 @@ type Props = Readonly<{
 
 type QueuedOperation =
   | Readonly<{ entity: "account"; id: number; versionNo: number; name: string; action: "ARCHIVE" | "RESTORE" }>
-  | Readonly<{ entity: "workload"; id: number; versionNo: number; name: string; action: "ARCHIVE" | "RESTORE" }>
+  | Readonly<{ entity: "workload"; id: number; versionNo: number; name: string; lastUpdated: string | null; notes: string | null; action: "ARCHIVE" | "RESTORE" }>
   | Readonly<{ entity: "deal"; id: number; versionNo: number; action: "DELETE" | "RESTORE" }>;
 
 const EMPTY_HIERARCHY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
 const refFor = (id: number, entity: "account" | "workload") => id > 0 ? String(id) : `${entity}-${Math.abs(id)}`;
 const nullable = (value: string) => value.trim() || null;
 const numeric = (value: string): number | null => value.trim() === "" ? null : Number(value);
+const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
 const friendlyError = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed.";
-const normalized = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+const stopPropagation = (event: Event) => event.stopPropagation();
+const CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요";
+const isInteractiveTarget = (target: EventTarget | null) =>
+  target instanceof Element && Boolean(target.closest("input, select, textarea, button, a, oj-button"));
+const targetPeriod = (deal: AccountWorkloadDeal) =>
+  deal.targetFiscalYear && deal.targetQuarter ? `${deal.targetFiscalYear} Q${deal.targetQuarter}` : "";
+const targetOptions = (deal: AccountWorkloadDeal) => {
+  const options: string[] = [];
+  for (let year = 24; year <= 35; year += 1) for (let quarter = 1; quarter <= 4; quarter += 1) options.push(`FY${year} Q${quarter}`);
+  const current = targetPeriod(deal);
+  return current && !options.includes(current) ? [current, ...options] : options;
+};
 
 const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({
   id, workloadId, versionNo: 0, name: "", opportunityNo: null, revenueType: "NEW", status: "OPEN",
@@ -43,6 +57,10 @@ const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({
   contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null,
   winProbability: null, latestUpdate: null, notes: null, deleted: false, deletedAt: null,
   sourceCommitmentId: null
+});
+
+const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
+  id, versionNo: 0, name, lastUpdated: null, notes: null, archived: false, plans: [], deals: []
 });
 
 const dealWrite = (deal: AccountWorkloadDeal, workloadId: number): DealWrite => ({
@@ -64,6 +82,7 @@ const dealWrite = (deal: AccountWorkloadDeal, workloadId: number): DealWrite => 
   acrUsd: deal.acrUsd,
   acrKrw: deal.acrKrw,
   winProbability: deal.winProbability,
+  // Notes stays hidden and must round-trip unchanged; Latest Update is edited in the child table.
   latestUpdate: deal.latestUpdate,
   notes: deal.notes,
   action: "UPSERT"
@@ -86,11 +105,12 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
   const [dirtyDeals, setDirtyDeals] = useState<Set<number>>(new Set());
   const [queued, setQueued] = useState<QueuedOperation[]>([]);
   const [planWrites, setPlanWrites] = useState<WorkloadPlanWrite[]>([]);
+  const [expandedWorkloads, setExpandedWorkloads] = useState<Set<number>>(new Set());
   const [forecastOpen, setForecastOpen] = useState(false);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastCandidates, setForecastCandidates] = useState<ForecastCandidate[]>([]);
   const [forecastError, setForecastError] = useState("");
-  const [candidateWorkload, setCandidateWorkload] = useState<Record<string, string>>({});
+  const [selectedCandidateKeys, setSelectedCandidateKeys] = useState<Set<string>>(new Set());
 
   const dirty = dirtyAccounts.size + dirtyWorkloads.size + dirtyDeals.size + queued.length + planWrites.length > 0;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
@@ -102,7 +122,7 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
       const result = await fetchAccountsWorkloadsHierarchy({ search, includeArchived, includeDeletedDeals });
       setHierarchy(result);
       setDirtyAccounts(new Set()); setDirtyWorkloads(new Set()); setDirtyDeals(new Set());
-      setQueued([]); setPlanWrites([]);
+      setQueued([]); setPlanWrites([]); setExpandedWorkloads(new Set());
     } catch (requestError) {
       setError(friendlyError(requestError));
     } finally {
@@ -112,17 +132,18 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
 
   useEffect(() => { void reload(); }, [search, includeArchived, includeDeletedDeals]);
 
-  const workloadOptions = useMemo(() => hierarchy.accounts.flatMap((account) => account.workloads.map((workload) => ({
-    id: workload.id, label: `${account.name} / ${workload.name}`
-  }))), [hierarchy]);
+  const missingForecastCandidates = useMemo(
+    () => filterForecastCandidates(forecastCandidates, hierarchy.accounts),
+    [forecastCandidates, hierarchy.accounts]
+  );
 
   const updateAccount = (id: number, name: string) => {
     setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, name } : account) }));
     setDirtyAccounts((current) => new Set(current).add(id));
   };
-  const updateWorkload = (id: number, name: string) => {
+  const updateWorkload = (id: number, field: "name" | "lastUpdated" | "notes", value: string | null) => {
     setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
-      ...account, workloads: account.workloads.map((workload) => workload.id === id ? { ...workload, name } : workload)
+      ...account, workloads: account.workloads.map((workload) => workload.id === id ? { ...workload, [field]: value } : workload)
     })) }));
     setDirtyWorkloads((current) => new Set(current).add(id));
   };
@@ -134,66 +155,123 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
     })) }));
     setDirtyDeals((current) => new Set(current).add(id));
   };
+  const updateDealTarget = (dealId: number, value: string) => {
+    const match = /^(FY\d{2}) Q([1-4])$/.exec(value);
+    updateDeal(dealId, "targetFiscalYear", match?.[1] ?? null);
+    updateDeal(dealId, "targetQuarter", match ? Number(match[2]) : null);
+  };
 
-  const addAccount = (name = "") => {
-    const id = nextTempId.current--;
-    setHierarchy((current) => ({ ...current, accounts: [...current.accounts, { id, versionNo: 0, name, archived: false, workloads: [] }] }));
-    setDirtyAccounts((current) => new Set(current).add(id));
+  const addAccountWorkload = (accountName = "", workloadName = "") => {
+    const accountId = nextTempId.current--;
+    const workloadId = nextTempId.current--;
+    const workload = emptyWorkload(workloadId, workloadName);
+    setHierarchy((current) => ({ ...current, accounts: [{
+      id: accountId, versionNo: 0, name: accountName, archived: false, workloads: [workload]
+    }, ...current.accounts] }));
+    setDirtyAccounts((current) => new Set(current).add(accountId));
+    setDirtyWorkloads((current) => new Set(current).add(workloadId));
+    setExpandedWorkloads((current) => new Set(current).add(workloadId));
+    return workloadId;
   };
   const addWorkload = (accountId: number) => {
     const id = nextTempId.current--;
     setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === accountId
-      ? { ...account, workloads: [...account.workloads, { id, versionNo: 0, name: "", archived: false, plans: [], deals: [] }] }
+      ? { ...account, workloads: [emptyWorkload(id), ...account.workloads] }
       : account) }));
     setDirtyWorkloads((current) => new Set(current).add(id));
+    setExpandedWorkloads((current) => new Set(current).add(id));
   };
   const addDeal = (workloadId: number) => {
     const id = nextTempId.current--;
     setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account,
       workloads: account.workloads.map((workload) => workload.id === workloadId
-        ? { ...workload, deals: [...workload.deals, emptyDeal(id, workloadId)] }
+        ? { ...workload, deals: [emptyDeal(id, workloadId), ...workload.deals] }
         : workload)
     })) }));
     setDirtyDeals((current) => new Set(current).add(id));
+    setExpandedWorkloads((current) => new Set(current).add(workloadId));
   };
 
   const archiveAccount = (account: AccountHierarchyAccount) => {
     if (account.id < 0) {
-      setHierarchy((current) => ({ ...current, accounts: current.accounts.filter((item) => item.id !== account.id) }));
+      const workloadIds = new Set(account.workloads.map((workload) => workload.id));
+      const dealIds = new Set(account.workloads.flatMap((workload) => workload.deals.map((deal) => deal.id)));
       setDirtyAccounts((current) => { const next = new Set(current); next.delete(account.id); return next; });
-      return;
+      setDirtyWorkloads((current) => new Set([...current].filter((id) => !workloadIds.has(id))));
+      setDirtyDeals((current) => new Set([...current].filter((id) => !dealIds.has(id))));
+    } else {
+      setDirtyAccounts((current) => { const next = new Set(current); next.delete(account.id); return next; });
+      setQueued((current) => [...current, { entity: "account", id: account.id, versionNo: account.versionNo, name: account.name, action: account.archived ? "RESTORE" : "ARCHIVE" }]);
     }
-    setDirtyAccounts((current) => { const next = new Set(current); next.delete(account.id); return next; });
-    setQueued((current) => [...current, { entity: "account", id: account.id, versionNo: account.versionNo, name: account.name, action: account.archived ? "RESTORE" : "ARCHIVE" }]);
     setHierarchy((current) => ({ ...current, accounts: current.accounts.filter((item) => item.id !== account.id) }));
   };
   const archiveWorkload = (workload: AccountWorkload) => {
     if (workload.id < 0) {
-      setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.filter((item) => item.id !== workload.id) })) }));
+      const dealIds = new Set(workload.deals.map((deal) => deal.id));
       setDirtyWorkloads((current) => { const next = new Set(current); next.delete(workload.id); return next; });
-      return;
+      setDirtyDeals((current) => new Set([...current].filter((id) => !dealIds.has(id))));
+    } else {
+      setDirtyWorkloads((current) => { const next = new Set(current); next.delete(workload.id); return next; });
+      setQueued((current) => [...current, { entity: "workload", id: workload.id, versionNo: workload.versionNo, name: workload.name,
+        lastUpdated: workload.lastUpdated, notes: workload.notes, action: workload.archived ? "RESTORE" : "ARCHIVE" }]);
     }
-    setDirtyWorkloads((current) => { const next = new Set(current); next.delete(workload.id); return next; });
-    setQueued((current) => [...current, { entity: "workload", id: workload.id, versionNo: workload.versionNo, name: workload.name, action: workload.archived ? "RESTORE" : "ARCHIVE" }]);
-    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.filter((item) => item.id !== workload.id) })) }));
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+      ...account, workloads: account.workloads.filter((item) => item.id !== workload.id)
+    })) }));
   };
   const deleteDeal = (deal: AccountWorkloadDeal) => {
     if (deal.id > 0) setQueued((current) => [...current, { entity: "deal", id: deal.id, versionNo: deal.versionNo, action: deal.deleted ? "RESTORE" : "DELETE" }]);
-    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.map((workload) => ({ ...workload, deals: workload.deals.filter((item) => item.id !== deal.id) })) })) }));
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.map((workload) => ({
+      ...workload, deals: workload.deals.filter((item) => item.id !== deal.id)
+    })) })) }));
     setDirtyDeals((current) => { const next = new Set(current); next.delete(deal.id); return next; });
   };
-
   const removePlan = (workloadId: number, planId: number) => {
     const plan = hierarchy.accounts.flatMap((account) => account.workloads)
       .find((workload) => workload.id === workloadId)?.plans.find((item) => item.id === planId);
     if (!plan) return;
-    setPlanWrites((current) => [...current, {
-      id: plan.id, workloadRef: null, versionNo: plan.versionNo,
-      sourcePlanId: plan.sourcePlanId, sourcePlanNumber: plan.sourcePlanNumber, action: "DELETE"
-    }]);
+    setPlanWrites((current) => [...current, { id: plan.id, workloadRef: null, versionNo: plan.versionNo,
+      sourcePlanId: plan.sourcePlanId, sourcePlanNumber: plan.sourcePlanNumber, action: "DELETE" }]);
   };
-  const removeQueuedPlan = (writeIndex: number) =>
-    setPlanWrites((current) => current.filter((_, index) => index !== writeIndex));
+  const updatePlanNumber = (workload: AccountWorkload, value: string) => {
+    const sourcePlanNumber = value.trim();
+    const primary = workload.plans[0];
+    const workloadRef = refFor(workload.id, "workload");
+
+    if (!primary && !sourcePlanNumber) return;
+    if (!primary) {
+      const planId = nextTempId.current--;
+      setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+        ...account, workloads: account.workloads.map((item) => item.id === workload.id
+          ? { ...item, plans: [...item.plans, { id: planId, workloadId: workload.id, sourcePlanId: null, sourcePlanNumber, versionNo: 0 }] }
+          : item)
+      })) }));
+      setPlanWrites((current) => [...current, { id: null, workloadRef, versionNo: null,
+        sourcePlanId: null, sourcePlanNumber, action: "UPSERT" }]);
+      return;
+    }
+
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+      ...account, workloads: account.workloads.map((item) => item.id === workload.id
+        ? { ...item, plans: item.plans.map((plan) => plan.id === primary.id ? { ...plan, sourcePlanNumber: sourcePlanNumber || null } : plan) }
+        : item)
+    })) }));
+    const matchesPrimary = (write: WorkloadPlanWrite) => primary.id > 0
+      ? write.id === primary.id
+      : write.id === null && write.workloadRef === workloadRef;
+    setPlanWrites((current) => [
+      ...current.filter((write) => !matchesPrimary(write)),
+      { id: primary.id > 0 ? primary.id : null, workloadRef: primary.id > 0 ? null : workloadRef,
+        versionNo: primary.id > 0 ? primary.versionNo : null, sourcePlanId: primary.sourcePlanId,
+        sourcePlanNumber: sourcePlanNumber || null,
+        action: !sourcePlanNumber && primary.sourcePlanId === null ? "DELETE" : "UPSERT" }
+    ]);
+  };
+  const toggleWorkloadExpanded = (workloadId: number) => setExpandedWorkloads((current) => {
+    const next = new Set(current);
+    if (next.has(workloadId)) next.delete(workloadId); else next.add(workloadId);
+    return next;
+  });
 
   const validateDraft = () => {
     for (const account of hierarchy.accounts) {
@@ -202,8 +280,8 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
         if (dirtyWorkloads.has(workload.id) && !workload.name.trim()) return "Every workload requires a name.";
         for (const deal of workload.deals) {
           if (!dirtyDeals.has(deal.id)) continue;
-          if (!deal.name.trim()) return "Every deal requires a name.";
-          if ((deal.targetFiscalYear === null) !== (deal.targetQuarter === null)) return "A deal target requires both fiscal year and quarter.";
+          if (!deal.name.trim()) return "Every opportunity requires a name.";
+          if ((deal.targetFiscalYear === null) !== (deal.targetQuarter === null)) return "An opportunity target requires both fiscal year and quarter.";
           if (deal.targetFiscalYear && !/^FY\d{2}$/.test(deal.targetFiscalYear)) return "Target fiscal year must use FYnn format.";
           if (deal.winProbability !== null && (deal.winProbability < 0 || deal.winProbability > 100)) return "Win probability must be from 0 to 100.";
         }
@@ -219,13 +297,13 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
     hierarchy.accounts.forEach((account) => {
       if (dirtyAccounts.has(account.id)) request.accounts.push({ id: account.id > 0 ? account.id : null, clientId: account.id > 0 ? null : refFor(account.id, "account"), versionNo: account.id > 0 ? account.versionNo : null, name: account.name, action: "UPSERT" });
       account.workloads.forEach((workload) => {
-        if (dirtyWorkloads.has(workload.id)) request.workloads.push({ id: workload.id > 0 ? workload.id : null, clientId: workload.id > 0 ? null : refFor(workload.id, "workload"), accountRef: refFor(account.id, "account"), versionNo: workload.id > 0 ? workload.versionNo : null, name: workload.name, action: "UPSERT" });
+        if (dirtyWorkloads.has(workload.id)) request.workloads.push({ id: workload.id > 0 ? workload.id : null, clientId: workload.id > 0 ? null : refFor(workload.id, "workload"), accountRef: refFor(account.id, "account"), versionNo: workload.id > 0 ? workload.versionNo : null, name: workload.name, lastUpdated: workload.lastUpdated, notes: workload.notes, action: "UPSERT" });
         workload.deals.forEach((deal) => { if (dirtyDeals.has(deal.id)) request.deals.push(dealWrite(deal, workload.id)); });
       });
     });
     queued.forEach((operation) => {
       if (operation.entity === "account") request.accounts.push({ id: operation.id, clientId: null, versionNo: operation.versionNo, name: operation.name, action: operation.action });
-      else if (operation.entity === "workload") request.workloads.push({ id: operation.id, clientId: null, accountRef: null, versionNo: operation.versionNo, name: operation.name, action: operation.action });
+      else if (operation.entity === "workload") request.workloads.push({ id: operation.id, clientId: null, accountRef: null, versionNo: operation.versionNo, name: operation.name, lastUpdated: operation.lastUpdated, notes: operation.notes, action: operation.action });
       else request.deals.push({ id: operation.id, clientId: null, workloadRef: null, versionNo: operation.versionNo, name: null, opportunityNo: null, revenueType: null, status: null, targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null, contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, action: operation.action });
     });
     setSaving(true); setError(""); setSaveErrors([]); setNotice("");
@@ -241,111 +319,152 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
   };
 
   const openForecast = async () => {
-    setForecastOpen(true); setForecastLoading(true); setForecastError("");
+    setForecastOpen(true); setForecastLoading(true); setForecastError(""); setSelectedCandidateKeys(new Set());
     try { setForecastCandidates(await fetchForecastCandidates()); }
     catch (requestError) { setForecastError(friendlyError(requestError)); }
     finally { setForecastLoading(false); }
   };
-  const addCandidate = (candidate: ForecastCandidate, index: number) => {
-    if (candidate.planId === null) {
-      if (!hierarchy.accounts.some((account) => normalized(account.name) === normalized(candidate.normalizedAccount))) addAccount(candidate.accountName);
-      setNotice(`Added ${candidate.accountName} as a draft account.`); return;
-    }
-    const workloadId = Number(candidateWorkload[String(index)] || workloadOptions[0]?.id);
-    if (!workloadId) return;
-    if (candidate.linkedWorkloadIds.includes(workloadId) || planWrites.some((write) => write.workloadRef === String(workloadId) && write.sourcePlanId === candidate.planId)) {
-      setForecastError("That Forecast plan is already linked to the selected workload."); return;
-    }
-    setPlanWrites((current) => [...current, { id: null, workloadRef: refFor(workloadId, "workload"), versionNo: null, sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, action: "UPSERT" }]);
-    setNotice(`Queued ${candidate.planNumber ?? candidate.accountName} for linking.`);
+  const toggleCandidate = (key: string) => setSelectedCandidateKeys((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const addSelectedCandidates = () => {
+    const selected = missingForecastCandidates.filter((candidate) => selectedCandidateKeys.has(forecastCandidateKey(candidate)));
+    const groups = new Map<string, { accountId: number; accountName: string; isNew: boolean; workloads: AccountWorkload[] }>();
+    const workloadIds: number[] = [];
+    const writes: WorkloadPlanWrite[] = [];
+    selected.forEach((candidate) => {
+      const accountName = candidate.accountName.trim();
+      const accountKey = normalizedAccountIdentity(accountName);
+      let group = groups.get(accountKey);
+      if (!group) {
+        const existing = hierarchy.accounts.find((account) => normalizedAccountIdentity(account.name) === accountKey);
+        group = { accountId: existing?.id ?? nextTempId.current--, accountName, isNew: !existing, workloads: [] };
+        groups.set(accountKey, group);
+      }
+      const workloadId = nextTempId.current--;
+      const hasSourcePlan = candidate.planId !== null || candidate.planNumber !== null;
+      const planId = hasSourcePlan ? nextTempId.current-- : null;
+      group.workloads.push({
+        ...emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME),
+        plans: planId === null ? [] : [{
+          id: planId, workloadId, sourcePlanId: candidate.planId,
+          sourcePlanNumber: candidate.planNumber, versionNo: 0
+        }]
+      });
+      workloadIds.push(workloadId);
+      if (hasSourcePlan) writes.push({
+        id: null, workloadRef: refFor(workloadId, "workload"), versionNo: null,
+        sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, action: "UPSERT"
+      });
+    });
+    setHierarchy((current) => {
+      let accounts = [...current.accounts];
+      groups.forEach((group) => {
+        if (group.isNew) {
+          accounts = [{ id: group.accountId, versionNo: 0, name: group.accountName, archived: false, workloads: group.workloads }, ...accounts];
+        } else {
+          accounts = accounts.map((account) => account.id === group.accountId
+            ? { ...account, workloads: [...group.workloads, ...account.workloads] }
+            : account);
+        }
+      });
+      return { ...current, accounts };
+    });
+    setDirtyAccounts((current) => {
+      const next = new Set(current);
+      groups.forEach((group) => { if (group.isNew) next.add(group.accountId); });
+      return next;
+    });
+    setDirtyWorkloads((current) => new Set([...current, ...workloadIds]));
+    setPlanWrites((current) => [...current, ...writes]);
+    setExpandedWorkloads((current) => new Set([...current, ...workloadIds]));
+    setSelectedCandidateKeys(new Set());
+    setForecastError("");
+    setForecastOpen(false);
+    setNotice(`Added ${selected.length} Consumption Records candidate${selected.length === 1 ? "" : "s"} as drafts.`);
   };
+
+  const renderOpportunityRows = (workload: AccountWorkload) => workload.deals.map((deal) => <tr key={deal.id} class={dirtyDeals.has(deal.id) ? "is-draft" : undefined}>
+    <td><div class="accounts-workloads-oppty-name"><input aria-label="Oppty Name" disabled={!canWrite} value={deal.name} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "name", event.currentTarget.value)}/>{dirtyDeals.has(deal.id) && <span class="accounts-workloads-draft-badge">Draft</span>}{canWrite && <button type="button" class="is-danger" onClick={(event) => { event.stopPropagation(); deleteDeal(deal); }}>×</button>}</div></td>
+    <td><input aria-label="Oppty No." disabled={!canWrite} value={deal.opportunityNo ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "opportunityNo", nullable(event.currentTarget.value))}/></td>
+    <td><select aria-label="Revenue Type" disabled={!canWrite} value={deal.revenueType} onClick={stopPropagation} onChange={(event) => updateDeal(deal.id, "revenueType", event.currentTarget.value)}><option value="NEW">New</option><option value="EXPANSION">Expansion</option><option value="RENEWAL">Renewal</option></select></td>
+    <td><input aria-label="Win Prob" type="number" min="0" max="100" disabled={!canWrite} value={deal.winProbability ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "winProbability", numeric(event.currentTarget.value))}/></td>
+    <td><select aria-label="Target Quarter" disabled={!canWrite} value={targetPeriod(deal)} onClick={stopPropagation} onChange={(event) => updateDealTarget(deal.id, event.currentTarget.value)}><option value="">—</option>{targetOptions(deal).map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
+    <td><input aria-label="ARR USD" type="number" disabled={!canWrite} value={deal.arrUsd ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "arrUsd", numeric(event.currentTarget.value))}/></td>
+    <td><input aria-label="ARR KRW" type="number" disabled={!canWrite} value={deal.arrKrw ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "arrKrw", numeric(event.currentTarget.value))}/></td>
+    <td><input aria-label="ACR USD" type="number" disabled={!canWrite} value={deal.acrUsd ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "acrUsd", numeric(event.currentTarget.value))}/></td>
+    <td><input aria-label="ACR KRW" type="number" disabled={!canWrite} value={deal.acrKrw ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "acrKrw", numeric(event.currentTarget.value))}/></td>
+    <td><select aria-label="Status" disabled={!canWrite} value={deal.status} onClick={stopPropagation} onChange={(event) => updateDeal(deal.id, "status", event.currentTarget.value)}><option value="OPEN">Open</option><option value="WON">Won</option><option value="LOST">Lost</option></select></td>
+    <td><input aria-label="Close Date" type="date" disabled={!canWrite} value={deal.actualCloseDate ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "actualCloseDate", nullable(event.currentTarget.value))}/></td>
+    <td><input aria-label="Start Date" type="date" disabled={!canWrite} value={deal.contractStartDate ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "contractStartDate", nullable(event.currentTarget.value))}/></td>
+    <td><input aria-label="End Date" type="date" disabled={!canWrite} value={deal.contractEndDate ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "contractEndDate", nullable(event.currentTarget.value))}/></td>
+    <td><input aria-label="Latest Update" disabled={!canWrite} value={deal.latestUpdate ?? ""} onClick={stopPropagation} onInput={(event) => updateDeal(deal.id, "latestUpdate", nullable(event.currentTarget.value))}/></td>
+  </tr>);
 
   return <section class="accounts-workloads-page accounts-hierarchy-page" aria-labelledby="accountsWorkloadsTitle">
     <header class="accounts-workloads-header">
-      <div>{breadcrumb}<h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1><p>Manage accounts, workloads, and their deals independently of fiscal year.</p></div>
+      <div>{breadcrumb}<h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1><p>Manage accounts, workloads, and their opportunities independently of fiscal year.</p></div>
       <div class="accounts-workloads-actions">
-        <oj-button disabled={!canWrite || saving} onojAction={() => addAccount()}>Add Account</oj-button>
-        <oj-button disabled={!canWrite || saving} onojAction={() => void openForecast()}>Forecast에서 추가</oj-button>
+        <oj-button disabled={!canWrite || saving} onojAction={() => addAccountWorkload()}>Add Account & Workload</oj-button>
+        <oj-button disabled={!canWrite || saving} onojAction={() => void openForecast()}>Consumption Records</oj-button>
         <oj-button chroming="callToAction" disabled={!canWrite || !dirty || saving} onojAction={() => void save()}>{saving ? "Saving…" : "Save changes"}</oj-button>
       </div>
     </header>
-    {!canWrite && <div class="accounts-workloads-banner" role="status">Read-only access. Write permission is required to change Accounts, Workloads, Plans, or Deals.</div>}
+    {!canWrite && <div class="accounts-workloads-banner" role="status">Read-only access. Write permission is required to change Accounts, Workloads, Plans, or Opportunities.</div>}
     <form class="accounts-workloads-toolbar" onSubmit={(event) => { event.preventDefault(); if (dirty) { setError("Save or discard draft changes before searching."); return; } setSearch(searchInput.trim()); }}>
-      <label class="accounts-workloads-search">Search hierarchy<div class="accounts-workloads-search__control"><input value={searchInput} onInput={(event) => setSearchInput((event.currentTarget as HTMLInputElement).value)} placeholder="Account, workload, or deal"/><button type="submit" aria-label="Search">⌕</button></div></label>
+      <label class="accounts-workloads-search">Search hierarchy<div class="accounts-workloads-search__control"><input value={searchInput} onInput={(event) => setSearchInput(event.currentTarget.value)} placeholder="Account, workload, or opportunity"/><button type="submit" aria-label="Search">⌕</button></div></label>
       <label class="accounts-workloads-switch"><input type="checkbox" checked={includeArchived} disabled={dirty} onChange={(event) => setIncludeArchived(event.currentTarget.checked)}/> Include archived</label>
-      <label class="accounts-workloads-switch"><input type="checkbox" checked={includeDeletedDeals} disabled={dirty} onChange={(event) => setIncludeDeletedDeals(event.currentTarget.checked)}/> Include deleted deals</label>
+      <label class="accounts-workloads-switch"><input type="checkbox" checked={includeDeletedDeals} disabled={dirty} onChange={(event) => setIncludeDeletedDeals(event.currentTarget.checked)}/> Include deleted opportunities</label>
       <oj-button disabled={loading || saving || dirty} onojAction={() => void reload()}>Refresh</oj-button>
     </form>
-    {error && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert">
-      <strong>{error}</strong>
-      {saveErrors.length > 0 && <ul>{saveErrors.map((item) => <li key={`${item.entity}-${item.operationIndex}-${item.field}`}>{item.entity} {item.clientId ?? `#${item.operationIndex + 1}`} · {item.field}: {item.message}</li>)}</ul>}
-    </div>}
+    {error && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert"><strong>{error}</strong>{saveErrors.length > 0 && <ul>{saveErrors.map((item) => <li key={`${item.entity}-${item.operationIndex}-${item.field}`}>{item.entity} {item.clientId ?? `#${item.operationIndex + 1}`} · {item.field}: {item.message}</li>)}</ul>}</div>}
     {notice && <div class="accounts-workloads-banner" role="status">{notice}</div>}
     {loading ? <div class="accounts-workloads-loading" role="status"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading hierarchy…</div> :
-      <div class="accounts-hierarchy" aria-label="Account hierarchy">
-        {hierarchy.accounts.length === 0 && <div class="kap-empty-state"><h2>No accounts found</h2><p>Adjust the search or add your first account.</p></div>}
-        {hierarchy.accounts.map((account) => <article class="accounts-hierarchy__account" key={account.id}>
-          <div class="accounts-hierarchy__heading">
-            <input aria-label="Account name" disabled={!canWrite} value={account.name} onInput={(event) => updateAccount(account.id, event.currentTarget.value)}/>
-            <span>{account.workloads.length} workload{account.workloads.length === 1 ? "" : "s"}</span>
-            {canWrite && <><button type="button" onClick={() => addWorkload(account.id)}>Add Workload</button><button type="button" class="is-danger" onClick={() => archiveAccount(account)}>{account.archived ? "Restore" : "Archive"}</button></>}
-          </div>
-          <div class="accounts-hierarchy__workloads">
-            {account.workloads.map((workload) => <section class="accounts-hierarchy__workload" key={workload.id}>
-              <div class="accounts-hierarchy__workload-heading"><input aria-label="Workload name" disabled={!canWrite} value={workload.name} onInput={(event) => updateWorkload(workload.id, event.currentTarget.value)}/>
-                <span>{workload.plans.filter((plan) => !planWrites.some((write) => write.id === plan.id && write.action === "DELETE")).length + planWrites.filter((write) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload")).length} Forecast link(s)</span>
-                {canWrite && <><button type="button" onClick={() => addDeal(workload.id)}>Add Deal</button><button type="button" class="is-danger" onClick={() => archiveWorkload(workload)}>{workload.archived ? "Restore" : "Archive"}</button></>}
-              </div>
-              <div class="accounts-hierarchy__plans" aria-label={`Forecast plans linked to ${workload.name}`}>
-                <span class="accounts-hierarchy__level-label">Plans</span>
-                {workload.plans.filter((plan) => !planWrites.some((write) => write.id === plan.id && write.action === "DELETE")).map((plan) => <span class="accounts-hierarchy__plan" key={plan.id}>
-                  {plan.sourcePlanNumber ?? `Forecast plan ${plan.sourcePlanId ?? plan.id}`}
-                  {canWrite && <button type="button" aria-label={`Unlink ${plan.sourcePlanNumber ?? "Forecast plan"}`} onClick={() => removePlan(workload.id, plan.id)}>×</button>}
-                </span>)}
-                {planWrites.map((write, writeIndex) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload") ? <span class="accounts-hierarchy__plan is-draft" key={`draft-plan-${writeIndex}`}>
-                  {write.sourcePlanNumber ?? `Forecast plan ${write.sourcePlanId}`} <small>Draft</small>
-                  {canWrite && <button type="button" aria-label={`Remove draft ${write.sourcePlanNumber ?? "Forecast plan"}`} onClick={() => removeQueuedPlan(writeIndex)}>×</button>}
-                </span> : null)}
-                {workload.plans.length === 0 && !planWrites.some((write) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload")) && <span class="accounts-hierarchy__empty">No plans linked.</span>}
-              </div>
-              <div class="accounts-hierarchy__deals">
-                <span class="accounts-hierarchy__level-label">Deals</span>
-                {workload.deals.length === 0 && <p class="accounts-hierarchy__empty">No deals yet.</p>}
-                {workload.deals.map((deal) => <div class="accounts-hierarchy__deal" key={deal.id}>
-                  <label>Deal Name<input disabled={!canWrite} value={deal.name} onInput={(event) => updateDeal(deal.id, "name", event.currentTarget.value)}/></label>
-                  <label>Opportunity<input disabled={!canWrite} value={deal.opportunityNo ?? ""} onInput={(event) => updateDeal(deal.id, "opportunityNo", nullable(event.currentTarget.value))}/></label>
-                  <label>Revenue Type<select disabled={!canWrite} value={deal.revenueType} onChange={(event) => updateDeal(deal.id, "revenueType", event.currentTarget.value)}><option value="NEW">New</option><option value="EXPANSION">Expansion</option><option value="RENEWAL">Renewal</option></select></label>
-                  <label>Status<select disabled={!canWrite} value={deal.status} onChange={(event) => updateDeal(deal.id, "status", event.currentTarget.value)}><option value="OPEN">Open</option><option value="WON">Won</option><option value="LOST">Lost</option></select></label>
-                  <label>Target FY<input disabled={!canWrite} placeholder="FY28" value={deal.targetFiscalYear ?? ""} onInput={(event) => updateDeal(deal.id, "targetFiscalYear", nullable(event.currentTarget.value.toUpperCase()))}/></label>
-                  <label>Quarter<select disabled={!canWrite} value={deal.targetQuarter ?? ""} onChange={(event) => updateDeal(deal.id, "targetQuarter", numeric(event.currentTarget.value))}><option value="">—</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select></label>
-                  <label>Win %<input type="number" min="0" max="100" disabled={!canWrite} value={deal.winProbability ?? ""} onInput={(event) => updateDeal(deal.id, "winProbability", numeric(event.currentTarget.value))}/></label>
-                  <label>Close Date<input type="date" disabled={!canWrite} value={deal.actualCloseDate ?? ""} onInput={(event) => updateDeal(deal.id, "actualCloseDate", nullable(event.currentTarget.value))}/></label>
-                  <label>Start Date<input type="date" disabled={!canWrite} value={deal.contractStartDate ?? ""} onInput={(event) => updateDeal(deal.id, "contractStartDate", nullable(event.currentTarget.value))}/></label>
-                  <label>End Date<input type="date" disabled={!canWrite} value={deal.contractEndDate ?? ""} onInput={(event) => updateDeal(deal.id, "contractEndDate", nullable(event.currentTarget.value))}/></label>
-                  <label>ARR ($)<input type="number" disabled={!canWrite} value={deal.arrUsd ?? ""} onInput={(event) => updateDeal(deal.id, "arrUsd", numeric(event.currentTarget.value))}/></label>
-                  <label>ARR (₩)<input type="number" disabled={!canWrite} value={deal.arrKrw ?? ""} onInput={(event) => updateDeal(deal.id, "arrKrw", numeric(event.currentTarget.value))}/></label>
-                  <label>ACR ($)<input type="number" disabled={!canWrite} value={deal.acrUsd ?? ""} onInput={(event) => updateDeal(deal.id, "acrUsd", numeric(event.currentTarget.value))}/></label>
-                  <label>ACR (₩)<input type="number" disabled={!canWrite} value={deal.acrKrw ?? ""} onInput={(event) => updateDeal(deal.id, "acrKrw", numeric(event.currentTarget.value))}/></label>
-                  <label class="accounts-hierarchy__wide">Latest Update<input disabled={!canWrite} value={deal.latestUpdate ?? ""} onInput={(event) => updateDeal(deal.id, "latestUpdate", nullable(event.currentTarget.value))}/></label>
-                  <label class="accounts-hierarchy__wide">Notes<input disabled={!canWrite} value={deal.notes ?? ""} onInput={(event) => updateDeal(deal.id, "notes", nullable(event.currentTarget.value))}/></label>
-                  {canWrite && <button type="button" class="is-danger" onClick={() => deleteDeal(deal)}>{deal.deleted ? "Restore" : "Delete"}</button>}
-                </div>)}
-              </div>
-            </section>)}
-          </div>
-        </article>)}
+      <div class="accounts-workloads-grid" tabIndex={0} aria-label="Editable Accounts and Workloads table">
+        <table class="accounts-workloads-grid__parent">
+          <thead><tr><th>Account</th><th>Workload</th><th>Plan Number</th><th>Last Updated</th><th>Notes</th></tr></thead>
+          <tbody>
+            {hierarchy.accounts.flatMap((account) => account.workloads.map((workload) => {
+              const expanded = expandedWorkloads.has(workload.id);
+              const visiblePlans = workload.plans.filter((plan) => !planWrites.some((write) => write.id === plan.id && write.action === "DELETE"));
+              const workloadDraft = dirtyAccounts.has(account.id) || dirtyWorkloads.has(workload.id) || planWrites.some((write) => write.workloadRef === refFor(workload.id, "workload") || visiblePlans.some((plan) => plan.id === write.id));
+              return <Fragment key={`${account.id}-${workload.id}`}>
+                <tr class={`accounts-workloads-parent-row${workloadDraft ? " is-draft" : ""}${expanded ? " is-expanded" : ""}`} aria-expanded={expanded} onClick={(event) => { if (!isInteractiveTarget(event.target)) toggleWorkloadExpanded(workload.id); }}>
+                  <td><div class="accounts-workloads-account-cell"><button type="button" class="accounts-workloads-expander" aria-label={`${expanded ? "Collapse" : "Expand"} ${account.name} ${workload.name}`} onClick={(event) => { event.stopPropagation(); toggleWorkloadExpanded(workload.id); }}>{expanded ? "▾" : "▸"}</button><input aria-label="Account" disabled={!canWrite} value={account.name} onClick={stopPropagation} onInput={(event) => updateAccount(account.id, event.currentTarget.value)}/>{workloadDraft && <span class="accounts-workloads-draft-badge">Draft</span>}</div></td>
+                  <td><div class="accounts-workloads-workload-cell"><input aria-label="Workload" disabled={!canWrite} value={workload.name} onClick={stopPropagation} onInput={(event) => updateWorkload(workload.id, "name", event.currentTarget.value)}/>{canWrite && <div><button type="button" onClick={(event) => { event.stopPropagation(); addDeal(workload.id); }}>Add Oppty</button><button type="button" onClick={(event) => { event.stopPropagation(); addWorkload(account.id); }}>Add Workload</button><button type="button" class="is-danger" onClick={(event) => { event.stopPropagation(); archiveWorkload(workload); }}>{workload.id < 0 ? "Remove" : workload.archived ? "Restore" : "Archive"}</button></div>}</div></td>
+                  <td><div class="accounts-hierarchy__plans"><input aria-label="Plan Number" disabled={!canWrite} value={visiblePlans[0]?.sourcePlanNumber ?? ""} onClick={stopPropagation} onInput={(event) => updatePlanNumber(workload, event.currentTarget.value)}/>{visiblePlans.slice(1).map((plan) => <span class="accounts-hierarchy__plan" key={plan.id}>{plan.sourcePlanNumber ?? `Plan ${plan.sourcePlanId ?? plan.id}`}{canWrite && <button type="button" aria-label={`Unlink ${plan.sourcePlanNumber ?? "plan"}`} onClick={(event) => { event.stopPropagation(); removePlan(workload.id, plan.id); }}>×</button>}</span>)}</div></td>
+                  <td><input aria-label="Last Updated" disabled={!canWrite} value={workload.lastUpdated ?? ""} onClick={stopPropagation} onInput={(event) => updateWorkload(workload.id, "lastUpdated", nullable(event.currentTarget.value))}/></td>
+                  <td><div class="accounts-workloads-notes-cell"><textarea aria-label="Notes" disabled={!canWrite} value={workload.notes ?? ""} onClick={stopPropagation} onInput={(event) => updateWorkload(workload.id, "notes", nullable(event.currentTarget.value))}/>{canWrite && account.workloads.length === 1 && <button type="button" class="is-danger" onClick={(event) => { event.stopPropagation(); archiveAccount(account); }}>{account.id < 0 ? "Remove row" : account.archived ? "Restore account" : "Archive account"}</button>}</div></td>
+                </tr>
+                {expanded && <tr class="accounts-workloads-child-row"><td colSpan={5}>
+                  <div class="accounts-workloads-opportunities">
+                    <div class="accounts-workloads-opportunities__heading"><strong>Opportunities</strong>{canWrite && <button type="button" onClick={(event) => { event.stopPropagation(); addDeal(workload.id); }}>Add Oppty</button>}</div>
+                    <table><thead><tr><th>Oppty Name</th><th>Oppty No.</th><th>Revenue Type</th><th>Win Prob</th><th>Target Quarter</th><th>ARR ($)</th><th>ARR (₩)</th><th>ACR ($)</th><th>ACR (₩)</th><th>Status</th><th>Close Date</th><th>Start Date</th><th>End Date</th><th>Latest Update</th></tr></thead><tbody>{renderOpportunityRows(workload)}{workload.deals.length === 0 && <tr><td colSpan={14} class="accounts-workloads-empty">No opportunities yet.</td></tr>}</tbody></table>
+                  </div>
+                </td></tr>}
+              </Fragment>;
+            }))}
+            {hierarchy.accounts.length === 0 && <tr><td colSpan={5} class="accounts-workloads-empty">No accounts found. Adjust the search or add your first Account &amp; Workload.</td></tr>}
+          </tbody>
+        </table>
       </div>}
     {forecastOpen && <div class="accounts-workloads-dialog-backdrop" role="presentation"><section class="accounts-workloads-dialog accounts-forecast-dialog" role="dialog" aria-modal="true" aria-labelledby="forecastCandidatesTitle">
-      <header><div><h2 id="forecastCandidatesTitle">Forecast candidates</h2><p>All candidates are shown, including plans already linked elsewhere.</p></div><button type="button" aria-label="Close" onClick={() => setForecastOpen(false)}>×</button></header>
+      <header><div><h2 id="forecastCandidatesTitle">Consumption Records</h2><p>Select records to add as Account + Workload drafts. Existing saved records and current drafts are excluded.</p></div><button type="button" aria-label="Close" onClick={() => setForecastOpen(false)}>×</button></header>
       {forecastError && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert">{forecastError}</div>}
-      {forecastLoading ? <div role="status">Loading Forecast candidates…</div> : <div class="accounts-forecast-list">
-        {forecastCandidates.map((candidate, index) => <div class="accounts-forecast-candidate" key={`${candidate.normalizedAccount}-${candidate.planId ?? "account"}`}>
-          <div><strong>{candidate.accountName}</strong><span>{candidate.planNumber ?? "Account only"}</span>{candidate.linked && <small>Linked to {candidate.linkedWorkloadIds.length} workload(s)</small>}</div>
-          {candidate.planId !== null && <select aria-label={`Destination for ${candidate.planNumber ?? candidate.accountName}`} value={candidateWorkload[String(index)] ?? ""} onChange={(event) => setCandidateWorkload((current) => ({ ...current, [String(index)]: event.currentTarget.value }))}><option value="">Select workload</option>{workloadOptions.map((option) => <option value={String(option.id)}>{option.label}</option>)}</select>}
-          <button type="button" disabled={!canWrite || (candidate.planId !== null && workloadOptions.length === 0)} onClick={() => addCandidate(candidate, index)}>{candidate.planId === null ? "Add Account" : "Link"}</button>
-        </div>)}
+      {forecastLoading ? <div role="status">Loading Consumption Records…</div> : <div class="accounts-forecast-list">
+        <table class="accounts-forecast-candidates-table">
+          <thead><tr><th aria-label="Select"/><th>Account</th><th>Plan ID(Number)</th></tr></thead>
+          <tbody>{missingForecastCandidates.map((candidate) => { const key = forecastCandidateKey(candidate); return <tr class="accounts-forecast-candidate" key={key}>
+            <td><input type="checkbox" aria-label={`Select ${candidate.accountName}`} checked={selectedCandidateKeys.has(key)} onChange={() => toggleCandidate(key)}/></td>
+            <td>{candidate.accountName}</td>
+            <td>{candidate.planNumber ?? "없음"}</td>
+          </tr>; })}</tbody>
+        </table>
+        {missingForecastCandidates.length === 0 && <p class="accounts-workloads-empty">No Consumption Records candidates to add.</p>}
       </div>}
-      <footer><button type="button" onClick={() => setForecastOpen(false)}>Done</button></footer>
+      <footer><span>{selectedCandidateKeys.size} selected / {missingForecastCandidates.length} candidates</span><div><button type="button" onClick={() => setForecastOpen(false)}>Cancel</button><button type="button" disabled={!canWrite || selectedCandidateKeys.size === 0} onClick={addSelectedCandidates}>Add</button></div></footer>
     </section></div>}
   </section>;
 }
