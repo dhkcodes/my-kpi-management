@@ -5,6 +5,7 @@ import { getNavigationRoute } from "../src/components/navigationRoutes";
 import {
   AccountsWorkloadsApiError,
   dedupeForecastCandidates,
+  filterForecastCandidates,
   fetchAccountsWorkloadsHierarchy,
   fetchForecastCandidates,
   saveAccountsWorkloadsHierarchy,
@@ -36,9 +37,33 @@ async function run() {
   const candidates: ForecastCandidate[] = [
     { accountName: "Acme", normalizedAccount: "ACME", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
     { accountName: " Acme ", normalizedAccount: "ACME", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
-    { accountName: "Beta", normalizedAccount: "BETA", planId: 7, planNumber: "PLAN-7", linked: true, linkedWorkloadIds: [3] }
+    { accountName: "Beta", normalizedAccount: "BETA", planId: 7, planNumber: "PLAN-7", linked: true, linkedWorkloadIds: [3] },
+    { accountName: "Acme", normalizedAccount: "ACME", planId: 8, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [] },
+    { accountName: "Acme", normalizedAccount: "ACME", planId: 9, planNumber: "PLAN-9", linked: false, linkedWorkloadIds: [] },
+    { accountName: "Renamed account", normalizedAccount: "RENAMED ACCOUNT", planId: 80, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [] }
   ];
-  assert.deepEqual(dedupeForecastCandidates(candidates).map((item) => item.accountName), ["Acme", "Beta"]);
+  assert.deepEqual(dedupeForecastCandidates(candidates).map((item) => item.planNumber),
+    [null, "PLAN-7", "PLAN-8", "PLAN-9", "PLAN-8"],
+    "same visible plan number with a different Plan ID remains a distinct candidate");
+  const existingAccounts = [{
+    id: 1, versionNo: 1, name: "Acme", archived: false,
+    workloads: [{
+      id: 2, versionNo: 1, name: "Database", lastUpdated: null, notes: null, archived: false, deals: [],
+      plans: [{ id: 3, workloadId: 2, sourcePlanId: 8, sourcePlanNumber: "PLAN-8", versionNo: 1 }]
+    }]
+  }, {
+    id: -1, versionNo: 0, name: "  Draft only  ", archived: false,
+    workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", lastUpdated: null, notes: null, archived: false, deals: [], plans: [] }]
+  }];
+  assert.deepEqual(
+    filterForecastCandidates([
+      ...candidates,
+      { accountName: "draft   only", normalizedAccount: "DRAFT ONLY", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
+      { accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] }
+    ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
+    [["Acme", "PLAN-9"], ["Renamed account", "PLAN-8"], ["Draft only plus", null]],
+    "saved Plan IDs and unsaved exact-account drafts are excluded without fuzzy-merging distinct Plan IDs or account names"
+  );
   let candidateUrl = "";
   await fetchForecastCandidates(async (input) => {
     candidateUrl = String(input);
@@ -49,7 +74,7 @@ async function run() {
 
   const saveRequest: AccountsWorkloadsHierarchySaveRequest = {
     accounts: [{ id: null, clientId: "account-1", versionNo: null, name: "Acme", action: "UPSERT" }],
-    workloads: [{ id: null, clientId: "workload-2", accountRef: "account-1", versionNo: null, name: "Database", action: "UPSERT" }],
+    workloads: [{ id: null, clientId: "workload-2", accountRef: "account-1", versionNo: null, name: "Database", lastUpdated: null, notes: null, action: "UPSERT" }],
     deals: [], workloadPlans: []
   };
   let saveUrl = "";
@@ -79,11 +104,17 @@ async function run() {
   assert.match(pageSource, /fetchAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /saveAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /fetchForecastCandidates/);
-  assert.match(pageSource, /Forecast에서 추가/);
-  assert.match(pageSource, /Add Account/);
+  assert.match(pageSource, /Consumption Records/);
+  assert.match(pageSource, /미정의 — 수정 필요/);
+  assert.match(pageSource, /type="checkbox"/, "candidate dialog supports multi-selection");
+  assert.match(pageSource, /Plan ID\(Number\)/, "candidate dialog exposes the original plan number");
+  assert.match(pageSource, /candidate\.planNumber \?\? "없음"/, "missing plan numbers are shown explicitly without inventing one");
+  assert.match(pageSource, /sourcePlanNumber: candidate\.planNumber/, "selected candidates carry their original plan number into the AW draft");
+  assert.match(pageSource, /emptyWorkload[\s\S]{0,240}deals: \[\]/, "candidate-created workloads do not create an opportunity");
+  assert.match(pageSource, /Add Account & Workload/);
   assert.match(pageSource, /Add Workload/);
-  assert.match(pageSource, /Add Deal/);
-  assert.match(pageSource, /accounts-hierarchy__plans/, "Account → Workload → Plan → Deal hierarchy is rendered");
+  assert.match(pageSource, /Add Oppty/);
+  assert.match(pageSource, /accounts-workloads-grid/, "wide Account → Workload table is rendered");
   assert.match(pageSource, /saveError instanceof AccountsWorkloadsApiError/, "structured batch errors are rendered without clearing the draft");
   assert.match(pageSource, /Keep the complete draft and queued operations/, "draft edits survive save errors");
   assert.doesNotMatch(pageSource, /Clone Previous FY|clone-preview/, "FY clone UI is removed");

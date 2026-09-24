@@ -94,6 +94,8 @@ export type AccountWorkload = Readonly<{
   id: number;
   versionNo: number;
   name: string;
+  lastUpdated: string | null;
+  notes: string | null;
   archived: boolean;
   plans: AccountWorkloadPlan[];
   deals: AccountWorkloadDeal[];
@@ -121,23 +123,54 @@ export type ForecastCandidate = Readonly<{
   linkedWorkloadIds: number[];
 }>;
 
-export const forecastCandidateKey = (candidate: ForecastCandidate): string =>
-  candidate.planId === null
-    ? `account:${candidate.normalizedAccount.trim().toLocaleLowerCase()}`
-    : `plan:${candidate.planId}`;
+const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+
+export const forecastCandidateKeys = (candidate: ForecastCandidate): string[] => {
+  if (candidate.planId !== null) return [`plan-id:${candidate.planId}`];
+  const account = normalizedAccountIdentity(candidate.normalizedAccount || candidate.accountName);
+  return account ? [`account:${account}`] : [];
+};
+
+export const forecastCandidateKey = (candidate: ForecastCandidate): string => forecastCandidateKeys(candidate)[0] ?? "";
 
 export const dedupeForecastCandidates = (candidates: ForecastCandidate[]): ForecastCandidate[] => {
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
-    const key = forecastCandidateKey(candidate);
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
+    const keys = forecastCandidateKeys(candidate);
+    if (keys.length === 0 || keys.some((key) => seen.has(key))) return false;
+    keys.forEach((key) => seen.add(key));
+    return true;
+  });
+};
+
+export const filterForecastCandidates = (
+  candidates: ForecastCandidate[],
+  accounts: readonly AccountHierarchyAccount[]
+): ForecastCandidate[] => {
+  const occupied = new Set<string>();
+  accounts.forEach((account) => {
+    const accountKey = normalizedAccountIdentity(account.name);
+    if (accountKey) occupied.add(`account:${accountKey}`);
+    account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
+      if (plan.sourcePlanId !== null) occupied.add(`plan-id:${plan.sourcePlanId}`);
+      else if (plan.sourcePlanNumber?.trim()) occupied.add(`plan-id:${plan.sourcePlanNumber.trim()}`);
+    }));
+  });
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const keys = forecastCandidateKeys(candidate);
+    if (candidate.linked || keys.length === 0 || keys.some((key) => occupied.has(key) || seen.has(key))) return false;
+    keys.forEach((key) => seen.add(key));
     return true;
   });
 };
 
 export type AccountWrite = Readonly<{ id: number | null; clientId: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
-export type WorkloadWrite = Readonly<{ id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
+export type WorkloadWrite = Readonly<{
+  id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null;
+  name: string | null; lastUpdated: string | null; notes: string | null; action: HierarchyWriteAction;
+}>;
 export type DealWrite = Readonly<{
   id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;
   name: string | null; opportunityNo: string | null; revenueType: "NEW" | "EXPANSION" | "RENEWAL" | null;
