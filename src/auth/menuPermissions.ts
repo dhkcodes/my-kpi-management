@@ -8,6 +8,7 @@ export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermission
   if (route.module === "kpiPage") return "kpis-overview";
   if (route.module === "weeklyActivities") return "weekly-activities";
   if (route.module === "myCustomers360") return "customers-overview";
+  if (route.module === "accountManagementOverview") return "accounts-workloads";
   if (route.module === "accountsWorkloads") return "accounts-workloads";
   if (route.module === "consumptionAnalysis") return "analysis";
   if (route.module === "consumptionAttainment") return "attainment";

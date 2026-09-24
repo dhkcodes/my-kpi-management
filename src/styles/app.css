@@ -3598,3 +3598,49 @@ h4.weekly-activity-section-label--next-week,
   .weekly-activity-filters__actions { grid-column: 1; }
   .weekly-activity-filters__actions { display: grid; grid-template-columns: 1fr 1fr; }
 }
+
+/* FY-independent account/workload/deal hierarchy. */
+.accounts-hierarchy-page { height: auto; min-height: calc(100dvh - var(--accounts-workloads-viewport-offset)); overflow: visible; }
+.accounts-hierarchy-page .accounts-workloads-header h1 { margin: .25rem 0; }
+.accounts-hierarchy-page .accounts-workloads-header p { color: var(--kpi-muted); margin: 0; }
+.accounts-workloads-banner { background: #f0f7f1; border: 1px solid #b8d7bd; border-radius: .25rem; margin-top: .75rem; padding: .65rem .8rem; }
+.accounts-workloads-banner--error { background: #fff3f2; border-color: #e3aaa5; color: #8a251d; }
+.accounts-hierarchy { display: grid; gap: 1rem; margin-top: 1rem; }
+.accounts-hierarchy__account { border: 1px solid var(--kpi-border); border-radius: .35rem; overflow: hidden; }
+.accounts-hierarchy__heading, .accounts-hierarchy__workload-heading { align-items: center; display: flex; flex-wrap: wrap; gap: .5rem; padding: .7rem; }
+.accounts-hierarchy__heading { background: #f2efec; }
+.accounts-hierarchy__workload-heading { background: #faf9f7; border-bottom: 1px solid var(--kpi-border); }
+.accounts-hierarchy__heading input, .accounts-hierarchy__workload-heading input { background: transparent; border: 1px solid transparent; color: var(--kpi-ink); flex: 1 1 16rem; font: inherit; font-weight: 800; min-height: 2.1rem; padding: .35rem .5rem; }
+.accounts-hierarchy__heading input:focus, .accounts-hierarchy__workload-heading input:focus { background: #fff; border-color: #6f92ad; outline: none; }
+.accounts-hierarchy button, .accounts-forecast-dialog button { background: #fff; border: 1px solid #9b9690; border-radius: .25rem; color: var(--kpi-ink); cursor: pointer; min-height: 2rem; padding: .35rem .65rem; }
+.accounts-hierarchy button.is-danger { color: #9b2c23; }
+.accounts-hierarchy button:disabled, .accounts-forecast-dialog button:disabled { cursor: not-allowed; opacity: .5; }
+.accounts-hierarchy__workloads { display: grid; gap: .75rem; padding: .75rem; }
+.accounts-hierarchy__workload { border: 1px solid #ddd8d2; border-radius: .25rem; overflow: hidden; }
+.accounts-hierarchy__plans { align-items: center; border-bottom: 1px solid #eeeae5; display: flex; flex-wrap: wrap; gap: .4rem; padding: .55rem .65rem; }
+.accounts-hierarchy__level-label { color: var(--kpi-muted); font-size: .7rem; font-weight: 800; margin-right: .2rem; text-transform: uppercase; }
+.accounts-hierarchy__plan { align-items: center; background: #f2f6f8; border: 1px solid #c9d8e1; border-radius: 1rem; display: inline-flex; gap: .35rem; padding: .2rem .35rem .2rem .65rem; }
+.accounts-hierarchy__plan.is-draft { border-style: dashed; }
+.accounts-hierarchy__plan button { border: 0; min-height: 1.4rem; padding: 0 .3rem; }
+.accounts-hierarchy__deals { display: grid; gap: .6rem; padding: .65rem; }
+.accounts-hierarchy__deal { align-items: end; background: #fff; border: 1px solid #e6e2dd; display: grid; gap: .5rem; grid-template-columns: repeat(6, minmax(7.5rem, 1fr)); padding: .65rem; }
+.accounts-hierarchy__deal label { color: var(--kpi-muted); display: grid; font-size: .7rem; font-weight: 800; gap: .2rem; text-transform: uppercase; }
+.accounts-hierarchy__deal input, .accounts-hierarchy__deal select, .accounts-forecast-candidate select { border: 1px solid #c9c4be; border-radius: .2rem; color: var(--kpi-ink); font: inherit; min-height: 2rem; min-width: 0; padding: .3rem .4rem; width: 100%; }
+.accounts-hierarchy__wide { grid-column: span 3; }
+.accounts-hierarchy__empty { color: var(--kpi-muted); margin: .25rem; }
+.accounts-workloads-dialog-backdrop { align-items: center; background: rgb(22 21 19 / 45%); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 1000; }
+.accounts-forecast-dialog { background: #fff; border-radius: .4rem; box-shadow: 0 1rem 3rem rgb(0 0 0 / 28%); display: grid; gap: .8rem; max-height: 85vh; max-width: 56rem; overflow: auto; padding: 1rem; width: 100%; }
+.accounts-forecast-dialog header, .accounts-forecast-dialog footer, .accounts-forecast-candidate { align-items: center; display: flex; gap: .75rem; justify-content: space-between; }
+.accounts-forecast-dialog h2 { margin: 0; }
+.accounts-forecast-dialog p { color: var(--kpi-muted); margin: .2rem 0 0; }
+.accounts-forecast-list { display: grid; gap: .5rem; }
+.accounts-forecast-candidate { border: 1px solid var(--kpi-border); padding: .65rem; }
+.accounts-forecast-candidate > div { display: grid; flex: 1 1 auto; gap: .15rem; }
+.accounts-forecast-candidate span, .accounts-forecast-candidate small { color: var(--kpi-muted); }
+.accounts-forecast-candidate select { flex: 0 1 20rem; }
+@media (max-width: 1000px) { .accounts-hierarchy__deal { grid-template-columns: repeat(3, minmax(7.5rem, 1fr)); } }
+@media (max-width: 640px) {
+  .accounts-hierarchy__deal { grid-template-columns: 1fr; }
+  .accounts-hierarchy__wide { grid-column: auto; }
+  .accounts-forecast-candidate { align-items: stretch; flex-direction: column; }
+}

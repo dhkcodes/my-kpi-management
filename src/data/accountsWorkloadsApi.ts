@@ -42,7 +42,7 @@ const accountsWorkloadsApiBase = () => {
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export type AccountsWorkloadsListQuery = Readonly<{
-  fiscalYear: FiscalYear;
+  fiscalYear?: FiscalYear;
   search?: string;
   includeDeleted?: boolean;
   sort?: string;
@@ -52,6 +52,112 @@ export type AccountsWorkloadsListQuery = Readonly<{
 export type AccountsWorkloadsListResponse = Readonly<{
   items: AccountWorkloadRow[];
   total: number;
+}>;
+
+export type DealStatus = "OPEN" | "WON" | "LOST";
+export type HierarchyWriteAction = "UPSERT" | "ARCHIVE" | "RESTORE" | "DELETE";
+
+export type AccountWorkloadDeal = Readonly<{
+  id: number;
+  workloadId: number;
+  versionNo: number;
+  name: string;
+  opportunityNo: string | null;
+  revenueType: "NEW" | "EXPANSION" | "RENEWAL";
+  status: DealStatus;
+  targetFiscalYear: string | null;
+  targetQuarter: number | null;
+  actualCloseDate: string | null;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+  arrUsd: number | null;
+  arrKrw: number | null;
+  acrUsd: number | null;
+  acrKrw: number | null;
+  winProbability: number | null;
+  latestUpdate: string | null;
+  notes: string | null;
+  deleted: boolean;
+  deletedAt: string | null;
+  sourceCommitmentId: number | null;
+}>;
+
+export type AccountWorkloadPlan = Readonly<{
+  id: number;
+  workloadId: number;
+  sourcePlanId: number | null;
+  sourcePlanNumber: string | null;
+  versionNo: number;
+}>;
+
+export type AccountWorkload = Readonly<{
+  id: number;
+  versionNo: number;
+  name: string;
+  archived: boolean;
+  plans: AccountWorkloadPlan[];
+  deals: AccountWorkloadDeal[];
+}>;
+
+export type AccountHierarchyAccount = Readonly<{
+  id: number;
+  versionNo: number;
+  name: string;
+  archived: boolean;
+  workloads: AccountWorkload[];
+}>;
+
+export type AccountsWorkloadsHierarchy = Readonly<{
+  fiscalYear: null;
+  accounts: AccountHierarchyAccount[];
+}>;
+
+export type ForecastCandidate = Readonly<{
+  accountName: string;
+  normalizedAccount: string;
+  planId: number | null;
+  planNumber: string | null;
+  linked: boolean;
+  linkedWorkloadIds: number[];
+}>;
+
+export const forecastCandidateKey = (candidate: ForecastCandidate): string =>
+  candidate.planId === null
+    ? `account:${candidate.normalizedAccount.trim().toLocaleLowerCase()}`
+    : `plan:${candidate.planId}`;
+
+export const dedupeForecastCandidates = (candidates: ForecastCandidate[]): ForecastCandidate[] => {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = forecastCandidateKey(candidate);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export type AccountWrite = Readonly<{ id: number | null; clientId: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
+export type WorkloadWrite = Readonly<{ id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
+export type DealWrite = Readonly<{
+  id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;
+  name: string | null; opportunityNo: string | null; revenueType: "NEW" | "EXPANSION" | "RENEWAL" | null;
+  status: DealStatus | null; targetFiscalYear: string | null; targetQuarter: number | null;
+  actualCloseDate: string | null; contractStartDate: string | null; contractEndDate: string | null;
+  arrUsd: number | null; arrKrw: number | null; acrUsd: number | null; acrKrw: number | null;
+  winProbability: number | null; latestUpdate: string | null; notes: string | null; action: HierarchyWriteAction;
+}>;
+export type WorkloadPlanWrite = Readonly<{ id: number | null; workloadRef: string | null; versionNo: number | null; sourcePlanId: number | null; sourcePlanNumber: string | null; action: HierarchyWriteAction }>;
+export type AccountsWorkloadsHierarchySaveRequest = Readonly<{
+  accounts: AccountWrite[]; workloads: WorkloadWrite[]; deals: DealWrite[]; workloadPlans: WorkloadPlanWrite[];
+}>;
+
+export type AccountsWorkloadsFieldError = Readonly<{
+  operationIndex: number;
+  entity: "account" | "workload" | "deal" | "workloadPlan";
+  clientId: string | null;
+  field: string;
+  code: string;
+  message: string;
 }>;
 
 export type AccountsWorkloadsFiscalYearsResponse = Readonly<{
@@ -77,7 +183,8 @@ export class AccountsWorkloadsApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
-    message: string
+    message: string,
+    public readonly errors: AccountsWorkloadsFieldError[] = []
   ) {
     super(message);
     this.name = "AccountsWorkloadsApiError";
@@ -107,7 +214,7 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
     throw new AccountsWorkloadsNetworkError(cause);
   }
   if (!response.ok) {
-    let payload: { code?: string; message?: string } = {};
+    let payload: { code?: string; message?: string; errors?: unknown } = {};
     try {
       payload = await response.json();
     } catch {
@@ -116,7 +223,19 @@ const requestJson = async <T>(fetchImpl: FetchLike, url: string, init?: RequestI
     throw new AccountsWorkloadsApiError(
       response.status,
       payload.code ?? "HTTP_ERROR",
-      payload.message ?? `Accounts & Workloads API request failed (${response.status})`
+      payload.message ?? `Accounts & Workloads API request failed (${response.status})`,
+      Array.isArray(payload.errors)
+        ? payload.errors.filter((candidate): candidate is AccountsWorkloadsFieldError => {
+            if (typeof candidate !== "object" || candidate === null) return false;
+            const value = candidate as Record<string, unknown>;
+            return Number.isInteger(value.operationIndex)
+              && ["account", "workload", "deal", "workloadPlan"].includes(String(value.entity))
+              && (value.clientId === null || typeof value.clientId === "string")
+              && typeof value.field === "string"
+              && typeof value.code === "string"
+              && typeof value.message === "string";
+          })
+        : []
     );
   }
   if (response.status === 204) return undefined as T;
@@ -171,7 +290,11 @@ const parseAccountWorkloadRow = (value: unknown): AccountWorkloadRow | null => {
     account: row.account,
     workloadName: row.workloadName,
     revenueType: row.revenueType ?? null,
-    opptyNo: textOrEmpty(row.opptyNo),
+    opptyNo: row.opptyNo as string | null,
+    dealName: typeof row.dealName === "string" && row.dealName.trim() ? row.dealName.trim() : row.workloadName,
+    dealStatus: typeof row.dealStatus === "string" ? row.dealStatus : null,
+    closeDate: typeof row.closeDate === "string" ? row.closeDate : "",
+    contractPeriodMonths: isNullableNonnegativeNumber(row.contractPeriodMonths) ? row.contractPeriodMonths : null,
     startDate: textOrEmpty(row.startDate),
     endDate: textOrEmpty(row.endDate),
     arrUsd: row.arrUsd,
@@ -291,12 +414,86 @@ export const cloneAccountsWorkloadsPreviousFiscalYear = async (
   };
 };
 
+const requiredObject = (value: unknown, message: string): Record<string, unknown> => {
+  if (typeof value !== "object" || value === null) throw new Error(message);
+  return value as Record<string, unknown>;
+};
+
+const parseHierarchy = (payload: unknown): AccountsWorkloadsHierarchy => {
+  const root = requiredObject(payload, "Malformed Accounts & Workloads hierarchy response");
+  if (root.fiscalYear !== null || !Array.isArray(root.accounts)) {
+    throw new Error("Malformed Accounts & Workloads hierarchy response");
+  }
+  // The hierarchy endpoint is a strongly typed, versioned API. Verify the structural
+  // discriminators here; individual nullable deal fields are represented verbatim.
+  root.accounts.forEach((account, accountIndex) => {
+    const value = requiredObject(account, `Malformed account ${accountIndex + 1}`);
+    if (!isPositiveInteger(value.id) || !isPositiveInteger(value.versionNo) || typeof value.name !== "string" ||
+        typeof value.archived !== "boolean" || !Array.isArray(value.workloads)) {
+      throw new Error(`Malformed account ${accountIndex + 1}`);
+    }
+    value.workloads.forEach((workload, workloadIndex) => {
+      const item = requiredObject(workload, `Malformed workload ${workloadIndex + 1}`);
+      if (!isPositiveInteger(item.id) || !isPositiveInteger(item.versionNo) || typeof item.name !== "string" ||
+          typeof item.archived !== "boolean" || !Array.isArray(item.plans) || !Array.isArray(item.deals)) {
+        throw new Error(`Malformed workload ${workloadIndex + 1}`);
+      }
+    });
+  });
+  return payload as AccountsWorkloadsHierarchy;
+};
+
+export const fetchAccountsWorkloadsHierarchy = async (
+  query: Readonly<{ search?: string; includeArchived?: boolean; includeDeletedDeals?: boolean }> = {},
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsHierarchy> => {
+  const params = new URLSearchParams({
+    search: query.search ?? "",
+    includeArchived: String(query.includeArchived ?? false),
+    includeDeletedDeals: String(query.includeDeletedDeals ?? false)
+  });
+  return parseHierarchy(await requestJson<unknown>(fetchImpl,
+    `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy?${params.toString()}`));
+};
+
+export const saveAccountsWorkloadsHierarchy = async (
+  request: AccountsWorkloadsHierarchySaveRequest,
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsHierarchy> => {
+  const payload = requiredObject(await requestJson<unknown>(fetchImpl,
+    `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy/save`, {
+      method: "POST",
+      body: JSON.stringify(request)
+    }), "Malformed Accounts & Workloads save response");
+  return parseHierarchy(payload.hierarchy);
+};
+
+export const fetchForecastCandidates = async (
+  fetchImpl: FetchLike = fetch
+): Promise<ForecastCandidate[]> => {
+  const payload = await requestJson<unknown>(fetchImpl,
+    `${accountsWorkloadsApiBase()}/accounts-workloads/forecast-candidates`);
+  if (!Array.isArray(payload)) throw new Error("Malformed Forecast candidates response");
+  return dedupeForecastCandidates(payload.map((entry, index): ForecastCandidate => {
+    const value = requiredObject(entry, `Malformed Forecast candidate ${index + 1}`);
+    const linkedWorkloadIds = value.linkedWorkloadIds;
+    if (typeof value.accountName !== "string" || typeof value.normalizedAccount !== "string" ||
+        !(value.planId === null || isPositiveInteger(value.planId)) ||
+        !(value.planNumber === null || typeof value.planNumber === "string") ||
+        typeof value.linked !== "boolean" || !Array.isArray(linkedWorkloadIds) ||
+        linkedWorkloadIds.some((id) => !isPositiveInteger(id))) {
+      throw new Error(`Malformed Forecast candidate ${index + 1}`);
+    }
+    return value as ForecastCandidate;
+  }));
+};
+
 export const fetchAccountsWorkloads = async (
   query: AccountsWorkloadsListQuery,
   fetchImpl: FetchLike = fetch
 ): Promise<AccountsWorkloadsListResponse> => {
   const params = new URLSearchParams();
-  params.set("fiscalYear", query.fiscalYear);
+  if (query.fiscalYear) params.set("fiscalYear", query.fiscalYear);
   params.set("search", query.search ?? "");
   params.set("includeDeleted", String(query.includeDeleted ?? false));
   params.set("sort", query.sort ?? "account");

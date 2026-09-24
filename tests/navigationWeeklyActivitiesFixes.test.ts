@@ -13,13 +13,18 @@ assert.deepEqual(
   [
     { id: "home", label: "Home", childIds: undefined },
     {
-      id: "my-customers",
-      label: "My Customers",
-      childIds: ["customers-overview", "accounts-workloads", "weekly-activities"]
+      id: "my-activities",
+      label: "My Activities",
+      childIds: ["weekly-activities"]
+    },
+    {
+      id: "account-management",
+      label: "Account Management",
+      childIds: ["account-management-overview", "accounts-workloads"]
     },
     {
       id: "kpis",
-      label: "KPI Activities",
+      label: "KPI",
       childIds: ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
     },
     { id: "consumption", label: "Consumption", childIds: ["analysis", "attainment", "records"] }

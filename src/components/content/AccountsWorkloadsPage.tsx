@@ -1,1280 +1,351 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { FiscalYear } from "../../data/kpiMockData";
-import { AccountsWorkloadsApiError, AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsClonePreview, AccountsWorkloadsListQuery, AccountsWorkloadsNetworkError, cloneAccountsWorkloadsPreviousFiscalYear, fetchAccountsWorkloadsClonePreview } from "../../data/accountsWorkloadsApi";
-import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
-import { FxRateRecord } from "../../data/kpiConfigurationApi";
-import { getTargetPeriodOptions } from "../../data/targetPeriod";
-import {
-  applyDraftDelete,
-  applyDraftRestore,
-  classifyAccountDeleteTargets,
-  hasEditableAccountWorkloadChanges,
-  hasSelectedDeletedRows,
-  overlayEditableAccountWorkloadChanges,
-  withMinimumPendingDuration
-} from "../../data/accountsWorkloadsSelection";
-import {
-  AccountWorkloadMetadata,
-  AccountWorkloadRow,
-  RevenueType
-} from "../../data/accountsWorkloadsMockData";
 import "ojs/ojbutton";
-import "ojs/ojswitch";
-import "ojs/ojdatetimepicker";
-import "ojs/ojdialog";
 import "ojs/ojprogress-circle";
-import { ojDialog } from "ojs/ojdialog";
-
-type EditableField = keyof Pick<
-  AccountWorkloadRow,
-  | "planNumber"
-  | "account"
-  | "workloadName"
-  | "revenueType"
-  | "opptyNo"
-  | "startDate"
-  | "endDate"
-  | "arrUsd"
-  | "arrKrw"
-  | "acrUsd"
-  | "acrKrw"
-  | "target"
-  | "winProbability"
-  | "latestUpdate"
-  | "notes"
->;
-
-type SortField = EditableField | "isImportant";
-
-type EditCell = Readonly<{
-  id: string;
-  field: EditableField;
-}>;
-
-type DeleteTargets = Readonly<{
-  draftIds: string[];
-  activeIds: string[];
-  permanentIds: string[];
-  baseRows: AccountWorkloadRow[];
-}>;
+import {
+  AccountHierarchyAccount,
+  AccountWorkload,
+  AccountWorkloadDeal,
+  AccountsWorkloadsApiError,
+  AccountsWorkloadsFieldError,
+  AccountsWorkloadsHierarchy,
+  AccountsWorkloadsHierarchySaveRequest,
+  DealWrite,
+  ForecastCandidate,
+  WorkloadPlanWrite,
+  fetchAccountsWorkloadsHierarchy,
+  fetchForecastCandidates,
+  saveAccountsWorkloadsHierarchy
+} from "../../data/accountsWorkloadsApi";
 
 type Props = Readonly<{
-  fiscalYear: FiscalYear;
   canWrite: boolean;
-  rows: AccountWorkloadRow[];
-  metadata: AccountWorkloadMetadata;
-  query: Omit<AccountsWorkloadsListQuery, "fiscalYear">;
-  dataSource: AccountsWorkloadsDataSource;
-  fxRate: FxRateRecord | null;
-  fxLoading: boolean;
-  fxError: string;
-  accountsWorkloadsRefreshing: boolean;
-  onQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
-  onRefresh: () => void;
-  onDraftStateChange: (active: boolean) => void;
-  onRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
   breadcrumb?: ComponentChildren;
+  onDraftStateChange?: (active: boolean) => void;
+  initialSearch?: string;
 }>;
 
-const editableFields: EditableField[] = [
-  "planNumber",
-  "account",
-  "workloadName",
-  "revenueType",
-  "opptyNo",
-  "startDate",
-  "endDate",
-  "arrUsd",
-  "arrKrw",
-  "acrUsd",
-  "acrKrw",
-  "target",
-  "winProbability",
-  "latestUpdate",
-  "notes"
-];
+type QueuedOperation =
+  | Readonly<{ entity: "account"; id: number; versionNo: number; name: string; action: "ARCHIVE" | "RESTORE" }>
+  | Readonly<{ entity: "workload"; id: number; versionNo: number; name: string; action: "ARCHIVE" | "RESTORE" }>
+  | Readonly<{ entity: "deal"; id: number; versionNo: number; action: "DELETE" | "RESTORE" }>;
 
-const centerAlignedFields = new Set<EditableField>([
-  "startDate",
-  "endDate",
-  "opptyNo",
-  "revenueType",
-  "target",
-  "winProbability"
-]);
-const rightAlignedFields = new Set<EditableField>(["arrUsd", "arrKrw", "acrUsd", "acrKrw"]);
-const fieldAlignmentClass = (field: EditableField) =>
-  rightAlignedFields.has(field)
-    ? "accounts-workloads-cell--right"
-    : centerAlignedFields.has(field)
-      ? "accounts-workloads-cell--center"
-      : "accounts-workloads-cell--left";
+const EMPTY_HIERARCHY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
+const refFor = (id: number, entity: "account" | "workload") => id > 0 ? String(id) : `${entity}-${Math.abs(id)}`;
+const nullable = (value: string) => value.trim() || null;
+const numeric = (value: string): number | null => value.trim() === "" ? null : Number(value);
+const friendlyError = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed.";
+const normalized = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
 
-const columnLabels: Record<EditableField | "rowNo" | "isImportant", string> = {
-  rowNo: "No",
-  isImportant: "!",
-  planNumber: "Plan Number",
-  account: "Account",
-  workloadName: "Workload",
-  revenueType: "Revenue Type",
-  opptyNo: "Oppty No",
-  startDate: "Start Date",
-  endDate: "End Date",
-  arrUsd: "ARR($)",
-  arrKrw: "ARR(₩)",
-  acrUsd: "ACR($)",
-  acrKrw: "ACR(₩)",
-  target: "Target",
-  winProbability: "Win Prob.",
-  latestUpdate: "Latest Update",
-  notes: "Notes"
-};
-
-const currencyUsdFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0
+const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({
+  id, workloadId, versionNo: 0, name: "", opportunityNo: null, revenueType: "NEW", status: "OPEN",
+  targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null,
+  contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null,
+  winProbability: null, latestUpdate: null, notes: null, deleted: false, deletedAt: null,
+  sourceCommitmentId: null
 });
 
-const currencyKrwFormatter = new Intl.NumberFormat("ko-KR", {
-  maximumFractionDigits: 0
+const dealWrite = (deal: AccountWorkloadDeal, workloadId: number): DealWrite => ({
+  id: deal.id > 0 ? deal.id : null,
+  clientId: deal.id > 0 ? null : `deal-${Math.abs(deal.id)}`,
+  workloadRef: refFor(workloadId, "workload"),
+  versionNo: deal.id > 0 ? deal.versionNo : null,
+  name: deal.name,
+  opportunityNo: deal.opportunityNo,
+  revenueType: deal.revenueType,
+  status: deal.status,
+  targetFiscalYear: deal.targetFiscalYear,
+  targetQuarter: deal.targetQuarter,
+  actualCloseDate: deal.actualCloseDate,
+  contractStartDate: deal.contractStartDate,
+  contractEndDate: deal.contractEndDate,
+  arrUsd: deal.arrUsd,
+  arrKrw: deal.arrKrw,
+  acrUsd: deal.acrUsd,
+  acrKrw: deal.acrKrw,
+  winProbability: deal.winProbability,
+  latestUpdate: deal.latestUpdate,
+  notes: deal.notes,
+  action: "UPSERT"
 });
 
-const formatUsd = (value: number | null) => (value === null ? "—" : `$${currencyUsdFormatter.format(value)}`);
-const formatKrw = (value: number | null) => (value === null ? "—" : `₩${currencyKrwFormatter.format(Math.round(value))}`);
-const formatProbability = (value: number | null) => (value === null ? "—" : `${value}%`);
-const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion", "Renewal"];
+export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange, initialSearch = "" }: Props) {
+  const nextTempId = useRef(-1);
+  const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY_HIERARCHY);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch);
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [includeDeletedDeals, setIncludeDeletedDeals] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saveErrors, setSaveErrors] = useState<AccountsWorkloadsFieldError[]>([]);
+  const [notice, setNotice] = useState("");
+  const [dirtyAccounts, setDirtyAccounts] = useState<Set<number>>(new Set());
+  const [dirtyWorkloads, setDirtyWorkloads] = useState<Set<number>>(new Set());
+  const [dirtyDeals, setDirtyDeals] = useState<Set<number>>(new Set());
+  const [queued, setQueued] = useState<QueuedOperation[]>([]);
+  const [planWrites, setPlanWrites] = useState<WorkloadPlanWrite[]>([]);
+  const [forecastOpen, setForecastOpen] = useState(false);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastCandidates, setForecastCandidates] = useState<ForecastCandidate[]>([]);
+  const [forecastError, setForecastError] = useState("");
+  const [candidateWorkload, setCandidateWorkload] = useState<Record<string, string>>({});
 
-const comparableValue = (value: unknown) => value ?? "";
+  const dirty = dirtyAccounts.size + dirtyWorkloads.size + dirtyDeals.size + queued.length + planWrites.length > 0;
+  useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
-const isFieldChanged = (savedRows: AccountWorkloadRow[], row: AccountWorkloadRow, field: EditableField) => {
-  const savedRow = savedRows.find((item) => item.id === row.id);
-  return Boolean(savedRow && comparableValue(savedRow[field]) !== comparableValue(row[field]));
-};
+  const reload = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await fetchAccountsWorkloadsHierarchy({ search, includeArchived, includeDeletedDeals });
+      setHierarchy(result);
+      setDirtyAccounts(new Set()); setDirtyWorkloads(new Set()); setDirtyDeals(new Set());
+      setQueued([]); setPlanWrites([]);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const sortValue = (row: AccountWorkloadRow, field: SortField) => {
-  const value = row[field];
-  if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "number") return value;
-  return value ?? "";
-};
+  useEffect(() => { void reload(); }, [search, includeArchived, includeDeletedDeals]);
 
-const numberFromInput = (value: string) => {
-  const normalized = value.replace(/[$₩,\s]/g, "");
-  if (normalized === "" || normalized === "—" || normalized === "-") return null;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+  const workloadOptions = useMemo(() => hierarchy.accounts.flatMap((account) => account.workloads.map((workload) => ({
+    id: workload.id, label: `${account.name} / ${workload.name}`
+  }))), [hierarchy]);
 
-const updateCurrencyPair = (row: AccountWorkloadRow, field: EditableField, value: number | null, exchangeRate: number): AccountWorkloadRow => {
-  const next = { ...row, [field]: value } as AccountWorkloadRow;
-  if (field === "arrUsd") next.arrKrw = value === null ? null : Math.round(value * exchangeRate);
-  if (field === "arrKrw") next.arrUsd = value === null ? null : Number((value / exchangeRate).toFixed(2));
-  if (field === "acrUsd") next.acrKrw = value === null ? null : Math.round(value * exchangeRate);
-  if (field === "acrKrw") next.acrUsd = value === null ? null : Number((value / exchangeRate).toFixed(2));
-  return next;
-};
+  const updateAccount = (id: number, name: string) => {
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, name } : account) }));
+    setDirtyAccounts((current) => new Set(current).add(id));
+  };
+  const updateWorkload = (id: number, name: string) => {
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+      ...account, workloads: account.workloads.map((workload) => workload.id === id ? { ...workload, name } : workload)
+    })) }));
+    setDirtyWorkloads((current) => new Set(current).add(id));
+  };
+  const updateDeal = (id: number, field: keyof AccountWorkloadDeal, value: unknown) => {
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+      ...account, workloads: account.workloads.map((workload) => ({
+        ...workload, deals: workload.deals.map((deal) => deal.id === id ? { ...deal, [field]: value } : deal)
+      }))
+    })) }));
+    setDirtyDeals((current) => new Set(current).add(id));
+  };
 
-const createEmptyRow = (fiscalYear: FiscalYear): AccountWorkloadRow => ({
-  id: `new-${Date.now()}`,
-  sourceRowNumber: 0,
-  planNumber: "",
-  account: "",
-  workloadName: "",
-  revenueType: "New",
-  opptyNo: "",
-  startDate: "",
-  endDate: "",
-  arrUsd: null,
-  arrKrw: null,
-  acrUsd: null,
-  acrKrw: null,
-  target: `${fiscalYear} Q1`,
-  winProbability: null,
-  latestUpdate: "",
-  notes: "",
-  isImportant: false,
-  isDeleted: false,
-  deletedAt: null,
-  deletedBy: null
-});
+  const addAccount = (name = "") => {
+    const id = nextTempId.current--;
+    setHierarchy((current) => ({ ...current, accounts: [...current.accounts, { id, versionNo: 0, name, archived: false, workloads: [] }] }));
+    setDirtyAccounts((current) => new Set(current).add(id));
+  };
+  const addWorkload = (accountId: number) => {
+    const id = nextTempId.current--;
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === accountId
+      ? { ...account, workloads: [...account.workloads, { id, versionNo: 0, name: "", archived: false, plans: [], deals: [] }] }
+      : account) }));
+    setDirtyWorkloads((current) => new Set(current).add(id));
+  };
+  const addDeal = (workloadId: number) => {
+    const id = nextTempId.current--;
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account,
+      workloads: account.workloads.map((workload) => workload.id === workloadId
+        ? { ...workload, deals: [...workload.deals, emptyDeal(id, workloadId)] }
+        : workload)
+    })) }));
+    setDirtyDeals((current) => new Set(current).add(id));
+  };
 
-const formatAccountsWorkloadsSaveError = (error: unknown) => {
-  const retry = "Your drafts are unchanged and can be retried.";
-  if (error instanceof AccountsWorkloadsNetworkError) return `The API could not be reached. ${retry}`;
-  if (error instanceof AccountsWorkloadsApiError) {
-    if (error.status === 401 || error.status === 403) return `You do not have permission to save these changes. ${retry}`;
-    if (error.status === 409 && error.code === "DUPLICATE_ACCOUNT_WORKLOAD") return error.message;
-    if (error.status === 409) return `Another user changed this data. Reload the latest data before saving again. ${retry}`;
-    if (error.status === 400 || error.status === 422 || error.code === "VALIDATION_ERROR") return `Validation failed: ${error.message}. ${retry}`;
-    if (error.status >= 500) return `The server could not save the changes (${error.code}). ${retry}`;
-    return `The save request was rejected (${error.code}). ${retry}`;
-  }
-  return `The changes could not be saved. ${retry}`;
-};
-
-function EditableCell({
-  row,
-  field,
-  value,
-  targetOptions,
-  onChange,
-  onCommit,
-  onCancel
-}: Readonly<{
-  row: AccountWorkloadRow;
-  field: EditableField;
-  value: AccountWorkloadRow[EditableField];
-  targetOptions: readonly string[];
-  onChange: (rowId: string, field: EditableField, value: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}>) {
-  const inputId = `${row.id}-${field}`;
-  const editorKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || event.keyCode === 229) return;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onCancel();
+  const archiveAccount = (account: AccountHierarchyAccount) => {
+    if (account.id < 0) {
+      setHierarchy((current) => ({ ...current, accounts: current.accounts.filter((item) => item.id !== account.id) }));
+      setDirtyAccounts((current) => { const next = new Set(current); next.delete(account.id); return next; });
       return;
     }
-    if (event.key === "Enter" && !(event.currentTarget instanceof HTMLTextAreaElement && event.shiftKey)) {
-      event.preventDefault();
-      event.stopPropagation();
-      onCommit();
+    setDirtyAccounts((current) => { const next = new Set(current); next.delete(account.id); return next; });
+    setQueued((current) => [...current, { entity: "account", id: account.id, versionNo: account.versionNo, name: account.name, action: account.archived ? "RESTORE" : "ARCHIVE" }]);
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.filter((item) => item.id !== account.id) }));
+  };
+  const archiveWorkload = (workload: AccountWorkload) => {
+    if (workload.id < 0) {
+      setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.filter((item) => item.id !== workload.id) })) }));
+      setDirtyWorkloads((current) => { const next = new Set(current); next.delete(workload.id); return next; });
+      return;
     }
+    setDirtyWorkloads((current) => { const next = new Set(current); next.delete(workload.id); return next; });
+    setQueued((current) => [...current, { entity: "workload", id: workload.id, versionNo: workload.versionNo, name: workload.name, action: workload.archived ? "RESTORE" : "ARCHIVE" }]);
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.filter((item) => item.id !== workload.id) })) }));
   };
-  if (field === "latestUpdate" || field === "notes") {
-    return (
-      <textarea
-        id={inputId}
-        class="accounts-workloads-edit-field accounts-workloads-edit-field--textarea"
-        value={`${value ?? ""}`}
-        onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLTextAreaElement).value)}
-        onKeyDown={editorKeyDown}
-        autofocus
-      />
-    );
-  }
-
-  if (field === "startDate" || field === "endDate") {
-    return (
-      <oj-input-date
-        id={inputId}
-        class="accounts-workloads-edit-field accounts-workloads-jet-date"
-        labelHint={columnLabels[field]}
-        labelEdge="none"
-        userAssistanceDensity="compact"
-        value={`${value ?? ""}`}
-        datePicker={{
-          changeMonth: "select",
-          changeYear: "select",
-          daysOutsideMonth: "visible"
-        }}
-        onvalueChanged={(event: CustomEvent) => onChange(row.id, field, `${event.detail.value ?? ""}`)}
-        onKeyDown={editorKeyDown}
-        autofocus>
-      </oj-input-date>
-    );
-  }
-
-  if (["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field)) {
-    return (
-      <input
-        id={inputId}
-        class="accounts-workloads-edit-field"
-        type="number"
-        value={value === null ? "" : `${value}`}
-        onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLInputElement).value)}
-        onKeyDown={editorKeyDown}
-        autofocus
-      />
-    );
-  }
-
-  if (field === "target") {
-    return (
-      <select
-        id={inputId}
-        class="accounts-workloads-edit-field"
-        value={`${value ?? ""}`}
-        onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLSelectElement).value)}
-        onKeyDown={editorKeyDown}
-        autofocus>
-        <option value="">—</option>
-        {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    );
-  }
-
-  if (field === "revenueType") {
-    return (
-      <select
-        id={inputId}
-        class="accounts-workloads-edit-field"
-        value={`${value ?? ""}`}
-        onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLSelectElement).value)}
-        onKeyDown={editorKeyDown}
-        autofocus>
-        <option value="">—</option>
-        {revenueTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    );
-  }
-
-  return (
-    <input
-      id={inputId}
-      class="accounts-workloads-edit-field"
-      value={`${value ?? ""}`}
-      onInput={(event) => onChange(row.id, field, (event.currentTarget as HTMLInputElement).value)}
-      onKeyDown={editorKeyDown}
-      autofocus
-    />
-  );
-}
-
-export function AccountsWorkloadsPage({
-  fiscalYear,
-  canWrite,
-  rows,
-  metadata,
-  query,
-  dataSource,
-  fxRate,
-  fxLoading,
-  fxError,
-  accountsWorkloadsRefreshing,
-  onQueryChange,
-  onRefresh,
-  onDraftStateChange,
-  onRowsChange,
-  breadcrumb
-} : Props) {
-  const targetOptions = getTargetPeriodOptions(fiscalYear);
-  const [draftRows, setDraftRows] = useState<AccountWorkloadRow[]>(rows);
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [includeDeleted, setIncludeDeleted] = useState(Boolean(query.includeDeleted));
-  const [sortField, setSortField] = useState<SortField>((query.sort as SortField | undefined) ?? "account");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(query.direction ?? "asc");
-  const [searchTerm, setSearchTerm] = useState(query.search ?? "");
-  const [editCell, setEditCell] = useState<EditCell | null>(null);
-  const [addingRow, setAddingRow] = useState<AccountWorkloadRow | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [deleteTargets, setDeleteTargets] = useState<DeleteTargets | null>(null);
-  const [clonePreview, setClonePreview] = useState<AccountsWorkloadsClonePreview | null>(null);
-  const [cloneOpen, setCloneOpen] = useState(false);
-  const [cloneSelection, setCloneSelection] = useState<number[]>([]);
-  const [cloneLoading, setCloneLoading] = useState(false);
-  const [cloneExecuting, setCloneExecuting] = useState(false);
-  const [cloneError, setCloneError] = useState("");
-  const initialExchangeRate = fxRate?.rateValue ?? metadata.exchangeRate;
-  const [savedExchangeRate, setSavedExchangeRate] = useState(initialExchangeRate);
-  const [exchangeRate, setExchangeRate] = useState(initialExchangeRate);
-  const [fxPopoverOpen, setFxPopoverOpen] = useState(false);
-  const [draftExchangeRate, setDraftExchangeRate] = useState(`${initialExchangeRate}`);
-  const gridScrollRef = useRef<HTMLDivElement>(null);
-  const savingDialogRef = useRef<ojDialog>(null);
-  const deleteDialogRef = useRef<ojDialog>(null);
-  const cloneDialogRef = useRef<ojDialog>(null);
-  const cloneGenerationRef = useRef(0);
-  const cloneSubmitInFlightRef = useRef(false);
-  const cloneContextFiscalYearRef = useRef(fiscalYear);
-  const addButtonRef = useRef<any>(null);
-  const deleteButtonRef = useRef<any>(null);
-  const deleteCancelButtonRef = useRef<any>(null);
-  const editEntrySnapshotRef = useRef<AccountWorkloadRow | null>(null);
-  const [scrollState, setScrollState] = useState({ left: 0, max: 0, clientWidth: 0 });
-
-  useEffect(() => () => { cloneGenerationRef.current += 1; }, []);
-
-  const updateScrollState = () => {
-    const grid = gridScrollRef.current;
-    if (!grid) return;
-    setScrollState({
-      left: Math.round(grid.scrollLeft),
-      max: Math.max(0, Math.round(grid.scrollWidth - grid.clientWidth)),
-      clientWidth: Math.round(grid.clientWidth)
-    });
+  const deleteDeal = (deal: AccountWorkloadDeal) => {
+    if (deal.id > 0) setQueued((current) => [...current, { entity: "deal", id: deal.id, versionNo: deal.versionNo, action: deal.deleted ? "RESTORE" : "DELETE" }]);
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.map((workload) => ({ ...workload, deals: workload.deals.filter((item) => item.id !== deal.id) })) })) }));
+    setDirtyDeals((current) => { const next = new Set(current); next.delete(deal.id); return next; });
   };
 
-  const moveHorizontally = (direction: -1 | 1) => {
-    const grid = gridScrollRef.current;
-    if (!grid) return;
-    const step = Math.max(320, Math.round(grid.clientWidth * 0.72));
-    grid.scrollTo({ left: grid.scrollLeft + direction * step, behavior: "smooth" });
-    window.setTimeout(updateScrollState, 240);
+  const removePlan = (workloadId: number, planId: number) => {
+    const plan = hierarchy.accounts.flatMap((account) => account.workloads)
+      .find((workload) => workload.id === workloadId)?.plans.find((item) => item.id === planId);
+    if (!plan) return;
+    setPlanWrites((current) => [...current, {
+      id: plan.id, workloadRef: null, versionNo: plan.versionNo,
+      sourcePlanId: plan.sourcePlanId, sourcePlanNumber: plan.sourcePlanNumber, action: "DELETE"
+    }]);
   };
+  const removeQueuedPlan = (writeIndex: number) =>
+    setPlanWrites((current) => current.filter((_, index) => index !== writeIndex));
 
-  const handleGridWheel = (event: WheelEvent) => {
-    if (!event.shiftKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.preventDefault();
-    const grid = gridScrollRef.current;
-    if (!grid) return;
-    grid.scrollLeft += event.deltaY;
-    updateScrollState();
-  };
-
-  const handleGridKeyDown = (event: KeyboardEvent) => {
-    if (event.target !== event.currentTarget) return;
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    moveHorizontally(event.key === "ArrowLeft" ? -1 : 1);
-  };
-
-  useEffect(() => {
-    if (!accountsWorkloadsRefreshing) {
-      setSearchTerm(query.search ?? "");
-      setIncludeDeleted(Boolean(query.includeDeleted));
-      setSortField((query.sort as SortField | undefined) ?? "account");
-      setSortDirection(query.direction ?? "asc");
+  const validateDraft = () => {
+    for (const account of hierarchy.accounts) {
+      if (dirtyAccounts.has(account.id) && !account.name.trim()) return "Every account requires a name.";
+      for (const workload of account.workloads) {
+        if (dirtyWorkloads.has(workload.id) && !workload.name.trim()) return "Every workload requires a name.";
+        for (const deal of workload.deals) {
+          if (!dirtyDeals.has(deal.id)) continue;
+          if (!deal.name.trim()) return "Every deal requires a name.";
+          if ((deal.targetFiscalYear === null) !== (deal.targetQuarter === null)) return "A deal target requires both fiscal year and quarter.";
+          if (deal.targetFiscalYear && !/^FY\d{2}$/.test(deal.targetFiscalYear)) return "Target fiscal year must use FYnn format.";
+          if (deal.winProbability !== null && (deal.winProbability < 0 || deal.winProbability > 100)) return "Win probability must be from 0 to 100.";
+        }
+      }
     }
-  }, [accountsWorkloadsRefreshing, query.direction, query.includeDeleted, query.search, query.sort]);
-
-  const visibleRows = useMemo(() => {
-    const sourceRows = editCell ? rows : draftRows;
-    if (dataSource === "api") {
-      return sourceRows.map((row) => draftRows.find((draftRow) => draftRow.id === row.id) ?? row);
-    }
-    const search = searchTerm.trim().toLowerCase();
-    const filtered = sourceRows.filter((row) => {
-      const matchesDeleted = includeDeleted || !row.isDeleted || selectedRowIds.includes(row.id);
-      const matchesSearch =
-        search === "" ||
-        row.account.toLowerCase().includes(search) ||
-        row.workloadName.toLowerCase().includes(search) ||
-        row.opptyNo.toLowerCase().includes(search) ||
-        row.planNumber.toLowerCase().includes(search);
-      return matchesDeleted && matchesSearch;
-    });
-    return [...filtered].sort((left, right) => {
-      const leftValue = sortValue(left, sortField);
-      const rightValue = sortValue(right, sortField);
-      const comparison = typeof leftValue === "number" && typeof rightValue === "number"
-        ? leftValue - rightValue
-        : `${leftValue}`.localeCompare(`${rightValue}`);
-      return sortDirection === "asc" ? comparison : comparison * -1;
-    }).map((row) => draftRows.find((draftRow) => draftRow.id === row.id) ?? row);
-  }, [dataSource, draftRows, editCell, includeDeleted, rows, searchTerm, selectedRowIds, sortDirection, sortField]);
-
-  const hasEditableRowChanges = hasEditableAccountWorkloadChanges(rows, draftRows);
-  const showEditActions = Boolean(addingRow || hasEditableRowChanges || exchangeRate !== savedExchangeRate);
-
-  useEffect(() => {
-    if (!showEditActions && !editCell) setDraftRows(rows);
-  }, [editCell, rows, showEditActions]);
-
-  useEffect(() => {
-    if (!fxRate || showEditActions) return;
-    setSavedExchangeRate(fxRate.rateValue);
-    setExchangeRate(fxRate.rateValue);
-    setDraftExchangeRate(`${fxRate.rateValue}`);
-  }, [fxRate, showEditActions]);
-
-  const draftActive = Boolean(showEditActions || editCell);
-  useEffect(() => {
-    onDraftStateChange(draftActive);
-    return () => onDraftStateChange(false);
-  }, [draftActive, onDraftStateChange]);
-
-  useEffect(() => {
-    if (saving) savingDialogRef.current?.open();
-    else if (savingDialogRef.current?.isOpen()) savingDialogRef.current.close();
-  }, [saving]);
-
-  useEffect(() => {
-    if (deleteTargets) deleteDialogRef.current?.open();
-    else if (deleteDialogRef.current?.isOpen()) deleteDialogRef.current.close();
-  }, [deleteTargets]);
-
-  useEffect(() => {
-    if (cloneContextFiscalYearRef.current === fiscalYear) return;
-    cloneContextFiscalYearRef.current = fiscalYear;
-    cloneGenerationRef.current += 1;
-    setCloneOpen(false);
-    setClonePreview(null);
-    setCloneSelection([]);
-    setCloneError("");
-    setCloneLoading(false);
-    setCloneExecuting(false);
-  }, [fiscalYear]);
-
-  useEffect(() => {
-    if (cloneOpen) cloneDialogRef.current?.open();
-    else if (cloneDialogRef.current?.isOpen()) cloneDialogRef.current.close();
-  }, [cloneOpen]);
-
-  useEffect(() => {
-    updateScrollState();
-    window.addEventListener("resize", updateScrollState);
-    return () => window.removeEventListener("resize", updateScrollState);
-  }, [visibleRows.length, addingRow]);
-
-  const selectedSavedRowIds = visibleRows.map((row) => row.id).filter((id) => selectedRowIds.includes(id));
-  const selectedActionIds = addingRow && selectedRowIds.includes(addingRow.id)
-    ? [addingRow.id, ...selectedSavedRowIds]
-    : selectedSavedRowIds;
-  const allVisibleSelected = visibleRows.length > 0 && selectedSavedRowIds.length === visibleRows.length;
-  const selectedCount = selectedActionIds.length;
-  const selectedHasDeletedRows = hasSelectedDeletedRows(rows, selectedSavedRowIds);
-  const hasFiscalYearSeed = fiscalYear === metadata.fiscalYear;
-
-  useEffect(() => {
-    const visibleIds = new Set(visibleRows.map((row) => row.id));
-    if (addingRow) visibleIds.add(addingRow.id);
-    setSelectedRowIds((current) => {
-      const next = current.filter((id) => visibleIds.has(id));
-      return next.length === current.length ? current : next;
-    });
-  }, [addingRow, visibleRows]);
-
-  const commitActiveCell = () => {
-    editEntrySnapshotRef.current = null;
-    setEditCell(null);
+    return "";
   };
 
-  const cancelCurrentCell = () => {
-    const snapshot = editEntrySnapshotRef.current;
-    if (snapshot) {
-      setDraftRows((current) => current.map((row) => row.id === snapshot.id ? snapshot : row));
-    }
-    editEntrySnapshotRef.current = null;
-    setEditCell(null);
-  };
-
-  useEffect(() => {
-    if (!editCell) return undefined;
-    let selectionFrame: number | undefined;
-    const mountFrame = window.requestAnimationFrame(() => {
-      selectionFrame = window.requestAnimationFrame(() => {
-        const cell = document.querySelector<HTMLElement>(
-          `[data-account-row-id="${CSS.escape(editCell.id)}"] [data-account-field="${CSS.escape(editCell.field)}"]`
-        );
-        const editor = cell?.querySelector<HTMLElement>(".accounts-workloads-edit-field");
-        if (!editor) return;
-        editor.focus();
+  const save = async () => {
+    const validation = validateDraft();
+    if (validation) { setError(validation); setSaveErrors([]); return; }
+    const request: AccountsWorkloadsHierarchySaveRequest = { accounts: [], workloads: [], deals: [], workloadPlans: [...planWrites] };
+    hierarchy.accounts.forEach((account) => {
+      if (dirtyAccounts.has(account.id)) request.accounts.push({ id: account.id > 0 ? account.id : null, clientId: account.id > 0 ? null : refFor(account.id, "account"), versionNo: account.id > 0 ? account.versionNo : null, name: account.name, action: "UPSERT" });
+      account.workloads.forEach((workload) => {
+        if (dirtyWorkloads.has(workload.id)) request.workloads.push({ id: workload.id > 0 ? workload.id : null, clientId: workload.id > 0 ? null : refFor(workload.id, "workload"), accountRef: refFor(account.id, "account"), versionNo: workload.id > 0 ? workload.versionNo : null, name: workload.name, action: "UPSERT" });
+        workload.deals.forEach((deal) => { if (dirtyDeals.has(deal.id)) request.deals.push(dealWrite(deal, workload.id)); });
       });
     });
-    return () => {
-      window.cancelAnimationFrame(mountFrame);
-      if (selectionFrame !== undefined) window.cancelAnimationFrame(selectionFrame);
-    };
-  }, [editCell]);
-
-  const submitSearch = () => {
-    onQueryChange({ ...query, search: searchTerm, includeDeleted, sort: sortField, direction: sortDirection });
-  };
-
-  const submitSearchOnEnter = (event: KeyboardEvent) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    submitSearch();
-  };
-
-  const toggleSort = (field: SortField) => {
-    const direction = sortField === field && sortDirection === "asc" ? "desc" : "asc";
-    setSortField(field);
-    setSortDirection(direction);
-    onQueryChange({ ...query, search: query.search, includeDeleted, sort: field, direction });
-  };
-
-  const sortIndicator = (field: SortField) => (sortField === field ? (sortDirection === "asc" ? "▲" : "▼") : "↕");
-
-  const updateDraftCell = (rowId: string, field: EditableField, rawValue: string) => {
-    setDraftRows((current) =>
-      current.map((row) => {
-        if (row.id !== rowId) return row;
-        if (["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field)) {
-          return updateCurrencyPair(row, field, numberFromInput(rawValue), exchangeRate);
-        }
-        if (field === "winProbability") {
-          return { ...row, winProbability: numberFromInput(rawValue) };
-        }
-        return { ...row, [field]: rawValue };
-      })
-    );
-  };
-
-  const updateAddRowCell = (field: EditableField, rawValue: string) => {
-    setAddingRow((current) => {
-      const row = current ?? createEmptyRow(fiscalYear);
-      if (["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field)) {
-        return updateCurrencyPair(row, field, numberFromInput(rawValue), exchangeRate);
-      }
-      if (field === "winProbability") {
-        return { ...row, winProbability: numberFromInput(rawValue) };
-      }
-      return { ...row, [field]: rawValue };
+    queued.forEach((operation) => {
+      if (operation.entity === "account") request.accounts.push({ id: operation.id, clientId: null, versionNo: operation.versionNo, name: operation.name, action: operation.action });
+      else if (operation.entity === "workload") request.workloads.push({ id: operation.id, clientId: null, accountRef: null, versionNo: operation.versionNo, name: operation.name, action: operation.action });
+      else request.deals.push({ id: operation.id, clientId: null, workloadRef: null, versionNo: operation.versionNo, name: null, opportunityNo: null, revenueType: null, status: null, targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null, contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, action: operation.action });
     });
-  };
-
-  const addRowEditorKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || event.keyCode === 229 || event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    setAddingRow(null);
-  };
-
-  const saveGridChanges = async () => {
-    if (!canWrite) { setSaveError("Write permission is required. Your unsaved changes were kept."); return; }
-    const rowsToSave = addingRow ? [...draftRows, addingRow] : draftRows;
-    if (addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim())) return;
-    const draftFxRate = fxRate && exchangeRate !== savedExchangeRate
-      ? { ...fxRate, rateValue: exchangeRate }
-      : undefined;
-    setSaving(true);
-    setSaveError("");
+    setSaving(true); setError(""); setSaveErrors([]); setNotice("");
     try {
-      const authoritative = await withMinimumPendingDuration(() =>
-        onRowsChange(rowsToSave, [], draftFxRate)
-      );
-      setDraftRows(authoritative.items);
-      if (authoritative.fxRate) {
-        setSavedExchangeRate(authoritative.fxRate.rateValue);
-        setExchangeRate(authoritative.fxRate.rateValue);
-        setDraftExchangeRate(`${authoritative.fxRate.rateValue}`);
-      } else {
-        setSavedExchangeRate(exchangeRate);
-        setDraftExchangeRate(`${exchangeRate}`);
-      }
-      setAddingRow(null);
-      setEditCell(null);
-      setSelectedRowIds([]);
-    } catch (error) {
-      setSaveError(formatAccountsWorkloadsSaveError(error));
-    } finally {
-      setSaving(false);
+      const saved = await saveAccountsWorkloadsHierarchy(request);
+      setHierarchy(saved); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set()); setDirtyDeals(new Set()); setQueued([]); setPlanWrites([]); setSaveErrors([]);
+      setNotice("Changes saved.");
+    } catch (saveError) {
+      // Keep the complete draft and queued operations so validation/conflict errors are retryable.
+      setError(friendlyError(saveError));
+      setSaveErrors(saveError instanceof AccountsWorkloadsApiError ? saveError.errors : []);
+    } finally { setSaving(false); }
+  };
+
+  const openForecast = async () => {
+    setForecastOpen(true); setForecastLoading(true); setForecastError("");
+    try { setForecastCandidates(await fetchForecastCandidates()); }
+    catch (requestError) { setForecastError(friendlyError(requestError)); }
+    finally { setForecastLoading(false); }
+  };
+  const addCandidate = (candidate: ForecastCandidate, index: number) => {
+    if (candidate.planId === null) {
+      if (!hierarchy.accounts.some((account) => normalized(account.name) === normalized(candidate.normalizedAccount))) addAccount(candidate.accountName);
+      setNotice(`Added ${candidate.accountName} as a draft account.`); return;
     }
-  };
-
-  const cancelEditSession = () => {
-    setDraftRows(rows);
-    setExchangeRate(savedExchangeRate);
-    setDraftExchangeRate(`${savedExchangeRate}`);
-    setEditCell(null);
-    setAddingRow(null);
-    setSelectedRowIds((current) => current.filter((id) => rows.some((row) => row.id === id)));
-  };
-
-  const addRow = () => {
-    if (!canWrite) { setSaveError("Write permission is required."); return; }
-    setAddingRow(createEmptyRow(fiscalYear));
-  };
-
-  const runImmediateRowsAction = async (nextRows: AccountWorkloadRow[], permanentIds: string[] = []) => {
-    if (!canWrite) { setSaveError("Write permission is required. Your unsaved changes were kept."); return null; }
-    setSaving(true);
-    setSaveError("");
-    try {
-      const authoritative = await withMinimumPendingDuration(() => onRowsChange(nextRows, permanentIds));
-      setDraftRows(overlayEditableAccountWorkloadChanges(authoritative.items, draftRows));
-      return authoritative;
-    } catch (error) {
-      setSaveError(formatAccountsWorkloadsSaveError(error));
-      return null;
-    } finally {
-      setSaving(false);
+    const workloadId = Number(candidateWorkload[String(index)] || workloadOptions[0]?.id);
+    if (!workloadId) return;
+    if (candidate.linkedWorkloadIds.includes(workloadId) || planWrites.some((write) => write.workloadRef === String(workloadId) && write.sourcePlanId === candidate.planId)) {
+      setForecastError("That Forecast plan is already linked to the selected workload."); return;
     }
+    setPlanWrites((current) => [...current, { id: null, workloadRef: refFor(workloadId, "workload"), versionNo: null, sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, action: "UPSERT" }]);
+    setNotice(`Queued ${candidate.planNumber ?? candidate.accountName} for linking.`);
   };
 
-  const highlightSelected = async () => {
-    if (!canWrite) { setSaveError("Write permission is required."); return; }
-    const savedIds = new Set(selectedSavedRowIds);
-    const nextRows = rows.map((row) => savedIds.has(row.id) ? { ...row, isImportant: !row.isImportant } : row);
-    const success = savedIds.size === 0 || await runImmediateRowsAction(nextRows);
-    if (success && addingRow && selectedRowIds.includes(addingRow.id)) {
-      setAddingRow({ ...addingRow, isImportant: !addingRow.isImportant });
-    }
-  };
-
-  const restoreDeleteLauncherFocus = () => {
-    window.requestAnimationFrame(() => {
-      const target = deleteButtonRef.current ?? addButtonRef.current;
-      target?.focus?.();
-    });
-  };
-
-  const focusDeleteCancel = () => window.setTimeout(() => {
-    const host = deleteCancelButtonRef.current as (HTMLElement & { shadowRoot?: ShadowRoot | null }) | null;
-    const target = host?.shadowRoot?.querySelector<HTMLButtonElement>("button")
-      || host?.querySelector<HTMLButtonElement>("button")
-      || host;
-    target?.focus();
-  }, 0);
-
-  const requestDelete = async () => {
-    if (!canWrite) { setSaveError("Write permission is required."); return; }
-    const targets = classifyAccountDeleteTargets(rows, selectedActionIds, addingRow?.id);
-    if (targets.draftIds.length + targets.activeIds.length + targets.permanentIds.length === 0) return;
-    if (targets.draftIds.length > 0) {
-      setAddingRow(null);
-      setSelectedRowIds((current) => current.filter((id) => !targets.draftIds.includes(id)));
-    }
-    const remainingSavedTargets = targets.activeIds.length + targets.permanentIds.length;
-    if (remainingSavedTargets === 0) {
-      setDeleteTargets(null);
-      restoreDeleteLauncherFocus();
-      return;
-    }
-    let baseRows = rows;
-    if (targets.activeIds.length > 0) {
-      const nextRows = applyDraftDelete(rows, targets.activeIds, "current-user", new Date().toISOString());
-      const authoritative = await runImmediateRowsAction(nextRows);
-      if (!authoritative) return;
-      baseRows = authoritative.items;
-      setSelectedRowIds((current) => current.filter((id) => !targets.activeIds.includes(id)));
-    }
-    if (targets.permanentIds.length === 0) {
-      setDeleteTargets(null);
-      restoreDeleteLauncherFocus();
-      return;
-    }
-    setDeleteTargets({ ...targets, draftIds: [], activeIds: [], baseRows });
-  };
-
-  const cancelDelete = () => {
-    setDeleteTargets(null);
-  };
-
-  const confirmDelete = async () => {
-    if (!canWrite) { setSaveError("Write permission is required. Nothing was deleted."); return; }
-    if (!deleteTargets) return;
-    const { draftIds, activeIds, permanentIds, baseRows } = deleteTargets;
-    const nextRows = applyDraftDelete(baseRows, activeIds, "current-user", new Date().toISOString());
-    const success = await runImmediateRowsAction(nextRows, permanentIds);
-    if (!success) return;
-    const removedIds = new Set([...draftIds, ...activeIds, ...permanentIds]);
-    setSelectedRowIds((current) => current.filter((id) => !removedIds.has(id)));
-    setDeleteTargets(null);
-  };
-
-  const restoreSelected = async () => {
-    if (!canWrite) { setSaveError("Write permission is required."); return; }
-    const restored = applyDraftRestore(rows, selectedSavedRowIds, rows);
-    const success = await runImmediateRowsAction(restored);
-    if (success) setSelectedRowIds([]);
-  };
-
-  const deleteDialogMessage = "Saved deleted rows will be permanently removed. This action cannot be undone.";
-
-  const applyExchangeRate = () => {
-    if (!canWrite) { setSaveError("Write permission is required."); return; }
-    const parsed = numberFromInput(draftExchangeRate);
-    if (parsed === null || parsed <= 0 || !fxRate) return;
-    setExchangeRate(parsed);
-    setDraftExchangeRate(`${parsed}`);
-    setDraftRows((current) =>
-      current.map((row) => row.isDeleted ? row : ({
-        ...row,
-        arrKrw: row.arrUsd === null ? row.arrKrw : Math.round(row.arrUsd * parsed),
-        acrKrw: row.acrUsd === null ? row.acrKrw : Math.round(row.acrUsd * parsed)
-      }))
-    );
-    setAddingRow((current) => current ? {
-      ...current,
-      arrKrw: current.arrUsd === null ? current.arrKrw : Math.round(current.arrUsd * parsed),
-      acrKrw: current.acrUsd === null ? current.acrKrw : Math.round(current.acrUsd * parsed)
-    } : current);
-    setFxPopoverOpen(false);
-  };
-
-  const cancelExchangeRateEdit = () => {
-    setDraftExchangeRate(`${exchangeRate}`);
-    setFxPopoverOpen(false);
-  };
-
-  const toggleSelection = (rowId: string) => {
-    setSelectedRowIds((current) =>
-      current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId]
-    );
-  };
-
-  const toggleAllVisibleRows = () => {
-    const visibleIds = visibleRows.map((row) => row.id);
-    setSelectedRowIds((current) => {
-      if (allVisibleSelected) return current.filter((id) => !visibleIds.includes(id));
-      return Array.from(new Set([...current, ...visibleIds]));
-    });
-  };
-
-  const cancelClone = () => {
-    cloneGenerationRef.current += 1;
-    setCloneOpen(false);
-    setCloneSelection([]);
-    setClonePreview(null);
-    setCloneError("");
-    setCloneLoading(false);
-  };
-
-  const openClonePreviousFiscalYear = async () => {
-    if (!canWrite) { setCloneError("Write permission is required."); return; }
-    if (draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api") return;
-    const generation = ++cloneGenerationRef.current;
-    cloneContextFiscalYearRef.current = fiscalYear;
-    setClonePreview(null);
-    setCloneSelection([]);
-    setCloneOpen(true);
-    setCloneLoading(true);
-    setCloneError("");
-    try {
-      const preview = await fetchAccountsWorkloadsClonePreview();
-      if (generation !== cloneGenerationRef.current
-          || fiscalYear !== cloneContextFiscalYearRef.current
-          || preview.targetFiscalYear !== fiscalYear
-          || preview.currentFiscalYear !== fiscalYear) return;
-      setClonePreview(preview);
-      setCloneSelection([...preview.eligibleSelectionIds]);
-    } catch (error) {
-      if (generation === cloneGenerationRef.current) {
-        setCloneError(error instanceof Error ? error.message : "Clone preview could not be loaded.");
-      }
-    } finally {
-      if (generation === cloneGenerationRef.current) setCloneLoading(false);
-    }
-  };
-
-  const toggleCloneWorkload = (sourceCommitmentId: number) => {
-    setCloneSelection((current) => current.includes(sourceCommitmentId)
-      ? current.filter((id) => id !== sourceCommitmentId)
-      : [...current, sourceCommitmentId]);
-  };
-
-  const toggleCloneAccount = (account: AccountsWorkloadsClonePreview["accounts"][number]) => {
-    const eligibleIds = account.workloads
-      .filter((item) => item.status === "ELIGIBLE")
-      .map((item) => item.sourceCommitmentId);
-    const allSelected = eligibleIds.length > 0 && eligibleIds.every((id) => cloneSelection.includes(id));
-    setCloneSelection((current) => allSelected
-      ? current.filter((id) => !eligibleIds.includes(id))
-      : Array.from(new Set([...current, ...eligibleIds])));
-  };
-
-  const executeClonePreviousFiscalYear = async () => {
-    if (!canWrite) { setCloneError("Write permission is required."); return; }
-    if (cloneSubmitInFlightRef.current || cloneExecuting || !clonePreview || cloneSelection.length === 0) return;
-    const targetFiscalYear = clonePreview.targetFiscalYear;
-    if (targetFiscalYear !== fiscalYear || targetFiscalYear !== cloneContextFiscalYearRef.current) return;
-    const sourceById = new Map(clonePreview.accounts.flatMap((account) => account.workloads)
-      .filter((item) => item.status === "ELIGIBLE")
-      .map((item) => [item.sourceCommitmentId, item]));
-    const sources = cloneSelection.map((sourceCommitmentId) => sourceById.get(sourceCommitmentId))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .map((item) => ({ sourceCommitmentId: item.sourceCommitmentId, sourceVersionNo: item.sourceVersionNo }));
-    if (sources.length !== cloneSelection.length) return;
-    cloneSubmitInFlightRef.current = true;
-    const generation = ++cloneGenerationRef.current;
-    setCloneExecuting(true);
-    setCloneError("");
-    try {
-      const authoritative = await cloneAccountsWorkloadsPreviousFiscalYear(
-        clonePreview.sourceFiscalYear, targetFiscalYear, sources);
-      if (generation !== cloneGenerationRef.current
-          || fiscalYear !== cloneContextFiscalYearRef.current
-          || authoritative.preview.targetFiscalYear !== fiscalYear
-          || authoritative.preview.currentFiscalYear !== fiscalYear
-          || clonePreview.targetFiscalYear !== fiscalYear) return;
-      setSelectedRowIds([]);
-      setDraftRows(authoritative.items);
-      setAddingRow(null);
-      setEditCell(null);
-      setCloneSelection([]);
-      setClonePreview(authoritative.preview);
-      setCloneOpen(false);
-      onRefresh();
-    } catch (error) {
-      if (generation === cloneGenerationRef.current) {
-        setCloneError(error instanceof Error ? error.message : "Clone could not be completed.");
-      }
-    } finally {
-      cloneSubmitInFlightRef.current = false;
-      if (generation === cloneGenerationRef.current) setCloneExecuting(false);
-    }
-  };
-
-  const renderEditableCell = (row: AccountWorkloadRow, field: EditableField, displayValue: string) => {
-    const isEditing = editCell?.id === row.id && editCell.field === field;
-    const isChanged = isFieldChanged(rows, row, field);
-    const value = row[field];
-    const cellClass = [
-      fieldAlignmentClass(field),
-      field === "latestUpdate" ? "accounts-workloads-latest-cell" : "",
-      field === "notes" ? "accounts-workloads-notes-cell" : "",
-      isEditing ? "is-editing-cell" : "",
-      isChanged ? "is-unsaved-cell" : ""
-    ].filter(Boolean).join(" ");
-    return (
-      <td data-account-field={field} class={cellClass || undefined}
-        onDblClick={(event) => {
-          if (!canWrite) return;
-          if ((event.target as Element).closest(".accounts-workloads-edit-field")) return;
-          event.preventDefault();
-          event.stopPropagation();
-          editEntrySnapshotRef.current = { ...row };
-          setEditCell({ id: row.id, field });
-        }}>
-        {isEditing ? (
-          <EditableCell row={row} field={field} value={value} targetOptions={targetOptions}
-            onChange={updateDraftCell} onCommit={commitActiveCell} onCancel={cancelCurrentCell} />
-        ) : field === "latestUpdate" ? (
-          <span class="accounts-workloads-update-trigger" tabIndex={0} aria-label={row.latestUpdate}>
-            <span class="accounts-workloads-update-summary">{row.latestUpdate || "—"}</span>
-            <span class="accounts-workloads-update-popup" role="tooltip">{row.latestUpdate || "No update yet."}</span>
-          </span>
-        ) : field === "notes" ? (
-          <span class="accounts-workloads-notes-content" title={row.notes || "No notes."}>{displayValue}</span>
-        ) : (
-          displayValue
-        )}
-      </td>
-    );
-  };
-
-  const renderAddInput = (field: EditableField, placeholder: string, type: "text" | "date" | "number" | "textarea" = "text") => {
-    const value = addingRow?.[field];
-    if (field === "target") {
-      return (
-        <select class="accounts-workloads-edit-field" value={`${value ?? ""}`}
-          aria-label="Target" onKeyDown={addRowEditorKeyDown}
-          onChange={(event) => updateAddRowCell(field, (event.currentTarget as HTMLSelectElement).value)}>
-          <option value="">—</option>
-          {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      );
-    }
-    if (field === "revenueType") {
-      return (
-        <select class="accounts-workloads-edit-field" value={`${value ?? ""}`}
-          aria-label="Revenue Type" onKeyDown={addRowEditorKeyDown}
-          onChange={(event) => updateAddRowCell(field, (event.currentTarget as HTMLSelectElement).value)}>
-          {revenueTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      );
-    }
-    if (type === "date") {
-      return (
-        <oj-input-date
-          class="accounts-workloads-edit-field accounts-workloads-jet-date accounts-workloads-jet-date--add"
-          labelHint={placeholder}
-          labelEdge="none"
-          userAssistanceDensity="compact"
-          value={`${value ?? ""}`}
-          datePicker={{
-            changeMonth: "select",
-            changeYear: "select",
-            daysOutsideMonth: "visible"
-          }}
-          onKeyDown={addRowEditorKeyDown}
-          onvalueChanged={(event: CustomEvent) => updateAddRowCell(field, `${event.detail.value ?? ""}`)}>
-        </oj-input-date>
-      );
-    }
-    if (type === "textarea") {
-      return (
-        <textarea
-          class="accounts-workloads-edit-field accounts-workloads-edit-field--textarea"
-          value={`${value ?? ""}`}
-          placeholder={placeholder}
-          onKeyDown={addRowEditorKeyDown}
-          onInput={(event) => updateAddRowCell(field, (event.currentTarget as HTMLTextAreaElement).value)}
-        />
-      );
-    }
-    return (
-      <input
-        class="accounts-workloads-edit-field"
-        type={type}
-        value={value === null ? "" : `${value ?? ""}`}
-        placeholder={placeholder}
-        onKeyDown={addRowEditorKeyDown}
-        onInput={(event) => updateAddRowCell(field, (event.currentTarget as HTMLInputElement).value)}
-      />
-    );
-  };
-
-  return (
-    <section class={rows.length === 0 ? "accounts-workloads-page is-empty" : "accounts-workloads-page"} aria-labelledby="accountsWorkloadsTitle">
-      <div class="accounts-workloads-header">
-        <div>
-          {breadcrumb}
-          <span class="kpi-eyebrow">My Customers 360</span>
-          <h2 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h2>
-
-        </div>
-        <div class="accounts-workloads-fx">
-          <button type="button" class="accounts-workloads-fx__button" disabled={!canWrite}
-            title={!canWrite ? "Write permission is required." : undefined}
-            onClick={() => setFxPopoverOpen((value) => !value)} aria-expanded={fxPopoverOpen ? "true" : "false"}>
-            <span>Exchange Rate (USD to KRW)</span>
-            <strong>1 USD = KRW {currencyKrwFormatter.format(exchangeRate)}</strong>
-          </button>
-          {fxPopoverOpen && (
-            <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
-              <label>
-                <span>Exchange Rate (USD to KRW)</span>
-                <input
-                  type="number"
-                  value={draftExchangeRate}
-                  onInput={(event) => setDraftExchangeRate((event.currentTarget as HTMLInputElement).value)}
-                />
-              </label>
-              <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
-              {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
-              {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
-              <div class="accounts-workloads-popover-actions">
-                <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || fxLoading || !fxRate}
-                  title={!canWrite ? "Write permission is required." : undefined} onClick={applyExchangeRate}>Apply</button>
-                <button type="button" class="accounts-workloads-button" onClick={cancelExchangeRateEdit}>Cancel</button>
-              </div>
-            </div>
-          )}
-        </div>
+  return <section class="accounts-workloads-page accounts-hierarchy-page" aria-labelledby="accountsWorkloadsTitle">
+    <header class="accounts-workloads-header">
+      <div>{breadcrumb}<h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1><p>Manage accounts, workloads, and their deals independently of fiscal year.</p></div>
+      <div class="accounts-workloads-actions">
+        <oj-button disabled={!canWrite || saving} onojAction={() => addAccount()}>Add Account</oj-button>
+        <oj-button disabled={!canWrite || saving} onojAction={() => void openForecast()}>Forecast에서 추가</oj-button>
+        <oj-button chroming="callToAction" disabled={!canWrite || !dirty || saving} onojAction={() => void save()}>{saving ? "Saving…" : "Save changes"}</oj-button>
       </div>
-
-      <div class="accounts-workloads-toolbar" aria-label="Accounts and workloads actions">
-        <div class="accounts-workloads-search">
-          <label for="accountsWorkloadsSearchInput">Search</label>
-          <div class="accounts-workloads-search__control">
-            <input
-              id="accountsWorkloadsSearchInput"
-              value={searchTerm}
-              disabled={draftActive || accountsWorkloadsRefreshing}
-              title={draftActive ? "Save or cancel changes before changing the server query." : undefined}
-              onInput={(event) => {
-                const search = (event.currentTarget as HTMLInputElement).value;
-                setSearchTerm(search);
-              }}
-              onKeyDown={submitSearchOnEnter}
-              placeholder="Account / Workload / Oppty / Plan Number"
-            />
-            <button
-              id="accountsWorkloadsSearchButton"
-              type="button"
-              aria-label="Search accounts and workloads"
-              title="Search"
-              disabled={draftActive || accountsWorkloadsRefreshing}
-              onClick={submitSearch}>
-              <span class="oj-ux-ico-search" aria-hidden="true"></span>
-            </button>
+    </header>
+    {!canWrite && <div class="accounts-workloads-banner" role="status">Read-only access. Write permission is required to change Accounts, Workloads, Plans, or Deals.</div>}
+    <form class="accounts-workloads-toolbar" onSubmit={(event) => { event.preventDefault(); if (dirty) { setError("Save or discard draft changes before searching."); return; } setSearch(searchInput.trim()); }}>
+      <label class="accounts-workloads-search">Search hierarchy<div class="accounts-workloads-search__control"><input value={searchInput} onInput={(event) => setSearchInput((event.currentTarget as HTMLInputElement).value)} placeholder="Account, workload, or deal"/><button type="submit" aria-label="Search">⌕</button></div></label>
+      <label class="accounts-workloads-switch"><input type="checkbox" checked={includeArchived} disabled={dirty} onChange={(event) => setIncludeArchived(event.currentTarget.checked)}/> Include archived</label>
+      <label class="accounts-workloads-switch"><input type="checkbox" checked={includeDeletedDeals} disabled={dirty} onChange={(event) => setIncludeDeletedDeals(event.currentTarget.checked)}/> Include deleted deals</label>
+      <oj-button disabled={loading || saving || dirty} onojAction={() => void reload()}>Refresh</oj-button>
+    </form>
+    {error && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert">
+      <strong>{error}</strong>
+      {saveErrors.length > 0 && <ul>{saveErrors.map((item) => <li key={`${item.entity}-${item.operationIndex}-${item.field}`}>{item.entity} {item.clientId ?? `#${item.operationIndex + 1}`} · {item.field}: {item.message}</li>)}</ul>}
+    </div>}
+    {notice && <div class="accounts-workloads-banner" role="status">{notice}</div>}
+    {loading ? <div class="accounts-workloads-loading" role="status"><oj-progress-circle value={-1} size="md"></oj-progress-circle> Loading hierarchy…</div> :
+      <div class="accounts-hierarchy" aria-label="Account hierarchy">
+        {hierarchy.accounts.length === 0 && <div class="kap-empty-state"><h2>No accounts found</h2><p>Adjust the search or add your first account.</p></div>}
+        {hierarchy.accounts.map((account) => <article class="accounts-hierarchy__account" key={account.id}>
+          <div class="accounts-hierarchy__heading">
+            <input aria-label="Account name" disabled={!canWrite} value={account.name} onInput={(event) => updateAccount(account.id, event.currentTarget.value)}/>
+            <span>{account.workloads.length} workload{account.workloads.length === 1 ? "" : "s"}</span>
+            {canWrite && <><button type="button" onClick={() => addWorkload(account.id)}>Add Workload</button><button type="button" class="is-danger" onClick={() => archiveAccount(account)}>{account.archived ? "Restore" : "Archive"}</button></>}
           </div>
-        </div>
-        <label class="accounts-workloads-switch">
-          <span>Include deleted</span>
-          <oj-switch
-            value={includeDeleted}
-            disabled={draftActive || accountsWorkloadsRefreshing}
-            onvalueChanged={(event: CustomEvent) => {
-              const nextIncludeDeleted = Boolean(event.detail.value);
-              setIncludeDeleted(nextIncludeDeleted);
-              onQueryChange({ ...query, search: query.search, includeDeleted: nextIncludeDeleted, sort: sortField, direction: sortDirection });
-            }}
-            aria-label="Include deleted rows">
-          </oj-switch>
-        </label>
-        <div class="accounts-workloads-actions accounts-workloads-actions--compact">
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || draftActive || saving || accountsWorkloadsRefreshing || cloneLoading || cloneExecuting || dataSource !== "api"}
-            title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void openClonePreviousFiscalYear()}>Clone Previous FY</oj-button>
-          <oj-button ref={addButtonRef} class="accounts-workloads-jet-button" chroming="callToAction" aria-label="Add Account" title={!canWrite ? "Write permission is required." : "Add Account"} disabled={!canWrite || saving} onojAction={addRow}>Add Account</oj-button>
-          {showEditActions && (
-            <>
-              <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || saving || Boolean(addingRow && (!addingRow.account.trim() || !addingRow.workloadName.trim()))}
-                title={!canWrite ? "Write permission is required." : undefined} onClick={() => void saveGridChanges()}>Save</button>
-              <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelEditSession}>Cancel</button>
-            </>
-          )}
-          {selectedCount > 0 && (
-            <>
-              <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || saving}
-                title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void highlightSelected()}>Highlight</oj-button>
-              {selectedHasDeletedRows && (
-                <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={!canWrite || saving}
-                  title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void restoreSelected()}>Restore</oj-button>
-              )}
-              <oj-button ref={deleteButtonRef} class="accounts-workloads-jet-button" chroming="danger" disabled={!canWrite || saving}
-                title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void requestDelete()}>Delete</oj-button>
-            </>
-          )}
-          <oj-button class="accounts-workloads-jet-button" chroming="outlined" disabled={draftActive || accountsWorkloadsRefreshing || saving} onojAction={onRefresh}>Refresh</oj-button>
-        </div>
-      </div>
-
-      {saveError && <div class="accounts-workloads-save-error" role="alert">{saveError}</div>}
-      <div class="accounts-workloads-table-meta" role="status">
-        {hasFiscalYearSeed ? `${metadata.parsedRowCount} workloads` : `No workloads available for ${fiscalYear}`}
-      </div>
-
-      <oj-dialog ref={savingDialogRef} class="accounts-workloads-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
-        <div class="accounts-workloads-saving-content" role="status" aria-live="polite">
-          <oj-progress-circle value={-1} size="sm" aria-label="Saving"></oj-progress-circle>
-          <span>Saving changes…</span>
-        </div>
-      </oj-dialog>
-
-      <oj-dialog
-        ref={deleteDialogRef}
-        class="accounts-workloads-delete-dialog"
-        initialVisibility="hide"
-        modality="modal"
-        cancelBehavior="escape"
-        dragAffordance="none"
-        resizeBehavior="none"
-        dialogTitle="Permanently delete saved row?"
-        onojOpen={focusDeleteCancel}
-        onojClose={() => { setDeleteTargets(null); restoreDeleteLauncherFocus(); }}>
-        <div class="accounts-workloads-delete-content">
-          <p>{deleteDialogMessage}</p>
-          <div class="accounts-workloads-save-actions">
-            <oj-button chroming="danger" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined}
-              onojAction={() => void confirmDelete()}>Delete</oj-button>
-            <oj-button ref={deleteCancelButtonRef} chroming="outlined" disabled={saving} onojAction={cancelDelete}>Cancel</oj-button>
+          <div class="accounts-hierarchy__workloads">
+            {account.workloads.map((workload) => <section class="accounts-hierarchy__workload" key={workload.id}>
+              <div class="accounts-hierarchy__workload-heading"><input aria-label="Workload name" disabled={!canWrite} value={workload.name} onInput={(event) => updateWorkload(workload.id, event.currentTarget.value)}/>
+                <span>{workload.plans.filter((plan) => !planWrites.some((write) => write.id === plan.id && write.action === "DELETE")).length + planWrites.filter((write) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload")).length} Forecast link(s)</span>
+                {canWrite && <><button type="button" onClick={() => addDeal(workload.id)}>Add Deal</button><button type="button" class="is-danger" onClick={() => archiveWorkload(workload)}>{workload.archived ? "Restore" : "Archive"}</button></>}
+              </div>
+              <div class="accounts-hierarchy__plans" aria-label={`Forecast plans linked to ${workload.name}`}>
+                <span class="accounts-hierarchy__level-label">Plans</span>
+                {workload.plans.filter((plan) => !planWrites.some((write) => write.id === plan.id && write.action === "DELETE")).map((plan) => <span class="accounts-hierarchy__plan" key={plan.id}>
+                  {plan.sourcePlanNumber ?? `Forecast plan ${plan.sourcePlanId ?? plan.id}`}
+                  {canWrite && <button type="button" aria-label={`Unlink ${plan.sourcePlanNumber ?? "Forecast plan"}`} onClick={() => removePlan(workload.id, plan.id)}>×</button>}
+                </span>)}
+                {planWrites.map((write, writeIndex) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload") ? <span class="accounts-hierarchy__plan is-draft" key={`draft-plan-${writeIndex}`}>
+                  {write.sourcePlanNumber ?? `Forecast plan ${write.sourcePlanId}`} <small>Draft</small>
+                  {canWrite && <button type="button" aria-label={`Remove draft ${write.sourcePlanNumber ?? "Forecast plan"}`} onClick={() => removeQueuedPlan(writeIndex)}>×</button>}
+                </span> : null)}
+                {workload.plans.length === 0 && !planWrites.some((write) => write.action === "UPSERT" && write.workloadRef === refFor(workload.id, "workload")) && <span class="accounts-hierarchy__empty">No plans linked.</span>}
+              </div>
+              <div class="accounts-hierarchy__deals">
+                <span class="accounts-hierarchy__level-label">Deals</span>
+                {workload.deals.length === 0 && <p class="accounts-hierarchy__empty">No deals yet.</p>}
+                {workload.deals.map((deal) => <div class="accounts-hierarchy__deal" key={deal.id}>
+                  <label>Deal Name<input disabled={!canWrite} value={deal.name} onInput={(event) => updateDeal(deal.id, "name", event.currentTarget.value)}/></label>
+                  <label>Opportunity<input disabled={!canWrite} value={deal.opportunityNo ?? ""} onInput={(event) => updateDeal(deal.id, "opportunityNo", nullable(event.currentTarget.value))}/></label>
+                  <label>Revenue Type<select disabled={!canWrite} value={deal.revenueType} onChange={(event) => updateDeal(deal.id, "revenueType", event.currentTarget.value)}><option value="NEW">New</option><option value="EXPANSION">Expansion</option><option value="RENEWAL">Renewal</option></select></label>
+                  <label>Status<select disabled={!canWrite} value={deal.status} onChange={(event) => updateDeal(deal.id, "status", event.currentTarget.value)}><option value="OPEN">Open</option><option value="WON">Won</option><option value="LOST">Lost</option></select></label>
+                  <label>Target FY<input disabled={!canWrite} placeholder="FY28" value={deal.targetFiscalYear ?? ""} onInput={(event) => updateDeal(deal.id, "targetFiscalYear", nullable(event.currentTarget.value.toUpperCase()))}/></label>
+                  <label>Quarter<select disabled={!canWrite} value={deal.targetQuarter ?? ""} onChange={(event) => updateDeal(deal.id, "targetQuarter", numeric(event.currentTarget.value))}><option value="">—</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select></label>
+                  <label>Win %<input type="number" min="0" max="100" disabled={!canWrite} value={deal.winProbability ?? ""} onInput={(event) => updateDeal(deal.id, "winProbability", numeric(event.currentTarget.value))}/></label>
+                  <label>Close Date<input type="date" disabled={!canWrite} value={deal.actualCloseDate ?? ""} onInput={(event) => updateDeal(deal.id, "actualCloseDate", nullable(event.currentTarget.value))}/></label>
+                  <label>Start Date<input type="date" disabled={!canWrite} value={deal.contractStartDate ?? ""} onInput={(event) => updateDeal(deal.id, "contractStartDate", nullable(event.currentTarget.value))}/></label>
+                  <label>End Date<input type="date" disabled={!canWrite} value={deal.contractEndDate ?? ""} onInput={(event) => updateDeal(deal.id, "contractEndDate", nullable(event.currentTarget.value))}/></label>
+                  <label>ARR ($)<input type="number" disabled={!canWrite} value={deal.arrUsd ?? ""} onInput={(event) => updateDeal(deal.id, "arrUsd", numeric(event.currentTarget.value))}/></label>
+                  <label>ARR (₩)<input type="number" disabled={!canWrite} value={deal.arrKrw ?? ""} onInput={(event) => updateDeal(deal.id, "arrKrw", numeric(event.currentTarget.value))}/></label>
+                  <label>ACR ($)<input type="number" disabled={!canWrite} value={deal.acrUsd ?? ""} onInput={(event) => updateDeal(deal.id, "acrUsd", numeric(event.currentTarget.value))}/></label>
+                  <label>ACR (₩)<input type="number" disabled={!canWrite} value={deal.acrKrw ?? ""} onInput={(event) => updateDeal(deal.id, "acrKrw", numeric(event.currentTarget.value))}/></label>
+                  <label class="accounts-hierarchy__wide">Latest Update<input disabled={!canWrite} value={deal.latestUpdate ?? ""} onInput={(event) => updateDeal(deal.id, "latestUpdate", nullable(event.currentTarget.value))}/></label>
+                  <label class="accounts-hierarchy__wide">Notes<input disabled={!canWrite} value={deal.notes ?? ""} onInput={(event) => updateDeal(deal.id, "notes", nullable(event.currentTarget.value))}/></label>
+                  {canWrite && <button type="button" class="is-danger" onClick={() => deleteDeal(deal)}>{deal.deleted ? "Restore" : "Delete"}</button>}
+                </div>)}
+              </div>
+            </section>)}
           </div>
-        </div>
-      </oj-dialog>
-
-      <oj-dialog
-        ref={cloneDialogRef}
-        class="accounts-workloads-clone-dialog"
-        initialVisibility="hide"
-        modality="modal"
-        cancelBehavior={cloneExecuting ? "none" : "escape"}
-        dragAffordance="none"
-        resizeBehavior="none"
-        dialogTitle="Clone Previous FY"
-        onojClose={cancelClone}>
-        <div class="accounts-workloads-clone-content">
-          {cloneLoading && <p role="status">Loading clone preview…</p>}
-          {cloneError && <p role="alert">{cloneError}</p>}
-          {clonePreview && (
-            <>
-              <p>Copy planning data from {clonePreview.sourceFiscalYear} to {clonePreview.targetFiscalYear}. Existing target workloads are skipped.</p>
-              <div class="accounts-workloads-clone-groups">
-                {clonePreview.accounts.map((account) => {
-                  const eligibleIds = account.workloads.filter((item) => item.status === "ELIGIBLE").map((item) => item.sourceCommitmentId);
-                  const accountSelected = eligibleIds.length > 0 && eligibleIds.every((id) => cloneSelection.includes(id));
-                  return (
-                    <fieldset key={account.account}>
-                      <legend>
-                        <label>
-                          <input type="checkbox" checked={accountSelected} disabled={eligibleIds.length === 0 || cloneExecuting}
-                            onChange={() => toggleCloneAccount(account)} />
-                          {account.account}
-                        </label>
-                      </legend>
-                      {account.workloads.map((item) => (
-                        <label key={item.sourceCommitmentId} class={item.status === "SKIP_TARGET_EXISTS" ? "is-skipped" : undefined}>
-                          {item.status === "SKIP_TARGET_EXISTS" && <span class="accounts-workloads-clone-status">Skip — target exists</span>}
-                          <input type="checkbox" checked={cloneSelection.includes(item.sourceCommitmentId)}
-                            disabled={item.status === "SKIP_TARGET_EXISTS" || cloneExecuting}
-                            onChange={() => toggleCloneWorkload(item.sourceCommitmentId)} />
-                          <span>{item.workloadName}</span>
-                        </label>
-                      ))}
-                    </fieldset>
-                  );
-                })}
-              </div>
-              <div class="accounts-workloads-save-actions">
-                <oj-button chroming="callToAction" disabled={!canWrite || cloneSelection.length === 0 || cloneExecuting || cloneLoading || draftActive || saving || accountsWorkloadsRefreshing || clonePreview.targetFiscalYear !== fiscalYear}
-                  title={!canWrite ? "Write permission is required." : undefined} onojAction={() => void executeClonePreviousFiscalYear()}>Clone selected</oj-button>
-                <oj-button chroming="outlined" disabled={cloneExecuting} onojAction={cancelClone}>Cancel</oj-button>
-              </div>
-            </>
-          )}
-        </div>
-      </oj-dialog>
-
-      <div class="accounts-workloads-grid-shell">
-        {accountsWorkloadsRefreshing && <div class="accounts-workloads-table-refresh" role="status" aria-live="polite">Refreshing table…</div>}
-
-        <div class="accounts-workloads-scroll-controls" aria-label="Horizontal table navigation">
-          <button type="button" class="accounts-workloads-scroll-control" aria-label="Move table left" title="Move left" disabled={scrollState.left <= 0} onClick={() => moveHorizontally(-1)}>‹</button>
-          <button type="button" class="accounts-workloads-scroll-control" aria-label="Move table right" title="Move right" disabled={scrollState.left >= scrollState.max} onClick={() => moveHorizontally(1)}>›</button>
-        </div>
-
-      <div class="accounts-workloads-grid-wrap" aria-label={`${fiscalYear} accounts and workloads grid`} ref={gridScrollRef} tabIndex={0} onScroll={updateScrollState} onWheel={handleGridWheel} onKeyDown={handleGridKeyDown}>
-        <table class="accounts-workloads-grid">
-          <thead>
-            <tr>
-              <th class="is-sticky accounts-workloads-selection-col">
-                <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisibleRows} aria-label="Select or clear all visible rows" />
-              </th>
-              <th class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">No</th>
-              <th class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center">
-                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("isImportant")}>! {sortIndicator("isImportant")}</button>
-              </th>
-              <th class="is-sticky accounts-workloads-plan-col">
-                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("planNumber")}>{columnLabels.planNumber} {sortIndicator("planNumber")}</button>
-              </th>
-              <th class="is-sticky accounts-workloads-account-col">
-                <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort("account")}>{columnLabels.account} {sortIndicator("account")}</button>
-              </th>
-              {editableFields.filter((field) => !["planNumber", "account"].includes(field)).map((field) => (
-                <th key={field} class={fieldAlignmentClass(field)}>
-                  <button type="button" disabled={draftActive || accountsWorkloadsRefreshing} onClick={() => toggleSort(field)}>{columnLabels[field]} {sortIndicator(field)}</button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {addingRow && (
-              <tr key={addingRow.id} data-account-row-id={addingRow.id} class="is-adding-row">
-                <td class="is-sticky accounts-workloads-selection-col"><input type="checkbox" checked={selectedRowIds.includes(addingRow.id)} onChange={() => toggleSelection(addingRow.id)} aria-label="Select unsaved Draft account" /></td>
-                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">—</td>
-                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center"></td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("planNumber", "UCM / PAYG")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("account", "Account *")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("workloadName", "Workload *")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("revenueType", "Revenue Type")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("opptyNo", "Oppty")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("startDate", "Start", "date")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("endDate", "End", "date")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("arrUsd", "USD", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("arrKrw", "KRW", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("acrUsd", "USD", "number")}</td>
-                <td class="accounts-workloads-cell--right">{renderAddInput("acrKrw", "KRW", "number")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("target", "Target")}</td>
-                <td class="accounts-workloads-cell--center">{renderAddInput("winProbability", "%", "number")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("latestUpdate", "Latest update", "textarea")}</td>
-                <td class="accounts-workloads-cell--left">{renderAddInput("notes", "Notes", "textarea")}</td>
-              </tr>
-            )}
-            {visibleRows.map((row, index) => (
-              <tr key={row.id} data-row-id={row.id} data-account-row-id={row.id} class={`${row.isImportant ? "is-important" : ""} ${row.isDeleted ? "is-deleted" : ""}`}>
-                <td class="is-sticky accounts-workloads-selection-col">
-                  <input type="checkbox" checked={selectedRowIds.includes(row.id)} onChange={() => toggleSelection(row.id)} aria-label={`Select ${row.account} ${row.workloadName}`} />
-                </td>
-                <td class="is-sticky accounts-workloads-no-col accounts-workloads-cell--center">{index + 1}</td>
-                <td class="is-sticky accounts-workloads-important-col accounts-workloads-cell--center">{row.isImportant ? <span class="accounts-workloads-important-badge">!</span> : ""}</td>
-                {renderEditableCell(row, "planNumber", row.planNumber || "—")}
-                {renderEditableCell(row, "account", row.account)}
-                {renderEditableCell(row, "workloadName", row.workloadName)}
-                {renderEditableCell(row, "revenueType", row.revenueType || "—")}
-                {renderEditableCell(row, "opptyNo", row.opptyNo || "—")}
-                {renderEditableCell(row, "startDate", row.startDate || "—")}
-                {renderEditableCell(row, "endDate", row.endDate || "—")}
-                {renderEditableCell(row, "arrUsd", formatUsd(row.arrUsd))}
-                {renderEditableCell(row, "arrKrw", formatKrw(row.arrKrw))}
-                {renderEditableCell(row, "acrUsd", formatUsd(row.acrUsd))}
-                {renderEditableCell(row, "acrKrw", formatKrw(row.acrKrw))}
-                {renderEditableCell(row, "target", row.target || "—")}
-                {renderEditableCell(row, "winProbability", formatProbability(row.winProbability))}
-                {renderEditableCell(row, "latestUpdate", row.latestUpdate)}
-                {renderEditableCell(row, "notes", row.notes || "—")}
-              </tr>
-            ))}
-            {visibleRows.length === 0 && !addingRow && (
-              <tr class="is-empty-row">
-                <td colSpan={18}>No accounts or workloads match the current filters.</td>
-              </tr>
-            )}
-
-          </tbody>
-        </table>
-      </div>
-      </div>
-
-
-    </section>
-  );
+        </article>)}
+      </div>}
+    {forecastOpen && <div class="accounts-workloads-dialog-backdrop" role="presentation"><section class="accounts-workloads-dialog accounts-forecast-dialog" role="dialog" aria-modal="true" aria-labelledby="forecastCandidatesTitle">
+      <header><div><h2 id="forecastCandidatesTitle">Forecast candidates</h2><p>All candidates are shown, including plans already linked elsewhere.</p></div><button type="button" aria-label="Close" onClick={() => setForecastOpen(false)}>×</button></header>
+      {forecastError && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert">{forecastError}</div>}
+      {forecastLoading ? <div role="status">Loading Forecast candidates…</div> : <div class="accounts-forecast-list">
+        {forecastCandidates.map((candidate, index) => <div class="accounts-forecast-candidate" key={`${candidate.normalizedAccount}-${candidate.planId ?? "account"}`}>
+          <div><strong>{candidate.accountName}</strong><span>{candidate.planNumber ?? "Account only"}</span>{candidate.linked && <small>Linked to {candidate.linkedWorkloadIds.length} workload(s)</small>}</div>
+          {candidate.planId !== null && <select aria-label={`Destination for ${candidate.planNumber ?? candidate.accountName}`} value={candidateWorkload[String(index)] ?? ""} onChange={(event) => setCandidateWorkload((current) => ({ ...current, [String(index)]: event.currentTarget.value }))}><option value="">Select workload</option>{workloadOptions.map((option) => <option value={String(option.id)}>{option.label}</option>)}</select>}
+          <button type="button" disabled={!canWrite || (candidate.planId !== null && workloadOptions.length === 0)} onClick={() => addCandidate(candidate, index)}>{candidate.planId === null ? "Add Account" : "Link"}</button>
+        </div>)}
+      </div>}
+      <footer><button type="button" onClick={() => setForecastOpen(false)}>Done</button></footer>
+    </section></div>}
+  </section>;
 }

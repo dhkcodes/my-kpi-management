@@ -54,12 +54,10 @@ assert.match(weekly, /editable=\{canWrite\}/,
   "Weekly double-click editing is removed for read-only users");
 assert.match(weekly, /canWrite \? <>[\s\S]*aria-label=\{`Edit[\s\S]*aria-label=\{`Delete/,
   "Weekly row mutation icons are hidden without write permission");
-assert.match(accounts, /onDblClick=\{\(event\) => \{[\s\S]{0,180}if \(!canWrite\)/,
-  "Accounts cell editing is blocked before editor creation");
-assert.match(accounts, /onDblClick=\{\(event\) => \{\s*if \(!canWrite\) return;/,
-  "read-only Accounts cell double-click is silently blocked");
-assert.doesNotMatch(accounts, /onDblClick=\{\(event\) => \{\s*if \(!canWrite\) \{ setSaveError\("Write permission is required\."\); return; \}/,
-  "read-only Accounts cell double-click does not raise a write-permission message");
+assert.match(accounts, /disabled=\{!canWrite \|\| !dirty \|\| saving\}/,
+  "Accounts save is disabled for read-only users");
+assert.match(accounts, /!canWrite && <div[^>]*>Read-only access\. Write permission is required/,
+  "read-only Accounts users receive a visible permission explanation");
 assert.match(records, /disabled=\{!canWrite \|\| hasDraftChanges[\s\S]*handleCsvFiles/,
   "actual import file input is disabled without write permission");
 assert.match(records, /applyPendingImport[\s\S]{0,180}if \(!canWrite\)/,

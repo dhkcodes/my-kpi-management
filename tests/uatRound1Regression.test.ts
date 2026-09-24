@@ -42,7 +42,7 @@ assert.match(content, /onOpenAccountWorkloads\(account\)/,
   "Account links use the dedicated automatic filter handoff");
 assert.match(app, /handleOpenAccountWorkloads[\s\S]*search: account, includeDeleted: false[\s\S]*setAccountsWorkloadsQuery\(nextQuery\)/,
   "the parent commits the Account filter before the detail page mounts");
-assert.match(accounts, /accounts-workloads-table-meta/);
+assert.match(accounts, /accounts-hierarchy/);
 assert.doesNotMatch(accounts, /Loaded rows:/);
 assert.match(kpi, /FY-valid Delivery Date before \$\{asOf\}/);
 assert.match(all, /Show and discover workshops/);

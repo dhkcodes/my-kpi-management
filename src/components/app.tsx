@@ -268,13 +268,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     }, [activeRoute.module, fiscalYear, canReadKpis]);
 
     useEffect(() => {
-      if (!needsAccountData || !["home", "myCustomers360", "accountsWorkloads"].includes(activeRoute.module)) return;
+      if (!needsAccountData || !["home", "myCustomers360"].includes(activeRoute.module)) return;
       let active = true;
       const requestId = ++accountsWorkloadsRequestIdRef.current;
-      const tableRoute = activeRoute.module === "accountsWorkloads";
-      const query: AccountsWorkloadsListQuery = tableRoute
-        ? { fiscalYear, ...accountsWorkloadsQuery }
-        : { fiscalYear, search: "", includeDeleted: true, sort: "account", direction: "asc" };
+      const query: AccountsWorkloadsListQuery = { fiscalYear, search: "", includeDeleted: true, sort: "account", direction: "asc" };
       const load = async () => {
         setAccountsWorkloadsRefreshing(false);
         setAccountsWorkloadsLoading(true);
@@ -307,8 +304,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           if (active && requestId === accountsWorkloadsRequestIdRef.current) setAccountsWorkloadsLoading(false);
         }
       };
-      const delay = tableRoute && (accountsWorkloadsQuery.search ?? "") !== "" ? 250 : 0;
-      const timer = window.setTimeout(() => void load(), delay);
+      const timer = window.setTimeout(() => void load(), 0);
       return () => {
         active = false;
         window.clearTimeout(timer);
