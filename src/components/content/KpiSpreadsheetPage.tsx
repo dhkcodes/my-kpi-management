@@ -484,10 +484,10 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
             class="kpi-workload-reset-option" onMouseDown={(event) => event.preventDefault()} onClick={resetWorkload}>
             <strong>선택 안함</strong><small>기존 값으로 되돌리기</small>
           </button>
-          {options.map((option, index) => <button key={option.workloadId} id={`kpi-workload-option-${state.generation}-${index + 1}`} type="button" role="option"
+          {options.map((option, index) => <button key={option.selectionId} id={`kpi-workload-option-${state.generation}-${index + 1}`} type="button" role="option"
             aria-selected={activeWorkloadIndex === index + 1} tabIndex={-1} title={formatKpiWorkloadOption(option)}
             onMouseDown={(event) => event.preventDefault()} onClick={() => chooseWorkload(option)}>
-            <strong>{formatKpiWorkloadOption(option)}</strong><small>Workload ID {option.workloadId}</small>
+            <strong>{formatKpiWorkloadOption(option)}</strong><small>{option.dealId ? `Opportunity ID ${option.dealId} · ` : ""}Workload ID {option.workloadId}</small>
           </button>)}
           {loading && <span>Loading…</span>}
           {!loading && options.length === 0 && <span>No matching workload.</span>}
