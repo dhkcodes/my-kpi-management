@@ -49,8 +49,13 @@ async function run() {
   assert.equal(normalized.rows[0].planNumber, "UCM TEST");
   assert.equal(normalized.rows[0].latestUpdate, "Ready");
   assert.equal(normalized.rows[0].revenueType, null, "legacy rows must remain unclassified");
+  const renewal = normalizeAccountWorkloadStateSeed({
+    ...fixture,
+    rows: [{ ...fixture.rows[0], revenueType: "Renewal" as const }]
+  });
+  assert.equal(renewal.rows[0].revenueType, "Renewal", "Renewal must survive normalization");
   assert.throws(
-    () => normalizeAccountWorkloadStateSeed({ ...fixture, rows: [{ ...fixture.rows[0], revenueType: "Renewal" }] }),
+    () => normalizeAccountWorkloadStateSeed({ ...fixture, rows: [{ ...fixture.rows[0], revenueType: "Upsell" }] }),
     /revenue type/i
   );
   assert.notEqual(normalized.rows, fixture.rows, "normalization must return a defensive row collection");

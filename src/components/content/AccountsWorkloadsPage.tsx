@@ -143,7 +143,7 @@ const currencyKrwFormatter = new Intl.NumberFormat("ko-KR", {
 const formatUsd = (value: number | null) => (value === null ? "—" : `$${currencyUsdFormatter.format(value)}`);
 const formatKrw = (value: number | null) => (value === null ? "—" : `₩${currencyKrwFormatter.format(Math.round(value))}`);
 const formatProbability = (value: number | null) => (value === null ? "—" : `${value}%`);
-const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion"];
+const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion", "Renewal"];
 
 const comparableValue = (value: unknown) => value ?? "";
 
@@ -204,6 +204,7 @@ const formatAccountsWorkloadsSaveError = (error: unknown) => {
   if (error instanceof AccountsWorkloadsNetworkError) return `The API could not be reached. ${retry}`;
   if (error instanceof AccountsWorkloadsApiError) {
     if (error.status === 401 || error.status === 403) return `You do not have permission to save these changes. ${retry}`;
+    if (error.status === 409 && error.code === "DUPLICATE_ACCOUNT_WORKLOAD") return error.message;
     if (error.status === 409) return `Another user changed this data. Reload the latest data before saving again. ${retry}`;
     if (error.status === 400 || error.status === 422 || error.code === "VALIDATION_ERROR") return `Validation failed: ${error.message}. ${retry}`;
     if (error.status >= 500) return `The server could not save the changes (${error.code}). ${retry}`;

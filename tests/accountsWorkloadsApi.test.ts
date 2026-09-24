@@ -304,7 +304,7 @@ async function run() {
     ["negative ARR KRW", { arrKrw: -1 }],
     ["negative ACR USD", { acrUsd: -1 }],
     ["negative ACR KRW", { acrKrw: -1 }],
-    ["unknown revenue type", { revenueType: "Renewal" as AccountWorkloadRow["revenueType"] }]
+    ["unknown revenue type", { revenueType: "Upsell" as AccountWorkloadRow["revenueType"] }]
   ];
   for (const [label, override] of invalidRowCases) {
     await assert.rejects(

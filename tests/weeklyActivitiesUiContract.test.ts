@@ -57,7 +57,7 @@ assert.match(page, /resolveFocusAfterRemoval\(items, record\.activityId\)/, "del
 assert.match(page, /window\.addEventListener\("beforeunload", handleBeforeUnload\)/, "reload warns while a weekly draft is genuinely dirty");
 assert.match(page, /onDirtyStateChange\?\.\(editSessionDirty\)/, "the page reports baseline-derived dirty state instead of editor presence");
 assert.match(page, /isWeeklyActivityDraftDirty\(/, "date and both content drafts are compared with their baseline");
-assert.match(content, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\} onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} \/>/);
+assert.match(content, /<WeeklyActivitiesPage key=\{fiscalYear\} fiscalYear=\{fiscalYear\} canWrite=\{canWrite\} onDirtyStateChange=\{onWeeklyActivitiesDraftStateChange\} breadcrumb=\{pageNavigation\} \/>/);
 assert.match(app, /confirmWeeklyActivitiesNavigation[\s\S]*weeklyActivitiesDraftActiveRef\.current[\s\S]*window\.confirm\(UNSAVED_WEEKLY_ACTIVITY_MESSAGE\)/, "navigation confirmation is centralized around the active weekly draft ref");
 assert.match(app, /handlePopState[\s\S]*const destinationHref = window\.location\.href[\s\S]*confirmWeeklyActivitiesNavigation\(route, destinationHref\)/, "browser Back and Forward pass the full destination URL, including hash, to the dirty guard");
 assert.match(app, /window\.history\.replaceState\(withHistoryIndex\(window\.history\.state, currentHistoryIndex\)/, "the current browser entry is indexed without replacing the stack");
