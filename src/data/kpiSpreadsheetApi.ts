@@ -51,9 +51,12 @@ export type KpiActivitySummary = Readonly<{
 }>;
 
 export type KpiWorkloadOption = Readonly<{
+  selectionId: string;
   workloadId: number;
   accountName: string;
   workloadName: string;
+  dealId: number | null;
+  opptyName: string | null;
   opptyNo: string | null;
 }>;
 
@@ -291,7 +294,16 @@ export async function listKpiWorkloadOptions(
     if (!isObject(item) || typeof item.workloadId !== "number" || typeof item.accountName !== "string" || typeof item.workloadName !== "string") {
       throw new Error("Invalid KPI workload option");
     }
-    return { workloadId: item.workloadId, accountName: item.accountName, workloadName: item.workloadName, opptyNo: asText(item.opptyNo) || null };
+    const dealId = asNullableNumber(item.dealId);
+    return {
+      selectionId: `${item.workloadId}:${dealId ?? "workload"}`,
+      workloadId: item.workloadId,
+      accountName: item.accountName,
+      workloadName: item.workloadName,
+      dealId,
+      opptyName: asText(item.opptyName) || null,
+      opptyNo: asText(item.opptyNo) || null
+    };
   });
   return { items, total: value.total, hasMore: value.hasMore };
 }

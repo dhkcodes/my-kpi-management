@@ -97,8 +97,12 @@ export const formatKpiWorkloadOption = (option: Readonly<{
   workloadId?: number;
   accountName: string;
   workloadName: string;
+  opptyName?: string | null;
   opptyNo: string | null;
-}>) => `${option.accountName} - ${option.workloadName}${option.opptyNo ? ` (${option.opptyNo})` : ""}`;
+}>) => {
+  const opportunity = [option.opptyName?.trim(), option.opptyNo?.trim()].filter(Boolean).join("/");
+  return `${option.accountName}-${option.workloadName}${opportunity ? ` (${opportunity})` : ""}`;
+};
 
 export const isKpiFieldChanged = (
   saved: KpiSpreadsheetRow,
