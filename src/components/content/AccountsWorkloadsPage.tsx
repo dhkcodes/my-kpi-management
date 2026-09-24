@@ -1,14 +1,16 @@
-import { ComponentChildren, h } from "preact";
+import { ComponentChildren, Fragment, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 import {
   AccountHierarchyAccount,
   AccountWorkload,
+  AccountWorkloadDeal,
   AccountsWorkloadsApiError,
   AccountsWorkloadsFieldError,
   AccountsWorkloadsHierarchy,
   AccountsWorkloadsHierarchySaveRequest,
+  DealWrite,
   ForecastCandidate,
   WorkloadPlanWrite,
   filterForecastCandidates,
@@ -18,340 +20,336 @@ import {
   saveAccountsWorkloadsHierarchy
 } from "../../data/accountsWorkloadsApi";
 
-type Props = Readonly<{
-  canWrite: boolean;
-  breadcrumb?: ComponentChildren;
-  onDraftStateChange?: (active: boolean) => void;
-  initialSearch?: string;
-}>;
+type Props = Readonly<{ canWrite: boolean; breadcrumb?: ComponentChildren; onDraftStateChange?: (active: boolean) => void; initialSearch?: string }>;
+type AwField = "account" | "workload" | "plan" | "lastUpdated" | "notes";
+type DealField = "name" | "opportunityNo" | "revenueType" | "winProbability" | "target" | "arrUsd" | "arrKrw" | "acrUsd" | "acrKrw" | "status" | "actualCloseDate" | "contractStartDate" | "contractEndDate" | "latestUpdate";
+type SortField = AwField | "arrUsd" | "acrUsd" | "opptyCount";
+type EditCell = Readonly<{ key: string; field: AwField }>;
+type DealEditCell = Readonly<{ key: string; field: DealField }>;
+type DealDraft = Readonly<{ key: string; workloadId: number; original: AccountWorkloadDeal | null; deal: AccountWorkloadDeal }>;
 
-type EditableField = "account" | "workload" | "planNumber" | "latestUpdate" | "notes";
-type EditingCell = Readonly<{ rowKey: string; field: EditableField }>;
-type DraftSnapshot = Readonly<{
-  hierarchy: AccountsWorkloadsHierarchy;
-  dirtyAccounts: Set<number>;
-  dirtyWorkloads: Set<number>;
-  planWrites: WorkloadPlanWrite[];
-}>;
-type FlatRow = Readonly<{
-  rowKey: string;
-  account: AccountHierarchyAccount;
-  workload: AccountWorkload;
-}>;
-
-const EMPTY_HIERARCHY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
+const EMPTY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
 const CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요";
+const rowKey = (accountId: number, workloadId: number) => `${accountId}:${workloadId}`;
 const refFor = (id: number, entity: "account" | "workload") => id > 0 ? String(id) : `${entity}-${Math.abs(id)}`;
-const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+const nullable = (value: string) => value.trim() || null;
+const numberValue = (value: string) => value.trim() === "" ? null : Number(value);
+const normalizedAccount = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
 const friendlyError = (error: unknown) => error instanceof Error ? error.message : "The request could not be completed.";
-const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
-  id, versionNo: 0, name, lastUpdated: null, notes: null, archived: false, plans: [], deals: []
-});
+const isInteractive = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("input,select,textarea,button,a,oj-button"));
+const fmtUsd = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+const fmtMoney = (value: number | null) => value === null ? "—" : fmtUsd.format(value);
+const targetPeriod = (deal: AccountWorkloadDeal) => deal.targetFiscalYear && deal.targetQuarter ? `${deal.targetFiscalYear} Q${deal.targetQuarter}` : "";
+const targetOptions = Array.from({ length: 48 }, (_, index) => `FY${24 + Math.floor(index / 4)} Q${(index % 4) + 1}`);
+const emptyWorkload = (id: number, name = ""): AccountWorkload => ({ id, versionNo: 0, name, lastUpdated: null, notes: null, highlighted: false, archived: false, plans: [], deals: [] });
+const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({ id, workloadId, versionNo: 0, name: "", opportunityNo: null, revenueType: "NEW", status: "OPEN", targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null, contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, deleted: false, deletedAt: null, sourceCommitmentId: null });
+const dealWrite = (deal: AccountWorkloadDeal, workloadId: number, original: AccountWorkloadDeal | null = null): DealWrite => ({ id: deal.id > 0 ? deal.id : null, clientId: deal.id > 0 ? null : `deal-${Math.abs(deal.id)}`, workloadRef: String(workloadId), versionNo: deal.id > 0 ? deal.versionNo : null, name: deal.name, opportunityNo: deal.opportunityNo, revenueType: deal.revenueType, status: deal.status, targetFiscalYear: deal.targetFiscalYear, targetQuarter: deal.targetQuarter, actualCloseDate: deal.actualCloseDate, contractStartDate: deal.contractStartDate, contractEndDate: deal.contractEndDate, arrUsd: deal.arrUsd, arrKrw: deal.arrKrw, acrUsd: deal.acrUsd, acrKrw: deal.acrKrw, winProbability: deal.winProbability, latestUpdate: original && nullable(deal.latestUpdate ?? "") === nullable(original.latestUpdate ?? "") ? null : deal.latestUpdate, notes: deal.notes, action: "UPSERT" });
 
 export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange, initialSearch = "" }: Props) {
   const nextTempId = useRef(-1);
-  const editInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY_HIERARCHY);
-  const [savedHierarchy, setSavedHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY_HIERARCHY);
-  const [dirtyAccounts, setDirtyAccounts] = useState<Set<number>>(new Set());
-  const [dirtyWorkloads, setDirtyWorkloads] = useState<Set<number>>(new Set());
-  const [planWrites, setPlanWrites] = useState<WorkloadPlanWrite[]>([]);
-  const [manualAdding, setManualAdding] = useState<Set<number>>(new Set());
-  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
-  const [editSnapshot, setEditSnapshot] = useState<DraftSnapshot | null>(null);
+  const editSnapshot = useRef<unknown>(null);
+  const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY);
+  const [baseline, setBaseline] = useState<AccountsWorkloadsHierarchy>(EMPTY);
+  const [searchInput, setSearchInput] = useState(initialSearch);
   const [search, setSearch] = useState(initialSearch);
-  const [includeArchived, setIncludeArchived] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saveErrors, setSaveErrors] = useState<AccountsWorkloadsFieldError[]>([]);
   const [notice, setNotice] = useState("");
+  const [dirtyAccounts, setDirtyAccounts] = useState<Set<number>>(new Set());
+  const [dirtyWorkloads, setDirtyWorkloads] = useState<Set<number>>(new Set());
+  const [pendingDeleteWorkloadIds, setPendingDeleteWorkloadIds] = useState<Set<number>>(new Set());
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [editCell, setEditCell] = useState<EditCell | null>(null);
+  const [sortField, setSortField] = useState<SortField>("account");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [dealDrafts, setDealDrafts] = useState<Map<string, DealDraft>>(new Map());
+  const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
   const [forecastOpen, setForecastOpen] = useState(false);
   const [forecastLoading, setForecastLoading] = useState(false);
-  const [forecastError, setForecastError] = useState("");
   const [forecastCandidates, setForecastCandidates] = useState<ForecastCandidate[]>([]);
   const [selectedCandidateKeys, setSelectedCandidateKeys] = useState<Set<string>>(new Set());
 
-  const draftActive = dirtyAccounts.size > 0 || dirtyWorkloads.size > 0 || planWrites.length > 0;
-  useEffect(() => { onDraftStateChange?.(draftActive); }, [draftActive, onDraftStateChange]);
-  useEffect(() => {
-    if (editingCell) window.setTimeout(() => { editInputRef.current?.focus(); editInputRef.current?.select(); }, 0);
-  }, [editingCell]);
+  const dirty = dirtyAccounts.size + dirtyWorkloads.size + dealDrafts.size + pendingDeleteWorkloadIds.size > 0;
+  useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
   const reload = async () => {
-    setLoading(true); setError(""); setSaveErrors([]); setNotice(""); setEditingCell(null); setEditSnapshot(null);
+    setLoading(true); setError("");
     try {
-      const result = await fetchAccountsWorkloadsHierarchy({ search, includeArchived, includeDeletedDeals: false });
-      setHierarchy(result); setSavedHierarchy(result);
-      setDirtyAccounts(new Set()); setDirtyWorkloads(new Set()); setPlanWrites([]); setManualAdding(new Set());
+      const result = await fetchAccountsWorkloadsHierarchy({ search, includeArchived: false, includeDeletedDeals: false });
+      setHierarchy(result); setBaseline(result); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set());
+      setPendingDeleteWorkloadIds(new Set()); setSelectedRows(new Set()); setEditCell(null);
     } catch (requestError) { setError(friendlyError(requestError)); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void reload(); }, [search, includeArchived]);
+  useEffect(() => { void reload(); }, [search]);
 
-  const rows = useMemo<FlatRow[]>(() => hierarchy.accounts.flatMap((account) =>
-    account.workloads.map((workload) => ({ rowKey: `${account.id}:${workload.id}`, account, workload }))), [hierarchy]);
-  const missingForecastCandidates = useMemo(
-    () => filterForecastCandidates(forecastCandidates, hierarchy.accounts),
-    [forecastCandidates, hierarchy.accounts]
-  );
+  const allRows = useMemo(() => {
+    const flattened = hierarchy.accounts.flatMap((account) => account.workloads.map((workload) => ({ account, workload, key: rowKey(account.id, workload.id) })));
+    const scalar = (item: typeof flattened[number]) => {
+      const deals = item.workload.deals.filter((deal) => !deal.deleted);
+      if (sortField === "account") return item.account.name;
+      if (sortField === "workload") return item.workload.name;
+      if (sortField === "plan") return item.workload.plans[0]?.sourcePlanNumber ?? "";
+      if (sortField === "lastUpdated") return item.workload.lastUpdated ?? "";
+      if (sortField === "notes") return item.workload.notes ?? "";
+      if (sortField === "arrUsd") return deals.reduce((sum, deal) => sum + (deal.arrUsd ?? 0), 0);
+      if (sortField === "acrUsd") return deals.reduce((sum, deal) => sum + (deal.acrUsd ?? 0), 0);
+      return deals.length;
+    };
+    return [...flattened].sort((left, right) => {
+      if (left.workload.id < 0 && right.workload.id > 0) return -1;
+      if (right.workload.id < 0 && left.workload.id > 0) return 1;
+      const a = scalar(left); const b = scalar(right);
+      const result = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+      return (sortDirection === "asc" ? result : -result) || left.key.localeCompare(right.key);
+    });
+  }, [hierarchy, sortField, sortDirection]);
+  // A pending delete is only a local draft. Keep the saved workload and its
+  // opportunities visible (and therefore counted) until Save succeeds.
+  const rows = allRows;
 
-  const updateAccount = (id: number, name: string) => {
-    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, name } : account) }));
-    setDirtyAccounts((current) => new Set(current).add(id));
-  };
-  const updateWorkload = (id: number, field: "name" | "lastUpdated" | "notes", value: string | null) => {
-    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
-      ...account, workloads: account.workloads.map((workload) => workload.id === id ? { ...workload, [field]: value } : workload)
+  const missingCandidates = useMemo(() => filterForecastCandidates(forecastCandidates, hierarchy.accounts), [forecastCandidates, hierarchy.accounts]);
+  const toggleSort = (field: SortField) => { if (sortField === field) setSortDirection((value) => value === "asc" ? "desc" : "asc"); else { setSortField(field); setSortDirection("asc"); } };
+  const sortLabel = (field: SortField) => sortField === field ? (sortDirection === "asc" ? "▲" : "▼") : "";
+
+  const updateAw = (accountId: number, workloadId: number, field: AwField, value: string) => {
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => account.id !== accountId ? account : ({ ...account,
+      name: field === "account" ? value : account.name,
+      workloads: account.workloads.map((workload) => workload.id !== workloadId ? workload : field === "workload" ? { ...workload, name: value } : field === "lastUpdated" ? { ...workload, lastUpdated: nullable(value) } : field === "notes" ? { ...workload, notes: nullable(value) } : { ...workload, plans: workload.plans.length ? workload.plans.map((plan, index) => index === 0 ? { ...plan, sourcePlanNumber: nullable(value) } : plan) : value.trim() ? [{ id: nextTempId.current--, workloadId, sourcePlanId: null, sourcePlanNumber: value, versionNo: 0 }] : [] } )
     })) }));
-    setDirtyWorkloads((current) => new Set(current).add(id));
+    if (field === "account") setDirtyAccounts((current) => new Set(current).add(accountId));
+    else setDirtyWorkloads((current) => new Set(current).add(workloadId));
   };
-  const updatePlanNumber = (workload: AccountWorkload, value: string) => {
-    const sourcePlanNumber = value.trim();
-    const primary = workload.plans[0];
-    const workloadRef = refFor(workload.id, "workload");
-    if (!primary && !sourcePlanNumber) return;
-    if (!primary) {
-      const planId = nextTempId.current--;
-      setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
-        ...account, workloads: account.workloads.map((item) => item.id === workload.id
-          ? { ...item, plans: [{ id: planId, workloadId: workload.id, sourcePlanId: null, sourcePlanNumber, versionNo: 0 }, ...item.plans] }
-          : item)
-      })) }));
-      setPlanWrites((current) => [...current, { id: null, workloadRef, versionNo: null, sourcePlanId: null, sourcePlanNumber, action: "UPSERT" }]);
+
+  const awValue = (account: AccountHierarchyAccount, workload: AccountWorkload, field: AwField) => field === "account" ? account.name : field === "workload" ? workload.name : field === "plan" ? workload.plans[0]?.sourcePlanNumber ?? "" : field === "lastUpdated" ? workload.lastUpdated ?? "" : workload.notes ?? "";
+  const beginAwEdit = (key: string, field: AwField, value: string) => { if (!canWrite) return; editSnapshot.current = value; setEditCell({ key, field }); };
+  const cancelAwCell = (accountId: number, workloadId: number, field: AwField) => { updateAw(accountId, workloadId, field, String(editSnapshot.current ?? "")); setEditCell(null); };
+  const awEditorKey = (event: KeyboardEvent, accountId: number, workloadId: number, field: AwField) => {
+    if (event.key === "Escape") { event.preventDefault(); cancelAwCell(accountId, workloadId, field); }
+    else if (event.key === "Enter" && !((field === "lastUpdated" || field === "notes") && event.shiftKey)) { event.preventDefault(); setEditCell(null); }
+  };
+  const tooltip = (value: string, empty = "—") => <span class="accounts-workloads-ellipsis"><span>{value || empty}</span>{value && <span class="accounts-workloads-instant-tooltip" role="tooltip">{value}</span>}</span>;
+  const renderAwCell = (account: AccountHierarchyAccount, workload: AccountWorkload, field: AwField) => {
+    const key = rowKey(account.id, workload.id); const value = awValue(account, workload, field); const editing = editCell?.key === key && editCell.field === field;
+    const baselineAccount = baseline.accounts.find((item) => item.id === account.id); const baselineWorkload = baselineAccount?.workloads.find((item) => item.id === workload.id);
+    const original = baselineAccount && baselineWorkload ? awValue(baselineAccount, baselineWorkload, field) : "";
+    const changed = value !== original;
+    return <td class={`${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`} onDblClick={(event) => { if (isInteractive(event.target)) return; event.stopPropagation(); beginAwEdit(key, field, value); }}>
+      {editing ? (field === "lastUpdated" || field === "notes" ? <textarea autoFocus class="accounts-workloads-edit-field" value={value} onInput={(event) => updateAw(account.id, workload.id, field, event.currentTarget.value)} onKeyDown={(event) => awEditorKey(event, account.id, workload.id, field)} onBlur={() => setEditCell(null)} /> : <input autoFocus class="accounts-workloads-edit-field" value={value} onInput={(event) => updateAw(account.id, workload.id, field, event.currentTarget.value)} onKeyDown={(event) => awEditorKey(event, account.id, workload.id, field)} onBlur={() => setEditCell(null)} />) : tooltip(value)}
+    </td>;
+  };
+
+  const addAw = () => { const accountId = nextTempId.current--; const workloadId = nextTempId.current--; setHierarchy((current) => ({ ...current, accounts: [{ id: accountId, versionNo: 0, name: "", archived: false, workloads: [emptyWorkload(workloadId)] }, ...current.accounts] })); setDirtyAccounts((current) => new Set(current).add(accountId)); setDirtyWorkloads((current) => new Set(current).add(workloadId)); setSelectedRows(new Set([rowKey(accountId, workloadId)])); };
+  const removeUnsavedSelected = (selected: ReadonlySet<string>) => {
+    const removedWorkloadIds = new Set(allRows.filter((row) => selected.has(row.key) && row.workload.id < 0).map((row) => row.workload.id));
+    if (!removedWorkloadIds.size) return;
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.filter((workload) => !removedWorkloadIds.has(workload.id)) })).filter((account) => account.id > 0 || account.workloads.length > 0) }));
+    setDirtyAccounts((current) => new Set([...current].filter((id) => id > 0)));
+    setDirtyWorkloads((current) => new Set([...current].filter((id) => !removedWorkloadIds.has(id))));
+    setDealDrafts((current) => new Map([...current].filter(([, draft]) => !removedWorkloadIds.has(draft.workloadId))));
+  };
+
+  const deleteSelected = async () => {
+    const selected = new Set(selectedRows);
+    const savedRows = rows.filter((row) => selected.has(row.key) && row.workload.id > 0);
+    const permanentTargets = savedRows.filter((row) => pendingDeleteWorkloadIds.has(row.workload.id));
+    const draftTargets = savedRows.filter((row) => !pendingDeleteWorkloadIds.has(row.workload.id));
+
+    if (permanentTargets.length) {
+      const targetNames = permanentTargets.map((row) => `${row.account.name} / ${row.workload.name}`).join("\n");
+      const opportunityCount = permanentTargets.reduce((sum, row) => sum + row.workload.deals.length, 0);
+      const confirmed = window.confirm(
+        `Permanently delete the selected AW?\n\n${targetNames}\n\nChild opportunities: ${opportunityCount}\n\nThis action also deletes all dependent history and cannot be undone or recovered.`
+      );
+      if (!confirmed) return;
+
+      const deletedIds = new Set(permanentTargets.map((row) => row.workload.id));
+      const request: AccountsWorkloadsHierarchySaveRequest = {
+        accounts: [], deals: [], workloadPlans: [],
+        workloads: permanentTargets.map((row) => ({
+          id: row.workload.id, clientId: null, accountRef: String(row.account.id),
+          versionNo: row.workload.versionNo, name: row.workload.name,
+          lastUpdated: row.workload.lastUpdated, notes: row.workload.notes,
+          highlighted: row.workload.highlighted, action: "PERMANENT_DELETE"
+        }))
+      };
+      setSaving(true); setError(""); setSaveErrors([]);
+      try {
+        const saved = await saveAccountsWorkloadsHierarchy(request);
+        setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+          ...account, workloads: account.workloads.filter((workload) => !deletedIds.has(workload.id))
+        })) }));
+        setBaseline(saved);
+        setDealDrafts((current) => new Map([...current].filter(([, draft]) => !deletedIds.has(draft.workloadId))));
+        setPendingDeleteWorkloadIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        setDirtyWorkloads((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        setSelectedRows(new Set());
+        setNotice(`${deletedIds.size} AW permanently deleted.`);
+      } catch (requestError) {
+        setError(friendlyError(requestError));
+        setSaveErrors(requestError instanceof AccountsWorkloadsApiError ? requestError.errors : []);
+      } finally { setSaving(false); }
       return;
     }
-    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
-      ...account, workloads: account.workloads.map((item) => item.id === workload.id
-        ? { ...item, plans: item.plans.map((plan) => plan.id === primary.id ? { ...plan, sourcePlanNumber: sourcePlanNumber || null } : plan) }
-        : item)
-    })) }));
-    const matchesPrimary = (write: WorkloadPlanWrite) => primary.id > 0
-      ? write.id === primary.id
-      : write.id === null && write.workloadRef === workloadRef;
-    setPlanWrites((current) => [
-      ...current.filter((write) => !matchesPrimary(write)),
-      { id: primary.id > 0 ? primary.id : null, workloadRef: primary.id > 0 ? null : workloadRef,
-        versionNo: primary.id > 0 ? primary.versionNo : null, sourcePlanId: primary.sourcePlanId,
-        sourcePlanNumber: sourcePlanNumber || null,
-        action: !sourcePlanNumber && primary.sourcePlanId === null ? "DELETE" : "UPSERT" }
-    ]);
-  };
 
-  const beginEdit = (rowKey: string, field: EditableField) => {
-    if (!canWrite || saving || manualAdding.has(Number(rowKey.split(":")[1]))) return;
-    setEditSnapshot({ hierarchy, dirtyAccounts: new Set(dirtyAccounts), dirtyWorkloads: new Set(dirtyWorkloads), planWrites: [...planWrites] });
-    setEditingCell({ rowKey, field });
-  };
-  const commitEdit = () => { setEditingCell(null); setEditSnapshot(null); };
-  const cancelEdit = () => {
-    if (editSnapshot) {
-      setHierarchy(editSnapshot.hierarchy); setDirtyAccounts(editSnapshot.dirtyAccounts);
-      setDirtyWorkloads(editSnapshot.dirtyWorkloads); setPlanWrites(editSnapshot.planWrites);
+    const newlyPendingIds = draftTargets.map((row) => row.workload.id);
+
+    removeUnsavedSelected(selected);
+    if (newlyPendingIds.length) {
+      setPendingDeleteWorkloadIds((current) => new Set([...current, ...newlyPendingIds]));
+      setDirtyWorkloads((current) => new Set([...current].filter((id) => !newlyPendingIds.includes(id))));
+      setNotice(`${newlyPendingIds.length} AW marked as a pending-delete Draft. Save to apply or Cancel to restore.`);
     }
-    setEditingCell(null); setEditSnapshot(null);
-  };
-  const handleEditKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") { event.preventDefault(); cancelEdit(); }
-    else if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); commitEdit(); }
+    setSelectedRows(new Set(draftTargets.map((row) => row.key)));
   };
 
-  const planNumber = (workload: AccountWorkload) => workload.plans[0]?.sourcePlanNumber
-    ?? (workload.plans[0]?.sourcePlanId === null || workload.plans[0]?.sourcePlanId === undefined ? "" : String(workload.plans[0].sourcePlanId));
-  const fieldValue = (row: FlatRow, field: EditableField) => {
-    if (field === "account") return row.account.name;
-    if (field === "workload") return row.workload.name;
-    if (field === "planNumber") return planNumber(row.workload);
-    if (field === "latestUpdate") return row.workload.lastUpdated ?? "";
-    return row.workload.notes ?? "";
-  };
-  const changeField = (row: FlatRow, field: EditableField, value: string) => {
-    if (field === "account") updateAccount(row.account.id, value);
-    else if (field === "workload") updateWorkload(row.workload.id, "name", value);
-    else if (field === "planNumber") updatePlanNumber(row.workload, value);
-    else if (field === "latestUpdate") updateWorkload(row.workload.id, "lastUpdated", value.trim() ? value : null);
-    else updateWorkload(row.workload.id, "notes", value.trim() ? value : null);
-  };
-  const isDirtyField = (row: FlatRow, field: EditableField) => field === "account"
-    ? dirtyAccounts.has(row.account.id)
-    : field === "planNumber" ? planWrites.some((write) => write.workloadRef === refFor(row.workload.id, "workload") || write.id === row.workload.plans[0]?.id)
-      : dirtyWorkloads.has(row.workload.id);
-  const renderEditableCell = (row: FlatRow, field: EditableField) => {
-    const active = editingCell?.rowKey === row.rowKey && editingCell.field === field;
-    const adding = manualAdding.has(row.workload.id);
-    const value = fieldValue(row, field);
-    const className = [active ? "is-editing-cell" : "", isDirtyField(row, field) ? "is-unsaved-cell" : ""].filter(Boolean).join(" ");
-    const input = (field === "latestUpdate" || field === "notes")
-      ? <textarea ref={active ? (element) => { editInputRef.current = element; } : undefined} class="accounts-workloads-edit-field accounts-workloads-edit-field--textarea" value={value}
-          aria-label={field === "latestUpdate" ? "Latest Update" : "Notes"}
-          onInput={(event) => changeField(row, field, (event.currentTarget as HTMLTextAreaElement).value)}
-          onBlur={active ? commitEdit : undefined} onKeyDown={active ? handleEditKeyDown : undefined} />
-      : <input ref={active ? (element) => { editInputRef.current = element; } : undefined} class="accounts-workloads-edit-field" value={value}
-          aria-label={field}
-          onInput={(event) => changeField(row, field, (event.currentTarget as HTMLInputElement).value)}
-          onBlur={active ? commitEdit : undefined} onKeyDown={active ? handleEditKeyDown : undefined} />;
-    return (
-      <td class={className || undefined} onDblClick={() => beginEdit(row.rowKey, field)} title={!active && !adding ? "Double-click to edit" : undefined}>
-        {active || adding ? input : (value || "—")}
-      </td>
-    );
+  const cancelSelected = () => {
+    const selected = selectedRows;
+    const selectedWorkloadIds = new Set(allRows.filter((row) => selected.has(row.key)).map((row) => row.workload.id));
+    setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => { const savedAccount = baseline.accounts.find((item) => item.id === account.id); return { ...account, name: selected.size && account.workloads.some((workload) => selected.has(rowKey(account.id, workload.id))) && savedAccount ? savedAccount.name : account.name, workloads: account.workloads.map((workload) => selected.has(rowKey(account.id, workload.id)) ? savedAccount?.workloads.find((item) => item.id === workload.id) ?? workload : workload).filter((workload) => workload.id > 0 || !selected.has(rowKey(account.id, workload.id))) }; }).filter((account) => account.id > 0 || account.workloads.length > 0) }));
+    setDirtyAccounts((current) => new Set([...current].filter((id) => !allRows.some((row) => selected.has(row.key) && row.account.id === id))));
+    setDirtyWorkloads((current) => new Set([...current].filter((id) => !selectedWorkloadIds.has(id))));
+    setPendingDeleteWorkloadIds((current) => new Set([...current].filter((id) => !selectedWorkloadIds.has(id))));
+    setDealDrafts((current) => new Map([...current].filter(([, draft]) => !selectedWorkloadIds.has(draft.workloadId))));
+    setSelectedRows(new Set());
   };
 
-  const addAccountWorkload = () => {
-    const accountId = nextTempId.current--;
-    const workloadId = nextTempId.current--;
-    setHierarchy((current) => ({ ...current, accounts: [{
-      id: accountId, versionNo: 0, name: "", archived: false, workloads: [emptyWorkload(workloadId)]
-    }, ...current.accounts] }));
-    setDirtyAccounts((current) => new Set(current).add(accountId));
-    setDirtyWorkloads((current) => new Set(current).add(workloadId));
-    setManualAdding((current) => new Set(current).add(workloadId));
+  const planWriteFor = (workload: AccountWorkload, saved: AccountWorkload | undefined): WorkloadPlanWrite[] => {
+    const current = workload.plans[0]; const original = saved?.plans[0]; const currentValue = current?.sourcePlanNumber?.trim() ?? ""; const originalValue = original?.sourcePlanNumber?.trim() ?? "";
+    if (currentValue === originalValue) return [];
+    if (!original && currentValue) return [{ id: null, workloadRef: refFor(workload.id, "workload"), versionNo: null, sourcePlanId: null, sourcePlanNumber: currentValue, action: "UPSERT" }];
+    if (original && !currentValue && original.sourcePlanId === null) return [{ id: original.id, workloadRef: null, versionNo: original.versionNo, sourcePlanId: null, sourcePlanNumber: null, action: "DELETE" }];
+    return original ? [{ id: original.id, workloadRef: null, versionNo: original.versionNo, sourcePlanId: original.sourcePlanId, sourcePlanNumber: currentValue || null, action: "UPSERT" }] : [];
   };
-  const cancelDraft = () => {
-    setHierarchy(savedHierarchy); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set()); setPlanWrites([]);
-    setManualAdding(new Set()); setEditingCell(null); setEditSnapshot(null); setError(""); setSaveErrors([]); setNotice("");
-  };
-  const validateDraft = () => {
-    for (const account of hierarchy.accounts) {
-      if (dirtyAccounts.has(account.id) && !account.name.trim()) return "Every account requires a name.";
-      for (const workload of account.workloads) if (dirtyWorkloads.has(workload.id) && !workload.name.trim()) return "Every workload requires a name.";
+
+  const saveAwDrafts = async () => {
+    const archivedIds = new Set(pendingDeleteWorkloadIds);
+    const request: AccountsWorkloadsHierarchySaveRequest = { accounts: [], workloads: [], deals: [], workloadPlans: [] };
+    for (const account of hierarchy.accounts) for (const workload of account.workloads) {
+      if (pendingDeleteWorkloadIds.has(workload.id)) {
+        if (workload.id > 0) request.workloads.push({ id: workload.id, clientId: null, accountRef: refFor(account.id, "account"), versionNo: workload.versionNo, name: workload.name, lastUpdated: workload.lastUpdated, notes: workload.notes, highlighted: workload.highlighted, action: "ARCHIVE" });
+        continue;
+      }
+      if (dirtyAccounts.has(account.id) && !request.accounts.some((write) => write.id === account.id || write.clientId === refFor(account.id, "account"))) request.accounts.push({ id: account.id > 0 ? account.id : null, clientId: account.id > 0 ? null : refFor(account.id, "account"), versionNo: account.id > 0 ? account.versionNo : null, name: account.name, action: "UPSERT" });
+      if (dirtyWorkloads.has(workload.id)) {
+        if (!account.name.trim() || !workload.name.trim()) { setError("Account and Workload are required."); return; }
+        request.workloads.push({ id: workload.id > 0 ? workload.id : null, clientId: workload.id > 0 ? null : refFor(workload.id, "workload"), accountRef: refFor(account.id, "account"), versionNo: workload.id > 0 ? workload.versionNo : null, name: workload.name, lastUpdated: workload.lastUpdated, notes: workload.notes, highlighted: workload.highlighted, action: "UPSERT" });
+        request.workloadPlans.push(...planWriteFor(workload, baseline.accounts.find((item) => item.id === account.id)?.workloads.find((item) => item.id === workload.id)));
+      }
     }
-    return "";
-  };
-  const save = async () => {
-    const validation = validateDraft();
-    if (validation) { setError(validation); setSaveErrors([]); return; }
-    const request: AccountsWorkloadsHierarchySaveRequest = { accounts: [], workloads: [], deals: [], workloadPlans: [...planWrites] };
-    hierarchy.accounts.forEach((account) => {
-      if (dirtyAccounts.has(account.id)) request.accounts.push({
-        id: account.id > 0 ? account.id : null, clientId: account.id > 0 ? null : refFor(account.id, "account"),
-        versionNo: account.id > 0 ? account.versionNo : null, name: account.name, action: "UPSERT"
-      });
-      account.workloads.forEach((workload) => {
-        if (dirtyWorkloads.has(workload.id)) request.workloads.push({
-          id: workload.id > 0 ? workload.id : null,
-          clientId: workload.id > 0 ? null : refFor(workload.id, "workload"),
-          accountRef: refFor(account.id, "account"), versionNo: workload.id > 0 ? workload.versionNo : null,
-          name: workload.name, lastUpdated: workload.lastUpdated, notes: workload.notes, action: "UPSERT"
-        });
-      });
-    });
-    setSaving(true); setError(""); setSaveErrors([]); setNotice("");
+    setSaving(true); setError(""); setSaveErrors([]);
     try {
       const saved = await saveAccountsWorkloadsHierarchy(request);
-      setHierarchy(saved); setSavedHierarchy(saved); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set());
-      setPlanWrites([]); setManualAdding(new Set()); setEditingCell(null); setEditSnapshot(null); setNotice("Changes saved.");
-    } catch (saveError) {
-      setError(friendlyError(saveError));
-      setSaveErrors(saveError instanceof AccountsWorkloadsApiError ? saveError.errors : []);
-    } finally { setSaving(false); }
+      const withoutArchived = { ...saved, accounts: saved.accounts.map((account) => ({
+        ...account,
+        workloads: account.workloads.filter((workload) => !archivedIds.has(workload.id))
+      })) };
+      setHierarchy(withoutArchived); setBaseline(withoutArchived); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set());
+      setDealDrafts((current) => new Map([...current].filter(([, draft]) => !archivedIds.has(draft.workloadId))));
+      setPendingDeleteWorkloadIds(new Set()); setSelectedRows(new Set()); setNotice("AW changes saved.");
+    }
+    catch (saveError) { setError(friendlyError(saveError)); setSaveErrors(saveError instanceof AccountsWorkloadsApiError ? saveError.errors : []); }
+    finally { setSaving(false); }
   };
 
-  const openForecast = async () => {
-    setForecastOpen(true); setForecastLoading(true); setForecastError(""); setSelectedCandidateKeys(new Set());
-    try { setForecastCandidates(await fetchForecastCandidates()); }
-    catch (requestError) { setForecastError(friendlyError(requestError)); }
-    finally { setForecastLoading(false); }
-  };
-  const toggleCandidate = (key: string) => setSelectedCandidateKeys((current) => {
-    const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next;
-  });
-  const addSelectedCandidates = () => {
-    const selected = missingForecastCandidates.filter((candidate) => selectedCandidateKeys.has(forecastCandidateKey(candidate)));
-    const groups = new Map<string, { accountId: number; accountName: string; isNew: boolean; workloads: AccountWorkload[] }>();
-    const workloadIds: number[] = [];
-    const writes: WorkloadPlanWrite[] = [];
-    selected.forEach((candidate) => {
-      const accountName = candidate.accountName.trim();
-      const accountKey = normalizedAccountIdentity(accountName);
-      let group = groups.get(accountKey);
-      if (!group) {
-        const existing = hierarchy.accounts.find((account) => normalizedAccountIdentity(account.name) === accountKey);
-        group = { accountId: existing?.id ?? nextTempId.current--, accountName, isNew: !existing, workloads: [] };
-        groups.set(accountKey, group);
-      }
-      const workloadId = nextTempId.current--;
-      const hasSourcePlan = candidate.planId !== null || candidate.planNumber !== null;
-      const tempPlanId = hasSourcePlan ? nextTempId.current-- : null;
-      group.workloads.push({ ...emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME), plans: tempPlanId === null ? [] : [{
-        id: tempPlanId, workloadId, sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, versionNo: 0
-      }] });
-      workloadIds.push(workloadId);
-      if (hasSourcePlan) writes.push({ id: null, workloadRef: refFor(workloadId, "workload"), versionNo: null,
-        sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, action: "UPSERT" });
-    });
-    setHierarchy((current) => {
-      const byId = new Map([...groups.values()].map((group) => [group.accountId, group]));
-      const updated = current.accounts.map((account) => {
-        const group = byId.get(account.id); return group ? { ...account, workloads: [...group.workloads, ...account.workloads] } : account;
-      });
-      const created = [...groups.values()].filter((group) => group.isNew).map((group) => ({
-        id: group.accountId, versionNo: 0, name: group.accountName, archived: false, workloads: group.workloads
-      }));
-      return { ...current, accounts: [...created, ...updated] };
-    });
-    setDirtyAccounts((current) => { const next = new Set(current); [...groups.values()].filter((group) => group.isNew).forEach((group) => next.add(group.accountId)); return next; });
-    setDirtyWorkloads((current) => { const next = new Set(current); workloadIds.forEach((id) => next.add(id)); return next; });
-    setPlanWrites((current) => [...current, ...writes]);
-    setForecastOpen(false); setNotice(`${selected.length} candidate${selected.length === 1 ? "" : "s"} added as draft.`);
+
+  const toggleHighlight = async (account: AccountHierarchyAccount, workload: AccountWorkload) => {
+    if (workload.id < 0) { setHierarchy((current) => ({ ...current, accounts: current.accounts.map((item) => ({ ...item, workloads: item.workloads.map((entry) => entry.id === workload.id ? { ...entry, highlighted: !entry.highlighted } : entry) })) })); setDirtyWorkloads((current) => new Set(current).add(workload.id)); return; }
+    const savedWorkload = baseline.accounts.find((item) => item.id === account.id)?.workloads.find((item) => item.id === workload.id);
+    if (!savedWorkload) { setError("Saved workload baseline is unavailable."); return; }
+    const request: AccountsWorkloadsHierarchySaveRequest = { accounts: [], deals: [], workloadPlans: [], workloads: [{ id: workload.id, clientId: null, accountRef: String(account.id), versionNo: workload.versionNo, name: savedWorkload.name, lastUpdated: savedWorkload.lastUpdated, notes: savedWorkload.notes, highlighted: !workload.highlighted, action: "UPSERT" }] };
+    setSaving(true);
+    try {
+      const saved = await saveAccountsWorkloadsHierarchy(request);
+      const confirmedWorkload = saved.accounts.flatMap((item) => item.workloads).find((item) => item.id === workload.id);
+      if (!confirmedWorkload) throw new Error("Saved workload was not returned.");
+      const mergeHighlight = (current: AccountsWorkloadsHierarchy): AccountsWorkloadsHierarchy => ({ ...current, accounts: current.accounts.map((item) => ({ ...item, workloads: item.workloads.map((entry) => entry.id === workload.id ? { ...entry, versionNo: confirmedWorkload.versionNo, highlighted: confirmedWorkload.highlighted } : entry) })) });
+      setHierarchy((current) => mergeHighlight(current));
+      setBaseline((current) => mergeHighlight(current));
+    }
+    catch (requestError) { setError(friendlyError(requestError)); }
+    finally { setSaving(false); }
   };
 
-  return (
-    <section class="content-page accounts-workloads-page" aria-label="Accounts and workloads">
-      {breadcrumb}
-      <div class="accounts-workloads-header">
-        <div><p class="eyebrow">KPI Workspace</p><h2>Accounts &amp; Workloads</h2><p>Double-click a cell to edit. Changes stay in Draft until Save.</p></div>
-      </div>
-      <div class="accounts-workloads-toolbar" aria-label="Accounts and workloads actions">
-        <div class="accounts-workloads-search"><label for="accountsWorkloadsSearchInput">Search</label><div class="accounts-workloads-search__control">
-          <input id="accountsWorkloadsSearchInput" value={search} disabled={draftActive || loading}
-            placeholder="Account / Workload / Plan Number" onInput={(event) => setSearch((event.currentTarget as HTMLInputElement).value)} />
-        </div></div>
-        <label class="accounts-workloads-switch"><span>Include archived</span><input type="checkbox" checked={includeArchived} disabled={draftActive || loading}
-          onChange={(event) => setIncludeArchived((event.currentTarget as HTMLInputElement).checked)} /></label>
-        <div class="accounts-workloads-actions accounts-workloads-actions--compact">
-          <oj-button chroming="outlined" disabled={!canWrite || saving} onojAction={() => void openForecast()}>Compare Consumption Records</oj-button>
-          <oj-button chroming="callToAction" disabled={!canWrite || saving} onojAction={addAccountWorkload}>{"Add Account & Workload"}</oj-button>
-          {draftActive && <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || saving} onClick={() => void save()}>Save</button>}
-          {draftActive && <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelDraft}>Cancel</button>}
-          <oj-button chroming="outlined" disabled={draftActive || loading || saving} onojAction={() => void reload()}>Refresh</oj-button>
-        </div>
-      </div>
-      {error && <div class="accounts-workloads-save-error" role="alert">{error}</div>}
-      {saveErrors.length > 0 && <div class="accounts-workloads-save-error" role="alert">{saveErrors.map((item) => `${item.field}: ${item.message}`).join(" · ")}</div>}
-      {notice && <div class="accounts-workloads-table-meta" role="status">{notice}</div>}
-      <div class="accounts-workloads-table-meta" role="status">{loading ? "Loading…" : `${rows.length} workloads`}{saving ? " · Saving…" : ""}</div>
-      <div class="accounts-workloads-grid-shell">
-        <div class="accounts-workloads-grid-wrap">
-          <table class="accounts-workloads-grid accounts-workloads-grid--aw-only">
-            <thead><tr><th>Account</th><th>Workload</th><th>Plan Number</th><th>Latest Update</th><th>Notes</th></tr></thead>
-            <tbody>
-              {rows.map((row) => <tr key={row.rowKey} class={manualAdding.has(row.workload.id) ? "is-adding-row" : undefined}>
-                {renderEditableCell(row, "account")}{renderEditableCell(row, "workload")}{renderEditableCell(row, "planNumber")}
-                {renderEditableCell(row, "latestUpdate")}{renderEditableCell(row, "notes")}
-              </tr>)}
-              {!loading && rows.length === 0 && <tr class="is-empty-row"><td colSpan={5}>No accounts or workloads match the current filters.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {forecastOpen && <div class="accounts-workloads-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Consumption Records candidates">
-        <div class="accounts-forecast-dialog">
-          <h3>Consumption Records candidates</h3>
-          <p>Plan ID is matched first. Without a Plan ID, Account uses normalized exact matching.</p>
-          {forecastLoading && <p role="status">Loading candidates…</p>}
-          {forecastError && <p role="alert">{forecastError}</p>}
-          {!forecastLoading && missingForecastCandidates.length === 0 && <p>No unlinked candidates.</p>}
-          <div class="accounts-forecast-list">{missingForecastCandidates.map((candidate) => {
-            const key = forecastCandidateKey(candidate);
-            return <label key={key}><input type="checkbox" checked={selectedCandidateKeys.has(key)} onChange={() => toggleCandidate(key)} />
-              <span><strong>{candidate.accountName}</strong><small>{candidate.planNumber ?? "No Plan Number"}</small></span></label>;
-          })}</div>
-          <div class="accounts-workloads-actions"><button type="button" class="accounts-workloads-button accounts-workloads-button--primary"
-            disabled={selectedCandidateKeys.size === 0} onClick={addSelectedCandidates}>Add selected as Draft</button>
-            <button type="button" class="accounts-workloads-button" onClick={() => setForecastOpen(false)}>Close</button></div>
-        </div>
-      </div>}
-    </section>
-  );
+  const beginDealEdit = (workloadId: number, deal: AccountWorkloadDeal, field: DealField) => { if (!canWrite) return; const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`; setDealDrafts((current) => { if (current.has(key)) return current; const next = new Map(current); next.set(key, { key, workloadId, original: deal.id > 0 ? deal : null, deal: { ...deal } }); return next; }); setDealEditCell({ key, field }); };
+  const updateDealDraft = (key: string, field: DealField, value: string) => setDealDrafts((current) => { const draft = current.get(key); if (!draft) return current; let deal = { ...draft.deal };
+    if (field === "target") { const match = /^(FY\d{2}) Q([1-4])$/.exec(value); deal.targetFiscalYear = match?.[1] ?? null; deal.targetQuarter = match ? Number(match[2]) : null; }
+    else if (["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field)) (deal as any)[field] = numberValue(value);
+    else if (["opportunityNo", "actualCloseDate", "contractStartDate", "contractEndDate", "latestUpdate"].includes(field)) (deal as any)[field] = nullable(value);
+    else (deal as any)[field] = value;
+    const next = new Map(current); next.set(key, { ...draft, deal }); return next; });
+  const addDeal = (workloadId: number) => { if (workloadId < 0) return; const id = nextTempId.current--; const deal = emptyDeal(id, workloadId); const key = `draft:${id}`; setDealDrafts((current) => new Map(current).set(key, { key, workloadId, original: null, deal })); setDealEditCell({ key, field: "name" }); };
+  const cancelDeal = (key: string) => { setDealDrafts((current) => { const next = new Map(current); next.delete(key); return next; }); if (dealEditCell?.key === key) setDealEditCell(null); };
+  const saveDeal = async (draft: DealDraft) => { if (!draft.deal.name.trim()) { setError("Oppty Name is required."); return; } setSaving(true); setError("");
+    try {
+      const saved = await saveAccountsWorkloadsHierarchy({ accounts: [], workloads: [], workloadPlans: [], deals: [dealWrite(draft.deal, draft.workloadId, draft.original)] });
+      const savedWorkload = saved.accounts.flatMap((account) => account.workloads).find((workload) => workload.id === draft.workloadId);
+      if (!savedWorkload) throw new Error("Saved workload was not returned.");
+      const mergeDeals = (current: AccountsWorkloadsHierarchy): AccountsWorkloadsHierarchy => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.map((workload) => workload.id === draft.workloadId ? { ...workload, deals: savedWorkload.deals } : workload) })) });
+      setHierarchy((current) => mergeDeals(current));
+      setBaseline((current) => mergeDeals(current));
+      setDealDrafts((current) => { const next = new Map(current); next.delete(draft.key); return next; }); setDealEditCell(null); setNotice("Opportunity saved independently.");
+    }
+    catch (requestError) { setError(friendlyError(requestError)); setSaveErrors(requestError instanceof AccountsWorkloadsApiError ? requestError.errors : []); }
+    finally { setSaving(false); } };
+
+  const dealDisplay = (deal: AccountWorkloadDeal, field: DealField) => field === "target" ? targetPeriod(deal) : field === "revenueType" ? deal.revenueType : field === "status" ? deal.status : String((deal as any)[field] ?? "");
+  const renderDealCell = (workloadId: number, deal: AccountWorkloadDeal, field: DealField) => { const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`; const draft = dealDrafts.get(key); const effective = draft?.deal ?? deal; const value = dealDisplay(effective, field); const editing = dealEditCell?.key === key && dealEditCell.field === field; const changed = Boolean(draft && dealDisplay(draft.original ?? emptyDeal(0, workloadId), field) !== value);
+    let editor: any = null;
+    if (editing) {
+      if (field === "revenueType") editor = <select autoFocus value={value} onChange={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)}><option value="NEW">New</option><option value="EXPANSION">Expansion</option><option value="RENEWAL">Renewal</option></select>;
+      else if (field === "status") editor = <select autoFocus value={value} onChange={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)}><option value="OPEN">Open</option><option value="WON">Won</option><option value="LOST">Lost</option></select>;
+      else if (field === "target") editor = <select autoFocus value={value} onChange={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)}><option value="">—</option>{targetOptions.map((option) => <option value={option}>{option}</option>)}</select>;
+      else if (["actualCloseDate", "contractStartDate", "contractEndDate"].includes(field)) editor = <input autoFocus type="date" value={value} onInput={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)} />;
+      else if (["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field)) editor = <input autoFocus type="number" value={value} onInput={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)} />;
+      else if (field === "latestUpdate") editor = <textarea autoFocus value={value} onInput={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)} />;
+      else editor = <input autoFocus value={value} onInput={(event) => updateDealDraft(key, field, event.currentTarget.value)} onBlur={() => setDealEditCell(null)} />;
+    }
+    return <td class={`${field === "name" || field === "opportunityNo" ? "is-oppty-sticky " : ""}${field === "name" ? "is-oppty-sticky-name " : "is-oppty-sticky-id "}${changed ? "is-unsaved-cell" : ""}`} onDblClick={(event) => { if (isInteractive(event.target)) return; event.stopPropagation(); beginDealEdit(workloadId, effective, field); }}>{editing ? editor : tooltip(value)}</td>;
+  };
+
+  const openForecast = async () => { setForecastOpen(true); setForecastLoading(true); setSelectedCandidateKeys(new Set()); try { setForecastCandidates(await fetchForecastCandidates()); } catch (requestError) { setError(friendlyError(requestError)); } finally { setForecastLoading(false); } };
+  const addCandidates = () => { const selected = missingCandidates.filter((item) => selectedCandidateKeys.has(forecastCandidateKey(item))); const groups = new Map<string, { accountId: number; name: string; isNew: boolean; workloads: AccountWorkload[] }>(); const workloadIds: number[] = [];
+    selected.forEach((candidate) => { const identity = normalizedAccount(candidate.accountName); let group = groups.get(identity); if (!group) { const existing = hierarchy.accounts.find((account) => normalizedAccount(account.name) === identity); group = { accountId: existing?.id ?? nextTempId.current--, name: candidate.accountName.trim(), isNew: !existing, workloads: [] }; groups.set(identity, group); } const workloadId = nextTempId.current--; const workload = emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME); if (candidate.planId !== null || candidate.planNumber !== null) Object.assign(workload, { plans: [{ id: nextTempId.current--, workloadId, sourcePlanId: candidate.planId, sourcePlanNumber: candidate.planNumber, versionNo: 0 }] }); group.workloads.push(workload); workloadIds.push(workloadId); });
+    setHierarchy((current) => { let accounts = [...current.accounts]; groups.forEach((group) => { accounts = group.isNew ? [{ id: group.accountId, versionNo: 0, name: group.name, archived: false, workloads: group.workloads }, ...accounts] : accounts.map((account) => account.id === group.accountId ? { ...account, workloads: [...group.workloads, ...account.workloads] } : account); }); return { ...current, accounts }; });
+    setDirtyAccounts((current) => { const next = new Set(current); groups.forEach((group) => { if (group.isNew) next.add(group.accountId); }); return next; }); setDirtyWorkloads((current) => new Set([...current, ...workloadIds])); setForecastOpen(false); setNotice(`Added ${selected.length} record candidate${selected.length === 1 ? "" : "s"} as AW drafts.`); };
+
+  const selectedCount = rows.filter((row) => selectedRows.has(row.key)).length;
+  const selectedDirtyCount = allRows.filter((row) => selectedRows.has(row.key) && (row.workload.id < 0 || pendingDeleteWorkloadIds.has(row.workload.id) || dirtyAccounts.has(row.account.id) || dirtyWorkloads.has(row.workload.id))).length;
+  const savableAwDraftCount = dirtyAccounts.size + dirtyWorkloads.size + pendingDeleteWorkloadIds.size;
+
+  return <section class="accounts-workloads-page accounts-hierarchy-page" aria-labelledby="accountsWorkloadsTitle">
+    <header class="accounts-workloads-header consumption-page__header">
+      <div>{breadcrumb}<span class="kpi-eyebrow">My Customers 360</span><h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1></div>
+      <div class="consumption-import-actions accounts-workloads-header-actions"><oj-button chroming="outlined" disabled={!canWrite || saving} onojAction={() => void openForecast()}><span slot="startIcon" class="oj-ux-ico-plus"/>Add from Records</oj-button><oj-button chroming="callToAction" disabled={!canWrite || saving} onojAction={addAw}>Add Account & Workload</oj-button></div>
+    </header>
+    <form class="accounts-workloads-toolbar consumption-range-bar accounts-workloads-toolbar--compact" onSubmit={(event) => { event.preventDefault(); if (dirty) { setError("Save or cancel drafts before searching."); return; } setSearch(searchInput.trim()); }}>
+      <label class="consumption-record-search accounts-workloads-search" for="accountsWorkloadsSearch">Search<input id="accountsWorkloadsSearch" type="search" value={searchInput} placeholder="Account, workload, opportunity, or Plan" onInput={(event) => setSearchInput(event.currentTarget.value)} /></label>
+      <button type="submit" class="consumption-range-apply" disabled={loading || saving}>Apply</button>
+      {selectedCount > 0 && <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>Delete</button>}
+      {selectedDirtyCount > 0 && <button type="button" class="accounts-workloads-button" onClick={cancelSelected}>Cancel</button>}
+      {savableAwDraftCount > 0 && <button type="button" class="accounts-workloads-button accounts-workloads-button--primary" disabled={!canWrite || saving} onClick={() => void saveAwDrafts()}>{saving ? "Saving…" : "Save"}</button>}
+    </form>
+    {error && <div class="accounts-workloads-banner accounts-workloads-banner--error" role="alert"><strong>{error}</strong>{saveErrors.length > 0 && <ul>{saveErrors.map((item) => <li>{item.entity} · {item.field}: {item.message}</li>)}</ul>}</div>}
+    {notice && <div class="accounts-workloads-banner" role="status">{notice}</div>}
+    {loading ? <div class="accounts-workloads-loading"><oj-progress-circle value={-1} size="md"/> Loading hierarchy…</div> : <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact"><table class="accounts-workloads-grid accounts-workloads-aw-grid"><thead><tr>
+      <th class="accounts-workloads-select-col" aria-label="Selection"/><th class="accounts-workloads-expand-col" aria-label="Expand"/><th class="accounts-workloads-highlight-col">★</th>
+      {([['account','Account'],['workload','Workload'],['plan','Plan Number'],['arrUsd','ARR($)'],['acrUsd','ACR($)'],['opptyCount','Oppty Count'],['lastUpdated','Latest Update'],['notes','Notes']] as [SortField,string][]).map(([field,label]) => <th class={`is-${field}`}><button type="button" onClick={() => toggleSort(field)}>{label} {sortLabel(field)}</button></th>)}
+    </tr></thead><tbody>{rows.map(({ account, workload, key }) => { const expanded = expandedRows.has(key); const pendingDelete = pendingDeleteWorkloadIds.has(workload.id); const deals = workload.deals.filter((deal) => !deal.deleted); const arr = deals.reduce((sum, deal) => sum + (deal.arrUsd ?? 0), 0); const acr = deals.reduce((sum, deal) => sum + (deal.acrUsd ?? 0), 0); const childDrafts = [...dealDrafts.values()].filter((draft) => draft.workloadId === workload.id); const shownDeals = deals.map((deal) => childDrafts.find((draft) => draft.deal.id === deal.id)?.deal ?? deal); childDrafts.filter((draft) => draft.original === null).forEach((draft) => shownDeals.unshift(draft.deal)); return <Fragment key={key}>
+      <tr class={`accounts-workloads-parent-row${workload.highlighted ? " is-highlighted" : ""}${selectedRows.has(key) ? " is-selected" : ""}${pendingDelete ? " is-pending-delete" : ""}`} onClick={(event) => { if (isInteractive(event.target)) return; setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; }); }}>
+        <td><input type="checkbox" checked={selectedRows.has(key)} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}/>{pendingDelete && <span class="accounts-workloads-pending-delete" role="status">Pending delete</span>}</td>
+        <td><button type="button" class="accounts-workloads-expander" onClick={() => setExpandedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}>{expanded ? "▾" : "▸"}</button></td>
+        <td><button type="button" class="accounts-workloads-highlight" aria-pressed={workload.highlighted} onClick={() => void toggleHighlight(account, workload)}>{workload.highlighted ? "★" : "☆"}</button></td>
+        {renderAwCell(account, workload, "account")}{renderAwCell(account, workload, "workload")}{renderAwCell(account, workload, "plan")}
+        <td class="accounts-workloads-number-cell">{fmtMoney(arr)}</td><td class="accounts-workloads-number-cell">{fmtMoney(acr)}</td><td class="accounts-workloads-number-cell">{deals.length}</td>
+        {renderAwCell(account, workload, "lastUpdated")}{renderAwCell(account, workload, "notes")}
+      </tr>
+      {expanded && <tr class="accounts-workloads-child-row"><td colSpan={11}><section class="accounts-workloads-opportunities" aria-label={`${account.name} ${workload.name} opportunities`}><header class="accounts-workloads-opportunities__heading"><div><strong>Opportunities</strong><span>{deals.length} saved</span></div><button type="button" disabled={!canWrite || workload.id < 0} onClick={() => addDeal(workload.id)}>Add Opportunity</button></header>{workload.id < 0 ? <p class="accounts-workloads-child-guidance">Save the parent AW before adding opportunities.</p> : <div class="accounts-workloads-oppty-scroll"><table class="accounts-workloads-oppty-grid"><thead><tr>{["Oppty Name","Oppty ID","Revenue Type","Win Prob","Target Quarter","ARR ($)","ARR (₩)","ACR ($)","ACR (₩)","Status","Close Date","Start Date","End Date","Latest Update","Actions"].map((label) => <th>{label}</th>)}</tr></thead><tbody>{shownDeals.map((deal) => { const draftKey = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`; const draft = dealDrafts.get(draftKey); return <tr class={draft ? "is-draft" : undefined}>{renderDealCell(workload.id, deal, "name")}{renderDealCell(workload.id, deal, "opportunityNo")}{renderDealCell(workload.id, deal, "revenueType")}{renderDealCell(workload.id, deal, "winProbability")}{renderDealCell(workload.id, deal, "target")}{renderDealCell(workload.id, deal, "arrUsd")}{renderDealCell(workload.id, deal, "arrKrw")}{renderDealCell(workload.id, deal, "acrUsd")}{renderDealCell(workload.id, deal, "acrKrw")}{renderDealCell(workload.id, deal, "status")}{renderDealCell(workload.id, deal, "actualCloseDate")}{renderDealCell(workload.id, deal, "contractStartDate")}{renderDealCell(workload.id, deal, "contractEndDate")}{renderDealCell(workload.id, deal, "latestUpdate")}<td class="accounts-workloads-oppty-actions">{draft && <><button type="button" disabled={saving} onClick={() => void saveDeal(draft)}>Save</button><button type="button" onClick={() => cancelDeal(draftKey)}>{draft.original ? "Cancel" : "Draft Delete"}</button></>}</td></tr>; })}{shownDeals.length === 0 && <tr><td colSpan={15} class="accounts-workloads-empty">No opportunities.</td></tr>}</tbody></table></div>}</section></td></tr>}
+    </Fragment>; })}{rows.length === 0 && <tr><td colSpan={11} class="accounts-workloads-empty">No accounts or workloads found.</td></tr>}</tbody></table></div>}
+    {forecastOpen && <div class="accounts-workloads-dialog-backdrop"><section class="accounts-workloads-dialog accounts-forecast-dialog" role="dialog" aria-modal="true"><header><div><h2>Add from Records</h2><p>Select missing Consumption Records. Plan ID is matched first; normalized Account exact match is used only when Plan ID is unavailable. They will be added as unsaved AW drafts.</p></div><button type="button" onClick={() => setForecastOpen(false)}>×</button></header>{forecastLoading ? <p>Loading…</p> : <table class="accounts-forecast-candidates-table"><thead><tr><th/><th>Account</th><th>Plan ID(Number)</th></tr></thead><tbody>{missingCandidates.map((candidate) => { const key = forecastCandidateKey(candidate); return <tr><td><input type="checkbox" checked={selectedCandidateKeys.has(key)} onChange={() => setSelectedCandidateKeys((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}/></td><td>{candidate.accountName}</td><td>{candidate.planNumber ?? "No Plan Number"}</td></tr>; })}</tbody></table>}<footer><span>{selectedCandidateKeys.size} selected</span><div><button type="button" onClick={() => setForecastOpen(false)}>Cancel</button><button type="button" disabled={!selectedCandidateKeys.size} onClick={addCandidates}>Add</button></div></footer></section></div>}
+  </section>;
 }

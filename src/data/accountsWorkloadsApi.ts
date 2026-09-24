@@ -55,7 +55,7 @@ export type AccountsWorkloadsListResponse = Readonly<{
 }>;
 
 export type DealStatus = "OPEN" | "WON" | "LOST";
-export type HierarchyWriteAction = "UPSERT" | "ARCHIVE" | "RESTORE" | "DELETE";
+export type HierarchyWriteAction = "UPSERT" | "ARCHIVE" | "RESTORE" | "DELETE" | "PERMANENT_DELETE";
 
 export type AccountWorkloadDeal = Readonly<{
   id: number;
@@ -96,6 +96,7 @@ export type AccountWorkload = Readonly<{
   name: string;
   lastUpdated: string | null;
   notes: string | null;
+  highlighted: boolean;
   archived: boolean;
   plans: AccountWorkloadPlan[];
   deals: AccountWorkloadDeal[];
@@ -169,7 +170,7 @@ export const filterForecastCandidates = (
 export type AccountWrite = Readonly<{ id: number | null; clientId: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
 export type WorkloadWrite = Readonly<{
   id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null;
-  name: string | null; lastUpdated: string | null; notes: string | null; action: HierarchyWriteAction;
+  name: string | null; lastUpdated: string | null; notes: string | null; highlighted?: boolean | null; action: HierarchyWriteAction;
 }>;
 export type DealWrite = Readonly<{
   id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;
@@ -468,7 +469,7 @@ const parseHierarchy = (payload: unknown): AccountsWorkloadsHierarchy => {
     value.workloads.forEach((workload, workloadIndex) => {
       const item = requiredObject(workload, `Malformed workload ${workloadIndex + 1}`);
       if (!isPositiveInteger(item.id) || !isPositiveInteger(item.versionNo) || typeof item.name !== "string" ||
-          typeof item.archived !== "boolean" || !Array.isArray(item.plans) || !Array.isArray(item.deals)) {
+          typeof item.highlighted !== "boolean" || typeof item.archived !== "boolean" || !Array.isArray(item.plans) || !Array.isArray(item.deals)) {
         throw new Error(`Malformed workload ${workloadIndex + 1}`);
       }
     });

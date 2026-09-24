@@ -3722,3 +3722,68 @@ h4.weekly-activity-section-label--next-week,
 }
 .accounts-forecast-list > label span { display: grid; gap: .2rem; }
 .accounts-forecast-list > label small { color: var(--kpi-muted); }
+
+/* Compact AW hierarchy aligned with the Consumption Records title/toolbar/table rhythm. */
+.accounts-hierarchy-page { gap: 10px; }
+.accounts-hierarchy-page .accounts-workloads-header { align-items: flex-end; margin: 0; padding-bottom: 0; }
+.accounts-hierarchy-page .accounts-workloads-header h1 { margin: 2px 0 0; }
+.accounts-workloads-header-actions { align-self: flex-end; }
+.accounts-workloads-toolbar--compact { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; min-height: 0; padding: 10px 12px; }
+.accounts-workloads-toolbar--compact .accounts-workloads-search { flex: 1 1 320px; max-width: 560px; }
+.accounts-workloads-toolbar--compact .accounts-workloads-search input { width: 100%; }
+.accounts-workloads-grid-wrap--compact { margin-top: 0; max-width: 100%; overflow-x: auto; }
+.accounts-workloads-grid.accounts-workloads-aw-grid { border-collapse: collapse; display: table; margin-top: 0; min-width: 1280px; table-layout: fixed; width: 100%; }
+.accounts-workloads-aw-grid th,.accounts-workloads-aw-grid td { vertical-align: middle; }
+.accounts-workloads-aw-grid th button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; min-height: 0; padding: 0; white-space: nowrap; }
+.accounts-workloads-aw-grid .accounts-workloads-select-col { width: 38px; }
+.accounts-workloads-aw-grid .accounts-workloads-expand-col { width: 42px; }
+.accounts-workloads-aw-grid .accounts-workloads-highlight-col { width: 42px; }
+.accounts-workloads-aw-grid .is-account { width: 150px; }
+.accounts-workloads-aw-grid .is-workload { width: 145px; }
+.accounts-workloads-aw-grid .is-plan { width: 118px; }
+.accounts-workloads-aw-grid .is-arrUsd,.accounts-workloads-aw-grid .is-acrUsd { width: 100px; }
+.accounts-workloads-aw-grid .is-opptyCount { width: 96px; }
+.accounts-workloads-aw-grid .is-lastUpdated { width: 215px; }
+.accounts-workloads-aw-grid .is-notes { width: 235px; }
+.accounts-workloads-parent-row.is-selected > td { box-shadow: inset 0 0 0 1px var(--oj-core-focus-border-color, #0572ce); }
+.accounts-workloads-parent-row.is-highlighted > td { background: #fff6d9; }
+.accounts-workloads-parent-row.is-pending-delete > td { background: #fff1ed; }
+.accounts-workloads-pending-delete {
+  background: #fbe3dc;
+  border: 1px solid #d87a64;
+  border-radius: 999px;
+  color: #8c2f20;
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.38rem;
+  white-space: nowrap;
+}
+
+.accounts-workloads-highlight,.accounts-workloads-expander { background: transparent !important; border: 0 !important; color: var(--oj-core-text-color-primary); cursor: pointer; min-height: 0 !important; padding: 0 !important; }
+.accounts-workloads-highlight { color: #a65d00; font-size: 1.15rem; }
+.accounts-workloads-number-cell { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.accounts-workloads-ellipsis { display: block; min-width: 0; position: relative; }
+.accounts-workloads-ellipsis > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accounts-workloads-instant-tooltip { background: var(--oj-core-bg-color-content, white); border: 1px solid var(--oj-core-divider-color, #d6d9de); border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.16); color: var(--oj-core-text-color-primary, #161513); display: none; font-size: .78rem; left: 0; line-height: 1.35; max-width: 420px; overflow-wrap: anywhere; padding: 6px 9px; pointer-events: none; position: absolute; top: calc(100% + 4px); white-space: pre-wrap; width: max-content; z-index: 40; }
+.accounts-workloads-ellipsis:hover .accounts-workloads-instant-tooltip,.accounts-workloads-ellipsis:focus-within .accounts-workloads-instant-tooltip { display: block; }
+.accounts-workloads-aw-grid td.is-editing-cell { background: #fffdf7; box-shadow: inset 0 0 0 2px rgba(199,70,52,.24); }
+.accounts-workloads-aw-grid td.is-unsaved-cell { background: var(--kap-grid-draft-bg); color: var(--kap-grid-draft-ink); position: relative; }
+.accounts-workloads-aw-grid td.is-unsaved-cell::after { background: var(--kap-grid-draft-line); bottom: 0; content: ""; height: 3px; left: .35rem; position: absolute; right: .35rem; }
+.accounts-workloads-child-row > td { background: #f5f6f7; padding: 0 14px 14px 62px; }
+.accounts-workloads-opportunities { background: #fff; border: 1px solid #d6d9de; border-left: 4px solid #312d2a; border-radius: 6px; max-width: 100%; overflow: hidden; }
+.accounts-workloads-opportunities__heading { align-items: center; background: #f5f6f7; border-bottom: 1px solid #d6d9de; display: flex; justify-content: space-between; left: auto; padding: 9px 12px; position: static; }
+.accounts-workloads-opportunities__heading div { align-items: baseline; display: flex; gap: 8px; }
+.accounts-workloads-opportunities__heading span { color: var(--oj-core-text-color-secondary); font-size: .76rem; }
+.accounts-workloads-oppty-scroll { max-width: 100%; overflow-x: auto; position: relative; }
+.accounts-workloads-opportunities table.accounts-workloads-oppty-grid { border-collapse: separate; border-spacing: 0; min-width: 1900px; table-layout: fixed; }
+.accounts-workloads-oppty-grid th,.accounts-workloads-oppty-grid td { background: #fff; border-bottom: 1px solid #e3e5e8; min-width: 118px; padding: 7px 8px; width: 118px; }
+.accounts-workloads-oppty-grid th:nth-child(1),.accounts-workloads-oppty-grid td:nth-child(1) { left: 0; min-width: 190px; position: sticky; width: 190px; z-index: 5; }
+.accounts-workloads-oppty-grid th:nth-child(2),.accounts-workloads-oppty-grid td:nth-child(2) { box-shadow: 4px 0 5px rgba(0,0,0,.08); left: 190px; min-width: 130px; position: sticky; width: 130px; z-index: 5; }
+.accounts-workloads-oppty-grid thead th:nth-child(-n+2) { z-index: 7; }
+.accounts-workloads-oppty-grid tr.is-draft td { background: #fff9e8; }
+.accounts-workloads-oppty-grid input,.accounts-workloads-oppty-grid select,.accounts-workloads-oppty-grid textarea { box-sizing: border-box; width: 100%; }
+.accounts-workloads-oppty-actions { white-space: nowrap; }
+.accounts-workloads-oppty-actions button + button { margin-left: 5px; }
+.accounts-workloads-child-guidance { color: var(--oj-core-text-color-secondary); margin: 0; padding: 14px; }
