@@ -3662,3 +3662,63 @@ h4.weekly-activity-section-label--next-week,
   .accounts-workloads-child-row > td { padding-left: .5rem; }
   .accounts-workloads-opportunities { max-width: calc(100vw - 2rem); }
 }
+
+/* Pure Accounts & Workloads table: restore the pre-opportunity inline-edit layout. */
+.accounts-workloads-grid-wrap {
+  max-width: 100%;
+  overflow: auto;
+}
+.accounts-workloads-grid.accounts-workloads-grid--aw-only {
+  border-collapse: collapse;
+  display: table;
+  margin-top: 0;
+  min-width: 72rem;
+  overflow: visible;
+  table-layout: fixed;
+  width: 100%;
+}
+.accounts-workloads-grid--aw-only th:nth-child(1) { width: 16rem; }
+.accounts-workloads-grid--aw-only th:nth-child(2) { width: 16rem; }
+.accounts-workloads-grid--aw-only th:nth-child(3) { width: 11rem; }
+.accounts-workloads-grid--aw-only th:nth-child(4) { width: 15rem; }
+.accounts-workloads-grid--aw-only th:nth-child(5) { width: 20rem; }
+.accounts-workloads-grid--aw-only td:nth-child(4),
+.accounts-workloads-grid--aw-only td:nth-child(5) {
+  left: auto;
+  position: static;
+  z-index: auto;
+}
+.accounts-workloads-grid--aw-only td {
+  cursor: default;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.accounts-workloads-grid--aw-only td.is-editing-cell {
+  background: #fffdf7;
+  box-shadow: inset 0 0 0 2px rgba(199, 70, 52, 0.24);
+}
+.accounts-workloads-grid--aw-only td.is-unsaved-cell {
+  background: var(--kap-grid-draft-bg);
+  color: var(--kap-grid-draft-ink);
+  position: relative;
+}
+.accounts-workloads-grid--aw-only td.is-unsaved-cell::after {
+  background: var(--kap-grid-draft-line);
+  bottom: 0;
+  content: "";
+  height: 3px;
+  left: .35rem;
+  position: absolute;
+  right: .35rem;
+}
+.accounts-workloads-grid--aw-only tr.is-adding-row td { background: #f7fbff; }
+.accounts-forecast-list > label {
+  align-items: center;
+  border-bottom: 1px solid var(--kpi-border);
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: auto 1fr;
+  padding: .65rem;
+}
+.accounts-forecast-list > label span { display: grid; gap: .2rem; }
+.accounts-forecast-list > label small { color: var(--kpi-muted); }
