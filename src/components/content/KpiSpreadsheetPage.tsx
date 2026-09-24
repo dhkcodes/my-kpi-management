@@ -83,12 +83,6 @@ const minimumProgress = (startedAt: number, minimumMs = 450) => new Promise<void
   const remaining = Math.max(0, minimumMs - (performance.now() - startedAt));
   window.setTimeout(resolve, remaining);
 });
-const formatActivityMetaDate = (value: string) => {
-  const date = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-US", {
-    month: "short", day: "numeric", year: "numeric", timeZone: "UTC"
-  }).format(date);
-};
 
 const quarterStatusClass = (status: ReturnType<typeof getQuarterStatus>) => ({
   Achieved: "kpi-quarter-status-label--achieved",
@@ -121,21 +115,22 @@ const portfolioQuarterStatuses = (
 });
 
 const portfolioQuarterTooltip = (summary: KpiActivitySummary | null, code: SpreadsheetKpiCode, quarter: Quarter) => {
-  if (!summary) return `${code} ${quarter}\nAchieved: N/A\nTarget: N/A`;
+  if (!summary) return `${code} ${quarter}\nAchieved count / Target count: N/A`;
   if (code === "D1") {
     const actual = summary.d1QuarterByStage[quarter];
     const lines = stages.map((stage) => {
       const apiStage = stage.toUpperCase() as keyof typeof actual;
-      return `${stage}: ${actual[apiStage].acrK}K / ${summary.targets.d1AcrKPerQuarter[apiStage]}K`;
+      const label = ({ onboarded: "Onboarded ACR", validated: "Validated ACR", identified: "Identified ACR" } as const)[stage];
+      return `${label}: ${actual[apiStage].acrK}K / ${summary.targets.d1AcrKPerQuarter[apiStage]}K`;
     });
     return `${code} ${quarter}\n${lines.join("\n")}`;
   }
   if (code === "C1" || code === "C2") {
     const actual = summary.quarterCounts.C1[quarter] + summary.quarterCounts.C2[quarter];
-    return `${code} ${quarter}\nAchieved: ${actual}\nTarget: ${summary.targets.c1C2CombinedPerQuarter}`;
+    return `${code} ${quarter}\nAchieved count / Target count: ${actual} / ${summary.targets.c1C2CombinedPerQuarter}`;
   }
   const target = summary.targets.countPerQuarter[code as keyof typeof summary.targets.countPerQuarter];
-  return `${code} ${quarter}\nAchieved: ${summary.quarterCounts[code][quarter]}\nTarget: ${target}`;
+  return `${code} ${quarter}\nAchieved count / Target count: ${summary.quarterCounts[code][quarter]} / ${target}`;
 };
 
 type EditorRect = Readonly<{ left: number; top: number; width: number; height: number }>;
@@ -812,9 +807,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
-      setApiMessage(items.length === 0
-        ? `No KPI activities entered for ${fiscalYear}`
-        : `${items.length} activities · Data through ${formatActivityMetaDate(overview.asOf)}`);
+      setApiMessage(items.length === 0 ? `No KPI activities entered for ${fiscalYear}` : "");
     }).catch((error) => {
       if (!active) return;
       const message = error instanceof Error ? error.message : "KPI API request failed.";
@@ -1181,8 +1174,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         </table></div>
         {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
       </section>}
-      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI portfolio</h3></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); return <tr><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{row.name}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-status-tooltip-trigger" title={tooltip} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></span></td>; })}</tr>; })}</tbody></table></div>
+      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI Performance</h3></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-status-tooltip-trigger" title={tooltip} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></span></td>; })}</tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>

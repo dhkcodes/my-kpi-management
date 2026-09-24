@@ -3516,3 +3516,57 @@ h4.weekly-activity-section-label--next-week,
 .kap-permission-table th { text-align: start; }
 .kap-permission-table thead th:not(:first-child), .kap-permission-table td { text-align: center; }
 .kap-permission-table input[type="checkbox"] { accent-color: var(--oj-core-brand-color-1); block-size: 1.15rem; inline-size: 1.15rem; }
+
+/* Compact alignment requested for Home, KPI, Activities, and Accounts. */
+.kap-header-wordmark {
+  display: block;
+  width: min(16rem, 45vw);
+  height: 2.15rem;
+  background: url("images/kap-wordmark.png") left center / contain no-repeat;
+}
+
+.home-consumption__quarter-list {
+  min-height: 18rem;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+.home-consumption__alerts li > div > strong,
+.home-consumption__alert-value > strong { font-size: .82rem; }
+.home-consumption__alerts li span { font-size: .68rem; }
+
+.kpi-spreadsheet-page__header h2,
+.kpi-guide-dialog__header h2 { font-size: 1.25rem; line-height: 1.25; }
+.kpi-sheet-tabs button,
+.kpi-sheet-table,
+.kpi-sheet-cards,
+.kpi-guide-list-item,
+.kpi-guide-main { font-size: .78rem; }
+.kpi-sheet-table th,
+.kpi-sheet-table td { font-size: .78rem; }
+.kpi-guide-details-heading h3 { font-size: .9rem; }
+.kpi-activities-table,
+.kpi-overview-portfolio__table-wrap table { font-size: .78rem; }
+.kpi-activities-table td,
+.kpi-activities-table th { font-size: .78rem; }
+
+.weekly-activity-filters {
+  grid-template-columns: 9rem 9rem minmax(12rem, 18rem) auto;
+  justify-content: start;
+}
+.weekly-activity-filters__actions { align-self: stretch; }
+.weekly-activity-filters__actions oj-button { min-height: 3.5rem; }
+
+.accounts-workloads-toolbar { grid-template-columns: minmax(15rem, 28rem) auto auto auto 1fr; }
+.accounts-workloads-search { width: 100%; }
+
+@media (max-width: 1024px) {
+  .accounts-workloads-toolbar { grid-template-columns: 1fr; }
+  .weekly-activity-filters { grid-template-columns: 9rem 9rem minmax(12rem, 18rem) auto; }
+  .weekly-activity-filters oj-input-text,
+  .weekly-activity-filters__actions { grid-column: auto; }
+}
+@media (max-width: 760px) {
+  .weekly-activity-filters { grid-template-columns: minmax(0, 1fr); }
+  .weekly-activity-filters oj-input-text,
+  .weekly-activity-filters__actions { grid-column: 1; }
+  .weekly-activity-filters__actions { display: grid; grid-template-columns: 1fr 1fr; }
+}

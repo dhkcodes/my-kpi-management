@@ -1281,7 +1281,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
             const dirty = draftForecastCompositions.has(forecastDraftKey(series.customer, month));
             if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
               class="consumption-value-cell consumption-mtd-cell">
-              <span>{hasCurrentMtd ? currency.format(currentMtd[month]) : "—"}{!hasCurrentMtd && <small>MTD unavailable</small>}</span>
+              <span>{hasCurrentMtd ? currency.format(currentMtd[month]) : "—"}</span>
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
