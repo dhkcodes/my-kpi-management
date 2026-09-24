@@ -11,6 +11,7 @@ import { FiscalYear, FiscalYearDataset, GuideSection, KpiStatus, WorkloadStage }
 import { formatAmountK } from "../../data/kpiCalculations";
 import { getNavigationRoute, isKpiActivitiesRoute, NavigationRouteDefinition } from "../navigationRoutes";
 import { PageNavigationToolbar } from "../PageNavigationToolbar";
+import { AccountManagementOverviewPage } from "./AccountManagementOverviewPage";
 import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
@@ -440,7 +441,7 @@ export function Content({
 
   return (
     <main id="cockpit" role="main" class="oj-web-applayout-content kpi-content">
-      {!['profile', 'users', 'consumptionRecords'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+      {!['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">
@@ -483,12 +484,12 @@ export function Content({
         <div class="accounts-workloads-source-status" role="status"><strong>Read-only access.</strong> Write permission is required to add, edit, delete, save, clone, restore, or import data.</div>
       )}
 
-      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
+      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
           <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
         </div>
       )}
-      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
@@ -611,6 +612,8 @@ export function Content({
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
           onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageNavigation} />
+      ) : activeRoute.module === "accountManagementOverview" ? (
+        <AccountManagementOverviewPage breadcrumb={pageNavigation} onNavigate={onNavigate} />
       ) : activeRoute.module === "myCustomers360" ? (
         accountsWorkloadsLoading ? (
           <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
@@ -628,32 +631,12 @@ export function Content({
           />
         )
       ) : activeRoute.module === "accountsWorkloads" ? (
-        accountsWorkloadsLoading ? (
-          <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountsWorkloadsLoadingText">
-            {pageNavigation}
-            <oj-progress-circle value={-1} size="md" aria-label="Loading Accounts and Workloads"></oj-progress-circle>
-            <span id="accountsWorkloadsLoadingText">Loading Accounts &amp; Workloads data…</span>
-          </section>
-        ) : (
-          <AccountsWorkloadsPage
-            key={fiscalYear}
-            fiscalYear={fiscalYear}
-            canWrite={canWrite}
-            rows={accountsWorkloadsRows}
-            metadata={accountWorkloadMetadata}
-            query={accountsWorkloadsQuery}
-            dataSource={accountsWorkloadsDataSource}
-            fxRate={fxRate}
-            fxLoading={fxLoading}
-            fxError={fxError}
-            accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
-            onQueryChange={onAccountsWorkloadsQueryChange}
-            onRefresh={onAccountsWorkloadsRefresh}
-            onDraftStateChange={onAccountsWorkloadsDraftStateChange}
-            onRowsChange={onAccountsWorkloadsRowsChange}
-            breadcrumb={pageNavigation}
-          />
-        )
+        <AccountsWorkloadsPage
+          canWrite={canWrite}
+          initialSearch={accountsWorkloadsQuery.search}
+          onDraftStateChange={onAccountsWorkloadsDraftStateChange}
+          breadcrumb={pageNavigation}
+        />
       ) : activeRoute.module === "weeklyActivities" ? (
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (

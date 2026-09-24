@@ -2,6 +2,7 @@ export type NavigationRouteModule =
   | "home"
   | "kpiPage"
   | "myCustomers360"
+  | "accountManagementOverview"
   | "accountsWorkloads"
   | "weeklyActivities"
   | "consumptionAnalysis"
@@ -28,6 +29,7 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "activity-f", module: "kpiPage", pageTitle: "[F] Customer references" },
   { id: "activity-h", module: "kpiPage", pageTitle: "[H] Technical blogs" },
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
+  { id: "account-management-overview", module: "accountManagementOverview", pageTitle: "Account Management Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
   { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },

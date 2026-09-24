@@ -75,11 +75,15 @@ export const kpiNavItems: NavigationItem[] = [
   { id: "activity-f", label: "Customer references", code: "F", codePlacement: "before" },
   { id: "activity-h", label: "Technical blogs", code: "H", codePlacement: "before" }
 ];
-export const customerNavItems: NavigationItem[] = [
-  { id: "customers-overview", label: "Portfolio Overview", icon: "oj-ux-ico-contact-group" },
-  { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" },
+export const activityNavItems: NavigationItem[] = [
   { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" }
 ];
+export const accountManagementNavItems: NavigationItem[] = [
+  { id: "account-management-overview", label: "Overview", icon: "oj-ux-ico-dashboard" },
+  { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" }
+];
+/** Legacy export retained for consumers that still refer to the previous group name. */
+export const customerNavItems = accountManagementNavItems;
 export const consumptionNavItems: NavigationItem[] = [
   { id: "analysis", label: "Analysis", icon: "oj-ux-ico-chart-line" },
   { id: "attainment", label: "Attainment", icon: "oj-ux-ico-chart-bar" },
@@ -87,7 +91,8 @@ export const consumptionNavItems: NavigationItem[] = [
 ];
 export const navItems: NavigationItem[] = [
   { id: "home", label: "Home", icon: "oj-ux-ico-home" },
-  { id: "my-customers", label: "My Customers", icon: "oj-ux-ico-contact-group", children: customerNavItems },
-  { id: "kpis", label: "KPI Activities", icon: "oj-ux-ico-book", children: kpiNavItems },
+  { id: "my-activities", label: "My Activities", icon: "oj-ux-ico-calendar-clock", children: activityNavItems },
+  { id: "account-management", label: "Account Management", icon: "oj-ux-ico-contact-group", children: accountManagementNavItems },
+  { id: "kpis", label: "KPI", icon: "oj-ux-ico-book", children: kpiNavItems },
   { id: "consumption", label: "Consumption", icon: "oj-ux-ico-chart-line", children: consumptionNavItems }
 ];

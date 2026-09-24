@@ -11,7 +11,12 @@ export type AccountWorkloadRow = {
   account: string;
   workloadName: string;
   revenueType?: RevenueType | null;
-  opptyNo: string;
+  /** Nullable: manually-created deals do not require a Forecast opportunity. */
+  opptyNo: string | null;
+  dealName?: string;
+  dealStatus?: string | null;
+  closeDate?: string;
+  contractPeriodMonths?: number | null;
   startDate: string;
   endDate: string;
   arrUsd: number | null;
