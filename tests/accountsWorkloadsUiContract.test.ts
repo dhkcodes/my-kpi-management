@@ -214,6 +214,8 @@ assert.match(page, /error\.status === 401 \|\| error\.status === 403[\s\S]*permi
   "401 and 403 save failures are identified as permission failures");
 assert.match(page, /error\.status === 409[\s\S]*changed this data/i,
   "409 save failures are identified as conflicts");
+assert.match(page, /error\.status === 409 && error\.code === "DUPLICATE_ACCOUNT_WORKLOAD"[\s\S]*return error\.message/,
+  "duplicate Account and Workload conflicts preserve the backend's understandable message");
 assert.match(page, /error\.status === 400 \|\| error\.status === 422[\s\S]*Validation failed/i,
   "400 and 422 save failures are identified as validation failures");
 assert.match(page, /error\.status >= 500[\s\S]*server/i,
