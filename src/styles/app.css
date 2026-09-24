@@ -3747,6 +3747,19 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-aw-grid .is-notes { width: 235px; }
 .accounts-workloads-parent-row.is-selected > td { box-shadow: inset 0 0 0 1px var(--oj-core-focus-border-color, #0572ce); }
 .accounts-workloads-parent-row.is-highlighted > td { background: #fff6d9; }
+.accounts-workloads-parent-row.is-pending-delete > td { background: #fff1ed; }
+.accounts-workloads-pending-delete {
+  background: #fbe3dc;
+  border: 1px solid #d87a64;
+  border-radius: 999px;
+  color: #8c2f20;
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.38rem;
+  white-space: nowrap;
+}
 
 .accounts-workloads-highlight,.accounts-workloads-expander { background: transparent !important; border: 0 !important; color: var(--oj-core-text-color-primary); cursor: pointer; min-height: 0 !important; padding: 0 !important; }
 .accounts-workloads-highlight { color: #a65d00; font-size: 1.15rem; }

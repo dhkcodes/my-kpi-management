@@ -55,7 +55,7 @@ export type AccountsWorkloadsListResponse = Readonly<{
 }>;
 
 export type DealStatus = "OPEN" | "WON" | "LOST";
-export type HierarchyWriteAction = "UPSERT" | "ARCHIVE" | "RESTORE" | "DELETE";
+export type HierarchyWriteAction = "UPSERT" | "ARCHIVE" | "RESTORE" | "DELETE" | "PERMANENT_DELETE";
 
 export type AccountWorkloadDeal = Readonly<{
   id: number;

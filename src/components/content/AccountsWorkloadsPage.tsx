@@ -43,7 +43,7 @@ const targetPeriod = (deal: AccountWorkloadDeal) => deal.targetFiscalYear && dea
 const targetOptions = Array.from({ length: 48 }, (_, index) => `FY${24 + Math.floor(index / 4)} Q${(index % 4) + 1}`);
 const emptyWorkload = (id: number, name = ""): AccountWorkload => ({ id, versionNo: 0, name, lastUpdated: null, notes: null, highlighted: false, archived: false, plans: [], deals: [] });
 const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({ id, workloadId, versionNo: 0, name: "", opportunityNo: null, revenueType: "NEW", status: "OPEN", targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null, contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: null, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, deleted: false, deletedAt: null, sourceCommitmentId: null });
-const dealWrite = (deal: AccountWorkloadDeal, workloadId: number): DealWrite => ({ id: deal.id > 0 ? deal.id : null, clientId: deal.id > 0 ? null : `deal-${Math.abs(deal.id)}`, workloadRef: String(workloadId), versionNo: deal.id > 0 ? deal.versionNo : null, name: deal.name, opportunityNo: deal.opportunityNo, revenueType: deal.revenueType, status: deal.status, targetFiscalYear: deal.targetFiscalYear, targetQuarter: deal.targetQuarter, actualCloseDate: deal.actualCloseDate, contractStartDate: deal.contractStartDate, contractEndDate: deal.contractEndDate, arrUsd: deal.arrUsd, arrKrw: deal.arrKrw, acrUsd: deal.acrUsd, acrKrw: deal.acrKrw, winProbability: deal.winProbability, latestUpdate: deal.latestUpdate, notes: deal.notes, action: "UPSERT" });
+const dealWrite = (deal: AccountWorkloadDeal, workloadId: number, original: AccountWorkloadDeal | null = null): DealWrite => ({ id: deal.id > 0 ? deal.id : null, clientId: deal.id > 0 ? null : `deal-${Math.abs(deal.id)}`, workloadRef: String(workloadId), versionNo: deal.id > 0 ? deal.versionNo : null, name: deal.name, opportunityNo: deal.opportunityNo, revenueType: deal.revenueType, status: deal.status, targetFiscalYear: deal.targetFiscalYear, targetQuarter: deal.targetQuarter, actualCloseDate: deal.actualCloseDate, contractStartDate: deal.contractStartDate, contractEndDate: deal.contractEndDate, arrUsd: deal.arrUsd, arrKrw: deal.arrKrw, acrUsd: deal.acrUsd, acrKrw: deal.acrKrw, winProbability: deal.winProbability, latestUpdate: original && nullable(deal.latestUpdate ?? "") === nullable(original.latestUpdate ?? "") ? null : deal.latestUpdate, notes: deal.notes, action: "UPSERT" });
 
 export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange, initialSearch = "" }: Props) {
   const nextTempId = useRef(-1);
@@ -108,10 +108,9 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
       return (sortDirection === "asc" ? result : -result) || left.key.localeCompare(right.key);
     });
   }, [hierarchy, sortField, sortDirection]);
-  const rows = useMemo(
-    () => allRows.filter((row) => !pendingDeleteWorkloadIds.has(row.workload.id)),
-    [allRows, pendingDeleteWorkloadIds]
-  );
+  // A pending delete is only a local draft. Keep the saved workload and its
+  // opportunities visible (and therefore counted) until Save succeeds.
+  const rows = allRows;
 
   const missingCandidates = useMemo(() => filterForecastCandidates(forecastCandidates, hierarchy.accounts), [forecastCandidates, hierarchy.accounts]);
   const toggleSort = (field: SortField) => { if (sortField === field) setSortDirection((value) => value === "asc" ? "desc" : "asc"); else { setSortField(field); setSortDirection("asc"); } };
@@ -154,10 +153,50 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
     setDealDrafts((current) => new Map([...current].filter(([, draft]) => !removedWorkloadIds.has(draft.workloadId))));
   };
 
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     const selected = new Set(selectedRows);
     const savedRows = rows.filter((row) => selected.has(row.key) && row.workload.id > 0);
-    const newlyPendingIds = savedRows.map((row) => row.workload.id);
+    const permanentTargets = savedRows.filter((row) => pendingDeleteWorkloadIds.has(row.workload.id));
+    const draftTargets = savedRows.filter((row) => !pendingDeleteWorkloadIds.has(row.workload.id));
+
+    if (permanentTargets.length) {
+      const targetNames = permanentTargets.map((row) => `${row.account.name} / ${row.workload.name}`).join("\n");
+      const opportunityCount = permanentTargets.reduce((sum, row) => sum + row.workload.deals.length, 0);
+      const confirmed = window.confirm(
+        `Permanently delete the selected AW?\n\n${targetNames}\n\nChild opportunities: ${opportunityCount}\n\nThis action also deletes all dependent history and cannot be undone or recovered.`
+      );
+      if (!confirmed) return;
+
+      const deletedIds = new Set(permanentTargets.map((row) => row.workload.id));
+      const request: AccountsWorkloadsHierarchySaveRequest = {
+        accounts: [], deals: [], workloadPlans: [],
+        workloads: permanentTargets.map((row) => ({
+          id: row.workload.id, clientId: null, accountRef: String(row.account.id),
+          versionNo: row.workload.versionNo, name: row.workload.name,
+          lastUpdated: row.workload.lastUpdated, notes: row.workload.notes,
+          highlighted: row.workload.highlighted, action: "PERMANENT_DELETE"
+        }))
+      };
+      setSaving(true); setError(""); setSaveErrors([]);
+      try {
+        const saved = await saveAccountsWorkloadsHierarchy(request);
+        setHierarchy((current) => ({ ...current, accounts: current.accounts.map((account) => ({
+          ...account, workloads: account.workloads.filter((workload) => !deletedIds.has(workload.id))
+        })) }));
+        setBaseline(saved);
+        setDealDrafts((current) => new Map([...current].filter(([, draft]) => !deletedIds.has(draft.workloadId))));
+        setPendingDeleteWorkloadIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        setDirtyWorkloads((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        setSelectedRows(new Set());
+        setNotice(`${deletedIds.size} AW permanently deleted.`);
+      } catch (requestError) {
+        setError(friendlyError(requestError));
+        setSaveErrors(requestError instanceof AccountsWorkloadsApiError ? requestError.errors : []);
+      } finally { setSaving(false); }
+      return;
+    }
+
+    const newlyPendingIds = draftTargets.map((row) => row.workload.id);
 
     removeUnsavedSelected(selected);
     if (newlyPendingIds.length) {
@@ -165,7 +204,7 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
       setDirtyWorkloads((current) => new Set([...current].filter((id) => !newlyPendingIds.includes(id))));
       setNotice(`${newlyPendingIds.length} AW marked as a pending-delete Draft. Save to apply or Cancel to restore.`);
     }
-    setSelectedRows(new Set(savedRows.map((row) => row.key)));
+    setSelectedRows(new Set(draftTargets.map((row) => row.key)));
   };
 
   const cancelSelected = () => {
@@ -210,6 +249,7 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
         workloads: account.workloads.filter((workload) => !archivedIds.has(workload.id))
       })) };
       setHierarchy(withoutArchived); setBaseline(withoutArchived); setDirtyAccounts(new Set()); setDirtyWorkloads(new Set());
+      setDealDrafts((current) => new Map([...current].filter(([, draft]) => !archivedIds.has(draft.workloadId))));
       setPendingDeleteWorkloadIds(new Set()); setSelectedRows(new Set()); setNotice("AW changes saved.");
     }
     catch (saveError) { setError(friendlyError(saveError)); setSaveErrors(saveError instanceof AccountsWorkloadsApiError ? saveError.errors : []); }
@@ -246,7 +286,7 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
   const cancelDeal = (key: string) => { setDealDrafts((current) => { const next = new Map(current); next.delete(key); return next; }); if (dealEditCell?.key === key) setDealEditCell(null); };
   const saveDeal = async (draft: DealDraft) => { if (!draft.deal.name.trim()) { setError("Oppty Name is required."); return; } setSaving(true); setError("");
     try {
-      const saved = await saveAccountsWorkloadsHierarchy({ accounts: [], workloads: [], workloadPlans: [], deals: [dealWrite(draft.deal, draft.workloadId)] });
+      const saved = await saveAccountsWorkloadsHierarchy({ accounts: [], workloads: [], workloadPlans: [], deals: [dealWrite(draft.deal, draft.workloadId, draft.original)] });
       const savedWorkload = saved.accounts.flatMap((account) => account.workloads).find((workload) => workload.id === draft.workloadId);
       if (!savedWorkload) throw new Error("Saved workload was not returned.");
       const mergeDeals = (current: AccountsWorkloadsHierarchy): AccountsWorkloadsHierarchy => ({ ...current, accounts: current.accounts.map((account) => ({ ...account, workloads: account.workloads.map((workload) => workload.id === draft.workloadId ? { ...workload, deals: savedWorkload.deals } : workload) })) });
@@ -299,16 +339,16 @@ export function AccountsWorkloadsPage({ canWrite, breadcrumb, onDraftStateChange
     {loading ? <div class="accounts-workloads-loading"><oj-progress-circle value={-1} size="md"/> Loading hierarchy…</div> : <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact"><table class="accounts-workloads-grid accounts-workloads-aw-grid"><thead><tr>
       <th class="accounts-workloads-select-col" aria-label="Selection"/><th class="accounts-workloads-expand-col" aria-label="Expand"/><th class="accounts-workloads-highlight-col">★</th>
       {([['account','Account'],['workload','Workload'],['plan','Plan Number'],['arrUsd','ARR($)'],['acrUsd','ACR($)'],['opptyCount','Oppty Count'],['lastUpdated','Latest Update'],['notes','Notes']] as [SortField,string][]).map(([field,label]) => <th class={`is-${field}`}><button type="button" onClick={() => toggleSort(field)}>{label} {sortLabel(field)}</button></th>)}
-    </tr></thead><tbody>{rows.map(({ account, workload, key }) => { const expanded = expandedRows.has(key); const deals = workload.deals.filter((deal) => !deal.deleted); const arr = deals.reduce((sum, deal) => sum + (deal.arrUsd ?? 0), 0); const acr = deals.reduce((sum, deal) => sum + (deal.acrUsd ?? 0), 0); const childDrafts = [...dealDrafts.values()].filter((draft) => draft.workloadId === workload.id); const shownDeals = deals.map((deal) => childDrafts.find((draft) => draft.deal.id === deal.id)?.deal ?? deal); childDrafts.filter((draft) => draft.original === null).forEach((draft) => shownDeals.unshift(draft.deal)); return <Fragment key={key}>
-      <tr class={`accounts-workloads-parent-row${workload.highlighted ? " is-highlighted" : ""}${selectedRows.has(key) ? " is-selected" : ""}`} onClick={(event) => { if (isInteractive(event.target)) return; setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; }); }}>
-        <td><input type="checkbox" checked={selectedRows.has(key)} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}/></td>
+    </tr></thead><tbody>{rows.map(({ account, workload, key }) => { const expanded = expandedRows.has(key); const pendingDelete = pendingDeleteWorkloadIds.has(workload.id); const deals = workload.deals.filter((deal) => !deal.deleted); const arr = deals.reduce((sum, deal) => sum + (deal.arrUsd ?? 0), 0); const acr = deals.reduce((sum, deal) => sum + (deal.acrUsd ?? 0), 0); const childDrafts = [...dealDrafts.values()].filter((draft) => draft.workloadId === workload.id); const shownDeals = deals.map((deal) => childDrafts.find((draft) => draft.deal.id === deal.id)?.deal ?? deal); childDrafts.filter((draft) => draft.original === null).forEach((draft) => shownDeals.unshift(draft.deal)); return <Fragment key={key}>
+      <tr class={`accounts-workloads-parent-row${workload.highlighted ? " is-highlighted" : ""}${selectedRows.has(key) ? " is-selected" : ""}${pendingDelete ? " is-pending-delete" : ""}`} onClick={(event) => { if (isInteractive(event.target)) return; setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; }); }}>
+        <td><input type="checkbox" checked={selectedRows.has(key)} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}/>{pendingDelete && <span class="accounts-workloads-pending-delete" role="status">Pending delete</span>}</td>
         <td><button type="button" class="accounts-workloads-expander" onClick={() => setExpandedRows((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}>{expanded ? "▾" : "▸"}</button></td>
         <td><button type="button" class="accounts-workloads-highlight" aria-pressed={workload.highlighted} onClick={() => void toggleHighlight(account, workload)}>{workload.highlighted ? "★" : "☆"}</button></td>
         {renderAwCell(account, workload, "account")}{renderAwCell(account, workload, "workload")}{renderAwCell(account, workload, "plan")}
         <td class="accounts-workloads-number-cell">{fmtMoney(arr)}</td><td class="accounts-workloads-number-cell">{fmtMoney(acr)}</td><td class="accounts-workloads-number-cell">{deals.length}</td>
         {renderAwCell(account, workload, "lastUpdated")}{renderAwCell(account, workload, "notes")}
       </tr>
-      {expanded && <tr class="accounts-workloads-child-row"><td colSpan={11}><section class="accounts-workloads-opportunities" aria-label={`${account.name} ${workload.name} opportunities`}><header class="accounts-workloads-opportunities__heading"><div><strong>Opportunities</strong><span>{deals.length} saved</span></div><button type="button" disabled={!canWrite || workload.id < 0} onClick={() => addDeal(workload.id)}>Add Opportunity</button></header>{workload.id < 0 ? <p class="accounts-workloads-child-guidance">Save the parent AW before adding opportunities.</p> : <div class="accounts-workloads-oppty-scroll"><table class="accounts-workloads-oppty-grid"><thead><tr>{["Oppty Name","Oppty ID","Revenue Type","Win Prob","Target Quarter","ARR ($)","ARR (₩)","ACR ($)","ACR (₩)","Status","Close Date","Start Date","End Date","Latest Update","Actions"].map((label) => <th>{label}</th>)}</tr></thead><tbody>{shownDeals.map((deal) => { const draftKey = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`; const draft = dealDrafts.get(draftKey); return <tr class={draft ? "is-draft" : undefined}>{renderDealCell(workload.id, deal, "name")}{renderDealCell(workload.id, deal, "opportunityNo")}{renderDealCell(workload.id, deal, "revenueType")}{renderDealCell(workload.id, deal, "winProbability")}{renderDealCell(workload.id, deal, "target")}{renderDealCell(workload.id, deal, "arrUsd")}{renderDealCell(workload.id, deal, "arrKrw")}{renderDealCell(workload.id, deal, "acrUsd")}{renderDealCell(workload.id, deal, "acrKrw")}{renderDealCell(workload.id, deal, "status")}{renderDealCell(workload.id, deal, "actualCloseDate")}{renderDealCell(workload.id, deal, "contractStartDate")}{renderDealCell(workload.id, deal, "contractEndDate")}{renderDealCell(workload.id, deal, "latestUpdate")}<td class="accounts-workloads-oppty-actions">{draft && <><button type="button" onClick={() => void saveDeal(draft)}>Save</button><button type="button" onClick={() => cancelDeal(draftKey)}>{draft.original ? "Cancel" : "Draft Delete"}</button></>}</td></tr>; })}{shownDeals.length === 0 && <tr><td colSpan={15} class="accounts-workloads-empty">No opportunities.</td></tr>}</tbody></table></div>}</section></td></tr>}
+      {expanded && <tr class="accounts-workloads-child-row"><td colSpan={11}><section class="accounts-workloads-opportunities" aria-label={`${account.name} ${workload.name} opportunities`}><header class="accounts-workloads-opportunities__heading"><div><strong>Opportunities</strong><span>{deals.length} saved</span></div><button type="button" disabled={!canWrite || workload.id < 0} onClick={() => addDeal(workload.id)}>Add Opportunity</button></header>{workload.id < 0 ? <p class="accounts-workloads-child-guidance">Save the parent AW before adding opportunities.</p> : <div class="accounts-workloads-oppty-scroll"><table class="accounts-workloads-oppty-grid"><thead><tr>{["Oppty Name","Oppty ID","Revenue Type","Win Prob","Target Quarter","ARR ($)","ARR (₩)","ACR ($)","ACR (₩)","Status","Close Date","Start Date","End Date","Latest Update","Actions"].map((label) => <th>{label}</th>)}</tr></thead><tbody>{shownDeals.map((deal) => { const draftKey = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`; const draft = dealDrafts.get(draftKey); return <tr class={draft ? "is-draft" : undefined}>{renderDealCell(workload.id, deal, "name")}{renderDealCell(workload.id, deal, "opportunityNo")}{renderDealCell(workload.id, deal, "revenueType")}{renderDealCell(workload.id, deal, "winProbability")}{renderDealCell(workload.id, deal, "target")}{renderDealCell(workload.id, deal, "arrUsd")}{renderDealCell(workload.id, deal, "arrKrw")}{renderDealCell(workload.id, deal, "acrUsd")}{renderDealCell(workload.id, deal, "acrKrw")}{renderDealCell(workload.id, deal, "status")}{renderDealCell(workload.id, deal, "actualCloseDate")}{renderDealCell(workload.id, deal, "contractStartDate")}{renderDealCell(workload.id, deal, "contractEndDate")}{renderDealCell(workload.id, deal, "latestUpdate")}<td class="accounts-workloads-oppty-actions">{draft && <><button type="button" disabled={saving} onClick={() => void saveDeal(draft)}>Save</button><button type="button" onClick={() => cancelDeal(draftKey)}>{draft.original ? "Cancel" : "Draft Delete"}</button></>}</td></tr>; })}{shownDeals.length === 0 && <tr><td colSpan={15} class="accounts-workloads-empty">No opportunities.</td></tr>}</tbody></table></div>}</section></td></tr>}
     </Fragment>; })}{rows.length === 0 && <tr><td colSpan={11} class="accounts-workloads-empty">No accounts or workloads found.</td></tr>}</tbody></table></div>}
     {forecastOpen && <div class="accounts-workloads-dialog-backdrop"><section class="accounts-workloads-dialog accounts-forecast-dialog" role="dialog" aria-modal="true"><header><div><h2>Add from Records</h2><p>Select missing Consumption Records. Plan ID is matched first; normalized Account exact match is used only when Plan ID is unavailable. They will be added as unsaved AW drafts.</p></div><button type="button" onClick={() => setForecastOpen(false)}>×</button></header>{forecastLoading ? <p>Loading…</p> : <table class="accounts-forecast-candidates-table"><thead><tr><th/><th>Account</th><th>Plan ID(Number)</th></tr></thead><tbody>{missingCandidates.map((candidate) => { const key = forecastCandidateKey(candidate); return <tr><td><input type="checkbox" checked={selectedCandidateKeys.has(key)} onChange={() => setSelectedCandidateKeys((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}/></td><td>{candidate.accountName}</td><td>{candidate.planNumber ?? "No Plan Number"}</td></tr>; })}</tbody></table>}<footer><span>{selectedCandidateKeys.size} selected</span><div><button type="button" onClick={() => setForecastOpen(false)}>Cancel</button><button type="button" disabled={!selectedCandidateKeys.size} onClick={addCandidates}>Add</button></div></footer></section></div>}
   </section>;

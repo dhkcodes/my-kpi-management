@@ -27,24 +27,28 @@ const api = readFileSync("src/data/accountsWorkloadsApi.ts", "utf8");
 assert.match(page, /pendingDeleteWorkloadIds/,
   "saved workloads use an explicit local pending-delete draft state");
 assert.match(page, /setPendingDeleteWorkloadIds/);
-assert.doesNotMatch(deleteHandler, /saveAccountsWorkloadsHierarchy|fetch\(/,
-  "the first Delete is a local draft transition and never calls the API");
+assert.match(deleteHandler, /if \(permanentTargets\.length\)[\s\S]*saveAccountsWorkloadsHierarchy\(request\)[\s\S]*return;[\s\S]*const newlyPendingIds = draftTargets/,
+  "the first Delete stays local; only re-deleting an already pending workload reaches the permanent-delete API path");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\(\(workload\) => !removedWorkloadIds\.has\(workload\.id\)\)/,
   "unsaved workload deletion is local removal");
-assert.match(page, /allRows[\s\S]*rows = useMemo\([\s\S]*!pendingDeleteWorkloadIds\.has\(row\.workload\.id\)/,
-  "pending-delete workloads and their child opportunities are excluded from rendering and row aggregates immediately");
+assert.match(page, /const rows = allRows/,
+  "pending-delete workloads remain visible so pre-save aggregates stay based on the existing saved data");
+assert.match(page, /is-pending-delete[\s\S]*Pending delete/,
+  "pending-delete workloads are visibly marked until Save or Cancel");
 assert.match(cancelHandler, /savedAccount = baseline\.accounts\.find[\s\S]*savedAccount\?\.workloads\.find[\s\S]*setPendingDeleteWorkloadIds\(\(current\) => new Set\(\[\.\.\.current\]\.filter/,
-  "Cancel restores the saved workload and children from the baseline and clears its pending-delete state");
+  "Cancel clears the pending-delete state and restores any edited workload and children from the baseline");
 assert.match(page, /pendingDeleteWorkloadIds\.has\(workload\.id\)[\s\S]*action: "ARCHIVE"/,
   "Save turns the pending-delete draft into one workload-level logical delete action");
 assert.match(page, /archivedIds[\s\S]*workloads\.filter\(\(workload\) => !archivedIds\.has\(workload\.id\)\)/,
   "a successful logical delete remains absent even if the save response contains the archived workload");
 assert.match(page, /setPendingDeleteWorkloadIds\(new Set\(\)\)[\s\S]*setSelectedRows\(new Set\(\)\)/,
   "a successful logical delete clears local pending-delete state only after the server accepts it");
-assert.doesNotMatch(page, /window\.confirm|permanentTargets|PERMANENT_DELETE|irreversible|delete permanently/i,
-  "there is no repeat-delete or permanent-delete confirmation UX");
-assert.doesNotMatch(api, /PERMANENT_DELETE/,
-  "PERMANENT_DELETE is not part of the frontend API action mapping");
+assert.match(deleteHandler, /permanentTargets[\s\S]*window\.confirm[\s\S]*PERMANENT_DELETE/,
+  "repeat Delete on a pending workload requires an irreversible confirmation before the API write");
+assert.match(deleteHandler, /workload\.name[\s\S]*workload\.deals\.length[\s\S]*cannot be undone/i,
+  "the permanent-delete confirmation identifies each AW and its child opportunity count");
+assert.match(api, /PERMANENT_DELETE/,
+  "PERMANENT_DELETE is mapped by the frontend API contract");
 assert.match(page, />Delete<\/button>/);
 assert.match(page, />Cancel<\/button>/);
 assert.doesNotMatch(page, />Archive<\/button>|>Restore<\/button>|Include archived/,
@@ -60,8 +64,8 @@ assert.match(page, /accounts-workloads-child-row/);
 assert.match(page, /Oppty Name/);
 assert.match(page, /Oppty ID/);
 assert.match(page, /Add Opportunity/);
-assert.match(page, /deals: \[dealWrite\(draft\.deal, draft\.workloadId\)\]/,
-  "an opportunity row Save sends only that opportunity operation");
+assert.match(page, /deals: \[dealWrite\(draft\.deal, draft\.workloadId, draft\.original\)\]/,
+  "an opportunity row Save sends only that opportunity operation and its original baseline");
 assert.match(page, /const mergeDeals[\s\S]*setHierarchy\(\(current\) => mergeDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeDeals\(current\)\)/,
   "an opportunity Save merges only that workload's server-confirmed deals and preserves unrelated AW/opportunity drafts");
 assert.match(page, /cancelDeal\(draftKey\)/,
