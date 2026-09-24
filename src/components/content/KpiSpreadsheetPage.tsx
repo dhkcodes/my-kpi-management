@@ -115,7 +115,8 @@ const portfolioQuarterStatuses = (
 });
 
 const portfolioQuarterTooltip = (summary: KpiActivitySummary | null, code: SpreadsheetKpiCode, quarter: Quarter) => {
-  if (!summary) return `${code} ${quarter}\nAchieved count / Target count: N/A`;
+  const displayCode = code === "C1" ? "C" : code;
+  if (!summary) return `${displayCode} ${quarter}\nAchieved count / Target count: N/A`;
   if (code === "D1") {
     const actual = summary.d1QuarterByStage[quarter];
     const lines = stages.map((stage) => {
@@ -123,14 +124,14 @@ const portfolioQuarterTooltip = (summary: KpiActivitySummary | null, code: Sprea
       const label = ({ onboarded: "Onboarded ACR", validated: "Validated ACR", identified: "Identified ACR" } as const)[stage];
       return `${label}: ${actual[apiStage].acrK}K / ${summary.targets.d1AcrKPerQuarter[apiStage]}K`;
     });
-    return `${code} ${quarter}\n${lines.join("\n")}`;
+    return `${displayCode} ${quarter}\n${lines.join("\n")}`;
   }
   if (code === "C1" || code === "C2") {
     const actual = summary.quarterCounts.C1[quarter] + summary.quarterCounts.C2[quarter];
-    return `${code} ${quarter}\nAchieved count / Target count: ${actual} / ${summary.targets.c1C2CombinedPerQuarter}`;
+    return `${displayCode} ${quarter}\nAchieved count / Target count: ${actual} / ${summary.targets.c1C2CombinedPerQuarter}`;
   }
   const target = summary.targets.countPerQuarter[code as keyof typeof summary.targets.countPerQuarter];
-  return `${code} ${quarter}\nAchieved count / Target count: ${summary.quarterCounts[code][quarter]} / ${target}`;
+  return `${displayCode} ${quarter}\nAchieved count / Target count: ${summary.quarterCounts[code][quarter]} / ${target}`;
 };
 
 type EditorRect = Readonly<{ left: number; top: number; width: number; height: number }>;
@@ -1175,7 +1176,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
       </section>}
       <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI Performance</h3></div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{row.code}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-status-tooltip-trigger" title={tooltip} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span></span></td>; })}</tr>; })}</tbody></table></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioCode = row.code === "C1" ? "C" : row.code; const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{portfolioCode}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span><span class="kpi-tooltip" role="tooltip">{tooltip}</span></span></td>; })}</tr>; })}</tbody></table></div>
       </section>
     </Fragment> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
@@ -1206,7 +1207,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       {showSummary && <Summary id={summaryId} expanded={summaryExpanded} summary={displaySummary} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
       <section id={guideId} class="kpi-activity-guide" hidden={!guideExpanded} aria-labelledby={`${guideId}Title`}>
         <div class="kpi-activity-guide__heading">
-          <div><span class="kpi-eyebrow">{activeTab} KPI Guide</span><h3 id={`${guideId}Title`}>{activeDefinition?.name}</h3></div>
+          <div><h3 id={`${guideId}Title`}>[{activeTab}] {activeDefinition?.name}</h3></div>
           <span>{fiscalYear}</span>
         </div>
         {(guideLoading || guideRecordsStale) ? <p role="status">Loading KPI Guide…</p> : guideError ? <p class="kpi-activity-guide__error" role="alert">{guideError}</p> : activeGuide ? <Fragment>
