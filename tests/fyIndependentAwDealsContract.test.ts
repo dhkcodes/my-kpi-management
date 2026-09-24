@@ -48,12 +48,12 @@ async function run() {
   const existingAccounts = [{
     id: 1, versionNo: 1, name: "Acme", archived: false,
     workloads: [{
-      id: 2, versionNo: 1, name: "Database", lastUpdated: null, notes: null, archived: false, deals: [],
+      id: 2, versionNo: 1, name: "Database", lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [],
       plans: [{ id: 3, workloadId: 2, sourcePlanId: 8, sourcePlanNumber: "PLAN-8", versionNo: 1 }]
     }]
   }, {
     id: -1, versionNo: 0, name: "  Draft only  ", archived: false,
-    workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", lastUpdated: null, notes: null, archived: false, deals: [], plans: [] }]
+    workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [], plans: [] }]
   }];
   assert.deepEqual(
     filterForecastCandidates([
@@ -112,7 +112,7 @@ async function run() {
   assert.match(pageSource, /sourcePlanNumber: candidate\.planNumber/, "selected candidates carry their original plan number into the AW draft");
   assert.match(pageSource, /emptyWorkload[\s\S]{0,240}deals: \[\]/, "candidate-created workloads do not create an opportunity");
   assert.match(pageSource, /Add Account & Workload/);
-  assert.doesNotMatch(pageSource, /Add Oppty|accounts-workloads-child-row/, "opportunity management UI is intentionally absent");
+  assert.match(pageSource, /Add Opportunity|accounts-workloads-child-row/, "opportunity management is isolated in the expandable child table");
   assert.match(pageSource, /accounts-workloads-grid/, "wide Account → Workload table is rendered");
   assert.match(pageSource, /saveError instanceof AccountsWorkloadsApiError/, "structured batch errors are rendered without clearing the draft");
   assert.match(pageSource, /setSaveErrors\(saveError instanceof AccountsWorkloadsApiError/, "draft edits survive save errors");
