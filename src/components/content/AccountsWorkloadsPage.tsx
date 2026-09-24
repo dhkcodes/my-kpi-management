@@ -143,7 +143,7 @@ const currencyKrwFormatter = new Intl.NumberFormat("ko-KR", {
 const formatUsd = (value: number | null) => (value === null ? "—" : `$${currencyUsdFormatter.format(value)}`);
 const formatKrw = (value: number | null) => (value === null ? "—" : `₩${currencyKrwFormatter.format(Math.round(value))}`);
 const formatProbability = (value: number | null) => (value === null ? "—" : `${value}%`);
-const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion"];
+const revenueTypeOptions: readonly RevenueType[] = ["New", "Expansion", "Renewal"];
 
 const comparableValue = (value: unknown) => value ?? "";
 

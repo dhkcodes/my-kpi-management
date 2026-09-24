@@ -79,7 +79,7 @@ assert.doesNotMatch(cssSource, /\.weekly-activity-card__sections section \.weekl
 assert.match(cssSource, /\.weekly-activity-toolbar \.ql-size[\s\S]*width:\s*6(?:\.\d+)?rem/, "the size picker reserves one horizontal row for the number and chevron");
 assert.match(cssSource, /\.weekly-activity-toolbar \.ql-size \.ql-picker-label\s*\{[\s\S]*align-items:\s*center[\s\S]*flex-direction:\s*row[\s\S]*justify-content:\s*center/, "the size text and chevron are horizontally adjacent and vertically centered");
 assert.match(appSource, /<oj-popup[\s\S]*id="kpiNavigationPopup"[\s\S]*autoDismiss="focusLoss"[\s\S]*initialFocus="firstFocusable"/, "JET popup owns outside-click, Escape, and initial-focus behavior");
-assert.match(appSource, /<nav class="kpi-menu-matrix"[\s\S]*navItems\.map/, "the dense matrix renders from the existing canonical menu tree");
+assert.match(appSource, /<nav class="kpi-menu-matrix"[\s\S]*visibleNavItems\.map/, "the dense matrix renders from the permission-filtered canonical menu tree");
 assert.match(appSource, /item\.children \? \([\s\S]*kpi-menu-group__label[\s\S]*item\.children\.map/, "parent items render as group labels while only children render links");
 assert.match(appSource, /href=\{getNavigationPath\(route\)\}[\s\S]*onNavigate\(item\.id\)/, "Home and leaf destinations retain real route hrefs and the existing navigation handoff");
 assert.match(appSource, /id="kpiNavigationClose"[\s\S]*onojAction=\{closeNavigation\}/, "the popup has an explicit close action");

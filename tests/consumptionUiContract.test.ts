@@ -202,7 +202,7 @@ assert.equal(insightsPage.includes("includeMtd"), true, "Analysis request includ
 assert.equal(insightsPage.includes("Include MTD"), true, "Analysis exposes the Include MTD toggle");
 assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
 assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
-assert.equal(recordsPage.includes("MTD · provisional"), true, "Current-period MTD is labelled provisional");
+assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
 assert.match(recordsPage, /actuals: showMtd && currentMtdPeriod[\s\S]*hasCurrentMtd \? \{ \[currentMtdPeriod\]: serverMtdTotals\[currentMtdPeriod\] \}[\s\S]*forecasts: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
   "portfolio MTD is represented separately from Forecast and never falls back to the current-period Forecast");
@@ -252,7 +252,7 @@ assert.match(recordsPage, /<details class="consumption-import-update-details"[\s
 assert.match(recordsPage, /consumption-import-hard-conflict[\s\S]*Import blocked[\s\S]*conflict\.reason[\s\S]*conflict\.rows\[0\][\s\S]*conflict\.values\[0\][\s\S]*conflict\.rows\[1\][\s\S]*conflict\.values\[1\]/, "Hard Conflict is a dedicated blocking banner with rows, key, values, and reason");
 assert.match(recordsPage, /pendingImport\.preview\.hasConflicts \? "Resolve errors"[\s\S]*isExactReplayPreview[\s\S]*"Already imported"[\s\S]*"Apply metadata refresh"[\s\S]*`Apply \$\{pendingImport\.preview\.insertFactCount\} new · \$\{pendingImport\.preview\.overwriteCount\} updates`/, "CTA distinguishes errors, exact replay, metadata-only refresh, and fact changes");
 assert.match(recordsPage, /Existing Actuals to overwrite[\s\S]*existingValue[\s\S]*newValue/, "overwrite preview discloses old and new values for scoped Plan-period keys");
-assert.match(recordsPage, /disabled=\{pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "conflicts and exact replay previews disable atomic Import without blocking metadata-only refresh");
+assert.match(recordsPage, /disabled=\{!canWrite \|\| pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "write denial, conflicts, and exact replay previews disable atomic Import without blocking metadata-only refresh");
 assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinals\[0\]\}[\s\S]*formatConflictCurrency\(conflict\.values\[0\]\)/, "Hard Conflict rows preserve decimal strings and distinguish equal source filenames by upload ordinal");
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
 assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
@@ -366,7 +366,7 @@ assert.match(recordsPage, /renderedRecordAccounts\.length === 0[\s\S]*consumptio
 assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPlans\(workspace\.plans, workspace\.fromQuarter, workspace\.toQuarter\)[\s\S]*recordGroupMatchesSearch[\s\S]*setRecordAccountNames\(adoptedAccountNames\)[\s\S]*setRecordsTotalAccounts\(adoptedAccountNames\.length\)[\s\S]*setRecordsHasMore\(false\)/, "workspace adoption rebuilds filtered Account names and Footer metadata instead of retaining stale paged rows");
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
-assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\)[\s\S]*const canEditControl = editable/, "every backend-declared DP or OCI Forecast cell is editable regardless of an existing value while ALL remains read-only");
+assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\) && !mtd;[\s\S]*const canEditControl = canWrite && editable/, "every backend-declared DP or OCI Forecast cell is editable outside MTD for authorized writers regardless of an existing value while ALL remains read-only");
 assert.match(recordsPage, /const editable = selectedPillar !== "ALL"/, "ALL is derived from entered pillar values and never directly entered without a standing helper note");
 assert.doesNotMatch(recordsPage, /ALL Forecast is read-only and sums entered Pillar values; missing values count as zero/, "derived ALL guidance is not repeated in the main content");
 assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");

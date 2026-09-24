@@ -131,7 +131,7 @@ const isNullableProbability = (value: unknown): value is number | null =>
   value === null || (isFiniteNumber(value) && value >= 0 && value <= 100);
 const isNullableString = (value: unknown): value is string | null => value === null || typeof value === "string";
 const isNullableRevenueType = (value: unknown): value is RevenueType | null =>
-  value === undefined || value === null || value === "New" || value === "Expansion";
+  value === undefined || value === null || value === "New" || value === "Expansion" || value === "Renewal";
 const textOrEmpty = (value: string | null) => value ?? "";
 const isRealIsoDate = (value: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);

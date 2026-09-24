@@ -112,7 +112,7 @@ assert.match(styles, /\.kpi-guide-criteria-table td\s*\{[^}]*line-height: 1\.35[
 assert.doesNotMatch(styles, /\.oj-dialog|\.oj-dialog-content|\.oj-dialog-body/, "KPI Guide scrolling does not override JET internal DOM");
 assert.match(page, /id="accountsWorkloadsFxError"[\s\S]*role="alert"/, "FX exposes an error state");
 
-assert.match(page, /aria-label="Add Account"[^>]*title="Add Account"[^>]*>Add Account<\/oj-button>/, "Accounts-only create action uses Add Account for text, accessibility, and tooltip");
+assert.match(page, /aria-label="Add Account"[^>]*title=\{[^}]*"Add Account"[^}]*\}[^>]*>Add Account<\/oj-button>/, "Accounts-only create action uses Add Account for text, accessibility, and tooltip");
 const addDraftRowAt = page.indexOf("key={addingRow.id}");
 const savedRowsAt = page.indexOf("visibleRows.map((row, index)");
 assert.ok(addDraftRowAt >= 0 && addDraftRowAt < savedRowsAt,
@@ -172,8 +172,8 @@ assert.doesNotMatch(page, /renderAddInput\("target", "FY27 Q1"\)/,
   "Add Account Target is not rendered as the legacy free-text input");
 assert.match(page, /revenueType: "Revenue Type"/,
   "Revenue Type is a visible Accounts & Workloads column");
-assert.match(page, /const revenueTypeOptions: readonly RevenueType\[\] = \["New", "Expansion"\]/,
-  "Revenue Type options are constrained to the backend contract");
+assert.match(page, /const revenueTypeOptions: readonly RevenueType\[\] = \["New", "Expansion", "Renewal"\]/,
+  "Revenue Type options include Renewal while remaining constrained to the backend contract");
 assert.match(page, /if \(field === "revenueType"\)[\s\S]*<select[\s\S]*revenueTypeOptions\.map/,
   "saved-row Revenue Type editing uses a SelectBox");
 assert.match(page, /renderAddInput\("revenueType", "Revenue Type"\)/,
@@ -183,10 +183,26 @@ assert.match(page, /revenueType: "New"/,
 assert.match(page, /renderEditableCell\(row, "revenueType", row\.revenueType \|\| "—"\)/,
   "legacy null Revenue Type is displayed as an em dash rather than auto-classified");
 
-assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100vh/,
-  "the common App shell owns short-content Footer placement for every route");
-assert.match(styles, /\.kpi-shell__body\s*\{[^}]*flex:\s*1 0 auto[^}]*min-height:\s*0/,
-  "the common body grows for short routes and remains in document flow for long routes");
+assert.match(styles, /\.kpi-shell\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*100dvh[^}]*padding-bottom:\s*var\(--kpi-footer-reserved-height\)/,
+  "the common App shell reserves the fixed Footer height for every route");
+assert.match(styles, /\.kpi-footer\s*\{[^}]*position:\s*fixed[^}]*bottom:\s*0/,
+  "the common Footer remains fixed at the bottom of the viewport");
+assert.match(styles, /\.accounts-workloads-page\s*\{[^}]*height:\s*calc\(100dvh - var\(--accounts-workloads-viewport-offset\)\)[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*min-height:\s*0/,
+  "Accounts & Workloads follows dynamic viewport height and forms a shrinkable column");
+assert.match(styles, /\.accounts-workloads-grid-shell\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0/,
+  "the Accounts & Workloads list fills the remaining page space");
+assert.match(styles, /\.accounts-workloads-grid-wrap\s*\{[^}]*height:\s*100%[^}]*overflow:\s*auto/,
+  "overflowing Account & Workloads rows scroll inside the list region");
+assert.match(styles, /\.accounts-workloads-grid th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/,
+  "the grid header remains visible while rows scroll");
+assert.match(page, /const handleGridWheel[\s\S]*if \(!event\.shiftKey \|\| Math\.abs\(event\.deltaY\) <= Math\.abs\(event\.deltaX\)\) return;[\s\S]*event\.preventDefault\(\)[\s\S]*grid\.scrollLeft \+= event\.deltaY/,
+  "ordinary vertical wheel scrolling remains native and only Shift+wheel is translated once to horizontal scrolling");
+assert.match(page, /class="accounts-workloads-grid-wrap"[^>]*onScroll=\{updateScrollState\}[^>]*onWheel=\{handleGridWheel\}[^>]*onKeyDown=\{handleGridKeyDown\}/,
+  "the persistent list container owns one scroll, wheel, and keyboard handler without row click delegation");
+assert.match(page, /const toggleSelection[\s\S]*setSelectedRowIds\(\(current\) =>[\s\S]*current\.includes\(rowId\)/,
+  "selection continues to use functional state updates so scroll rerenders cannot drop or duplicate clicks");
+assert.match(page, /const authoritative = await[\s\S]*setDraftRows\(authoritative\.items\)[\s\S]*setSelectedRowIds\(\[\]\)/,
+  "successful edits retain the established authoritative refresh and selection reset behavior");
 assert.match(styles, /\.kpi-shell:has\(\.kpi-side-nav\.is-open\) \.kpi-footer\s*\{[^}]*margin-left:\s*18rem[^}]*width:\s*calc\(100% - 19\.5rem\)/,
   "desktop Footer aligns to the open-navigation content wrapper edges");
 assert.doesNotMatch(styles, /:has\(\.kpi-spreadsheet-page\)[^{]*\.kpi-footer/,
@@ -211,13 +227,13 @@ assert.match(page, /clonePreview\.accounts\.map/, "preview is grouped by Account
 assert.match(page, /toggleCloneAccount/, "account-level checkbox selects eligible workloads");
 assert.match(page, /toggleCloneWorkload/, "individual workload checkboxes are supported");
 assert.match(page, /item\.status === "SKIP_TARGET_EXISTS"[\s\S]*disabled/, "target-exists workloads are labeled and disabled");
-assert.match(page, /disabled=\{cloneSelection\.length === 0 \|\| cloneExecuting \|\| cloneLoading \|\| draftActive \|\| saving \|\| accountsWorkloadsRefreshing/, "execute is disabled without eligible selection or during any conflicting async/draft state");
+assert.match(page, /disabled=\{!canWrite \|\| cloneSelection\.length === 0 \|\| cloneExecuting \|\| cloneLoading \|\| draftActive \|\| saving \|\| accountsWorkloadsRefreshing \|\| clonePreview\.targetFiscalYear !== fiscalYear\}/, "execute is disabled without write access or eligible selection, during any conflicting async/draft state, or after an FY context change");
 assert.match(page, /cloneAccountsWorkloadsPreviousFiscalYear[\s\S]*setSelectedRowIds\(\[\]\)[\s\S]*setDraftRows\(authoritative\.items\)[\s\S]*onRefresh\(\)/, "success clears selection/drafts and refreshes authoritative current FY rows");
 assert.match(page, /const cloneGenerationRef = useRef\(0\)/, "clone async work has an explicit generation guard");
 assert.match(page, /cloneGenerationRef\.current \+= 1[\s\S]*setClonePreview\(null\)[\s\S]*setCloneSelection\(\[\]\)/, "opening or cancelling invalidates stale work and clears prior candidates");
 assert.match(page, /generation !== cloneGenerationRef\.current[\s\S]*fiscalYear !== cloneContextFiscalYearRef\.current/, "stale preview and clone responses are rejected after context changes");
 assert.match(page, /authoritative\.preview\.targetFiscalYear !== fiscalYear[\s\S]*clonePreview\.targetFiscalYear !== fiscalYear/, "clone success rejects reconciliation outside the exact current target FY context");
-assert.match(page, /disabled=\{draftActive \|\| saving \|\| accountsWorkloadsRefreshing \|\| cloneLoading \|\| cloneExecuting \|\| dataSource !== "api"\}/, "clone launch locks for drafts, save, table load, preview, and submit");
+assert.match(page, /disabled=\{!canWrite \|\| draftActive \|\| saving \|\| accountsWorkloadsRefreshing \|\| cloneLoading \|\| cloneExecuting \|\| dataSource !== "api"\}/, "clone launch locks without write access and during drafts, save, table load, preview, and submit");
 assert.match(page, /const cloneSubmitInFlightRef = useRef\(false\)/, "clone submit has an immediate ref lock");
 assert.match(page, /if \(cloneSubmitInFlightRef\.current \|\| cloneExecuting \|\| !clonePreview \|\| cloneSelection\.length === 0\) return;[\s\S]*cloneSubmitInFlightRef\.current = true;[\s\S]*cloneAccountsWorkloadsPreviousFiscalYear[\s\S]*finally \{[\s\S]*cloneSubmitInFlightRef\.current = false;/, "clone submit is synchronously single-flight even before state rerenders");
 assert.match(page, /catch \(error\)[\s\S]{0,180}setCloneError[\s\S]{0,120}finally/, "clone failure preserves selection for retry");

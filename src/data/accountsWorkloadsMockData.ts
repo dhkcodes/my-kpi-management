@@ -1,6 +1,6 @@
 import { FiscalYear } from "./kpiMockData";
 
-export type RevenueType = "New" | "Expansion";
+export type RevenueType = "New" | "Expansion" | "Renewal";
 
 export type AccountWorkloadRow = {
   id: string;

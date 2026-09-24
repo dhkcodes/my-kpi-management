@@ -34,7 +34,7 @@ const nullableString = (value: unknown, field: string) => {
 
 const nullableRevenueType = (value: unknown, field: string): RevenueType | null => {
   if (value === null || value === undefined) return null;
-  if (value === "New" || value === "Expansion") return value;
+  if (value === "New" || value === "Expansion" || value === "Renewal") return value;
   throw new Error(`Invalid ${field}`);
 };
 

@@ -44,7 +44,7 @@ assert.match(app, /handleOpenAccountWorkloads[\s\S]*search: account, includeDele
   "the parent commits the Account filter before the detail page mounts");
 assert.match(accounts, /accounts-workloads-table-meta/);
 assert.doesNotMatch(accounts, /Loaded rows:/);
-assert.match(kpi, /Data through/);
+assert.match(kpi, /FY-valid Delivery Date before \$\{asOf\}/);
 assert.match(all, /Show and discover workshops/);
 assert.match(styles, /\.accounts-pulse-v2-workload-count/);
 assert.match(styles, /\.my-customers-360-account-link/);
