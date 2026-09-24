@@ -107,20 +107,19 @@ async function run() {
   assert.match(pageSource, /Consumption Records/);
   assert.match(pageSource, /미정의 — 수정 필요/);
   assert.match(pageSource, /type="checkbox"/, "candidate dialog supports multi-selection");
-  assert.match(pageSource, /Plan ID\(Number\)/, "candidate dialog exposes the original plan number");
-  assert.match(pageSource, /candidate\.planNumber \?\? "없음"/, "missing plan numbers are shown explicitly without inventing one");
+  assert.match(pageSource, /Plan ID is matched first/, "candidate dialog explains Plan ID precedence");
+  assert.match(pageSource, /candidate\.planNumber \?\? "No Plan Number"/, "missing plan numbers are shown explicitly without inventing one");
   assert.match(pageSource, /sourcePlanNumber: candidate\.planNumber/, "selected candidates carry their original plan number into the AW draft");
   assert.match(pageSource, /emptyWorkload[\s\S]{0,240}deals: \[\]/, "candidate-created workloads do not create an opportunity");
   assert.match(pageSource, /Add Account & Workload/);
-  assert.match(pageSource, /Add Workload/);
-  assert.match(pageSource, /Add Oppty/);
+  assert.doesNotMatch(pageSource, /Add Oppty|accounts-workloads-child-row/, "opportunity management UI is intentionally absent");
   assert.match(pageSource, /accounts-workloads-grid/, "wide Account → Workload table is rendered");
   assert.match(pageSource, /saveError instanceof AccountsWorkloadsApiError/, "structured batch errors are rendered without clearing the draft");
-  assert.match(pageSource, /Keep the complete draft and queued operations/, "draft edits survive save errors");
+  assert.match(pageSource, /setSaveErrors\(saveError instanceof AccountsWorkloadsApiError/, "draft edits survive save errors");
   assert.doesNotMatch(pageSource, /Clone Previous FY|clone-preview/, "FY clone UI is removed");
   assert.match(contentSource, /accountsWorkloads[\s\S]{0,120}accountManagementOverview[\s\S]{0,120}kpi-fiscal-year-panel/, "AW route omits the fiscal-year control");
 
-  console.log("FY-independent hierarchical AW/Deal frontend contracts passed");
+  console.log("FY-independent AW-only frontend and Consumption candidate contracts passed");
 }
 
 void run();
