@@ -8,6 +8,7 @@ const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.inde
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
 const cancelHandler = page.slice(page.indexOf("const cancelAllDrafts"), page.indexOf("const planWriteFor"));
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
+const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
 assert.match(page, /type AwField = "account" \| "workload" \| "plan" \| "lastUpdated" \| "notes"/);
 assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
@@ -78,14 +79,16 @@ assert.match(page, /dealWrite\(draft\.deal, draft\.workloadId, draft\.original, 
   "every submitted opportunity write carries its stable draft key as clientId");
 assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*clearSubmittedDrafts\(\)/,
   "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
-assert.match(page, /validateConfirmedOpportunityWrites\(submittedWrites, confirmedWorkloads, saved\.dealResults\)[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*search:\s*""[\s\S]*includeArchived:\s*true[\s\S]*includeDeletedDeals:\s*true/,
+assert.match(page, /validateConfirmedOpportunityWrites\([\s\S]*?submittedWrites,[\s\S]*?confirmedWorkloads,[\s\S]*?saved\.dealResults,[\s\S]*?new Set\(knownServerIds\)[\s\S]*?\);[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*search:\s*""[\s\S]*includeArchived:\s*true[\s\S]*includeDeletedDeals:\s*true/,
   "an incomplete save response is rechecked once with an unfiltered server reload before it is treated as unconfirmed");
-const unconfirmedSaveBranch = saveDealHandler.match(/if \(saveAccepted\) \{([\s\S]*?)\}\s*else \{/);
-assert.ok(unconfirmedSaveBranch, "post-commit confirmation failures have an explicit uncertain-state branch");
-assert.doesNotMatch(unconfirmedSaveBranch[1], /clearSubmittedDrafts|setDealDrafts/,
-  "an uncertain save must preserve every opportunity draft");
-assert.match(unconfirmedSaveBranch[1], /Drafts were preserved[\s\S]*will not be resent automatically[\s\S]*Reload and explicitly reconcile/,
-  "an uncertain save requires explicit reload/reconciliation and forbids automatic retry");
+assert.match(page, /const isDefiniteWriteRejection[\s\S]*\[400, 401, 403, 404, 409, 422\]\.includes\(error\.status\)/,
+  "only explicit non-ambiguous client rejections are retryable; timeout-like and server responses remain pending");
+assert.match(saveDealHandler, /isDefiniteWriteRejection\(requestError\)[\s\S]*dealSaveLock\.markAwaitingConfirmation\(\)[\s\S]*setPendingDealConfirmation/,
+  "ambiguous Opportunity saves enter pending confirmation");
+assert.match(saveDealHandler, /drafts: Object\.freeze\(\[\.\.\.drafts\]\)[\s\S]*submittedWrites: Object\.freeze/,
+  "an uncertain save preserves both the drafts and submitted snapshot");
+assert.match(saveDealHandler, /저장 확인 대기[\s\S]*Save is blocked until GET reconciliation succeeds/,
+  "an uncertain save is visibly separated and cannot be retried as a POST");
 assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
 assert.match(page, /const updateDealDraft[\s\S]*if \(dealSaveLock\.isLocked\(\)\) return/,
@@ -214,5 +217,25 @@ assert.match(page, /const addDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) retur
 assert.match(page, /const cancelDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
 assert.match(saveDealHandler, /if \(dealSaveLock\.isLocked\(\)\) return;[\s\S]*dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*finally \{\s*dealSaveLock\.release\(\);\s*setSaving\(false\);/,
   "save blocks duplicate submission immediately and releases the lock on success or failure");
+assert.match(page, /저장 확인 대기/,
+  "unknown POST outcomes are presented as a distinct save-confirmation-pending state");
+assert.match(saveDealHandler, /markAwaitingConfirmation/,
+  "a lost or malformed POST response keeps the synchronous resend gate locked");
+assert.match(page, /const reconcilePendingDealSave[\s\S]*fetchAccountsWorkloadsHierarchy[\s\S]*validateConfirmedOpportunityWrites[\s\S]*confirmReconciled/,
+  "only an authoritative GET reconciliation can release a pending opportunity save");
+assert.match(page, /pendingDealConfirmation[\s\S]*submittedWrites/,
+  "the submitted write snapshot is retained in memory for later GET reconciliation");
+assert.match(page, /const confirmDealDelete[\s\S]*fetchAccountsWorkloadsHierarchy[\s\S]*validateConfirmedOpportunityWrites/,
+  "delete success requires an authoritative GET showing target absence");
+assert.match(page, /const reconcilePendingDealSave[\s\S]*includeDeletedDeals:\s*false[\s\S]*validateConfirmedOpportunityWrites/,
+  "pending DELETE reconciliation excludes soft-deleted rows before checking target absence");
+assert.match(confirmDealDeleteHandler, /dealSaveLock\.tryStart\(submittedDeletes\)[\s\S]*saveAccountsWorkloadsHierarchyWithResults[\s\S]*isDefiniteWriteRejection\(requestError\)[\s\S]*markAwaitingConfirmation[\s\S]*setPendingDealConfirmation/,
+  "an uncertain Opportunity delete preserves its submitted snapshot and blocks duplicate DELETE posts");
+assert.match(page, /hasUnrecoverableNewDealCorrelationLoss[\s\S]*originalId === null[\s\S]*result\.clientId === write\.clientId/,
+  "a new row whose correlation was lost is identified as not recoverable by ordinary GET matching");
+assert.match(page, /저장 결과 확인 불가 — 관리자 확인 필요/,
+  "the UI does not promise GET recovery when a new-row correlation was lost");
+assert.doesNotMatch(page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete")), /setDealDrafts\(new Map\(\)\)/,
+  "deleting selected opportunities cannot erase unrelated drafts");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");

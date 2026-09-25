@@ -14,6 +14,7 @@ import {
   AccountsWorkloadsHierarchySaveRequest,
   DealWrite,
   ForecastCandidate,
+  OpportunityDealResult,
   WorkloadPlanWrite,
   filterForecastCandidates,
   fetchAccountsWorkloadsHierarchy,
@@ -24,7 +25,10 @@ import {
 } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
-import { validateConfirmedOpportunityWrites } from "./opportunitySaveReconciliation";
+import {
+  SubmittedOpportunityWrite,
+  validateConfirmedOpportunityWrites,
+} from "./opportunitySaveReconciliation";
 import {
   OpportunityCurrencyField,
   updateOpportunityCurrencyPair,
@@ -65,6 +69,12 @@ type DealDraft = Readonly<{
   original: AccountWorkloadDeal | null;
   deal: AccountWorkloadDeal;
 }>;
+type PendingDealConfirmation = Readonly<{
+  drafts: ReadonlyArray<DealDraft>;
+  submittedWrites: ReadonlyArray<SubmittedOpportunityWrite>;
+  dealResults: ReadonlyArray<OpportunityDealResult>;
+  knownServerIds: ReadonlyArray<number>;
+}>;
 
 const EMPTY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
 const CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요";
@@ -81,6 +91,20 @@ const friendlyError = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "The request could not be completed.";
+const isDefiniteWriteRejection = (error: unknown) =>
+  error instanceof AccountsWorkloadsApiError &&
+  [400, 401, 403, 404, 409, 422].includes(error.status);
+
+const hasUnrecoverableNewDealCorrelationLoss = (
+  pending: PendingDealConfirmation | null,
+) => Boolean(
+  pending?.submittedWrites.some(
+    (write) => write.originalId === null &&
+      !pending.dealResults.some(
+        (result) => result.action === "UPSERT" && result.clientId === write.clientId,
+      ),
+  ),
+);
 const isInteractive = (target: EventTarget | null) =>
   target instanceof Element &&
   Boolean(target.closest("input,select,textarea,button,a,oj-button"));
@@ -228,6 +252,8 @@ export function AccountsWorkloadsPage({
   const [dealDrafts, setDealDrafts] = useState<Map<string, DealDraft>>(
     new Map(),
   );
+  const [pendingDealConfirmation, setPendingDealConfirmation] =
+    useState<PendingDealConfirmation | null>(null);
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
   const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
     Readonly<{ text: string; top: number; left: number }> | null
@@ -773,6 +799,9 @@ export function AccountsWorkloadsPage({
     setError("");
     const pageScrollY = window.scrollY;
     const deletedDealIds = new Set(targets.map((deal) => deal.id));
+    const knownServerIds = hierarchy.accounts.flatMap((account) =>
+      account.workloads.flatMap((workload) => workload.deals.map((deal) => deal.id)),
+    ).filter((id) => id > 0);
     const firstTarget = targets[0];
     const currentDeals = hierarchy.accounts
       .flatMap((account) => account.workloads)
@@ -791,18 +820,54 @@ export function AccountsWorkloadsPage({
         document.querySelector<HTMLElement>(`[data-opportunity-scroll="${workloadId}"]`)?.scrollLeft ?? 0,
       ]),
     );
+    const deleteWrites = targets.map((deal) =>
+      dealWrite({ ...deal, deleted: true }, deal.workloadId, deal),
+    );
+    const submittedDeletes: SubmittedOpportunityWrite[] = targets.map((deal, index) => ({
+      clientId: `deal:${deal.id}`,
+      workloadId: deal.workloadId,
+      originalId: deal.id,
+      write: deleteWrites[index],
+    }));
+    const submittedDeleteDrafts = targets.flatMap((deal) => {
+      const draft = dealDrafts.get(`deal:${deal.id}`);
+      return draft ? [draft] : [];
+    });
+    if (!dealSaveLock.tryStart(submittedDeletes)) {
+      setSaving(false);
+      return;
+    }
+    let saveAccepted = false;
+    let responseDealResults: ReadonlyArray<OpportunityDealResult> = [];
     try {
-      const saved = await saveAccountsWorkloadsHierarchy({
+      const saved = await saveAccountsWorkloadsHierarchyWithResults({
         accounts: [],
         workloads: [],
         workloadPlans: [],
-        deals: targets.map((deal) =>
-          dealWrite({ ...deal, deleted: true }, deal.workloadId, deal),
-        ),
+        deals: deleteWrites,
       });
-      setHierarchy(saved);
-      setBaseline(saved);
-      setDealDrafts(new Map());
+      saveAccepted = true;
+      responseDealResults = saved.dealResults;
+      const confirmed = await fetchAccountsWorkloadsHierarchy({
+        search: "",
+        includeArchived: true,
+        includeDeletedDeals: false,
+      });
+      const confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
+      validateConfirmedOpportunityWrites(
+        submittedDeletes,
+        confirmedWorkloads,
+        saved.dealResults,
+        new Set(knownServerIds),
+      );
+      applyConfirmedDeals(
+        confirmedWorkloads,
+        new Set(targets.map((deal) => deal.workloadId)),
+      );
+      const deletedDraftKeys = new Set(targets.map((deal) => `deal:${deal.id}`));
+      setDealDrafts((current) => new Map(
+        [...current].filter(([key]) => !deletedDraftKeys.has(key)),
+      ));
       setSelectedDeals(new Map());
       requestAnimationFrame(() => {
         window.scrollTo({ top: pageScrollY });
@@ -823,14 +888,30 @@ export function AccountsWorkloadsPage({
         }
       });
       setNotice(`${targets.length} opportunity deleted.`);
+      dealSaveLock.confirmReconciled();
     } catch (requestError) {
-      setError(friendlyError(requestError));
-      setSaveErrors(
-        requestError instanceof AccountsWorkloadsApiError
-          ? requestError.errors
-          : [],
-      );
+      if (!saveAccepted && isDefiniteWriteRejection(requestError)) {
+        setError(friendlyError(requestError));
+        setSaveErrors(
+          requestError instanceof AccountsWorkloadsApiError
+            ? requestError.errors
+            : [],
+        );
+      } else {
+        dealSaveLock.markAwaitingConfirmation();
+        setPendingDealConfirmation({
+          drafts: Object.freeze([...submittedDeleteDrafts]),
+          submittedWrites: Object.freeze([...submittedDeletes]),
+          dealResults: Object.freeze([...responseDealResults]),
+          knownServerIds: Object.freeze([...knownServerIds]),
+        });
+        setError(
+          "저장 확인 대기: the Opportunity delete outcome could not be confirmed. Selection and submitted snapshot are preserved; delete and Save remain blocked until GET reconciliation succeeds.",
+        );
+        setSaveErrors([]);
+      }
     } finally {
+      dealSaveLock.release();
       setSaving(false);
     }
   };
@@ -1289,6 +1370,89 @@ export function AccountsWorkloadsPage({
     setError("");
     setSaveErrors([]);
   };
+  const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
+    submitted.workloadId === current.workloadId &&
+    (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
+    submitted.deal.deleted === current.deal.deleted &&
+    DEAL_DRAFT_FIELDS.every(
+      (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
+    );
+  const clearSubmittedDealDrafts = (drafts: ReadonlyArray<DealDraft>) =>
+    setDealDrafts((current) => {
+      const next = new Map(current);
+      for (const submitted of drafts) {
+        const latest = next.get(submitted.key);
+        if (latest && sameDraftRevision(submitted, latest)) next.delete(submitted.key);
+      }
+      return next;
+    });
+  const applyConfirmedDeals = (
+    confirmedWorkloads: ReadonlyArray<AccountWorkload>,
+    touchedWorkloadIds: ReadonlySet<number>,
+  ) => {
+    const confirmedDealsByWorkload = new Map(
+      confirmedWorkloads.map((workload) => [workload.id, workload.deals] as const),
+    );
+    const merge = (current: AccountsWorkloadsHierarchy): AccountsWorkloadsHierarchy => ({
+      ...current,
+      accounts: current.accounts.map((account) => ({
+        ...account,
+        workloads: account.workloads.map((workload) =>
+          touchedWorkloadIds.has(workload.id) && confirmedDealsByWorkload.has(workload.id)
+            ? { ...workload, deals: confirmedDealsByWorkload.get(workload.id)! }
+            : workload,
+        ),
+      })),
+    });
+    setHierarchy((current) => merge(current));
+    setBaseline((current) => merge(current));
+  };
+  const reconcilePendingDealSave = async () => {
+    const pending = pendingDealConfirmation;
+    if (!pending || !dealSaveLock.isAwaitingConfirmation() || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const confirmed = await fetchAccountsWorkloadsHierarchy({
+        search: "",
+        includeArchived: true,
+        includeDeletedDeals: false,
+      });
+      const confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
+      validateConfirmedOpportunityWrites(
+        pending.submittedWrites,
+        confirmedWorkloads,
+        pending.dealResults,
+        new Set(pending.knownServerIds),
+      );
+      applyConfirmedDeals(
+        confirmedWorkloads,
+        new Set(pending.submittedWrites.map((submission) => submission.workloadId)),
+      );
+      clearSubmittedDealDrafts(pending.drafts);
+      const confirmedDeleteKeys = new Set(
+        pending.submittedWrites
+          .filter((submission) => submission.write.action === "DELETE")
+          .map((submission) => submission.clientId),
+      );
+      if (confirmedDeleteKeys.size) {
+        setDealDrafts((current) => new Map(
+          [...current].filter(([key]) => !confirmedDeleteKeys.has(key)),
+        ));
+      }
+      setPendingDealConfirmation(null);
+      dealSaveLock.confirmReconciled();
+      setSelectedDeals(new Map());
+      setDealEditCell(null);
+      setNotice(`${pending.submittedWrites.length} Opportunities confirmed.`);
+    } catch (requestError) {
+      setError(
+        `저장 확인 대기: ${friendlyError(requestError)} Drafts are preserved and Save remains blocked.`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
   const saveDealDrafts = async () => {
     if (dealSaveLock.isLocked()) return;
     const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
@@ -1311,31 +1475,19 @@ export function AccountsWorkloadsPage({
         .map((element) => [element.dataset.opportunityScroll ?? "", element.scrollLeft] as const),
     );
     let saveAccepted = false;
+    let responseDealResults: ReadonlyArray<OpportunityDealResult> = [];
     const dealWrites = drafts.map((draft) =>
       dealWrite(draft.deal, draft.workloadId, draft.original, draft.key),
     );
-    const submittedWrites = drafts.map((draft, index) => ({
+    const submittedWrites: SubmittedOpportunityWrite[] = drafts.map((draft, index) => ({
       clientId: draft.key,
       workloadId: draft.workloadId,
       originalId: draft.original?.id ?? null,
       write: dealWrites[index],
     }));
-    const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
-      submitted.workloadId === current.workloadId &&
-      (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
-      submitted.deal.deleted === current.deal.deleted &&
-      DEAL_DRAFT_FIELDS.every(
-        (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
-      );
-    const clearSubmittedDrafts = () =>
-      setDealDrafts((current) => {
-        const next = new Map(current);
-        for (const submitted of drafts) {
-          const latest = next.get(submitted.key);
-          if (latest && sameDraftRevision(submitted, latest)) next.delete(submitted.key);
-        }
-        return next;
-      });
+    const knownServerIds = hierarchy.accounts.flatMap((account) =>
+      account.workloads.flatMap((workload) => workload.deals.map((deal) => deal.id)),
+    ).filter((id) => id > 0);
     try {
       const saved = await saveAccountsWorkloadsHierarchyWithResults({
         accounts: [],
@@ -1344,10 +1496,16 @@ export function AccountsWorkloadsPage({
         deals: dealWrites,
       });
       saveAccepted = true;
+      responseDealResults = saved.dealResults;
       let confirmed = saved.hierarchy;
       let confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
       try {
-        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, saved.dealResults);
+        validateConfirmedOpportunityWrites(
+          submittedWrites,
+          confirmedWorkloads,
+          saved.dealResults,
+          new Set(knownServerIds),
+        );
       } catch {
         confirmed = await fetchAccountsWorkloadsHierarchy({
           search: "",
@@ -1355,7 +1513,12 @@ export function AccountsWorkloadsPage({
           includeDeletedDeals: true,
         });
         confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
-        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, saved.dealResults);
+        validateConfirmedOpportunityWrites(
+          submittedWrites,
+          confirmedWorkloads,
+          saved.dealResults,
+          new Set(knownServerIds),
+        );
       }
       const touchedWorkloadIds = new Set(drafts.map((draft) => draft.workloadId));
       const confirmedDealsByWorkload = new Map(
@@ -1376,6 +1539,7 @@ export function AccountsWorkloadsPage({
       });
       setHierarchy((current) => mergeConfirmedDeals(current));
       setBaseline((current) => mergeConfirmedDeals(current));
+      const clearSubmittedDrafts = () => clearSubmittedDealDrafts(drafts);
       clearSubmittedDrafts();
       setSelectedDeals(new Map());
       setDealEditCell(null);
@@ -1387,17 +1551,23 @@ export function AccountsWorkloadsPage({
         });
       });
     } catch (requestError) {
-      if (saveAccepted) {
+      const confirmedRejection = !saveAccepted && isDefiniteWriteRejection(requestError);
+      if (!confirmedRejection) {
+        dealSaveLock.markAwaitingConfirmation();
+        setPendingDealConfirmation({
+          drafts: Object.freeze([...drafts]),
+          submittedWrites: Object.freeze([...submittedWrites]),
+          dealResults: Object.freeze([...responseDealResults]),
+          knownServerIds: Object.freeze([...knownServerIds]),
+        });
         setError(
-          "Opportunities were accepted by the server, but the exact saved result could not be confirmed. Drafts were preserved and will not be resent automatically. Reload and explicitly reconcile before retrying.",
+          "저장 확인 대기: the POST outcome could not be confirmed. Drafts and the submitted snapshot are preserved; Save is blocked until GET reconciliation succeeds.",
         );
         setSaveErrors([]);
       } else {
         setError(friendlyError(requestError));
         setSaveErrors(
-          requestError instanceof AccountsWorkloadsApiError
-            ? requestError.errors
-            : [],
+          requestError instanceof AccountsWorkloadsApiError ? requestError.errors : [],
         );
       }
     } finally {
@@ -2081,6 +2251,7 @@ export function AccountsWorkloadsPage({
                                   disabled={
                                     !canWrite ||
                                     saving ||
+                                    Boolean(pendingDealConfirmation) ||
                                     workload.id < 0
                                   }
                                   onClick={() => addDeal(workload.id)}
@@ -2090,24 +2261,38 @@ export function AccountsWorkloadsPage({
                                 {selectedDeals.size > 0 && !dealEditCell && (
                                   <button
                                     type="button"
-                                    disabled={!canWrite || saving}
+                                    disabled={!canWrite || saving || Boolean(pendingDealConfirmation)}
                                     onClick={requestDealDelete}
                                   >
                                     Delete selected
+                                  </button>
+                                )}
+                                {pendingDealConfirmation && (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      saving ||
+                                      hasUnrecoverableNewDealCorrelationLoss(pendingDealConfirmation)
+                                    }
+                                    onClick={() => void reconcilePendingDealSave()}
+                                  >
+                                    {hasUnrecoverableNewDealCorrelationLoss(pendingDealConfirmation)
+                                      ? "저장 결과 확인 불가 — 관리자 확인 필요"
+                                      : "저장 확인 대기 — GET 확인"}
                                   </button>
                                 )}
                                 {activeDraft && (
                                   <>
                                     <button
                                       type="button"
-                                      disabled={saving}
+                                      disabled={saving || Boolean(pendingDealConfirmation)}
                                       onClick={() => void saveDealDrafts()}
                                     >
                                       Save
                                     </button>
                                     <button
                                       type="button"
-                                      disabled={saving}
+                                      disabled={saving || Boolean(pendingDealConfirmation)}
                                       onClick={() => cancelDeal(activeDraft.key)}
                                     >
                                       Cancel

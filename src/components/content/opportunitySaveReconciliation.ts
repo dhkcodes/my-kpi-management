@@ -135,6 +135,18 @@ const verifyPersistedFields = (
   }
 };
 
+const persistedFieldsMatch = (
+  submission: SubmittedOpportunityWrite,
+  confirmed: ConfirmedOpportunityDeal,
+) => {
+  try {
+    verifyPersistedFields(submission, confirmed);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Confirm each submitted write against the authoritative hierarchy. Existing rows
  * retain their original identity; newly inserted rows must be correlated through
@@ -144,18 +156,28 @@ export const validateConfirmedOpportunityWrites = (
   submissions: ReadonlyArray<SubmittedOpportunityWrite>,
   workloads: ReadonlyArray<ConfirmedOpportunityWorkload>,
   dealResults: ReadonlyArray<OpportunityDealResult>,
+  knownServerIds: ReadonlySet<number> = new Set<number>(),
 ) => {
   const dealsByWorkload = new Map(
     workloads.map((workload) => [workload.id, workload.deals] as const),
   );
   const resultByClientId = new Map<string, OpportunityDealResult>();
+  const clientIdByServerId = new Map<number, string>();
   for (const result of dealResults) {
     if (resultByClientId.has(result.clientId)) {
       throw new Error(`Duplicate Opportunity clientId mapping: ${result.clientId}.`);
     }
+    if (result.action === "UPSERT") {
+      const mappedClientId = clientIdByServerId.get(result.serverId);
+      if (mappedClientId !== undefined && mappedClientId !== result.clientId) {
+        throw new Error(`Duplicate Opportunity serverId mapping: ${result.serverId}.`);
+      }
+      clientIdByServerId.set(result.serverId, result.clientId);
+    }
     resultByClientId.set(result.clientId, result);
   }
 
+  const assignedNewServerIds = new Set<number>();
   for (const submission of submissions) {
     const confirmedDeals = dealsByWorkload.get(submission.workloadId);
     if (!confirmedDeals) {
@@ -175,16 +197,24 @@ export const validateConfirmedOpportunityWrites = (
     let confirmedId = submission.originalId;
     if (confirmedId === null) {
       const result = resultByClientId.get(submission.clientId);
-      if (
-        !result ||
-        result.action !== "UPSERT" ||
-        result.workloadId !== submission.workloadId ||
-        !Number.isInteger(result.serverId) ||
-        result.serverId <= 0
-      ) {
-        throw new Error(`Opportunity clientId mapping was missing or invalid: ${submission.clientId}. Reload and reconcile before retrying.`);
+      if (result) {
+        if (
+          result.action !== "UPSERT" ||
+          result.workloadId !== submission.workloadId ||
+          !Number.isInteger(result.serverId) ||
+          result.serverId <= 0 ||
+          knownServerIds.has(result.serverId) ||
+          assignedNewServerIds.has(result.serverId)
+        ) {
+          throw new Error(`Opportunity clientId mapping was missing or invalid: ${submission.clientId}. Reload and reconcile before retrying.`);
+        }
+        confirmedId = result.serverId;
+      } else {
+        throw new Error(
+          `Opportunity clientId mapping was unavailable after the POST response was lost: ${submission.clientId}. Confirmation remains pending.`,
+        );
       }
-      confirmedId = result.serverId;
+      assignedNewServerIds.add(confirmedId);
     }
 
     const confirmed = confirmedDeals.find((deal) => deal.id === confirmedId);

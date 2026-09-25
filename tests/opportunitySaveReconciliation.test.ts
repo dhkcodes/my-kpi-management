@@ -103,8 +103,21 @@ assert.doesNotThrow(() =>
       { clientId: "draft:-2", serverId: 902, workloadId: 51, action: "UPSERT" },
       { clientId: "draft:-1", serverId: 901, workloadId: 51, action: "UPSERT" },
     ],
+    new Set([701]),
   ),
   "clientId mappings confirm multiple new rows independent of response and hierarchy order",
+);
+
+assert.throws(
+  () =>
+    validateConfirmedOpportunityWrites(
+      [submission("draft:-existing-id", null)],
+      workloads([deal(701)]),
+      [{ clientId: "draft:-existing-id", serverId: 701, workloadId: 51, action: "UPSERT" }],
+      new Set([701]),
+    ),
+  /serverId|mapping/i,
+  "a malformed new-row mapping cannot reuse a server id that existed before submission",
 );
 
 assert.doesNotThrow(() =>
@@ -156,6 +169,63 @@ assert.throws(
     ),
   /clientId|mapping/i,
   "a missing new-row mapping is an unconfirmed save",
+);
+
+assert.throws(
+  () =>
+    validateConfirmedOpportunityWrites(
+      [submission("draft:-6", null), submission("draft:-7", null, { name: "Other" })],
+      workloads([deal(906), deal(907, { name: "Other" })]),
+      [
+        { clientId: "draft:-6", serverId: 906, workloadId: 51, action: "UPSERT" },
+        { clientId: "draft:-7", serverId: 906, workloadId: 51, action: "UPSERT" },
+      ],
+    ),
+  /serverId|mapping/i,
+  "one server id cannot confirm two new client ids",
+);
+
+assert.throws(
+  () =>
+    validateConfirmedOpportunityWrites(
+      [
+        submission("draft:-8", null, { name: "First concurrent" }),
+        submission("draft:-9", null, { name: "Second concurrent" }),
+      ],
+      workloads([
+        deal(701, { name: "Preexisting" }),
+        deal(908, { name: "Second concurrent" }),
+        deal(909, { name: "First concurrent" }),
+      ]),
+      [],
+    ),
+  /clientId|mapping|pending/i,
+  "a GET cannot guess correlation for concurrent new rows after the POST response is lost",
+);
+
+assert.throws(
+  () =>
+    validateConfirmedOpportunityWrites(
+      [
+        submission("draft:-10", null, { name: "Present" }),
+        submission("draft:-11", null, { name: "Missing" }),
+      ],
+      workloads([deal(701, { name: "Preexisting" }), deal(910, { name: "Present" })]),
+      [],
+    ),
+  /missing|mapping|returned/i,
+  "a partial GET result cannot clear any pending submission as successful",
+);
+
+assert.throws(
+  () =>
+    validateConfirmedOpportunityWrites(
+      [submission("draft:-12", null, { name: "Expected value" })],
+      workloads([deal(701, { name: "Preexisting" }), deal(912, { name: "Wrong value" })]),
+      [],
+    ),
+  /missing|mapping|returned/i,
+  "an inserted-looking row with unpersisted values cannot confirm a lost response",
 );
 
 assert.doesNotThrow(() =>
