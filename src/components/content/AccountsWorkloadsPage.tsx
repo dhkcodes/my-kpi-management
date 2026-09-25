@@ -23,6 +23,7 @@ import {
 } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
+import { validateConfirmedOpportunityWrites } from "./opportunitySaveReconciliation";
 import {
   OpportunityCurrencyField,
   updateOpportunityCurrencyPair,
@@ -267,12 +268,14 @@ export function AccountsWorkloadsPage({
     }),
   );
   const fxDirty = fxRateValue > 0 && fxRateValue !== savedFxRateValue;
+  const fxDraftDirty =
+    fxPopoverOpen && fxDraft.trim() !== String(fxRateValue || "");
   const dirty =
     changedAccountIds.size +
       changedWorkloadIds.size +
       [...dealDrafts.values()].filter(isDealDraftChanged).length +
       pendingDeleteWorkloadIds.size >
-      0 || fxDirty;
+      0 || fxDirty || fxDraftDirty;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
   useEffect(() => {
@@ -591,6 +594,9 @@ export function AccountsWorkloadsPage({
             <input
               autoFocus
               class="accounts-workloads-edit-field"
+              aria-label={`${field === "account" ? "Account" : field === "workload" ? "Workload" : field}${field === "account" || field === "workload" ? " (required)" : ""}`}
+              aria-required={field === "account" || field === "workload" ? "true" : undefined}
+              placeholder={field === "account" ? "Account *" : field === "workload" ? "Workload *" : undefined}
               value={value}
               onInput={(event) =>
                 updateAw(
@@ -919,76 +925,23 @@ export function AccountsWorkloadsPage({
     }
   };
 
-  const cancelSelected = () => {
+  const cancelAllDrafts = () => {
     if (dealSaveLock.isLocked()) return;
-    const selected = selectedRows;
-    const selectedWorkloadIds = new Set(
-      allRows
-        .filter((row) => selected.has(row.key))
-        .map((row) => row.workload.id),
-    );
-    setHierarchy((current) => ({
-      ...current,
-      accounts: current.accounts
-        .map((account) => {
-          const savedAccount = baseline.accounts.find(
-            (item) => item.id === account.id,
-          );
-          return {
-            ...account,
-            name:
-              selected.size &&
-              account.workloads.some((workload) =>
-                selected.has(rowKey(account.id, workload.id)),
-              ) &&
-              savedAccount
-                ? savedAccount.name
-                : account.name,
-            workloads: account.workloads
-              .map((workload) =>
-                selected.has(rowKey(account.id, workload.id))
-                  ? (savedAccount?.workloads.find(
-                      (item) => item.id === workload.id,
-                    ) ?? workload)
-                  : workload,
-              )
-              .filter(
-                (workload) =>
-                  workload.id > 0 ||
-                  !selected.has(rowKey(account.id, workload.id)),
-              ),
-          };
-        })
-        .filter((account) => account.id > 0 || account.workloads.length > 0),
-    }));
-    setDirtyAccounts(
-      (current) =>
-        new Set(
-          [...current].filter(
-            (id) =>
-              !allRows.some(
-                (row) => selected.has(row.key) && row.account.id === id,
-              ),
-          ),
-        ),
-    );
-    setDirtyWorkloads(
-      (current) =>
-        new Set([...current].filter((id) => !selectedWorkloadIds.has(id))),
-    );
-    setPendingDeleteWorkloadIds(
-      (current) =>
-        new Set([...current].filter((id) => !selectedWorkloadIds.has(id))),
-    );
-    setDealDrafts(
-      (current) =>
-        new Map(
-          [...current].filter(
-            ([, draft]) => !selectedWorkloadIds.has(draft.workloadId),
-          ),
-        ),
-    );
+    setHierarchy(baseline);
+    setDirtyAccounts(new Set());
+    setDirtyWorkloads(new Set());
+    setPendingDeleteWorkloadIds(new Set());
+    setDealDrafts(new Map());
     setSelectedRows(new Set());
+    setSelectedDeals(new Map());
+    setEditCell(null);
+    setDealEditCell(null);
+    setFxRateValue(savedFxRateValue);
+    setFxDraft(String(savedFxRateValue || ""));
+    setFxPopoverOpen(false);
+    setError("");
+    setSaveErrors([]);
+    setNotice("All unsaved changes canceled.");
   };
 
   const planWriteFor = (
@@ -1038,6 +991,14 @@ export function AccountsWorkloadsPage({
 
   const saveAwDrafts = async () => {
     if (dealSaveLock.isLocked()) return;
+    if (
+      hierarchy.accounts.some(
+        (account) => changedAccountIds.has(account.id) && !account.name.trim(),
+      )
+    ) {
+      setError("Account and Workload are required.");
+      return;
+    }
     const archivedIds = new Set(pendingDeleteWorkloadIds);
     const request: AccountsWorkloadsHierarchySaveRequest = {
       accounts: [],
@@ -1323,6 +1284,8 @@ export function AccountsWorkloadsPage({
       return next;
     });
     if (dealEditCell?.key === key) setDealEditCell(null);
+    setError("");
+    setSaveErrors([]);
   };
   const saveDealDrafts = async () => {
     if (dealSaveLock.isLocked()) return;
@@ -1345,6 +1308,29 @@ export function AccountsWorkloadsPage({
       Array.from(document.querySelectorAll<HTMLElement>("[data-opportunity-scroll]"))
         .map((element) => [element.dataset.opportunityScroll ?? "", element.scrollLeft] as const),
     );
+    let saveAccepted = false;
+    const submittedWrites = drafts.map((draft) => ({
+      workloadId: draft.workloadId,
+      originalId: draft.original?.id ?? null,
+      deleted: draft.deal.deleted,
+    }));
+    const baselineWorkloads = baseline.accounts.flatMap((account) => account.workloads);
+    const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
+      submitted.workloadId === current.workloadId &&
+      (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
+      submitted.deal.deleted === current.deal.deleted &&
+      DEAL_DRAFT_FIELDS.every(
+        (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
+      );
+    const clearSubmittedDrafts = () =>
+      setDealDrafts((current) => {
+        const next = new Map(current);
+        for (const submitted of drafts) {
+          const latest = next.get(submitted.key);
+          if (latest && sameDraftRevision(submitted, latest)) next.delete(submitted.key);
+        }
+        return next;
+      });
     try {
       const saved = await saveAccountsWorkloadsHierarchy({
         accounts: [],
@@ -1352,28 +1338,24 @@ export function AccountsWorkloadsPage({
         workloadPlans: [],
         deals: drafts.map((draft) => dealWrite(draft.deal, draft.workloadId, draft.original)),
       });
+      saveAccepted = true;
+      let confirmed = saved;
+      let confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
+      try {
+        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, baselineWorkloads);
+      } catch {
+        confirmed = await fetchAccountsWorkloadsHierarchy({
+          search: "",
+          includeArchived: true,
+          includeDeletedDeals: true,
+        });
+        confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
+        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, baselineWorkloads);
+      }
       const touchedWorkloadIds = new Set(drafts.map((draft) => draft.workloadId));
-      const confirmedWorkloads = saved.accounts.flatMap((account) => account.workloads);
       const confirmedDealsByWorkload = new Map(
         confirmedWorkloads.map((workload) => [workload.id, workload.deals] as const),
       );
-      const sameSavedDeal = (expected: AccountWorkloadDeal, actual: AccountWorkloadDeal) =>
-        DEAL_DRAFT_FIELDS.every((field) => String(actual[field] ?? "") === String(expected[field] ?? ""));
-      for (const draft of drafts) {
-        const confirmedDeals = confirmedDealsByWorkload.get(draft.workloadId);
-        if (!confirmedDeals) throw new Error("Saved Opportunity workload was not returned.");
-        const originalId = draft.original?.id ?? null;
-        if (draft.deal.deleted) {
-          if (originalId !== null && confirmedDeals.some((deal) => deal.id === originalId))
-            throw new Error("Deleted Opportunity was still returned.");
-        } else {
-          const confirmed = originalId !== null
-            ? confirmedDeals.find((deal) => deal.id === originalId)
-            : confirmedDeals.find((deal) => sameSavedDeal(draft.deal, deal));
-          if (!confirmed || !sameSavedDeal(draft.deal, confirmed))
-            throw new Error("Saved Opportunity was not returned with the requested values.");
-        }
-      }
       const mergeConfirmedDeals = (
         current: AccountsWorkloadsHierarchy,
       ): AccountsWorkloadsHierarchy => ({
@@ -1389,21 +1371,7 @@ export function AccountsWorkloadsPage({
       });
       setHierarchy((current) => mergeConfirmedDeals(current));
       setBaseline((current) => mergeConfirmedDeals(current));
-      const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
-        submitted.workloadId === current.workloadId &&
-        (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
-        submitted.deal.deleted === current.deal.deleted &&
-        DEAL_DRAFT_FIELDS.every(
-          (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
-        );
-      setDealDrafts((current) => {
-        const next = new Map(current);
-        for (const submitted of drafts) {
-          const latest = next.get(submitted.key);
-          if (latest && sameDraftRevision(submitted, latest)) next.delete(submitted.key);
-        }
-        return next;
-      });
+      clearSubmittedDrafts();
       setSelectedDeals(new Map());
       setDealEditCell(null);
       setNotice(`${drafts.length} Opportunities saved.`);
@@ -1414,12 +1382,22 @@ export function AccountsWorkloadsPage({
         });
       });
     } catch (requestError) {
-      setError(friendlyError(requestError));
-      setSaveErrors(
-        requestError instanceof AccountsWorkloadsApiError
-          ? requestError.errors
-          : [],
-      );
+      if (saveAccepted) {
+        clearSubmittedDrafts();
+        setSelectedDeals(new Map());
+        setDealEditCell(null);
+        setError(
+          "Opportunities were accepted by the server, but the saved result could not be confirmed. Drafts were cleared to prevent duplicate creation; reload before editing or saving these Opportunities again.",
+        );
+        setSaveErrors([]);
+      } else {
+        setError(friendlyError(requestError));
+        setSaveErrors(
+          requestError instanceof AccountsWorkloadsApiError
+            ? requestError.errors
+            : [],
+        );
+      }
     } finally {
       dealSaveLock.release();
       setSaving(false);
@@ -1550,6 +1528,8 @@ export function AccountsWorkloadsPage({
         editor = (
           <input
             autoFocus
+            aria-label={field === "name" ? "Oppty Name (required)" : undefined}
+            placeholder={field === "name" ? "Oppty Name *" : undefined}
             value={value}
             onInput={(event) =>
               updateDealDraft(key, field, event.currentTarget.value)
@@ -1850,40 +1830,34 @@ export function AccountsWorkloadsPage({
             {saving ? "Saving…" : "Save"}
           </button>
         )}
-        {(selectedDirtyCount > 0 || fxDirty) && (
+        {dirty && (
           <button
             type="button"
             class="accounts-workloads-button"
             disabled={saving}
-            onClick={() => {
-              if (selectedDirtyCount > 0) cancelSelected();
-              if (fxDirty) {
-                setFxRateValue(savedFxRateValue);
-                setFxDraft(String(savedFxRateValue || ""));
-              }
-            }}
+            onClick={cancelAllDrafts}
           >
             Cancel
           </button>
         )}
-        {selectedCount > 0 && !editCell && selectedDirtyCount === 0 && selectedArchivedCount > 0 && (
+        {selectedCount > 0 && !editCell && !dirty && selectedArchivedCount > 0 && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
             Restore
           </button>
         )}
-        {selectedCount > 0 && !editCell && selectedDirtyCount === 0 && (
+        {selectedCount > 0 && !editCell && !dirty && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
             {selectedArchivedCount > 0 ? "Delete" : "Draft Delete"}
           </button>
         )}
-        <oj-button
+        <button
+          type="button"
           class="accounts-workloads-add-aw"
-          chroming="callToAction"
           disabled={!canWrite || saving}
-          onojAction={addAw}
+          onClick={addAw}
         >
           Add Account & Workload
-        </oj-button>
+        </button>
       </form>
       <div class="accounts-workloads-table-summary">
         <span>{hierarchy.accounts.length} accounts</span>
@@ -1894,6 +1868,17 @@ export function AccountsWorkloadsPage({
           role="alert"
         >
           <strong>{error}</strong>
+          <button
+            type="button"
+            class="accounts-workloads-banner__dismiss"
+            aria-label="Dismiss error"
+            onClick={() => {
+              setError("");
+              setSaveErrors([]);
+            }}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
           {saveErrors.length > 0 && (
             <ul>
               {saveErrors.map((item) => (
@@ -1945,7 +1930,9 @@ export function AccountsWorkloadsPage({
                 ).map(([field, label]) => (
                   <th class={`is-${field}`}>
                     <button type="button" onClick={() => toggleSort(field)}>
-                      {label} {sortLabel(field)}
+                      {label}{(field === "account" || field === "workload") && (
+                        <> <span class="accounts-workloads-required-marker" aria-label="required">*</span></>
+                      )} {sortLabel(field)}
                     </button>
                   </th>
                 ))}
@@ -2171,7 +2158,11 @@ export function AccountsWorkloadsPage({
                                         "End Date",
                                         "Latest Update",
                                       ].map((label) => (
-                                        <th>{label}</th>
+                                        <th>
+                                          {label}{label === "Oppty Name" && (
+                                            <> <span class="accounts-workloads-required-marker" aria-label="required">*</span></>
+                                          )}
+                                        </th>
                                       ))}
                                     </tr>
                                   </thead>

@@ -1189,6 +1189,7 @@ body {
   justify-content: space-between;
   margin-bottom: 1rem;
   position: relative;
+  z-index: 40;
 }
 
 .accounts-workloads-header h2 {
@@ -1240,7 +1241,7 @@ body {
   right: 0;
   top: calc(100% + 0.5rem);
   width: 18rem;
-  z-index: 12;
+  z-index: 50;
 }
 
 .accounts-workloads-fx-popover label,
@@ -3604,7 +3605,10 @@ h4.weekly-activity-section-label--next-week,
 .accounts-hierarchy-page .accounts-workloads-header h1 { margin: .25rem 0; }
 .accounts-hierarchy-page .accounts-workloads-header p { color: var(--kpi-muted); margin: 0; }
 .accounts-workloads-banner { background: #f0f7f1; border: 1px solid #b8d7bd; border-radius: .25rem; margin-top: .75rem; padding: .65rem .8rem; }
-.accounts-workloads-banner--error { background: #fff3f2; border-color: #e3aaa5; color: #8a251d; }
+.accounts-workloads-banner--error { background: #fff3f2; border-color: #e3aaa5; color: #8a251d; padding-right: 3rem; position: relative; }
+.accounts-workloads-banner__dismiss { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-flex; font-size: 1.25rem; height: 2rem; justify-content: center; position: absolute; right: .5rem; top: .45rem; width: 2rem; }
+.accounts-workloads-banner__dismiss:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.accounts-workloads-required-marker { color: var(--oj-core-danger-1, #b3261e); font-weight: 900; }
 .accounts-workloads-grid { border: 1px solid var(--kpi-border); box-sizing: border-box; margin-top: 1rem; max-width: 100%; min-width: 0; overflow-x: auto; width: 100%; }
 .accounts-workloads-grid table { border-collapse: collapse; table-layout: fixed; }
 .accounts-workloads-grid__parent { min-width: 76rem; width: 100%; }
@@ -3725,6 +3729,11 @@ h4.weekly-activity-section-label--next-week,
 
 /* Compact AW hierarchy aligned with the Consumption Records title/toolbar/table rhythm. */
 .accounts-hierarchy-page { gap: 10px; }
+.accounts-workloads-page.accounts-hierarchy-page {
+  height: calc(100dvh - var(--accounts-workloads-viewport-offset));
+  min-height: 0;
+  overflow: hidden;
+}
 .accounts-hierarchy-page .accounts-workloads-header { align-items: flex-end; margin: 0; padding-bottom: 0; }
 .accounts-hierarchy-page .accounts-workloads-header h1 { margin: 2px 0 0; }
 .accounts-workloads-header-actions { align-items: flex-end; align-self: flex-end; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -3957,7 +3966,6 @@ h4.weekly-activity-section-label--next-week,
   background: #52677f; color: #fff;
 }
 .accounts-workloads-toolbar--compact .consumption-range-apply:hover { background: #40556d; }
-.accounts-workloads-include-deleted { align-self: center; margin: 0 0 0 .15rem; }
 .accounts-workloads-page #accountsWorkloadsTitle { font-size: clamp(1.7rem, 2.2vw, 2.25rem); }
 
 .accounts-workloads-parent-row.is-highlighted:not(.is-selected) > td,
@@ -4018,8 +4026,7 @@ h4.weekly-activity-section-label--next-week,
   min-width: 13rem;
   align-self: center;
 }
-.accounts-workloads-toolbar--compact .consumption-range-apply,
-.accounts-workloads-toolbar--compact .accounts-workloads-include-deleted {
+.accounts-workloads-toolbar--compact .consumption-range-apply {
   align-self: center;
   margin-top: 0;
   margin-bottom: 0;
@@ -4029,7 +4036,11 @@ h4.weekly-activity-section-label--next-week,
   margin-left: 0;
 }
 .accounts-workloads-grid-wrap.accounts-workloads-grid-wrap--compact {
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 1rem;
   max-width: 100%;
 }
 .accounts-workloads-grid.accounts-workloads-aw-grid {
@@ -4042,11 +4053,11 @@ h4.weekly-activity-section-label--next-week,
   min-width: 0;
   max-width: none;
 }
-.accounts-workloads-aw-grid th,
-.accounts-workloads-aw-grid td,
-.accounts-workloads-aw-grid th:nth-child(-n + 5),
-.accounts-workloads-aw-grid td:nth-child(-n + 5),
-.accounts-workloads-aw-grid .is-plan {
+.accounts-workloads-aw-grid > thead > tr > th,
+.accounts-workloads-aw-grid > tbody > tr.accounts-workloads-parent-row > td,
+.accounts-workloads-aw-grid > thead > tr > th:nth-child(-n + 5),
+.accounts-workloads-aw-grid > tbody > tr.accounts-workloads-parent-row > td:nth-child(-n + 5),
+.accounts-workloads-aw-grid > :is(thead, tbody) > tr > .is-plan {
   position: static;
   left: auto;
   z-index: auto;
@@ -4096,12 +4107,15 @@ h4.weekly-activity-section-label--next-week,
 
 /* Runtime layout contract: original FX popover, inline deleted toggle, deterministic opportunity columns. */
 .accounts-workloads-include-deleted {
+  align-self: center;
   display: inline-flex;
   flex-direction: row;
   align-items: center;
   flex: 0 0 auto;
   width: auto;
   gap: 0.42rem;
+  line-height: 1rem;
+  margin: 0 0 0 .15rem;
   white-space: nowrap;
 }
 .accounts-workloads-include-deleted input,
@@ -4109,6 +4123,19 @@ h4.weekly-activity-section-label--next-week,
   flex: 0 0 auto;
   margin: 0;
 }
+.accounts-workloads-add-aw {
+  background: var(--kpi-brand);
+  border: 1px solid var(--kpi-brand);
+  border-radius: .25rem;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 850;
+  min-height: 2.25rem;
+  padding: .45rem .78rem;
+}
+.accounts-workloads-add-aw:disabled { cursor: not-allowed; opacity: .5; }
 .accounts-workloads-oppty-grid {
   table-layout: fixed;
   width: 2575px;
@@ -4133,6 +4160,8 @@ h4.weekly-activity-section-label--next-week,
   min-width: 260px;
   max-width: 260px;
   overflow: hidden;
+  position: sticky;
+  z-index: 12;
 }
 .accounts-workloads-oppty-grid th:nth-child(2),
 .accounts-workloads-oppty-grid td:nth-child(2) {
@@ -4141,9 +4170,26 @@ h4.weekly-activity-section-label--next-week,
   min-width: 165px;
   max-width: 165px;
   overflow: hidden;
+  position: sticky;
+  z-index: 12;
 }
-.accounts-workloads-oppty-grid th:nth-child(n + 3),
-.accounts-workloads-oppty-grid td:nth-child(n + 3) {
+.accounts-workloads-oppty-grid th:nth-child(n + 3) {
   position: static;
   left: auto;
+}
+.accounts-workloads-oppty-grid td:nth-child(n + 3) {
+  left: auto;
+  position: relative;
+}
+.accounts-workloads-aw-grid .accounts-workloads-oppty-grid td:nth-child(n + 3) {
+  z-index: auto;
+}
+.accounts-workloads-oppty-grid td.is-unsaved-cell::after {
+  background: var(--kap-grid-draft-line);
+  bottom: 0;
+  content: "";
+  height: 3px;
+  left: .35rem;
+  position: absolute;
+  right: .35rem;
 }
