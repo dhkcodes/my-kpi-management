@@ -1,4 +1,5 @@
 import { ComponentChildren, Fragment, h } from "preact";
+import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojdialog";
@@ -26,9 +27,14 @@ import {
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
 import {
+  correlateLegacyOpportunityResults,
   SubmittedOpportunityWrite,
   validateConfirmedOpportunityWrites,
 } from "./opportunitySaveReconciliation";
+import {
+  canonicalizeOpportunityRevenueType,
+  opportunityRevenueTypeOptions,
+} from "../../data/opportunityRevenueType";
 import {
   OpportunityCurrencyField,
   updateOpportunityCurrencyPair,
@@ -548,14 +554,30 @@ export function AccountsWorkloadsPage({
       setEditCell(null);
     }
   };
+  const showImmediateTooltip = (
+    element: HTMLElement,
+    value: string,
+    onlyIfClipped = false,
+  ) => {
+    if (!value || (onlyIfClipped && element.scrollWidth <= element.clientWidth)) {
+      setLatestUpdateTooltip(null);
+      return;
+    }
+    const bounds = element.getBoundingClientRect();
+    setLatestUpdateTooltip({
+      text: value,
+      top: bounds.bottom + 6,
+      left: Math.min(bounds.left, window.innerWidth - 376),
+    });
+  };
   const tooltip = (value: string, empty = "—") => (
     <span
       class="accounts-workloads-ellipsis"
       tabIndex={value ? 0 : undefined}
-      onMouseEnter={(event) => {
-        const element = event.currentTarget;
-        element.title = value && element.scrollWidth > element.clientWidth ? value : "";
-      }}
+      onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value)}
+      onMouseLeave={() => setLatestUpdateTooltip(null)}
+      onFocus={(event) => showImmediateTooltip(event.currentTarget, value)}
+      onBlur={() => setLatestUpdateTooltip(null)}
     >
       {value || empty}
     </span>
@@ -563,10 +585,11 @@ export function AccountsWorkloadsPage({
   const truncatedWorkload = (value: string) => (
     <span
       class="accounts-workloads-ellipsis"
-      onMouseEnter={(event) => {
-        const element = event.currentTarget;
-        element.title = element.scrollWidth > element.clientWidth ? value : "";
-      }}
+      tabIndex={value ? 0 : undefined}
+      onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
+      onMouseLeave={() => setLatestUpdateTooltip(null)}
+      onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
+      onBlur={() => setLatestUpdateTooltip(null)}
     >
       {value || "—"}
     </span>
@@ -599,6 +622,7 @@ export function AccountsWorkloadsPage({
           beginAwEdit(key, field, value);
         }}
       >
+        <div class={`accounts-workloads-cell-content${changed ? " is-unsaved-content" : ""}`}>
         {editing ? (
           field === "lastUpdated" || field === "notes" ? (
             <textarea
@@ -647,6 +671,7 @@ export function AccountsWorkloadsPage({
         ) : (
           value || "—"
         )}
+        </div>
       </td>
     );
   };
@@ -1332,7 +1357,9 @@ export function AccountsWorkloadsPage({
         ].includes(field)
       )
         (deal as any)[field] = nullable(value);
-      else (deal as any)[field] = value;
+      else if (field === "revenueType") {
+        deal.revenueType = canonicalizeOpportunityRevenueType(value);
+      } else (deal as any)[field] = value;
       const next = new Map(current);
       next.set(key, { ...draft, deal });
       return next;
@@ -1496,51 +1523,34 @@ export function AccountsWorkloadsPage({
         deals: dealWrites,
       });
       saveAccepted = true;
-      responseDealResults = saved.dealResults;
-      let confirmed = saved.hierarchy;
-      let confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
-      try {
-        validateConfirmedOpportunityWrites(
-          submittedWrites,
-          confirmedWorkloads,
-          saved.dealResults,
-          new Set(knownServerIds),
-        );
-      } catch {
-        confirmed = await fetchAccountsWorkloadsHierarchy({
-          search: "",
-          includeArchived: true,
-          includeDeletedDeals: true,
-        });
-        confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
-        validateConfirmedOpportunityWrites(
-          submittedWrites,
-          confirmedWorkloads,
-          saved.dealResults,
-          new Set(knownServerIds),
-        );
-      }
-      const touchedWorkloadIds = new Set(drafts.map((draft) => draft.workloadId));
-      const confirmedDealsByWorkload = new Map(
-        confirmedWorkloads.map((workload) => [workload.id, workload.deals] as const),
+      const knownIds = new Set(knownServerIds);
+      const postWorkloads = saved.hierarchy.accounts.flatMap((account) => account.workloads);
+      responseDealResults = saved.dealResults.length
+        ? saved.dealResults
+        : correlateLegacyOpportunityResults(submittedWrites, postWorkloads, knownIds);
+      validateConfirmedOpportunityWrites(
+        submittedWrites,
+        postWorkloads,
+        responseDealResults,
+        knownIds,
       );
-      const mergeConfirmedDeals = (
-        current: AccountsWorkloadsHierarchy,
-      ): AccountsWorkloadsHierarchy => ({
-        ...current,
-        accounts: current.accounts.map((account) => ({
-          ...account,
-          workloads: account.workloads.map((workload) =>
-            touchedWorkloadIds.has(workload.id) && confirmedDealsByWorkload.has(workload.id)
-              ? { ...workload, deals: confirmedDealsByWorkload.get(workload.id)! }
-              : workload,
-          ),
-        })),
+      const confirmed = await fetchAccountsWorkloadsHierarchy({
+        search: "",
+        includeArchived: true,
+        includeDeletedDeals: true,
       });
-      setHierarchy((current) => mergeConfirmedDeals(current));
-      setBaseline((current) => mergeConfirmedDeals(current));
-      const clearSubmittedDrafts = () => clearSubmittedDealDrafts(drafts);
-      clearSubmittedDrafts();
+      const confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
+      validateConfirmedOpportunityWrites(
+        submittedWrites,
+        confirmedWorkloads,
+        responseDealResults,
+        knownIds,
+      );
+      applyConfirmedDeals(
+        confirmedWorkloads,
+        new Set(drafts.map((draft) => draft.workloadId)),
+      );
+      clearSubmittedDealDrafts(drafts);
       setSelectedDeals(new Map());
       setDealEditCell(null);
       setNotice(`${drafts.length} Opportunities saved.`);
@@ -1615,12 +1625,9 @@ export function AccountsWorkloadsPage({
             }
             onBlur={() => setDealEditCell(null)}
           >
-            {value && !["NEW", "EXPANSION", "RENEWAL"].includes(value) && (
-              <option value={value}>{value}</option>
-            )}
-            <option value="NEW">New</option>
-            <option value="EXPANSION">Expansion</option>
-            <option value="RENEWAL">Renewal</option>
+            {opportunityRevenueTypeOptions(value).map((option) => (
+              <option value={option.value}>{option.label}</option>
+            ))}
           </select>
         );
       else if (field === "status")
@@ -1733,21 +1740,17 @@ export function AccountsWorkloadsPage({
           }
         }}
       >
+        <div class={`accounts-workloads-cell-content${changed ? " is-unsaved-content" : ""}`}>
         {editing
           ? editor
           : field === "latestUpdate"
             ? <span
                 class="accounts-workloads-ellipsis"
-                onMouseEnter={(event) => {
-                  if (!value) return;
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  setLatestUpdateTooltip({
-                    text: value,
-                    top: bounds.bottom + 6,
-                    left: Math.min(bounds.left, window.innerWidth - 376),
-                  });
-                }}
+                tabIndex={value ? 0 : undefined}
+                onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value)}
                 onMouseLeave={() => setLatestUpdateTooltip(null)}
+                onFocus={(event) => showImmediateTooltip(event.currentTarget, value)}
+                onBlur={() => setLatestUpdateTooltip(null)}
               >
                 {value || "—"}
               </span>
@@ -1756,6 +1759,7 @@ export function AccountsWorkloadsPage({
               : ["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field) && value
                 ? Number(value).toLocaleString("en-US")
                 : value || "—"}
+        </div>
       </td>
     );
   };
@@ -1889,60 +1893,6 @@ export function AccountsWorkloadsPage({
           <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
         </div>
         <div class="consumption-import-actions accounts-workloads-header-actions">
-          <div class="accounts-workloads-fx">
-            <button
-              type="button"
-              class="accounts-workloads-fx__button"
-              disabled={!canWrite || fxLoading || fxSaving || saving}
-              aria-expanded={fxPopoverOpen ? "true" : "false"}
-              onClick={() => {
-                setFxDraft(String(fxRateValue || ""));
-                setFxPopoverOpen((value) => !value);
-              }}
-            >
-              <span>Exchange Rate (USD to KRW)</span>
-              <strong>1 USD = KRW {fmtUsd.format(fxRateValue)}</strong>
-            </button>
-            {fxPopoverOpen && (
-              <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
-                <label>
-                  <span>Exchange Rate (USD to KRW)</span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={fxDraft}
-                    disabled={!canWrite || fxLoading || fxSaving || saving}
-                    onInput={(event) => setFxDraft(event.currentTarget.value)}
-                  />
-                </label>
-                <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
-                {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
-                {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
-                <div class="accounts-workloads-popover-actions">
-                  <button
-                    type="button"
-                    class="accounts-workloads-button accounts-workloads-button--primary"
-                    disabled={!canWrite || fxLoading || fxSaving || saving}
-                    onClick={applyFxRate}
-                  >
-                    Apply
-                  </button>
-                  <button
-                    type="button"
-                    class="accounts-workloads-button"
-                    disabled={fxSaving || saving}
-                    onClick={() => {
-                      setFxDraft(String(fxRateValue || ""));
-                      setFxPopoverOpen(false);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
           <oj-button
             chroming="outlined"
             disabled={!canWrite || saving}
@@ -2070,6 +2020,62 @@ export function AccountsWorkloadsPage({
           {notice}
         </div>
       )}
+      <div class="accounts-workloads-table-controls">
+        <div class="accounts-workloads-fx">
+          <button
+            type="button"
+            class="accounts-workloads-fx__button"
+            disabled={!canWrite || fxLoading || fxSaving || saving}
+            aria-expanded={fxPopoverOpen ? "true" : "false"}
+            onClick={() => {
+              setFxDraft(String(fxRateValue || ""));
+              setFxPopoverOpen((value) => !value);
+            }}
+          >
+            <span>Exchange Rate (USD to KRW)</span>
+            <strong>1 USD = KRW {fmtUsd.format(fxRateValue)}</strong>
+          </button>
+          {fxPopoverOpen && (
+            <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
+              <label>
+                <span>Exchange Rate (USD to KRW)</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={fxDraft}
+                  disabled={!canWrite || fxLoading || fxSaving || saving}
+                  onInput={(event) => setFxDraft(event.currentTarget.value)}
+                />
+              </label>
+              <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
+              {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
+              {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
+              <div class="accounts-workloads-popover-actions">
+                <button
+                  type="button"
+                  class="accounts-workloads-button accounts-workloads-button--primary"
+                  disabled={!canWrite || fxLoading || fxSaving || saving}
+                  onClick={applyFxRate}
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  class="accounts-workloads-button"
+                  disabled={fxSaving || saving}
+                  onClick={() => {
+                    setFxDraft(String(fxRateValue || ""));
+                    setFxPopoverOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       {loading ? (
         <div class="accounts-workloads-loading">
           <oj-progress-circle value={-1} size="md" /> Loading hierarchy…
@@ -2639,7 +2645,7 @@ export function AccountsWorkloadsPage({
           </section>
         </div>
       )}
-      {latestUpdateTooltip && (
+      {latestUpdateTooltip && typeof document !== "undefined" && createPortal(
         <div
           class="accounts-workloads-latest-tooltip"
           role="tooltip"
@@ -2649,7 +2655,8 @@ export function AccountsWorkloadsPage({
           }}
         >
           {latestUpdateTooltip.text}
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

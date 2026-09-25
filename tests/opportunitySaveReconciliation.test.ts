@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import {
+import type {
   ConfirmedOpportunityDeal,
   SubmittedOpportunityWrite,
+} from "../src/components/content/opportunitySaveReconciliation";
+import {
+  correlateLegacyOpportunityResults,
   validateConfirmedOpportunityWrites,
 } from "../src/components/content/opportunitySaveReconciliation";
 
@@ -106,6 +109,55 @@ assert.doesNotThrow(() =>
     new Set([701]),
   ),
   "clientId mappings confirm multiple new rows independent of response and hierarchy order",
+);
+
+assert.doesNotThrow(() =>
+  validateConfirmedOpportunityWrites(
+    [submission("draft:case", null, { revenueType: "NEW" })],
+    workloads([deal(913, { revenueType: "New" })]),
+    [{ clientId: "draft:case", serverId: 913, workloadId: 51, action: "UPSERT" }],
+  ),
+  "the backend's display-label enum serialization is equivalent to the canonical write value",
+);
+
+const legacyMixedSubmissions = [
+  submission("deal:701", 701, { name: "Existing updated" }),
+  submission("draft:-20", null, { name: "First new", revenueType: "NEW" }),
+  submission("draft:-21", null, { name: "Second new", revenueType: "EXPANSION" }),
+];
+const legacyMixedWorkloads = workloads([
+  deal(701, { name: "Existing updated", revenueType: "New" }),
+  deal(920, { name: "Second new", revenueType: "Expansion" }),
+  deal(919, { name: "First new", revenueType: "New" }),
+]);
+const inferredLegacyResults = correlateLegacyOpportunityResults(
+  legacyMixedSubmissions,
+  legacyMixedWorkloads,
+  new Set([701]),
+);
+assert.deepEqual(inferredLegacyResults, [
+  { clientId: "draft:-20", serverId: 919, workloadId: 51, action: "UPSERT" },
+  { clientId: "draft:-21", serverId: 920, workloadId: 51, action: "UPSERT" },
+]);
+assert.doesNotThrow(() => validateConfirmedOpportunityWrites(
+  legacyMixedSubmissions,
+  legacyMixedWorkloads,
+  inferredLegacyResults,
+  new Set([701]),
+), "old Backend responses without dealResults remain safe for uniquely correlatable mixed batches");
+
+const ambiguousLegacy = [
+  submission("draft:-30", null, { name: "Same" }),
+  submission("draft:-31", null, { name: "Same" }),
+];
+assert.deepEqual(
+  correlateLegacyOpportunityResults(
+    ambiguousLegacy,
+    workloads([deal(930, { name: "Same" }), deal(931, { name: "Same" })]),
+    new Set(),
+  ),
+  [],
+  "identical new rows are never guessed or released without clientId correlation",
 );
 
 assert.throws(

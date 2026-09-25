@@ -3,6 +3,7 @@ import type {
   DealWrite,
   OpportunityDealResult,
 } from "../../data/accountsWorkloadsApi";
+import { canonicalizeOpportunityRevenueType } from "../../data/opportunityRevenueType";
 
 export type SubmittedOpportunityWrite = Readonly<{
   clientId: string;
@@ -111,6 +112,9 @@ const normalizedField = (
   if (field === "opportunityNo" || field === "latestUpdate") {
     return trimBlankToNull(value as string | null);
   }
+  if (field === "revenueType") {
+    return canonicalizeOpportunityRevenueType(String(value ?? ""));
+  }
   if (numericFields.has(field)) return oracleScale4(value as number | null);
   return value;
 };
@@ -145,6 +149,55 @@ const persistedFieldsMatch = (
   } catch {
     return false;
   }
+};
+
+/**
+ * Older Backends returned an authoritative hierarchy but no clientId mappings.
+ * Recover only mappings that have one unique new server row matching one unique
+ * submission. Ambiguous identical rows deliberately remain uncorrelated.
+ */
+export const correlateLegacyOpportunityResults = (
+  submissions: ReadonlyArray<SubmittedOpportunityWrite>,
+  workloads: ReadonlyArray<ConfirmedOpportunityWorkload>,
+  knownServerIds: ReadonlySet<number>,
+): OpportunityDealResult[] => {
+  const dealsByWorkload = new Map(
+    workloads.map((workload) => [workload.id, workload.deals] as const),
+  );
+  const candidates = new Map<string, number[]>();
+  for (const submission of submissions) {
+    if (submission.originalId !== null || submission.write.action !== "UPSERT") continue;
+    const matches = (dealsByWorkload.get(submission.workloadId) ?? [])
+      .filter((deal) => !knownServerIds.has(deal.id) && persistedFieldsMatch(submission, deal))
+      .map((deal) => deal.id);
+    candidates.set(submission.clientId, matches);
+  }
+
+  const results: OpportunityDealResult[] = [];
+  const assigned = new Set<number>();
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const submission of submissions) {
+      if (!candidates.has(submission.clientId) || results.some((item) => item.clientId === submission.clientId)) continue;
+      const available = candidates.get(submission.clientId)!.filter((id) => !assigned.has(id));
+      const uniquelyClaimed = available.filter((id) =>
+        [...candidates.entries()].filter(([clientId, ids]) =>
+          !results.some((item) => item.clientId === clientId) && ids.includes(id) && !assigned.has(id),
+        ).length === 1,
+      );
+      if (available.length !== 1 || uniquelyClaimed.length !== 1) continue;
+      assigned.add(available[0]);
+      results.push({
+        clientId: submission.clientId,
+        serverId: available[0],
+        workloadId: submission.workloadId,
+        action: "UPSERT",
+      });
+      progressed = true;
+    }
+  }
+  return results;
 };
 
 /**

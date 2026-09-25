@@ -17,7 +17,8 @@ import {
   AccountsWorkloadsApiError,
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloadsClonePreview,
-  cloneAccountsWorkloadsPreviousFiscalYear
+  cloneAccountsWorkloadsPreviousFiscalYear,
+  fetchAccountsWorkloadsHierarchy
 } from "../src/data/accountsWorkloadsApi";
 import { AccountWorkloadRow } from "../src/data/accountsWorkloadsMockData";
 
@@ -535,13 +536,30 @@ async function run() {
   assert.deepEqual(hierarchySave.dealResults, [
     { clientId: "draft:-8", serverId: 808, workloadId: 51, action: "UPSERT" }
   ], "hierarchy saves expose deal correlation results without depending on response order");
-  await assert.rejects(
-    () => saveAccountsWorkloadsHierarchyWithResults(
+  const oldShapeSave = await saveAccountsWorkloadsHierarchyWithResults(
       { accounts: [], workloads: [], deals: [], workloadPlans: [] },
       async () => response({ hierarchy: { fiscalYear: null, accounts: [] } })
-    ),
-    /Malformed Accounts & Workloads save response/,
-    "a save response without deal correlation results is rejected"
+  );
+  assert.deepEqual(oldShapeSave.dealResults, [],
+    "the additive dealResults contract remains compatible with a sequentially deployed old Backend");
+
+  const hierarchyWithDisplayRevenue = await fetchAccountsWorkloadsHierarchy({}, async () => response({
+    fiscalYear: null,
+    accounts: [{
+      id: 1, versionNo: 1, name: "Account", archived: false,
+      workloads: [{
+        id: 51, versionNo: 1, name: "Workload", highlighted: false, archived: false, plans: [],
+        deals: [
+          { id: 1, revenueType: " New " },
+          { id: 2, revenueType: "Strategic Alliance" },
+        ],
+      }],
+    }],
+  }));
+  assert.deepEqual(
+    hierarchyWithDisplayRevenue.accounts[0].workloads[0].deals.map((deal) => deal.revenueType),
+    ["NEW", "Strategic Alliance"],
+    "known wire display variants canonicalize while unknown values retain their text",
   );
 
   delete (globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string }).__KPI_API_BASE_URL__;

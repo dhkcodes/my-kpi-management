@@ -292,8 +292,8 @@ assert.match(styles, /\.kpi-grid-column-header[^}]*background:\s*var\(--kap-grid
   "KPI headers consume the Accounts-aligned grid header token");
 assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var\(--kap-grid-kpi-reflected-bg\)/,
   "KPI Reflected rows use the calm teal reflection surface token");
-assert.match(styles, /\.accounts-workloads-grid td\.is-unsaved-cell::after[^{]*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
-  "Accounts drafts expose the shared pink 3px line");
+assert.match(styles, /\.accounts-workloads-cell-content\.is-unsaved-content::after[^{]*\{[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
+  "Accounts inner draft content exposes the shared pink 3px line");
 assert.match(styles, /\.kpi-grid-cell\.is-unsaved-cell::after[^}]*background:\s*var\(--kap-grid-draft-line\)[^}]*height:\s*3px/,
   "KPI drafts expose the same pink 3px line");
 
