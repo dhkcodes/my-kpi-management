@@ -74,8 +74,8 @@ assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) =>
   "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
 assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
-assert.match(page, /const updateDealDraft[\s\S]*if \(saving\) return/,
-  "opportunity draft mutation is blocked while a save is in flight");
+assert.match(page, /const updateDealDraft[\s\S]*if \(dealSavingRef\.current\) return/,
+  "opportunity draft mutation is blocked immediately while a save is in flight");
 assert.match(page, /cancelDeal\(activeDraft\.key\)/,
   "an opportunity row Cancel is isolated to that opportunity draft");
 assert.doesNotMatch(page, /const hasNewDeal =|const hasNewAw =/,
@@ -149,5 +149,13 @@ assert.match(styles, /is-pending-delete > td:nth-child\(5\)[\s\S]*background:\s*
   "Plan Number receives the same Draft Delete background as the row");
 assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*position:\s*static/,
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
+assert.match(page, /const dealSavingRef = useRef\(false\);/,
+  "Opportunity save owns a synchronous mutation lock");
+assert.match(page, /const beginDealEdit[\s\S]*?if \(!canWrite \|\| dealSavingRef\.current\) return;/);
+assert.match(page, /const updateDealDraft[\s\S]*?if \(dealSavingRef\.current\) return;/);
+assert.match(page, /const addDeal[\s\S]*?if \(dealSavingRef\.current\) return;/);
+assert.match(page, /const cancelDeal[\s\S]*?if \(dealSavingRef\.current\) return;/);
+assert.match(saveDealHandler, /if \(dealSavingRef\.current\) return;[\s\S]*dealSavingRef\.current = true;[\s\S]*finally \{\s*dealSavingRef\.current = false;\s*setSaving\(false\);/,
+  "save blocks duplicate submission immediately and releases the lock on success or failure");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");
