@@ -162,7 +162,8 @@ export function AccountsWorkloadsPage({
   initialSearch = "",
 }: Props) {
   const nextTempId = useRef(-1);
-  const editSnapshot = useRef<unknown>(null);
+  const editSnapshot = useRef("");
+  const highlightRequests = useRef(new Set<number>());
   const permanentDeleteDialogRef = useRef<any>(null);
   const dealDeleteDialogRef = useRef<any>(null);
   const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY);
@@ -281,6 +282,7 @@ export function AccountsWorkloadsPage({
   // A pending delete is only a local draft. Keep the saved workload and its
   // opportunities visible (and therefore counted) until Save succeeds.
   const rows = allRows;
+  const allExpanded = rows.length > 0 && rows.every((row) => expandedRows.has(row.key));
 
   const missingCandidates = useMemo(
     () => filterForecastCandidates(forecastCandidates, hierarchy.accounts),
@@ -516,6 +518,7 @@ export function AccountsWorkloadsPage({
     setDirtyAccounts((current) => new Set(current).add(accountId));
     setDirtyWorkloads((current) => new Set(current).add(workloadId));
     setSelectedRows(new Set([rowKey(accountId, workloadId)]));
+    setEditCell({ key: rowKey(accountId, workloadId), field: "account" });
   };
   const removeUnsavedSelected = (selected: ReadonlySet<string>) => {
     const removedWorkloadIds = new Set(
@@ -581,21 +584,25 @@ export function AccountsWorkloadsPage({
       await saveAccountsWorkloadsHierarchy(request);
       setHierarchy((current) => ({
         ...current,
-        accounts: current.accounts.map((account) => ({
-          ...account,
-          workloads: account.workloads.filter(
-            (workload) => !deletedIds.has(workload.id),
-          ),
-        })),
+        accounts: current.accounts
+          .map((account) => ({
+            ...account,
+            workloads: account.workloads.filter(
+              (workload) => !deletedIds.has(workload.id),
+            ),
+          }))
+          .filter((account) => account.workloads.length > 0),
       }));
       setBaseline((current) => ({
         ...current,
-        accounts: current.accounts.map((account) => ({
-          ...account,
-          workloads: account.workloads.filter(
-            (workload) => !deletedIds.has(workload.id),
-          ),
-        })),
+        accounts: current.accounts
+          .map((account) => ({
+            ...account,
+            workloads: account.workloads.filter(
+              (workload) => !deletedIds.has(workload.id),
+            ),
+          }))
+          .filter((account) => account.workloads.length > 0),
       }));
       setDealDrafts(
         (current) =>
@@ -634,8 +641,15 @@ export function AccountsWorkloadsPage({
     if (!targets.length) return;
     setSaving(true);
     setError("");
+    const pageScrollY = window.scrollY;
+    const scrollPositions = new Map(
+      [...new Set(targets.map((deal) => deal.workloadId))].map((workloadId) => [
+        workloadId,
+        document.querySelector<HTMLElement>(`[data-opportunity-scroll="${workloadId}"]`)?.scrollLeft ?? 0,
+      ]),
+    );
     try {
-      await saveAccountsWorkloadsHierarchy({
+      const saved = await saveAccountsWorkloadsHierarchy({
         accounts: [],
         workloads: [],
         workloadPlans: [],
@@ -643,8 +657,17 @@ export function AccountsWorkloadsPage({
           dealWrite({ ...deal, deleted: true }, deal.workloadId, deal),
         ),
       });
+      setHierarchy(saved);
+      setBaseline(saved);
+      setDealDrafts(new Map());
       setSelectedDeals(new Map());
-      await reload();
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: pageScrollY });
+        scrollPositions.forEach((left, workloadId) => {
+          const scroller = document.querySelector<HTMLElement>(`[data-opportunity-scroll="${workloadId}"]`);
+          if (scroller) scroller.scrollLeft = left;
+        });
+      });
       setNotice(`${targets.length} opportunity deleted.`);
     } catch (requestError) {
       setError(friendlyError(requestError));
@@ -969,6 +992,8 @@ export function AccountsWorkloadsPage({
       setError("Saved workload baseline is unavailable.");
       return;
     }
+    if (highlightRequests.current.has(workload.id)) return;
+    highlightRequests.current.add(workload.id);
     const request: AccountsWorkloadsHierarchySaveRequest = {
       accounts: [],
       deals: [],
@@ -987,7 +1012,6 @@ export function AccountsWorkloadsPage({
         },
       ],
     };
-    setSaving(true);
     try {
       const saved = await saveAccountsWorkloadsHierarchy(request);
       const confirmedWorkload = saved.accounts
@@ -1017,7 +1041,7 @@ export function AccountsWorkloadsPage({
     } catch (requestError) {
       setError(friendlyError(requestError));
     } finally {
-      setSaving(false);
+      highlightRequests.current.delete(workload.id);
     }
   };
 
@@ -1161,6 +1185,19 @@ export function AccountsWorkloadsPage({
         : field === "status"
           ? deal.status
           : String((deal as any)[field] ?? "");
+  const isDealDraftChanged = (draft: DealDraft) => {
+    if (!draft.original) return true;
+    return (
+      [
+        "name", "opportunityNo", "revenueType", "status", "targetFiscalYear",
+        "targetQuarter", "actualCloseDate", "contractStartDate", "contractEndDate",
+        "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability", "latestUpdate",
+      ] as const
+    ).some(
+      (field) =>
+        String(draft.deal[field] ?? "") !== String(draft.original?.[field] ?? ""),
+    );
+  };
   const renderDealCell = (
     workloadId: number,
     deal: AccountWorkloadDeal,
@@ -1292,12 +1329,20 @@ export function AccountsWorkloadsPage({
           event.stopPropagation();
           beginDealEdit(workloadId, effective, field);
         }}
+        onKeyDown={(event) => {
+          if (editing && event.key === "Enter") {
+            event.preventDefault();
+            setDealEditCell(null);
+          }
+        }}
       >
         {editing
           ? editor
           : field === "latestUpdate"
-            ? tooltip(value)
-            : value || "—"}
+            ? <span class="accounts-workloads-ellipsis" title={value}>{value || "—"}</span>
+            : ["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field) && value
+              ? Number(value).toLocaleString("en-US")
+              : value || "—"}
       </td>
     );
   };
@@ -1437,7 +1482,7 @@ export function AccountsWorkloadsPage({
             onojAction={() => void openForecast()}
           >
             <span slot="startIcon" class="oj-ux-ico-plus" />
-            Add from Records
+            Account Recommendations
           </oj-button>
           <oj-button
             chroming="callToAction"
@@ -1463,7 +1508,7 @@ export function AccountsWorkloadsPage({
           class="consumption-record-search accounts-workloads-search"
           for="accountsWorkloadsSearch"
         >
-          Search
+          <span class="oj-helper-hidden-accessible">Search</span>
           <input
             id="accountsWorkloadsSearch"
             type="search"
@@ -1477,7 +1522,8 @@ export function AccountsWorkloadsPage({
           class="consumption-range-apply"
           disabled={loading || saving}
         >
-          Search
+          <span class="oj-ux-ico-search" aria-hidden="true" />
+          <span class="oj-helper-hidden-accessible">Search</span>
         </button>
         <label class="accounts-workloads-include-deleted">
           <input
@@ -1488,7 +1534,7 @@ export function AccountsWorkloadsPage({
           />
           Include Deleted
         </label>
-        {selectedCount > 0 && (
+        {selectedCount > 0 && rows.some((row) => selectedRows.has(row.key) && row.workload.id > 0) && (
           <button
             type="button"
             class="accounts-workloads-button"
@@ -1517,25 +1563,16 @@ export function AccountsWorkloadsPage({
             {saving ? "Saving…" : "Save"}
           </button>
         )}
+        <span class="accounts-workloads-toolbar-spacer" />
+        <oj-button chroming="outlined" disabled={!canWrite || saving || hasNewAw} onojAction={() => void openForecast()}>
+          Account Recommendations
+        </oj-button>
+        <oj-button chroming="callToAction" disabled={!canWrite || saving || hasNewAw} onojAction={addAw}>
+          Add Account & Workload
+        </oj-button>
       </form>
       <div class="accounts-workloads-table-summary">
         <span>{hierarchy.accounts.length} accounts</span>
-        <div>
-          <button
-            type="button"
-            class="accounts-workloads-button"
-            onClick={() => setExpandedRows(new Set(rows.map((row) => row.key)))}
-          >
-            Expand all
-          </button>
-          <button
-            type="button"
-            class="accounts-workloads-button"
-            onClick={() => setExpandedRows(new Set())}
-          >
-            Collapse all
-          </button>
-        </div>
       </div>
       {error && (
         <div
@@ -1568,7 +1605,17 @@ export function AccountsWorkloadsPage({
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
               <tr>
-                <th class="accounts-workloads-expand-col" aria-label="Expand" />
+                <th class="accounts-workloads-expand-col">
+                  <button
+                    type="button"
+                    class="accounts-workloads-expand-all"
+                    aria-label={allExpanded ? "Collapse all" : "Expand all"}
+                    title={allExpanded ? "Collapse all" : "Expand all"}
+                    onClick={() => setExpandedRows(allExpanded ? new Set() : new Set(rows.map((row) => row.key)))}
+                  >
+                    <span class={allExpanded ? "oj-ux-ico-collapse" : "oj-ux-ico-expand"} />
+                  </button>
+                </th>
                 <th class="accounts-workloads-highlight-col">★</th>
                 {(
                   [
@@ -1607,9 +1654,10 @@ export function AccountsWorkloadsPage({
                 const childDrafts = [...dealDrafts.values()].filter(
                   (draft) => draft.workloadId === workload.id,
                 );
+                const changedChildDrafts = childDrafts.filter(isDealDraftChanged);
                 const activeDraft =
-                  childDrafts.find((draft) => draft.key === dealEditCell?.key) ??
-                  childDrafts[0];
+                  changedChildDrafts.find((draft) => draft.key === dealEditCell?.key) ??
+                  changedChildDrafts[0];
                 const shownDeals = deals.map(
                   (deal) =>
                     childDrafts.find((draft) => draft.deal.id === deal.id)
@@ -1780,7 +1828,7 @@ export function AccountsWorkloadsPage({
                                         "Oppty Name",
                                         "Oppty ID",
                                         "Revenue Type",
-                                        "Win Prob",
+                                        "WIN PROB.",
                                         "Target Quarter",
                                         "ARR ($)",
                                         "ARR (₩)",
@@ -1791,7 +1839,6 @@ export function AccountsWorkloadsPage({
                                         "Start Date",
                                         "End Date",
                                         "Latest Update",
-                                        "Actions",
                                       ].map((label) => (
                                         <th>{label}</th>
                                       ))}
@@ -1894,14 +1941,14 @@ export function AccountsWorkloadsPage({
                                             deal,
                                             "latestUpdate",
                                           )}
-                                          <td class="accounts-workloads-oppty-actions" />
+
                                         </tr>
                                       );
                                     })}
                                     {shownDeals.length === 0 && (
                                       <tr>
                                         <td
-                                          colSpan={15}
+                                          colSpan={14}
                                           class="accounts-workloads-empty"
                                         >
                                           No opportunities.
@@ -2009,9 +2056,10 @@ export function AccountsWorkloadsPage({
           >
             <header>
               <div>
-                <h2>Add from Records</h2>
+                <h2>Account Recommendations</h2>
                 <p>
-                  Select missing Consumption Records. Plan ID is matched first;
+                  Select one or more recommendations, then confirm to add them as
+                  unsaved Account &amp; Workload drafts. Plan ID is matched first;
                   normalized Account exact match is used only when Plan ID is
                   unavailable. They will be added as unsaved AW drafts.
                 </p>
@@ -2038,13 +2086,15 @@ export function AccountsWorkloadsPage({
                       <tr key={key}>
                         <td>
                           <input
-                            type="radio"
-                            name="forecast-candidate"
+                            type="checkbox"
                             checked={selectedCandidateKeys.has(key)}
                             onChange={() =>
-                              setSelectedCandidateKeys((current) =>
-                                current.has(key) ? new Set() : new Set([key]),
-                              )
+                              setSelectedCandidateKeys((current) => {
+                                const next = new Set(current);
+                                if (next.has(key)) next.delete(key);
+                                else next.add(key);
+                                return next;
+                              })
                             }
                           />
                         </td>
@@ -2067,7 +2117,7 @@ export function AccountsWorkloadsPage({
                   disabled={!selectedCandidateKeys.size}
                   onClick={addCandidates}
                 >
-                  Add
+                  Apply selected
                 </button>
               </div>
             </footer>
