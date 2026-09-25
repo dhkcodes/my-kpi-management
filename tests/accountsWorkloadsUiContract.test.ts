@@ -88,7 +88,9 @@ assert.match(saveDealHandler, /isDefiniteWriteRejection\(requestError\)[\s\S]*de
 assert.match(saveDealHandler, /drafts: Object\.freeze\(\[\.\.\.drafts\]\)[\s\S]*submittedWrites: Object\.freeze/,
   "an uncertain save preserves both the drafts and submitted snapshot");
 assert.match(saveDealHandler, /저장 확인 대기[\s\S]*Save is blocked until GET reconciliation succeeds/,
-  "an uncertain save is visibly separated and cannot be retried as a POST");
+  "an uncertain save with recoverable correlation is visibly separated and cannot be retried as a POST");
+assert.match(saveDealHandler, /hasUnrecoverableNewDealCorrelationLoss\(pendingConfirmation\)[\s\S]*일반 재조회로 해당 행을 안전하게 연결할 수 없습니다[\s\S]*입력은 보존되고 재전송은 차단됩니다[\s\S]*관리자 확인이 필요합니다/,
+  "a lost new-row correlation preserves input without promising that a general GET can unlock it");
 assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
 assert.match(page, /const updateDealDraft[\s\S]*if \(dealSaveLock\.isLocked\(\)\) return/,

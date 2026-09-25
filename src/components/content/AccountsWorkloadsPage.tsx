@@ -1554,14 +1554,17 @@ export function AccountsWorkloadsPage({
       const confirmedRejection = !saveAccepted && isDefiniteWriteRejection(requestError);
       if (!confirmedRejection) {
         dealSaveLock.markAwaitingConfirmation();
-        setPendingDealConfirmation({
+        const pendingConfirmation: PendingDealConfirmation = {
           drafts: Object.freeze([...drafts]),
           submittedWrites: Object.freeze([...submittedWrites]),
           dealResults: Object.freeze([...responseDealResults]),
           knownServerIds: Object.freeze([...knownServerIds]),
-        });
+        };
+        setPendingDealConfirmation(pendingConfirmation);
         setError(
-          "저장 확인 대기: the POST outcome could not be confirmed. Drafts and the submitted snapshot are preserved; Save is blocked until GET reconciliation succeeds.",
+          hasUnrecoverableNewDealCorrelationLoss(pendingConfirmation)
+            ? "저장 확인 대기: 신규 Opportunity correlation을 받지 못해 일반 재조회로 해당 행을 안전하게 연결할 수 없습니다. 입력은 보존되고 재전송은 차단됩니다. 관리자 확인이 필요합니다."
+            : "저장 확인 대기: the POST outcome could not be confirmed. Drafts and the submitted snapshot are preserved; Save is blocked until GET reconciliation succeeds.",
         );
         setSaveErrors([]);
       } else {
