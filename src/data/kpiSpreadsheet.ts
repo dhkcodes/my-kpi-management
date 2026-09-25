@@ -15,7 +15,7 @@ const field = (key: KpiFieldKey, label: string, type: KpiField["type"] = "text")
 const manageTime = field("manageTimeReflected", "Reflected", "manageTime");
 
 const base = [manageTime, field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
-const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
+const related = [manageTime, field("accountWorkload", "Account / Workload / Oppty", "workload"), field("srNumber", "SR Number"), field("title", "SR Description", "textarea")];
 const delivery = field("deliveryDate", "Delivery Date", "date");
 
 export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]> = {
@@ -23,7 +23,7 @@ export const KPI_FIELD_CONTRACTS: Record<SpreadsheetKpiCode, readonly KpiField[]
   B: [...related, delivery],
   C1: [...related, delivery],
   C2: [...related, delivery],
-  D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty.No", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target", "targetPeriod"), delivery],
+  D1: [manageTime, field("accountWorkload", "Account / Workload / Oppty", "workload"), field("srNumber", "SR Number"), field("title", "Activity", "activity"), field("stage", "Sales Stage", "stage"), field("acrK", "ACR (K)", "number"), field("targetQuarter", "Target", "targetPeriod"), delivery],
   F: [...base, delivery],
   H: [manageTime, field("title", "Content", "textarea"), delivery]
 };

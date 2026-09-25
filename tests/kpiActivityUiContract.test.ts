@@ -80,7 +80,14 @@ assert.match(page, /collision:\s*"none"/,
 assert.match(page, /--kpi-workload-popup-max-height/,
   "below-launcher results must shrink to the remaining viewport height rather than opening at (0,0)");
 assert.match(page, /onWorkload\(option\); onFinish\(\)/);
-assert.match(page, />선택 안함</);
+assert.match(contract, /field\("accountWorkload", "Account \/ Workload \/ Oppty", "workload"\)/,
+  "linked workload columns use the corrected opportunity heading");
+assert.doesNotMatch(contract, /Account \/ Workload \/ Oppty\.No/);
+assert.match(page, /setQuery\(""\)/,
+  "opening an editor must not use the formatted existing link as a backend search query");
+assert.match(page, /row\.workloadId != null \? row\.accountWorkload : "선택 안함"/,
+  "an existing workload link stays visible and selectable independently from filtered candidates");
+assert.match(page, /row\.workloadId != null \? "현재 연결 유지" : "기존 값으로 되돌리기"/);
 assert.doesNotMatch(page, /setTimeout\(openPopup/);
 
 assert.match(page, /is-unsaved-cell/);

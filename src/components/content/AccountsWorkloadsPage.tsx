@@ -164,6 +164,7 @@ export function AccountsWorkloadsPage({
   const nextTempId = useRef(-1);
   const editSnapshot = useRef<unknown>(null);
   const permanentDeleteDialogRef = useRef<any>(null);
+  const dealDeleteDialogRef = useRef<any>(null);
   const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY);
   const [baseline, setBaseline] = useState<AccountsWorkloadsHierarchy>(EMPTY);
   const [searchInput, setSearchInput] = useState(initialSearch);
@@ -183,6 +184,7 @@ export function AccountsWorkloadsPage({
     Set<number>
   >(new Set());
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [selectedDeals, setSelectedDeals] = useState<Map<number, AccountWorkloadDeal>>(new Map());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
   const [sortField, setSortField] = useState<SortField>("account");
@@ -192,6 +194,7 @@ export function AccountsWorkloadsPage({
   );
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
   const [permanentDeleteTargets, setPermanentDeleteTargets] = useState<string[]>([]);
+  const [dealDeleteTargets, setDealDeleteTargets] = useState<AccountWorkloadDeal[]>([]);
   const [forecastOpen, setForecastOpen] = useState(false);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastCandidates, setForecastCandidates] = useState<
@@ -404,6 +407,17 @@ export function AccountsWorkloadsPage({
       )}
     </span>
   );
+  const truncatedWorkload = (value: string) => (
+    <span
+      class="accounts-workloads-ellipsis"
+      onMouseEnter={(event) => {
+        const element = event.currentTarget;
+        element.title = element.scrollWidth > element.clientWidth ? value : "";
+      }}
+    >
+      {value || "—"}
+    </span>
+  );
   const renderAwCell = (
     account: AccountHierarchyAccount,
     workload: AccountWorkload,
@@ -472,8 +486,12 @@ export function AccountsWorkloadsPage({
               onBlur={() => setEditCell(null)}
             />
           )
-        ) : (
+        ) : field === "lastUpdated" || field === "notes" ? (
           tooltip(value)
+        ) : field === "workload" ? (
+          truncatedWorkload(value)
+        ) : (
+          value || "—"
         )}
       </td>
     );
@@ -609,20 +627,53 @@ export function AccountsWorkloadsPage({
     }
   };
 
+  const confirmDealDelete = async () => {
+    const targets = dealDeleteTargets;
+    dealDeleteDialogRef.current?.close();
+    setDealDeleteTargets([]);
+    if (!targets.length) return;
+    setSaving(true);
+    setError("");
+    try {
+      await saveAccountsWorkloadsHierarchy({
+        accounts: [],
+        workloads: [],
+        workloadPlans: [],
+        deals: targets.map((deal) =>
+          dealWrite({ ...deal, deleted: true }, deal.workloadId, deal),
+        ),
+      });
+      setSelectedDeals(new Map());
+      await reload();
+      setNotice(`${targets.length} opportunity deleted.`);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+      setSaveErrors(
+        requestError instanceof AccountsWorkloadsApiError
+          ? requestError.errors
+          : [],
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requestDealDelete = () => {
+    const targets = [...selectedDeals.values()].filter((deal) => deal.id > 0);
+    if (!targets.length) return;
+    setDealDeleteTargets(targets);
+    dealDeleteDialogRef.current?.open();
+  };
+
   const deleteSelected = async () => {
     const selected = new Set(selectedRows);
     const savedRows = rows.filter(
       (row) => selected.has(row.key) && row.workload.id > 0,
     );
     const permanentTargets = savedRows.filter(
-      (row) =>
-        row.workload.archived || pendingDeleteWorkloadIds.has(row.workload.id),
+      (row) => row.workload.archived,
     );
-    const draftTargets = savedRows.filter(
-      (row) =>
-        !row.workload.archived &&
-        !pendingDeleteWorkloadIds.has(row.workload.id),
-    );
+    const draftTargets = savedRows.filter((row) => !row.workload.archived);
 
     if (permanentTargets.length) {
       setPermanentDeleteTargets(permanentTargets.map((row) => row.key));
@@ -630,22 +681,45 @@ export function AccountsWorkloadsPage({
       return;
     }
 
-    const newlyPendingIds = draftTargets.map((row) => row.workload.id);
-
     removeUnsavedSelected(selected);
-    if (newlyPendingIds.length) {
-      setPendingDeleteWorkloadIds(
-        (current) => new Set([...current, ...newlyPendingIds]),
-      );
-      setDirtyWorkloads(
-        (current) =>
-          new Set([...current].filter((id) => !newlyPendingIds.includes(id))),
-      );
-      setNotice(
-        `${newlyPendingIds.length} AW marked as Draft Delete. Save to apply or Cancel to restore.`,
-      );
+    if (!draftTargets.length) {
+      setSelectedRows(new Set());
+      return;
     }
-    setSelectedRows(new Set(draftTargets.map((row) => row.key)));
+
+    const request: AccountsWorkloadsHierarchySaveRequest = {
+      accounts: [],
+      deals: [],
+      workloadPlans: [],
+      workloads: draftTargets.map((row) => ({
+        id: row.workload.id,
+        clientId: null,
+        accountRef: String(row.account.id),
+        versionNo: row.workload.versionNo,
+        name: row.workload.name,
+        lastUpdated: row.workload.lastUpdated,
+        notes: row.workload.notes,
+        highlighted: row.workload.highlighted,
+        action: "ARCHIVE",
+      })),
+    };
+    setSaving(true);
+    setError("");
+    try {
+      await saveAccountsWorkloadsHierarchy(request);
+      setSelectedRows(new Set());
+      await reload();
+      setNotice(`${draftTargets.length} AW moved to Draft Delete.`);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+      setSaveErrors(
+        requestError instanceof AccountsWorkloadsApiError
+          ? requestError.errors
+          : [],
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelSelected = () => {
@@ -1015,18 +1089,6 @@ export function AccountsWorkloadsPage({
     });
     if (dealEditCell?.key === key) setDealEditCell(null);
   };
-  const markDealDraftDelete = (draft: DealDraft) => {
-    if (!draft.original) {
-      cancelDeal(draft.key);
-      return;
-    }
-    setDealDrafts((current) => {
-      const next = new Map(current);
-      next.set(draft.key, { ...draft, deal: { ...draft.deal, deleted: true } });
-      return next;
-    });
-    setDealEditCell(null);
-  };
   const saveDeal = async (draft: DealDraft) => {
     if (!draft.deal.deleted && !draft.deal.name.trim()) {
       setError("Oppty Name is required.");
@@ -1231,7 +1293,11 @@ export function AccountsWorkloadsPage({
           beginDealEdit(workloadId, effective, field);
         }}
       >
-        {editing ? editor : tooltip(value)}
+        {editing
+          ? editor
+          : field === "latestUpdate"
+            ? tooltip(value)
+            : value || "—"}
       </td>
     );
   };
@@ -1351,6 +1417,12 @@ export function AccountsWorkloadsPage({
     <section
       class="accounts-workloads-page accounts-hierarchy-page"
       aria-labelledby="accountsWorkloadsTitle"
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("button,input,textarea,select,oj-button,.accounts-workloads-parent-row")) return;
+        setSelectedRows(new Set());
+        setSelectedDeals(new Map());
+      }}
     >
       <header class="accounts-workloads-header consumption-page__header">
         <div>
@@ -1400,6 +1472,13 @@ export function AccountsWorkloadsPage({
             onInput={(event) => setSearchInput(event.currentTarget.value)}
           />
         </label>
+        <button
+          type="submit"
+          class="consumption-range-apply"
+          disabled={loading || saving}
+        >
+          Search
+        </button>
         <label class="accounts-workloads-include-deleted">
           <input
             type="checkbox"
@@ -1409,13 +1488,6 @@ export function AccountsWorkloadsPage({
           />
           Include Deleted
         </label>
-        <button
-          type="submit"
-          class="consumption-range-apply"
-          disabled={loading || saving}
-        >
-          Apply
-        </button>
         {selectedCount > 0 && (
           <button
             type="button"
@@ -1446,6 +1518,25 @@ export function AccountsWorkloadsPage({
           </button>
         )}
       </form>
+      <div class="accounts-workloads-table-summary">
+        <span>{hierarchy.accounts.length} accounts</span>
+        <div>
+          <button
+            type="button"
+            class="accounts-workloads-button"
+            onClick={() => setExpandedRows(new Set(rows.map((row) => row.key)))}
+          >
+            Expand all
+          </button>
+          <button
+            type="button"
+            class="accounts-workloads-button"
+            onClick={() => setExpandedRows(new Set())}
+          >
+            Collapse all
+          </button>
+        </div>
+      </div>
       {error && (
         <div
           class="accounts-workloads-banner accounts-workloads-banner--error"
@@ -1477,7 +1568,6 @@ export function AccountsWorkloadsPage({
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
               <tr>
-                <th class="accounts-workloads-select-col" aria-label="Status" />
                 <th class="accounts-workloads-expand-col" aria-label="Expand" />
                 <th class="accounts-workloads-highlight-col">★</th>
                 {(
@@ -1535,7 +1625,11 @@ export function AccountsWorkloadsPage({
                       onClick={(event) => {
                         if (isInteractive(event.target)) return;
                         if (!event.ctrlKey && !event.metaKey) {
-                          setSelectedRows(new Set([key]));
+                          setSelectedRows((current) =>
+                            current.size === 1 && current.has(key)
+                              ? new Set()
+                              : new Set([key]),
+                          );
                           return;
                         }
                         setSelectedRows((current) => {
@@ -1546,16 +1640,6 @@ export function AccountsWorkloadsPage({
                         });
                       }}
                     >
-                      <td>
-                        {pendingDelete && (
-                          <span
-                            class="accounts-workloads-pending-delete"
-                            role="status"
-                          >
-                            Draft Delete
-                          </span>
-                        )}
-                      </td>
                       <td>
                         <button
                           type="button"
@@ -1601,7 +1685,7 @@ export function AccountsWorkloadsPage({
                     </tr>
                     {expanded && (
                       <tr class="accounts-workloads-child-row">
-                        <td colSpan={11}>
+                        <td colSpan={10}>
                           <section
                             class="accounts-workloads-opportunities"
                             aria-label={`${account.name} ${workload.name} opportunities`}
@@ -1651,6 +1735,15 @@ export function AccountsWorkloadsPage({
                                 >
                                   Add Opportunity
                                 </button>
+                                {selectedDeals.size > 0 && (
+                                  <button
+                                    type="button"
+                                    disabled={!canWrite || saving}
+                                    onClick={requestDealDelete}
+                                  >
+                                    Delete selected
+                                  </button>
+                                )}
                                 {activeDraft && (
                                   <>
                                     <button
@@ -1666,13 +1759,6 @@ export function AccountsWorkloadsPage({
                                       onClick={() => cancelDeal(activeDraft.key)}
                                     >
                                       Cancel
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={saving || activeDraft.deal.deleted}
-                                      onClick={() => markDealDraftDelete(activeDraft)}
-                                    >
-                                      Draft Delete
                                     </button>
                                   </>
                                 )}
@@ -1721,7 +1807,22 @@ export function AccountsWorkloadsPage({
                                       return (
                                         <tr
                                           key={draftKey}
-                                          class={`${draft ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}`}
+                                          class={`${draft ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}${selectedDeals.has(deal.id) ? " is-selected" : ""}`}
+                                          onClick={(event) => {
+                                            if (isInteractive(event.target)) return;
+                                            event.stopPropagation();
+                                            if (deal.id <= 0) return;
+                                            setSelectedDeals((current) => {
+                                              const next = new Map(current);
+                                              if (!event.ctrlKey && !event.metaKey) {
+                                                if (next.size === 1 && next.has(deal.id)) return new Map();
+                                                return new Map([[deal.id, deal]]);
+                                              }
+                                              if (next.has(deal.id)) next.delete(deal.id);
+                                              else next.set(deal.id, deal);
+                                              return next;
+                                            });
+                                          }}
                                         >
                                           {renderDealCell(
                                             workload.id,
@@ -1820,7 +1921,7 @@ export function AccountsWorkloadsPage({
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={11} class="accounts-workloads-empty">
+                  <td colSpan={10} class="accounts-workloads-empty">
                     No accounts or workloads found.
                   </td>
                 </tr>
@@ -1867,6 +1968,35 @@ export function AccountsWorkloadsPage({
             onojAction={() => void confirmPermanentDelete()}
           >
             {saving ? "Deleting…" : "Permanently delete"}
+          </oj-button>
+        </div>
+      </oj-dialog>
+      <oj-dialog
+        ref={dealDeleteDialogRef}
+        dialogTitle="Delete selected opportunities?"
+        cancelBehavior={saving ? "none" : "icon"}
+        onojClose={() => {
+          if (!saving) setDealDeleteTargets([]);
+        }}
+      >
+        <div slot="body" class="accounts-workloads-permanent-delete-dialog">
+          <p>
+            {dealDeleteTargets.length} selected {dealDeleteTargets.length === 1 ? "opportunity" : "opportunities"} will be permanently deleted immediately. This cannot be undone.
+          </p>
+        </div>
+        <div slot="footer">
+          <oj-button
+            disabled={saving}
+            onojAction={() => dealDeleteDialogRef.current?.close()}
+          >
+            Cancel
+          </oj-button>
+          <oj-button
+            chroming="danger"
+            disabled={saving || !dealDeleteTargets.length}
+            onojAction={() => void confirmDealDelete()}
+          >
+            {saving ? "Deleting…" : "Delete"}
           </oj-button>
         </div>
       </oj-dialog>
