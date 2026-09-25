@@ -51,8 +51,10 @@ assert.match(api, /PERMANENT_DELETE/,
   "PERMANENT_DELETE is mapped by the frontend API contract");
 assert.match(page, /Draft Delete/);
 assert.match(page, /Include Deleted/);
-assert.doesNotMatch(page, />Archive<\/button>|>Restore<\/button>|Include archived/,
-  "legacy Archive/Restore wording is not exposed");
+assert.match(page, /action: "RESTORE"/,
+  "included Draft Delete rows can be restored without recreating data");
+assert.doesNotMatch(page, />Archive<\/button>|Include archived/,
+  "legacy Archive wording is not exposed");
 assert.match(page, /<div>[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<h1 id="accountsWorkloadsTitle">/,
   "the menu path is rendered above the page title");
 assert.match(page, /highlighted: !workload\.highlighted/);
@@ -73,10 +75,12 @@ assert.match(page, /const mergeDeals[\s\S]*setHierarchy\(\(current\) => mergeDea
   "an opportunity Save merges only that workload's server-confirmed deals and preserves unrelated AW/opportunity drafts");
 assert.match(page, /cancelDeal\(activeDraft\.key\)/,
   "an opportunity row Cancel is isolated to that opportunity draft");
-assert.match(page, /const hasNewDeal = \[\.\.\.dealDrafts\.values\(\)\]\.some/,
-  "only one unsaved opportunity can exist across the page");
-assert.match(page, /const hasNewAw = allRows\.some/,
-  "only one unsaved AW can be added before Save or Cancel");
+assert.doesNotMatch(page, /const hasNewDeal =|const hasNewAw =/,
+  "new AW and opportunity drafts are not globally single-row locked");
+assert.match(page, /new Map\(current\)\.set\(key, \{ key, workloadId, original: null, deal \}\)/,
+  "multiple new opportunities are retained independently in the draft map");
+assert.match(page, /setHierarchy\(\(current\) =>[\s\S]*accounts: \[/,
+  "multiple new AW rows remain in hierarchy state until saved or cancelled");
 assert.match(page, /<oj-input-date/,
   "opportunity date editing uses the Oracle JET calendar");
 assert.match(page, /\{ length: 16 \}[\s\S]*FY\$\{24 \+ Math\.floor/,
@@ -84,7 +88,7 @@ assert.match(page, /\{ length: 16 \}[\s\S]*FY\$\{24 \+ Math\.floor/,
 assert.match(page, /Save the parent AW before adding opportunities/);
 assert.doesNotMatch(page, /notes: draft\.deal\.notes/,
   "opportunity Notes is excluded from the editor and save payload");
-assert.match(page, /Add from Records/);
+assert.match(page, /Account Recommendations/);
 assert.match(page, /filterForecastCandidates\(forecastCandidates, hierarchy\.accounts\)/);
 assert.match(api, /if \(candidate\.planId !== null\) return \[`plan-id:\$\{candidate\.planId\}`\][\s\S]*normalizedAccountIdentity/,
   "Add from Records uses Plan ID first and normalized Account exact-match only as fallback");

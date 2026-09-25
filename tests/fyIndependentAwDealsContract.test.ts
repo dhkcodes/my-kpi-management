@@ -104,7 +104,7 @@ async function run() {
   assert.match(pageSource, /fetchAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /saveAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /fetchForecastCandidates/);
-  assert.match(pageSource, /Consumption Records/);
+  assert.match(pageSource, /Account Recommendations/);
   assert.match(pageSource, /미정의 — 수정 필요/);
   assert.match(pageSource, /type="checkbox"/, "candidate dialog supports multi-selection");
   assert.match(pageSource, /Plan ID is matched first/, "candidate dialog explains Plan ID precedence");
@@ -115,7 +115,7 @@ async function run() {
   assert.match(pageSource, /Add Opportunity|accounts-workloads-child-row/, "opportunity management is isolated in the expandable child table");
   assert.match(pageSource, /accounts-workloads-grid/, "wide Account → Workload table is rendered");
   assert.match(pageSource, /saveError instanceof AccountsWorkloadsApiError/, "structured batch errors are rendered without clearing the draft");
-  assert.match(pageSource, /setSaveErrors\(saveError instanceof AccountsWorkloadsApiError/, "draft edits survive save errors");
+  assert.match(pageSource, /setSaveErrors\([\s\S]{0,120}saveError instanceof AccountsWorkloadsApiError/, "draft edits survive save errors");
   assert.doesNotMatch(pageSource, /Clone Previous FY|clone-preview/, "FY clone UI is removed");
   assert.match(contentSource, /accountsWorkloads[\s\S]{0,120}accountManagementOverview[\s\S]{0,120}kpi-fiscal-year-panel/, "AW route omits the fiscal-year control");
 
