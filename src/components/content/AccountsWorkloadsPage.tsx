@@ -20,6 +20,7 @@ import {
   fetchForecastCandidates,
   forecastCandidateKey,
   saveAccountsWorkloadsHierarchy,
+  saveAccountsWorkloadsHierarchyWithResults,
 } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
@@ -149,9 +150,10 @@ const dealWrite = (
   deal: AccountWorkloadDeal,
   workloadId: number,
   original: AccountWorkloadDeal | null = null,
+  clientId = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`,
 ): DealWrite => ({
   id: deal.id > 0 ? deal.id : null,
-  clientId: deal.id > 0 ? null : `deal-${Math.abs(deal.id)}`,
+  clientId,
   workloadRef: String(workloadId),
   versionNo: deal.id > 0 ? deal.versionNo : null,
   name: deal.name,
@@ -1309,12 +1311,15 @@ export function AccountsWorkloadsPage({
         .map((element) => [element.dataset.opportunityScroll ?? "", element.scrollLeft] as const),
     );
     let saveAccepted = false;
-    const submittedWrites = drafts.map((draft) => ({
+    const dealWrites = drafts.map((draft) =>
+      dealWrite(draft.deal, draft.workloadId, draft.original, draft.key),
+    );
+    const submittedWrites = drafts.map((draft, index) => ({
+      clientId: draft.key,
       workloadId: draft.workloadId,
       originalId: draft.original?.id ?? null,
-      deleted: draft.deal.deleted,
+      write: dealWrites[index],
     }));
-    const baselineWorkloads = baseline.accounts.flatMap((account) => account.workloads);
     const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
       submitted.workloadId === current.workloadId &&
       (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
@@ -1332,17 +1337,17 @@ export function AccountsWorkloadsPage({
         return next;
       });
     try {
-      const saved = await saveAccountsWorkloadsHierarchy({
+      const saved = await saveAccountsWorkloadsHierarchyWithResults({
         accounts: [],
         workloads: [],
         workloadPlans: [],
-        deals: drafts.map((draft) => dealWrite(draft.deal, draft.workloadId, draft.original)),
+        deals: dealWrites,
       });
       saveAccepted = true;
-      let confirmed = saved;
+      let confirmed = saved.hierarchy;
       let confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
       try {
-        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, baselineWorkloads);
+        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, saved.dealResults);
       } catch {
         confirmed = await fetchAccountsWorkloadsHierarchy({
           search: "",
@@ -1350,7 +1355,7 @@ export function AccountsWorkloadsPage({
           includeDeletedDeals: true,
         });
         confirmedWorkloads = confirmed.accounts.flatMap((account) => account.workloads);
-        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, baselineWorkloads);
+        validateConfirmedOpportunityWrites(submittedWrites, confirmedWorkloads, saved.dealResults);
       }
       const touchedWorkloadIds = new Set(drafts.map((draft) => draft.workloadId));
       const confirmedDealsByWorkload = new Map(
@@ -1383,11 +1388,8 @@ export function AccountsWorkloadsPage({
       });
     } catch (requestError) {
       if (saveAccepted) {
-        clearSubmittedDrafts();
-        setSelectedDeals(new Map());
-        setDealEditCell(null);
         setError(
-          "Opportunities were accepted by the server, but the saved result could not be confirmed. Drafts were cleared to prevent duplicate creation; reload before editing or saving these Opportunities again.",
+          "Opportunities were accepted by the server, but the exact saved result could not be confirmed. Drafts were preserved and will not be resent automatically. Reload and explicitly reconcile before retrying.",
         );
         setSaveErrors([]);
       } else {

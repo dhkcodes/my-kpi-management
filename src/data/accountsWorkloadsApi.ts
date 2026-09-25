@@ -184,6 +184,16 @@ export type WorkloadPlanWrite = Readonly<{ id: number | null; workloadRef: strin
 export type AccountsWorkloadsHierarchySaveRequest = Readonly<{
   accounts: AccountWrite[]; workloads: WorkloadWrite[]; deals: DealWrite[]; workloadPlans: WorkloadPlanWrite[];
 }>;
+export type OpportunityDealResult = Readonly<{
+  clientId: string;
+  serverId: number;
+  workloadId: number;
+  action: HierarchyWriteAction;
+}>;
+export type AccountsWorkloadsHierarchySaveResponse = Readonly<{
+  hierarchy: AccountsWorkloadsHierarchy;
+  dealResults: OpportunityDealResult[];
+}>;
 
 export type AccountsWorkloadsFieldError = Readonly<{
   operationIndex: number;
@@ -490,15 +500,45 @@ export const fetchAccountsWorkloadsHierarchy = async (
     `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy?${params.toString()}`));
 };
 
+const requestAccountsWorkloadsHierarchySave = async (
+  request: AccountsWorkloadsHierarchySaveRequest,
+  fetchImpl: FetchLike,
+) => requiredObject(await requestJson<unknown>(fetchImpl,
+  `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy/save`, {
+    method: "POST",
+    body: JSON.stringify(request)
+  }), "Malformed Accounts & Workloads save response");
+
+export const saveAccountsWorkloadsHierarchyWithResults = async (
+  request: AccountsWorkloadsHierarchySaveRequest,
+  fetchImpl: FetchLike = fetch
+): Promise<AccountsWorkloadsHierarchySaveResponse> => {
+  const payload = await requestAccountsWorkloadsHierarchySave(request, fetchImpl);
+  if (!Array.isArray(payload.dealResults)) {
+    throw new Error("Malformed Accounts & Workloads save response");
+  }
+  const dealResults = payload.dealResults.map((candidate) => {
+    const result = requiredObject(candidate, "Malformed Accounts & Workloads save response");
+    if (
+      typeof result.clientId !== "string" || !Number.isInteger(result.serverId) ||
+      !Number.isInteger(result.workloadId) ||
+      !["UPSERT", "ARCHIVE", "DELETE", "RESTORE", "PERMANENT_DELETE"].includes(String(result.action))
+    ) throw new Error("Malformed Accounts & Workloads save response");
+    return {
+      clientId: result.clientId,
+      serverId: result.serverId as number,
+      workloadId: result.workloadId as number,
+      action: result.action as HierarchyWriteAction,
+    };
+  });
+  return { hierarchy: parseHierarchy(payload.hierarchy), dealResults };
+};
+
 export const saveAccountsWorkloadsHierarchy = async (
   request: AccountsWorkloadsHierarchySaveRequest,
   fetchImpl: FetchLike = fetch
 ): Promise<AccountsWorkloadsHierarchy> => {
-  const payload = requiredObject(await requestJson<unknown>(fetchImpl,
-    `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy/save`, {
-      method: "POST",
-      body: JSON.stringify(request)
-    }), "Malformed Accounts & Workloads save response");
+  const payload = await requestAccountsWorkloadsHierarchySave(request, fetchImpl);
   return parseHierarchy(payload.hierarchy);
 };
 

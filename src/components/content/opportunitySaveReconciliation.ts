@@ -1,76 +1,196 @@
+import type {
+  AccountWorkloadDeal,
+  DealWrite,
+  OpportunityDealResult,
+} from "../../data/accountsWorkloadsApi";
+
 export type SubmittedOpportunityWrite = Readonly<{
+  clientId: string;
   workloadId: number;
   originalId: number | null;
-  deleted: boolean;
+  write: DealWrite;
 }>;
+
+export type ConfirmedOpportunityDeal = Readonly<Pick<
+  AccountWorkloadDeal,
+  | "id"
+  | "name"
+  | "opportunityNo"
+  | "revenueType"
+  | "status"
+  | "targetFiscalYear"
+  | "targetQuarter"
+  | "actualCloseDate"
+  | "contractStartDate"
+  | "contractEndDate"
+  | "arrUsd"
+  | "arrKrw"
+  | "acrUsd"
+  | "acrKrw"
+  | "winProbability"
+  | "latestUpdate"
+  | "notes"
+>>;
 
 export type ConfirmedOpportunityWorkload = Readonly<{
   id: number;
-  deals: ReadonlyArray<Readonly<{ id: number }>>;
+  deals: ReadonlyArray<ConfirmedOpportunityDeal>;
 }>;
 
+const trim = (value: string | null) => value === null ? null : value.trim();
+const trimBlankToNull = (value: string | null) => trim(value) || null;
+
+/** Convert a finite JS number to Oracle's NUMBER(*,4) half-up representation. */
+const oracleScale4 = (value: number | null): string | null => {
+  if (value === null) return null;
+  if (!Number.isFinite(value)) return `invalid:${String(value)}`;
+
+  const negative = value < 0;
+  const [coefficient, exponentText = "0"] = Math.abs(value).toString().toLowerCase().split("e");
+  const [whole, fraction = ""] = coefficient.split(".");
+  const digits = `${whole}${fraction}`;
+  const decimalPosition = whole.length + Number(exponentText);
+  const digitAt = (position: number) =>
+    position < 0 || position >= digits.length ? "0" : digits[position];
+
+  let integer = decimalPosition <= 0
+    ? "0"
+    : Array.from({ length: decimalPosition }, (_, index) => digitAt(index)).join("");
+  let decimals = Array.from(
+    { length: 4 },
+    (_, index) => digitAt(decimalPosition + index),
+  ).join("");
+
+  if (digitAt(decimalPosition + 4) >= "5") {
+    const scaledDigits = `${integer}${decimals}`.split("");
+    let carry = 1;
+    for (let index = scaledDigits.length - 1; index >= 0 && carry; index -= 1) {
+      const next = Number(scaledDigits[index]) + carry;
+      scaledDigits[index] = String(next % 10);
+      carry = next >= 10 ? 1 : 0;
+    }
+    if (carry) scaledDigits.unshift("1");
+    integer = scaledDigits.slice(0, -4).join("") || "0";
+    decimals = scaledDigits.slice(-4).join("").padStart(4, "0");
+  }
+
+  integer = integer.replace(/^0+(?=\d)/, "");
+  const scaled = `${integer}.${decimals}`;
+  return negative && scaled !== "0.0000" ? `-${scaled}` : scaled;
+};
+
+const comparedFields = [
+  "name",
+  "opportunityNo",
+  "revenueType",
+  "status",
+  "targetFiscalYear",
+  "targetQuarter",
+  "actualCloseDate",
+  "contractStartDate",
+  "contractEndDate",
+  "arrUsd",
+  "arrKrw",
+  "acrUsd",
+  "acrKrw",
+  "winProbability",
+  "latestUpdate",
+  "notes",
+] as const;
+
+type ComparedField = typeof comparedFields[number];
+const numericFields = new Set<ComparedField>([
+  "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability",
+]);
+
+const normalizedField = (
+  field: ComparedField,
+  value: DealWrite[ComparedField] | ConfirmedOpportunityDeal[ComparedField],
+) => {
+  if (field === "name") return trim(value as string | null);
+  if (field === "opportunityNo" || field === "latestUpdate") {
+    return trimBlankToNull(value as string | null);
+  }
+  if (numericFields.has(field)) return oracleScale4(value as number | null);
+  return value;
+};
+
+const verifyPersistedFields = (
+  submission: SubmittedOpportunityWrite,
+  confirmed: ConfirmedOpportunityDeal,
+) => {
+  for (const field of comparedFields) {
+    // For existing rows, null/blank means "retain latest update" rather than write NULL.
+    if (
+      field === "latestUpdate" &&
+      submission.originalId !== null &&
+      trimBlankToNull(submission.write.latestUpdate) === null
+    ) continue;
+
+    const expected = normalizedField(field, submission.write[field]);
+    const actual = normalizedField(field, confirmed[field]);
+    if (!Object.is(expected, actual)) {
+      throw new Error(`Saved Opportunity field mismatch: ${field}. Reload and reconcile before retrying.`);
+    }
+  }
+};
+
 /**
- * The hierarchy returned from a successful save is authoritative. Validate only
- * stable identities here: the backend may normalize text, nulls, currencies, or
- * generated values, so exact draft-value comparison would turn a committed save
- * into a false client-side failure.
- *
- * New rows cannot be paired one-by-one because the response contract does not
- * echo deal clientIds. Instead, confirm the number of newly assigned server IDs
- * per workload relative to the pre-save baseline; response order is irrelevant.
+ * Confirm each submitted write against the authoritative hierarchy. Existing rows
+ * retain their original identity; newly inserted rows must be correlated through
+ * the save response's clientId -> serverId result. Counts are never sufficient.
  */
 export const validateConfirmedOpportunityWrites = (
   submissions: ReadonlyArray<SubmittedOpportunityWrite>,
   workloads: ReadonlyArray<ConfirmedOpportunityWorkload>,
-  baselineWorkloads: ReadonlyArray<ConfirmedOpportunityWorkload>,
+  dealResults: ReadonlyArray<OpportunityDealResult>,
 ) => {
   const dealsByWorkload = new Map(
     workloads.map((workload) => [workload.id, workload.deals] as const),
   );
-  const baselineIdsByWorkload = new Map(
-    baselineWorkloads.map(
-      (workload) => [workload.id, new Set(workload.deals.map((deal) => deal.id))] as const,
-    ),
-  );
+  const resultByClientId = new Map<string, OpportunityDealResult>();
+  for (const result of dealResults) {
+    if (resultByClientId.has(result.clientId)) {
+      throw new Error(`Duplicate Opportunity clientId mapping: ${result.clientId}.`);
+    }
+    resultByClientId.set(result.clientId, result);
+  }
 
   for (const submission of submissions) {
     const confirmedDeals = dealsByWorkload.get(submission.workloadId);
     if (!confirmedDeals) {
-      throw new Error("Saved Opportunity workload was not returned.");
+      throw new Error("Saved Opportunity workload was not returned. Reload and reconcile before retrying.");
     }
 
-    if (submission.originalId === null) continue;
-    const returned = confirmedDeals.some(
-      (deal) => deal.id === submission.originalId,
-    );
-    if (submission.deleted && returned) {
-      throw new Error("Deleted Opportunity was still returned.");
+    if (submission.write.action === "DELETE") {
+      if (submission.originalId === null) {
+        throw new Error("A new Opportunity cannot be confirmed as a server deletion.");
+      }
+      if (confirmedDeals.some((deal) => deal.id === submission.originalId)) {
+        throw new Error("Deleted Opportunity was still returned. Reload and reconcile before retrying.");
+      }
+      continue;
     }
-    if (!submission.deleted && !returned) {
-      throw new Error("Saved Opportunity was not returned.");
-    }
-  }
 
-  const newSubmissionsByWorkload = new Map<number, number>();
-  for (const submission of submissions) {
-    if (submission.originalId !== null || submission.deleted) continue;
-    newSubmissionsByWorkload.set(
-      submission.workloadId,
-      (newSubmissionsByWorkload.get(submission.workloadId) ?? 0) + 1,
-    );
-  }
-  for (const [workloadId, submittedCount] of Array.from(newSubmissionsByWorkload)) {
-    const confirmedDeals = dealsByWorkload.get(workloadId) ?? [];
-    const baselineIds = baselineIdsByWorkload.get(workloadId) ?? new Set<number>();
-    const returnedNewIds = new Set(
-      confirmedDeals
-        .map((deal) => deal.id)
-        .filter((id) => id > 0 && !baselineIds.has(id)),
-    );
-    if (returnedNewIds.size < submittedCount) {
-      throw new Error(
-        "Opportunity save succeeded, but the returned result was incomplete. Reload before retrying.",
-      );
+    let confirmedId = submission.originalId;
+    if (confirmedId === null) {
+      const result = resultByClientId.get(submission.clientId);
+      if (
+        !result ||
+        result.action !== "UPSERT" ||
+        result.workloadId !== submission.workloadId ||
+        !Number.isInteger(result.serverId) ||
+        result.serverId <= 0
+      ) {
+        throw new Error(`Opportunity clientId mapping was missing or invalid: ${submission.clientId}. Reload and reconcile before retrying.`);
+      }
+      confirmedId = result.serverId;
     }
+
+    const confirmed = confirmedDeals.find((deal) => deal.id === confirmedId);
+    if (!confirmed) {
+      throw new Error("Saved Opportunity was not returned. Reload and reconcile before retrying.");
+    }
+    verifyPersistedFields(submission, confirmed);
   }
 };

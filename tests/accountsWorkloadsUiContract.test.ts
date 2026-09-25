@@ -72,14 +72,20 @@ assert.match(page, /accounts-workloads-child-row/);
 assert.match(page, /Oppty Name/);
 assert.match(page, /Oppty ID/);
 assert.match(page, /Add Opportunity/);
-assert.match(page, /const changedDrafts = \[\.\.\.dealDrafts\.values\(\)\]\.filter\(isDealDraftChanged\)[\s\S]*const drafts = dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*deals: drafts\.map\(\(draft\) => dealWrite/,
+assert.match(page, /const changedDrafts = \[\.\.\.dealDrafts\.values\(\)\]\.filter\(isDealDraftChanged\)[\s\S]*const drafts = dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*const dealWrites = drafts\.map[\s\S]*deals: dealWrites/,
   "one opportunity Save sends every changed opportunity draft in one atomic hierarchy request");
+assert.match(page, /dealWrite\(draft\.deal, draft\.workloadId, draft\.original, draft\.key\)/,
+  "every submitted opportunity write carries its stable draft key as clientId");
 assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*clearSubmittedDrafts\(\)/,
   "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
-assert.match(page, /validateConfirmedOpportunityWrites\(submittedWrites, confirmedWorkloads, baselineWorkloads\)[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*includeDeletedDeals:\s*true/,
-  "an incomplete save response is rechecked with an unfiltered server reload before it is treated as unconfirmed");
-assert.match(page, /if \(saveAccepted\)[\s\S]*clearSubmittedDrafts\(\)[\s\S]*Drafts were cleared to prevent duplicate creation/,
-  "post-commit confirmation failures are distinguished from save failures and cannot leave retryable duplicate-creation drafts");
+assert.match(page, /validateConfirmedOpportunityWrites\(submittedWrites, confirmedWorkloads, saved\.dealResults\)[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*search:\s*""[\s\S]*includeArchived:\s*true[\s\S]*includeDeletedDeals:\s*true/,
+  "an incomplete save response is rechecked once with an unfiltered server reload before it is treated as unconfirmed");
+const unconfirmedSaveBranch = saveDealHandler.match(/if \(saveAccepted\) \{([\s\S]*?)\}\s*else \{/);
+assert.ok(unconfirmedSaveBranch, "post-commit confirmation failures have an explicit uncertain-state branch");
+assert.doesNotMatch(unconfirmedSaveBranch[1], /clearSubmittedDrafts|setDealDrafts/,
+  "an uncertain save must preserve every opportunity draft");
+assert.match(unconfirmedSaveBranch[1], /Drafts were preserved[\s\S]*will not be resent automatically[\s\S]*Reload and explicitly reconcile/,
+  "an uncertain save requires explicit reload/reconciliation and forbids automatic retry");
 assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
 assert.match(page, /const updateDealDraft[\s\S]*if \(dealSaveLock\.isLocked\(\)\) return/,
