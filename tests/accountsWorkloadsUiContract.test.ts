@@ -16,8 +16,10 @@ assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
   "Latest Update and Notes retain multiline editors");
 assert.match(page, /accounts-workloads-ellipsis/);
-assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
-  "truncated cells expose their complete value through the browser tooltip");
+assert.match(page, /showImmediateTooltip[\s\S]*createPortal\([\s\S]*accounts-workloads-latest-tooltip/,
+  "truncated AW and Opportunity text uses the same immediate portaled tooltip");
+assert.doesNotMatch(page, /\.title\s*=/,
+  "AW text does not also install a delayed native title tooltip");
 assert.doesNotMatch(page, /Double-click to edit/);
 assert.match(page, /Account[\s\S]*Workload[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
 assert.match(page, /sortField === "arrUsd"/);
@@ -77,10 +79,10 @@ assert.match(page, /const changedDrafts = \[\.\.\.dealDrafts\.values\(\)\]\.filt
   "one opportunity Save sends every changed opportunity draft in one atomic hierarchy request");
 assert.match(page, /dealWrite\(draft\.deal, draft\.workloadId, draft\.original, draft\.key\)/,
   "every submitted opportunity write carries its stable draft key as clientId");
-assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*clearSubmittedDrafts\(\)/,
+assert.match(page, /applyConfirmedDeals\([\s\S]*clearSubmittedDealDrafts\(drafts\)/,
   "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
-assert.match(page, /validateConfirmedOpportunityWrites\([\s\S]*?submittedWrites,[\s\S]*?confirmedWorkloads,[\s\S]*?saved\.dealResults,[\s\S]*?new Set\(knownServerIds\)[\s\S]*?\);[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*search:\s*""[\s\S]*includeArchived:\s*true[\s\S]*includeDeletedDeals:\s*true/,
-  "an incomplete save response is rechecked once with an unfiltered server reload before it is treated as unconfirmed");
+assert.match(saveDealHandler, /saveAccountsWorkloadsHierarchyWithResults[\s\S]*correlateLegacyOpportunityResults[\s\S]*validateConfirmedOpportunityWrites[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*validateConfirmedOpportunityWrites[\s\S]*clearSubmittedDealDrafts\(drafts\)/,
+  "POST validation and correlation are followed by an authoritative GET before drafts are released");
 assert.match(page, /const isDefiniteWriteRejection[\s\S]*\[400, 401, 403, 404, 409, 422\]\.includes\(error\.status\)/,
   "only explicit non-ambiguous client rejections are retryable; timeout-like and server responses remain pending");
 assert.match(saveDealHandler, /isDefiniteWriteRejection\(requestError\)[\s\S]*dealSaveLock\.markAwaitingConfirmation\(\)[\s\S]*setPendingDealConfirmation/,
@@ -136,8 +138,8 @@ assert.match(page, /Scroll opportunities right/,
   "opportunity rows can move horizontally even when the bottom scrollbar is outside the viewport");
 assert.match(page, /event\.ctrlKey && !event\.metaKey/,
   "row click selection preserves Ctrl or Command multi-selection while double click remains editing");
-assert.match(page, /field === "revenueType"[\s\S]*value=\{value\}[\s\S]*<option value="NEW">/,
-  "Revenue Type editing selects the current value");
+assert.match(page, /field === "revenueType"[\s\S]*value=\{value\}[\s\S]*opportunityRevenueTypeOptions\(value\)/,
+  "Revenue Type editing selects a canonical or preserved custom value without duplicate defaults");
 assert.match(styles, /accounts-workloads-child-row > td \{[^}]*padding: 14px 14px 14px 62px/,
   "expanded opportunity boxes keep equal top and bottom spacing");
 const awScrollFrame = styles.match(
@@ -161,8 +163,8 @@ assert.doesNotMatch(page, /onFocus=\{focusToEnd\}/,
   "focus handlers do not repeatedly force the caret after the initial edit focus");
 assert.match(page, /const changed = !baselineWorkload \|\| value !== original/,
   "all cells in a new AW row, including a blank Plan Number, retain draft styling");
-assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
-  "ellipsis cells expose the full value on hover only when truncated");
+assert.match(page, /element\.scrollWidth <= element\.clientWidth[\s\S]*setLatestUpdateTooltip\(null\)/,
+  "ellipsis cells expose the full value only when truncated");
 assert.match(page, /field === "plan"\s*\? \{[\s\S]*plans:/,
   "only the Plan editor can update the Plan value; Account edits cannot fall through to it");
 assert.match(page, /selectedCount > 0 && !editCell && !dirty/,
@@ -178,13 +180,16 @@ assert.match(styles, /is-pending-delete > td:nth-child\(5\)[\s\S]*background:\s*
 assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*position:\s*static/,
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
-  "the original pre-Opportunities exchange-rate button and popover UI are preserved");
+  "the exchange-rate button retains its Apply and Cancel popover behavior");
+assert.match(page, /class="accounts-workloads-table-controls"[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
+  "the compact exchange-rate control sits at the far-right table edge immediately above the table state");
 assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
   "Include Deleted keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
   "opportunity identity and scrolling columns have explicit widths");
 assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*inline-flex[^}]*flex-direction:\s*row[^}]*white-space:\s*nowrap/,
   "Include Deleted cannot wrap its label below the checkbox");
+assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*flex-wrap:\s*nowrap/);
 assert.match(styles, /\.accounts-workloads-oppty-grid\s*\{[^}]*table-layout:\s*fixed/,
   "opportunity column width and sticky offsets use one deterministic fixed layout");
 assert.match(styles, /\.accounts-workloads-oppty-grid th:nth-child\(1\),[\s\S]*position:\s*sticky/,
@@ -199,8 +204,12 @@ assert.match(page, /changedAccountIds\.has\(account\.id\) && !account\.name\.tri
   "blank Account values are rejected before any save request is sent");
 assert.match(page, /aria-required=\{field === "account" \|\| field === "workload" \? "true" : undefined\}/,
   "required AW editors expose their requirement to assistive technology");
-assert.match(styles, /\.accounts-workloads-oppty-grid td\.is-unsaved-cell::after\s*\{[^}]*left:\s*\.35rem[^}]*right:\s*\.35rem/,
-  "the draft line remains visible but is bounded to the changed opportunity cell");
+assert.match(styles, /\.accounts-workloads-cell-content\.is-unsaved-content::after\s*\{[^}]*left:\s*\.35rem[^}]*right:\s*\.35rem/,
+  "the draft line is bounded to an inner changed-content wrapper");
+assert.doesNotMatch(styles, /accounts-workloads[^\n{]*td\.is-unsaved-cell::after/,
+  "Accounts draft underlines are never positioned from a table cell pseudo-element");
+assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
+  "sticky Opportunity identity headers share the other header background");
 assert.match(page, /type="button"[\s\S]*class="accounts-workloads-add-aw"[\s\S]*onClick=\{addAw\}/,
   "Add Account & Workload cannot submit the search form");
 assert.match(page, /\(field === "account" \|\| field === "workload"\) && \([\s\S]*accounts-workloads-required-marker/,

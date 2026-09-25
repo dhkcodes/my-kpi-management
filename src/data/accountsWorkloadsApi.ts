@@ -2,6 +2,7 @@ import { AccountWorkloadRow, RevenueType } from "./accountsWorkloadsMockData";
 import { FiscalYear } from "./kpiMockData";
 import { FxRateRecord } from "./kpiConfigurationApi";
 import { apiFetch } from "../auth/apiFetch";
+import { canonicalizeOpportunityRevenueType } from "./opportunityRevenueType";
 
 export const ACCOUNTS_WORKLOADS_API_BASE = "/api/v1";
 
@@ -63,7 +64,7 @@ export type AccountWorkloadDeal = Readonly<{
   versionNo: number;
   name: string;
   opportunityNo: string | null;
-  revenueType: "NEW" | "EXPANSION" | "RENEWAL";
+  revenueType: string;
   status: DealStatus;
   targetFiscalYear: string | null;
   targetQuarter: number | null;
@@ -174,7 +175,7 @@ export type WorkloadWrite = Readonly<{
 }>;
 export type DealWrite = Readonly<{
   id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;
-  name: string | null; opportunityNo: string | null; revenueType: "NEW" | "EXPANSION" | "RENEWAL" | null;
+  name: string | null; opportunityNo: string | null; revenueType: string | null;
   status: DealStatus | null; targetFiscalYear: string | null; targetQuarter: number | null;
   actualCloseDate: string | null; contractStartDate: string | null; contractEndDate: string | null;
   arrUsd: number | null; arrKrw: number | null; acrUsd: number | null; acrKrw: number | null;
@@ -484,7 +485,22 @@ const parseHierarchy = (payload: unknown): AccountsWorkloadsHierarchy => {
       }
     });
   });
-  return payload as AccountsWorkloadsHierarchy;
+  return {
+    fiscalYear: null,
+    accounts: root.accounts.map((account) => {
+      const value = account as AccountHierarchyAccount;
+      return {
+        ...value,
+        workloads: value.workloads.map((workload) => ({
+          ...workload,
+          deals: workload.deals.map((deal) => ({
+            ...deal,
+            revenueType: canonicalizeOpportunityRevenueType(String(deal.revenueType ?? "")),
+          })),
+        })),
+      };
+    }),
+  };
 };
 
 export const fetchAccountsWorkloadsHierarchy = async (
@@ -514,10 +530,10 @@ export const saveAccountsWorkloadsHierarchyWithResults = async (
   fetchImpl: FetchLike = fetch
 ): Promise<AccountsWorkloadsHierarchySaveResponse> => {
   const payload = await requestAccountsWorkloadsHierarchySave(request, fetchImpl);
-  if (!Array.isArray(payload.dealResults)) {
+  if (payload.dealResults !== undefined && !Array.isArray(payload.dealResults)) {
     throw new Error("Malformed Accounts & Workloads save response");
   }
-  const dealResults = payload.dealResults.map((candidate) => {
+  const dealResults = (payload.dealResults ?? []).map((candidate) => {
     const result = requiredObject(candidate, "Malformed Accounts & Workloads save response");
     if (
       typeof result.clientId !== "string" || !Number.isInteger(result.serverId) ||
