@@ -194,6 +194,9 @@ export function AccountsWorkloadsPage({
     new Map(),
   );
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
+  const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
+    Readonly<{ text: string; top: number; left: number }> | null
+  >(null);
   const [permanentDeleteTargets, setPermanentDeleteTargets] = useState<string[]>([]);
   const [dealDeleteTargets, setDealDeleteTargets] = useState<AccountWorkloadDeal[]>([]);
   const [forecastOpen, setForecastOpen] = useState(false);
@@ -1339,7 +1342,21 @@ export function AccountsWorkloadsPage({
         {editing
           ? editor
           : field === "latestUpdate"
-            ? <span class="accounts-workloads-ellipsis" title={value}>{value || "—"}</span>
+            ? <span
+                class="accounts-workloads-ellipsis"
+                onMouseEnter={(event) => {
+                  if (!value) return;
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  setLatestUpdateTooltip({
+                    text: value,
+                    top: bounds.bottom + 6,
+                    left: Math.min(bounds.left, window.innerWidth - 376),
+                  });
+                }}
+                onMouseLeave={() => setLatestUpdateTooltip(null)}
+              >
+                {value || "—"}
+              </span>
             : ["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field) && value
               ? Number(value).toLocaleString("en-US")
               : value || "—"}
@@ -2122,6 +2139,18 @@ export function AccountsWorkloadsPage({
               </div>
             </footer>
           </section>
+        </div>
+      )}
+      {latestUpdateTooltip && (
+        <div
+          class="accounts-workloads-latest-tooltip"
+          role="tooltip"
+          style={{
+            top: `${latestUpdateTooltip.top}px`,
+            left: `${Math.max(8, latestUpdateTooltip.left)}px`,
+          }}
+        >
+          {latestUpdateTooltip.text}
         </div>
       )}
     </section>
