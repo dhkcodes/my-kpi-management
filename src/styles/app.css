@@ -3610,7 +3610,7 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-grid__parent { min-width: 76rem; width: 100%; }
 .accounts-workloads-grid th { background: #f2efec; border-bottom: 1px solid #c9c4be; color: var(--kpi-ink); font-size: .72rem; font-weight: 800; padding: .55rem .6rem; text-align: left; text-transform: uppercase; }
 .accounts-workloads-grid td { border-bottom: 1px solid #e4e0db; padding: .45rem .55rem; vertical-align: top; }
-.accounts-workloads-grid__parent > thead th:nth-child(1) { width: 18rem; }
+.accounts-workloads-grid__parent > thead > tr > th:nth-child(1) { width: 18rem; }
 .accounts-workloads-grid__parent > thead th:nth-child(2) { width: 25rem; }
 .accounts-workloads-grid__parent > thead th:nth-child(3) { width: 14rem; }
 .accounts-workloads-grid__parent > thead th:nth-child(4) { width: 11rem; }
@@ -3998,3 +3998,94 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-grid tr.is-draft-delete > td:nth-child(-n+2) { background: #fff1ed; }
 .accounts-workloads-oppty-grid th:nth-child(5), .accounts-workloads-oppty-grid td:nth-child(5) { min-width: 148px; width: 148px; }
 .accounts-workloads-oppty-grid th:nth-child(6), .accounts-workloads-oppty-grid td:nth-child(6) { min-width: 120px; width: 120px; }
+
+/* Additional revision 5: mirror the Consumption toolbar and remove AW-only horizontal scrolling. */
+.accounts-workloads-toolbar--compact {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: .5rem;
+  padding: .75rem 1rem;
+  min-height: 3.75rem;
+  box-sizing: border-box;
+}
+.accounts-workloads-toolbar--compact .accounts-workloads-search {
+  flex: 0 1 20.5rem;
+  width: min(20.5rem, 32vw);
+  min-width: 13rem;
+  align-self: center;
+}
+.accounts-workloads-toolbar--compact .consumption-range-apply,
+.accounts-workloads-toolbar--compact .accounts-workloads-include-deleted {
+  align-self: center;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.accounts-workloads-toolbar--compact .accounts-workloads-add-aw {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+.accounts-workloads-grid-wrap.accounts-workloads-grid-wrap--compact {
+  overflow: visible;
+  max-width: 100%;
+}
+.accounts-workloads-grid.accounts-workloads-aw-grid {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+.accounts-workloads-grid.accounts-workloads-aw-grid th,
+.accounts-workloads-grid.accounts-workloads-aw-grid td {
+  min-width: 0;
+  max-width: none;
+}
+.accounts-workloads-aw-grid th,
+.accounts-workloads-aw-grid td,
+.accounts-workloads-aw-grid th:nth-child(-n + 5),
+.accounts-workloads-aw-grid td:nth-child(-n + 5),
+.accounts-workloads-aw-grid .is-plan {
+  position: static;
+  left: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+.accounts-workloads-aw-grid th:nth-child(5),
+.accounts-workloads-aw-grid td:nth-child(5),
+.accounts-workloads-aw-grid .is-plan {
+  position: static;
+  left: auto;
+  min-width: 0;
+  max-width: none;
+  box-shadow: none;
+}
+.accounts-workloads-aw-grid th:nth-child(1), .accounts-workloads-aw-grid td:nth-child(1) { width: 3%; }
+.accounts-workloads-aw-grid th:nth-child(2), .accounts-workloads-aw-grid td:nth-child(2) { width: 3%; }
+.accounts-workloads-aw-grid th:nth-child(3), .accounts-workloads-aw-grid td:nth-child(3) { width: 12%; }
+.accounts-workloads-aw-grid th:nth-child(4), .accounts-workloads-aw-grid td:nth-child(4) { width: 18%; }
+.accounts-workloads-aw-grid th:nth-child(5), .accounts-workloads-aw-grid td:nth-child(5) { width: 10%; }
+.accounts-workloads-aw-grid th:nth-child(6), .accounts-workloads-aw-grid td:nth-child(6),
+.accounts-workloads-aw-grid th:nth-child(7), .accounts-workloads-aw-grid td:nth-child(7) { width: 8%; }
+.accounts-workloads-aw-grid th:nth-child(8), .accounts-workloads-aw-grid td:nth-child(8) { width: 7%; }
+.accounts-workloads-aw-grid th:nth-child(9), .accounts-workloads-aw-grid td:nth-child(9),
+.accounts-workloads-aw-grid th:nth-child(10), .accounts-workloads-aw-grid td:nth-child(10) { width: 14%; min-width: 0; max-width: none; }
+.accounts-workloads-parent-row.is-pending-delete > td:nth-child(5),
+.accounts-workloads-parent-row.is-pending-delete:hover > td:nth-child(5) { background: #fff1ed; }
+.accounts-workloads-parent-row.is-pending-delete.is-selected > td:nth-child(5) { background: #fbd5ce; }
+.accounts-workloads-aw-grid th:nth-child(n+3),
+.accounts-workloads-aw-grid td:nth-child(n+3),
+.accounts-workloads-oppty-grid th,
+.accounts-workloads-oppty-grid td { text-align: left; }
+.accounts-workloads-aw-grid th:nth-child(6), .accounts-workloads-aw-grid td:nth-child(6),
+.accounts-workloads-aw-grid th:nth-child(7), .accounts-workloads-aw-grid td:nth-child(7),
+.accounts-workloads-aw-grid th:nth-child(8), .accounts-workloads-aw-grid td:nth-child(8),
+.accounts-workloads-oppty-grid th:nth-child(4), .accounts-workloads-oppty-grid td:nth-child(4),
+.accounts-workloads-oppty-grid th:nth-child(6), .accounts-workloads-oppty-grid td:nth-child(6),
+.accounts-workloads-oppty-grid th:nth-child(7), .accounts-workloads-oppty-grid td:nth-child(7),
+.accounts-workloads-oppty-grid th:nth-child(8), .accounts-workloads-oppty-grid td:nth-child(8),
+.accounts-workloads-oppty-grid th:nth-child(9), .accounts-workloads-oppty-grid td:nth-child(9) { text-align: right; }
+.accounts-workloads-oppty-grid th:nth-child(5),
+.accounts-workloads-oppty-grid td:nth-child(5) {
+  position: static;
+  left: auto;
+  z-index: auto;
+  box-shadow: none;
+}

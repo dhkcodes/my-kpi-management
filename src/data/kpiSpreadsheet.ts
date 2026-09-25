@@ -101,7 +101,7 @@ export const formatKpiWorkloadOption = (option: Readonly<{
   opptyNo: string | null;
 }>) => {
   const opportunity = [option.opptyName?.trim(), option.opptyNo?.trim()].filter(Boolean).join("/");
-  return `${option.accountName}-${option.workloadName}${opportunity ? ` (${opportunity})` : ""}`;
+  return `${option.accountName} - ${option.workloadName}${opportunity ? ` (${opportunity})` : ""}`;
 };
 
 export const isKpiFieldChanged = (

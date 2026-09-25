@@ -79,23 +79,26 @@ const targetPeriod = (deal: AccountWorkloadDeal) =>
   deal.targetFiscalYear && deal.targetQuarter
     ? `${deal.targetFiscalYear} Q${deal.targetQuarter}`
     : "";
+const DEAL_DRAFT_FIELDS = [
+  "name", "opportunityNo", "revenueType", "status", "targetFiscalYear",
+  "targetQuarter", "actualCloseDate", "contractStartDate", "contractEndDate",
+  "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability", "latestUpdate",
+] as const;
 const isDealDraftChanged = (draft: DealDraft) => {
   if (!draft.original) return true;
-  return (
-    [
-      "name", "opportunityNo", "revenueType", "status", "targetFiscalYear",
-      "targetQuarter", "actualCloseDate", "contractStartDate", "contractEndDate",
-      "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability", "latestUpdate",
-    ] as const
-  ).some(
+  return DEAL_DRAFT_FIELDS.some(
     (field) =>
       String(draft.deal[field] ?? "") !== String(draft.original?.[field] ?? ""),
   );
 };
-const targetOptions = Array.from(
-  { length: 16 },
-  (_, index) => `FY${24 + Math.floor(index / 4)} Q${(index % 4) + 1}`,
-);
+const currentFiscalYear = (today = new Date()) =>
+  (today.getMonth() >= 5 ? today.getFullYear() + 1 : today.getFullYear()) % 100;
+export const targetOptionsFor = (fiscalYear = currentFiscalYear()) => [
+  `FY${fiscalYear - 1} Q3`, `FY${fiscalYear - 1} Q4`,
+  `FY${fiscalYear} Q1`, `FY${fiscalYear} Q2`, `FY${fiscalYear} Q3`, `FY${fiscalYear} Q4`,
+  `FY${fiscalYear + 1} Q1`, `FY${fiscalYear + 1} Q2`,
+];
+const targetOptions = targetOptionsFor();
 const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
   id,
   versionNo: 0,
@@ -381,29 +384,31 @@ export function AccountsWorkloadsPage({
                       ? { ...workload, lastUpdated: nullable(value) }
                       : field === "notes"
                         ? { ...workload, notes: nullable(value) }
-                        : {
-                            ...workload,
-                            plans: workload.plans.length
-                              ? workload.plans.map((plan, index) =>
-                                  index === 0
-                                    ? {
-                                        ...plan,
-                                        sourcePlanNumber: nullable(value),
-                                      }
-                                    : plan,
-                                )
-                              : value.trim()
-                                ? [
-                                    {
-                                      id: nextTempId.current--,
-                                      workloadId,
-                                      sourcePlanId: null,
-                                      sourcePlanNumber: value,
-                                      versionNo: 0,
-                                    },
-                                  ]
-                                : [],
-                          },
+                        : field === "plan"
+                          ? {
+                              ...workload,
+                              plans: workload.plans.length
+                                ? workload.plans.map((plan, index) =>
+                                    index === 0
+                                      ? {
+                                          ...plan,
+                                          sourcePlanNumber: nullable(value),
+                                        }
+                                      : plan,
+                                  )
+                                : value.trim()
+                                  ? [
+                                      {
+                                        id: nextTempId.current--,
+                                        workloadId,
+                                        sourcePlanId: null,
+                                        sourcePlanNumber: value,
+                                        versionNo: 0,
+                                      },
+                                    ]
+                                  : [],
+                            }
+                          : workload,
               ),
             },
       ),
@@ -1182,7 +1187,7 @@ export function AccountsWorkloadsPage({
     deal: AccountWorkloadDeal,
     field: DealField,
   ) => {
-    if (!canWrite) return;
+    if (!canWrite || saving) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
     setDealDrafts((current) => {
       if (current.has(key)) return current;
@@ -1197,7 +1202,8 @@ export function AccountsWorkloadsPage({
     });
     setDealEditCell({ key, field });
   };
-  const updateDealDraft = (key: string, field: DealField, value: string) =>
+  const updateDealDraft = (key: string, field: DealField, value: string) => {
+    if (saving) return;
     setDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
@@ -1227,8 +1233,9 @@ export function AccountsWorkloadsPage({
       next.set(key, { ...draft, deal });
       return next;
     });
+  };
   const addDeal = (workloadId: number) => {
-    if (workloadId < 0) return;
+    if (saving || workloadId < 0) return;
     const id = nextTempId.current--;
     const deal = emptyDeal(id, workloadId);
     const key = `draft:${id}`;
@@ -1238,6 +1245,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field: "name" });
   };
   const cancelDeal = (key: string) => {
+    if (saving) return;
     setDealDrafts((current) => {
       const next = new Map(current);
       next.delete(key);
@@ -1245,57 +1253,87 @@ export function AccountsWorkloadsPage({
     });
     if (dealEditCell?.key === key) setDealEditCell(null);
   };
-  const saveDeal = async (draft: DealDraft) => {
-    if (!draft.deal.deleted && !draft.deal.name.trim()) {
+  const saveDealDrafts = async () => {
+    const drafts = [...dealDrafts.values()].filter(isDealDraftChanged);
+    if (!drafts.length) return;
+    if (drafts.some((draft) => !draft.deal.deleted && !draft.deal.name.trim())) {
       setError("Oppty Name is required.");
       return;
     }
     setSaving(true);
     setError("");
     const pageScrollY = window.scrollY;
-    const opportunityScroller = document.querySelector<HTMLElement>(
-      `[data-opportunity-scroll="${draft.workloadId}"]`,
+    const opportunityScrolls = new Map(
+      Array.from(document.querySelectorAll<HTMLElement>("[data-opportunity-scroll]"))
+        .map((element) => [element.dataset.opportunityScroll ?? "", element.scrollLeft] as const),
     );
-    const opportunityScrollLeft = opportunityScroller?.scrollLeft ?? 0;
     try {
       const saved = await saveAccountsWorkloadsHierarchy({
         accounts: [],
         workloads: [],
         workloadPlans: [],
-        deals: [dealWrite(draft.deal, draft.workloadId, draft.original)],
+        deals: drafts.map((draft) => dealWrite(draft.deal, draft.workloadId, draft.original)),
       });
-      const savedWorkload = saved.accounts
-        .flatMap((account) => account.workloads)
-        .find((workload) => workload.id === draft.workloadId);
-      if (!savedWorkload) throw new Error("Saved workload was not returned.");
-      const mergeDeals = (
+      const touchedWorkloadIds = new Set(drafts.map((draft) => draft.workloadId));
+      const confirmedWorkloads = saved.accounts.flatMap((account) => account.workloads);
+      const confirmedDealsByWorkload = new Map(
+        confirmedWorkloads.map((workload) => [workload.id, workload.deals] as const),
+      );
+      const sameSavedDeal = (expected: AccountWorkloadDeal, actual: AccountWorkloadDeal) =>
+        DEAL_DRAFT_FIELDS.every((field) => String(actual[field] ?? "") === String(expected[field] ?? ""));
+      for (const draft of drafts) {
+        const confirmedDeals = confirmedDealsByWorkload.get(draft.workloadId);
+        if (!confirmedDeals) throw new Error("Saved Opportunity workload was not returned.");
+        const originalId = draft.original?.id ?? null;
+        if (draft.deal.deleted) {
+          if (originalId !== null && confirmedDeals.some((deal) => deal.id === originalId))
+            throw new Error("Deleted Opportunity was still returned.");
+        } else {
+          const confirmed = originalId !== null
+            ? confirmedDeals.find((deal) => deal.id === originalId)
+            : confirmedDeals.find((deal) => sameSavedDeal(draft.deal, deal));
+          if (!confirmed || !sameSavedDeal(draft.deal, confirmed))
+            throw new Error("Saved Opportunity was not returned with the requested values.");
+        }
+      }
+      const mergeConfirmedDeals = (
         current: AccountsWorkloadsHierarchy,
       ): AccountsWorkloadsHierarchy => ({
         ...current,
         accounts: current.accounts.map((account) => ({
           ...account,
           workloads: account.workloads.map((workload) =>
-            workload.id === draft.workloadId
-              ? { ...workload, deals: savedWorkload.deals }
+            touchedWorkloadIds.has(workload.id) && confirmedDealsByWorkload.has(workload.id)
+              ? { ...workload, deals: confirmedDealsByWorkload.get(workload.id)! }
               : workload,
           ),
         })),
       });
-      setHierarchy((current) => mergeDeals(current));
-      setBaseline((current) => mergeDeals(current));
+      setHierarchy((current) => mergeConfirmedDeals(current));
+      setBaseline((current) => mergeConfirmedDeals(current));
+      const sameDraftRevision = (submitted: DealDraft, current: DealDraft) =>
+        submitted.workloadId === current.workloadId &&
+        (submitted.original?.id ?? null) === (current.original?.id ?? null) &&
+        submitted.deal.deleted === current.deal.deleted &&
+        DEAL_DRAFT_FIELDS.every(
+          (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
+        );
       setDealDrafts((current) => {
         const next = new Map(current);
-        next.delete(draft.key);
+        for (const submitted of drafts) {
+          const latest = next.get(submitted.key);
+          if (latest && sameDraftRevision(submitted, latest)) next.delete(submitted.key);
+        }
         return next;
       });
+      setSelectedDeals(new Map());
       setDealEditCell(null);
-      setNotice("");
+      setNotice(`${drafts.length} Opportunities saved.`);
       requestAnimationFrame(() => {
         window.scrollTo({ top: pageScrollY });
-        const restoredScroller = document.querySelector<HTMLElement>(
-          `[data-opportunity-scroll="${draft.workloadId}"]`,
-        );
-        if (restoredScroller) restoredScroller.scrollLeft = opportunityScrollLeft;
+        document.querySelectorAll<HTMLElement>("[data-opportunity-scroll]").forEach((element) => {
+          element.scrollLeft = opportunityScrolls.get(element.dataset.opportunityScroll ?? "") ?? 0;
+        });
       });
     } catch (requestError) {
       setError(friendlyError(requestError));
@@ -1443,7 +1481,12 @@ export function AccountsWorkloadsPage({
     }
     return (
       <td
-        class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell" : ""}`}
+        class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
+        onClick={(event) => {
+          if (dealEditCell && (dealEditCell.key !== key || dealEditCell.field !== field) && !isInteractive(event.target)) {
+            setDealEditCell(null);
+          }
+        }}
         onDblClick={(event) => {
           if (isInteractive(event.target)) return;
           event.stopPropagation();
@@ -1474,9 +1517,11 @@ export function AccountsWorkloadsPage({
               >
                 {value || "—"}
               </span>
-            : ["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(field) && value
-              ? Number(value).toLocaleString("en-US")
-              : value || "—"}
+            : field === "winProbability" && value
+              ? `${Number(value).toLocaleString("en-US")}%`
+              : ["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field) && value
+                ? Number(value).toLocaleString("en-US")
+                : value || "—"}
       </td>
     );
   };
@@ -1617,13 +1662,6 @@ export function AccountsWorkloadsPage({
             <span slot="startIcon" class="oj-ux-ico-plus" />
             Account Recommendations
           </oj-button>
-          <oj-button
-            chroming="callToAction"
-            disabled={!canWrite || saving}
-            onojAction={addAw}
-          >
-            Add Account & Workload
-          </oj-button>
         </div>
       </header>
       <form
@@ -1683,16 +1721,24 @@ export function AccountsWorkloadsPage({
             Cancel
           </button>
         )}
-        {selectedCount > 0 && selectedDirtyCount === 0 && selectedArchivedCount > 0 && (
+        {selectedCount > 0 && !editCell && selectedDirtyCount === 0 && selectedArchivedCount > 0 && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
             Restore
           </button>
         )}
-        {selectedCount > 0 && selectedDirtyCount === 0 && (
+        {selectedCount > 0 && !editCell && selectedDirtyCount === 0 && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
             {selectedArchivedCount > 0 ? "Delete" : "Draft Delete"}
           </button>
         )}
+        <oj-button
+          class="accounts-workloads-add-aw"
+          chroming="callToAction"
+          disabled={!canWrite || saving}
+          onojAction={addAw}
+        >
+          Add Account & Workload
+        </oj-button>
       </form>
       <div class="accounts-workloads-table-summary">
         <span>{hierarchy.accounts.length} accounts</span>
@@ -1906,7 +1952,7 @@ export function AccountsWorkloadsPage({
                                 >
                                   Add Opportunity
                                 </button>
-                                {selectedDeals.size > 0 && (
+                                {selectedDeals.size > 0 && !dealEditCell && (
                                   <button
                                     type="button"
                                     disabled={!canWrite || saving}
@@ -1920,7 +1966,7 @@ export function AccountsWorkloadsPage({
                                     <button
                                       type="button"
                                       disabled={saving}
-                                      onClick={() => void saveDeal(activeDraft)}
+                                      onClick={() => void saveDealDrafts()}
                                     >
                                       Save
                                     </button>

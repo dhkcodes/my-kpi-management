@@ -78,10 +78,10 @@ assert.equal(fiscalQuarterFromDeliveryDate("2026-08-31"), "Q1");
 assert.equal(fiscalQuarterFromDeliveryDate("2026-09-01"), "Q2");
 assert.equal(fiscalQuarterFromDeliveryDate("2027-03-31"), "Q4");
 assert.equal(fiscalQuarterFromDeliveryDate(""), "");
-assert.equal(formatKpiWorkloadOption({ workloadId: 7, accountName: "Acme", workloadName: "ERP", opptyName: "Cloud Move", opptyNo: "OP-7" }), "Acme-ERP (Cloud Move/OP-7)");
-assert.equal(formatKpiWorkloadOption({ workloadId: 8, accountName: "Acme", workloadName: "Analytics", opptyName: "Data Lake", opptyNo: null }), "Acme-Analytics (Data Lake)");
-assert.equal(formatKpiWorkloadOption({ workloadId: 9, accountName: "Acme", workloadName: "Database", opptyName: null, opptyNo: "OP-9" }), "Acme-Database (OP-9)");
-assert.equal(formatKpiWorkloadOption({ workloadId: 10, accountName: "Acme", workloadName: "Security", opptyName: null, opptyNo: null }), "Acme-Security");
+assert.equal(formatKpiWorkloadOption({ workloadId: 7, accountName: "Acme", workloadName: "ERP", opptyName: "Cloud Move", opptyNo: "OP-7" }), "Acme - ERP (Cloud Move/OP-7)");
+assert.equal(formatKpiWorkloadOption({ workloadId: 8, accountName: "Acme", workloadName: "Analytics", opptyName: "Data Lake", opptyNo: null }), "Acme - Analytics (Data Lake)");
+assert.equal(formatKpiWorkloadOption({ workloadId: 9, accountName: "Acme", workloadName: "Database", opptyName: null, opptyNo: "OP-9" }), "Acme - Database (OP-9)");
+assert.equal(formatKpiWorkloadOption({ workloadId: 10, accountName: "Acme", workloadName: "Security", opptyName: null, opptyNo: null }), "Acme - Security");
 
 const rows: KpiSpreadsheetRow[] = [
   { id: "c1-jun", manageTimeReflected: true, fiscalYear: "FY27", kpiCode: "C1", quarter: "Q4", month: "Aug", accountWorkload: "Synthetic Account / Analytics", title: "Workshop", srNumber: "SYN-1001", stage: "", acrK: null, targetQuarter: "", deliveryDate: "2026-06-12" },
