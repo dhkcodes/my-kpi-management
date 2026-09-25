@@ -185,6 +185,7 @@ export function AccountsWorkloadsPage({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const dealSavingRef = useRef(false);
   const [error, setError] = useState("");
   const [saveErrors, setSaveErrors] = useState<AccountsWorkloadsFieldError[]>(
     [],
@@ -1187,7 +1188,7 @@ export function AccountsWorkloadsPage({
     deal: AccountWorkloadDeal,
     field: DealField,
   ) => {
-    if (!canWrite || saving) return;
+    if (!canWrite || dealSavingRef.current) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
     setDealDrafts((current) => {
       if (current.has(key)) return current;
@@ -1203,7 +1204,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field });
   };
   const updateDealDraft = (key: string, field: DealField, value: string) => {
-    if (saving) return;
+    if (dealSavingRef.current) return;
     setDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
@@ -1235,7 +1236,7 @@ export function AccountsWorkloadsPage({
     });
   };
   const addDeal = (workloadId: number) => {
-    if (saving || workloadId < 0) return;
+    if (dealSavingRef.current || workloadId < 0) return;
     const id = nextTempId.current--;
     const deal = emptyDeal(id, workloadId);
     const key = `draft:${id}`;
@@ -1245,7 +1246,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field: "name" });
   };
   const cancelDeal = (key: string) => {
-    if (saving) return;
+    if (dealSavingRef.current) return;
     setDealDrafts((current) => {
       const next = new Map(current);
       next.delete(key);
@@ -1254,12 +1255,14 @@ export function AccountsWorkloadsPage({
     if (dealEditCell?.key === key) setDealEditCell(null);
   };
   const saveDealDrafts = async () => {
+    if (dealSavingRef.current) return;
     const drafts = [...dealDrafts.values()].filter(isDealDraftChanged);
     if (!drafts.length) return;
     if (drafts.some((draft) => !draft.deal.deleted && !draft.deal.name.trim())) {
       setError("Oppty Name is required.");
       return;
     }
+    dealSavingRef.current = true;
     setSaving(true);
     setError("");
     const pageScrollY = window.scrollY;
@@ -1343,6 +1346,7 @@ export function AccountsWorkloadsPage({
           : [],
       );
     } finally {
+      dealSavingRef.current = false;
       setSaving(false);
     }
   };

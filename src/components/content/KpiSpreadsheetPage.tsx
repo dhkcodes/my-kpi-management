@@ -310,6 +310,8 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<KpiWorkloadOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [workloadError, setWorkloadError] = useState("");
+  const [workloadRetryVersion, setWorkloadRetryVersion] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [activeWorkloadIndex, setActiveWorkloadIndex] = useState(0);
@@ -354,6 +356,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
     setQuery("");
     setOptions([]);
     setLoading(false);
+    setWorkloadError("");
     setHasMore(false);
     setOffset(0);
     setActiveWorkloadIndex(0);
@@ -374,6 +377,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
     const requestGeneration = ++requestGenerationRef.current;
     const timer = window.setTimeout(() => {
       setLoading(true);
+      setWorkloadError("");
       void listKpiWorkloadOptions(fiscalYear, query, 0).then((page) => {
         if (!active || requestGenerationRef.current !== requestGeneration) return;
         setOptions(page.items); setOffset(page.items.length); setHasMore(page.hasMore);
@@ -381,11 +385,12 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
       }).catch(() => {
         if (active && requestGenerationRef.current === requestGeneration) {
           setOptions([]); setOffset(0); setHasMore(false); setActiveWorkloadIndex(0);
+          setWorkloadError("Unable to load workloads.");
         }
       }).finally(() => { if (active && requestGenerationRef.current === requestGeneration) setLoading(false); });
     }, 180);
     return () => { active = false; requestGenerationRef.current += 1; window.clearTimeout(timer); };
-  }, [field.type, fiscalYear, query, workloadActive]);
+  }, [field.type, fiscalYear, query, workloadActive, workloadRetryVersion]);
 
   useEffect(() => {
     if (field.type === "workload" && workloadActive) openPopup();
@@ -424,7 +429,14 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
       setOptions((current) => [...current, ...page.items]);
       setOffset((current) => current + page.items.length);
       setHasMore(page.hasMore);
-    }).catch(() => undefined).finally(() => { if (requestGenerationRef.current === requestGeneration) setLoading(false); });
+    }).catch(() => {
+      if (requestGenerationRef.current === requestGeneration) setWorkloadError("Unable to load workloads.");
+    }).finally(() => { if (requestGenerationRef.current === requestGeneration) setLoading(false); });
+  };
+
+  const retryWorkloadSearch = () => {
+    setWorkloadError("");
+    setWorkloadRetryVersion((current) => current + 1);
   };
 
   const chooseWorkload = (option: KpiWorkloadOption) => {
@@ -491,7 +503,9 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
             <strong>{formatKpiWorkloadOption(option)}</strong><small>{option.dealId ? `Opportunity ID ${option.dealId} · ` : ""}Workload ID {option.workloadId}</small>
           </button>)}
           {loading && <span>Loading…</span>}
-          {!loading && options.length === 0 && <span>No matching workload.</span>}
+          {!loading && workloadError && <span role="alert">Unable to load workloads.</span>}
+          {!loading && workloadError && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={retryWorkloadSearch}>Retry</button>}
+          {!loading && !workloadError && options.length === 0 && <span>No matching workload.</span>}
           {hasMore && <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={loadMore}>Load 10 more</button>}
         </div>
       </oj-popup>

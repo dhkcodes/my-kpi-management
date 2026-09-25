@@ -303,5 +303,13 @@ assert.match(page, /if \(!await settleDialogClosed\(navigationDialogRef\.current
   "navigation must abort and report when the JET dialog cannot settle closed");
 assert.match(page, /if \(!await settleDialogClosed\(deleteDialogRef\.current\)\)[\s\S]*Delete was cancelled[\s\S]*return/,
   "Delete must abort and report when the JET dialog cannot settle closed");
+assert.match(page, /const \[workloadError, setWorkloadError\] = useState\(""\);/,
+  "workload picker tracks query failure separately from empty results");
+assert.match(page, /setWorkloadError\("Unable to load workloads\."\)/,
+  "workload picker exposes only a short non-sensitive error");
+assert.match(page, /\{!loading && workloadError && <span role="alert">Unable to load workloads\.<\/span>\}/);
+assert.match(page, /workloadError && <button[\s\S]*onClick=\{retryWorkloadSearch\}[\s\S]*>Retry<\/button>/);
+assert.match(page, /\{!loading && !workloadError && options\.length === 0 && <span>No matching workload\.<\/span>\}/,
+  "No matching workload is reserved for a successful empty response");
 
 console.log("kpiActivityUiContract tests passed");
