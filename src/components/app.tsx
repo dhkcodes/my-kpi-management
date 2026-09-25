@@ -56,6 +56,7 @@ import {
   fetchKpiGuides,
   FxRateRecord,
   KpiGuideRecord,
+  updateFxRate,
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import type { AuthSession } from "../auth/authSession";
@@ -685,6 +686,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             fxLoading={fxLoading}
             fxError={fxError}
             onSaveGuide={saveKpiGuide}
+            onFxRateChange={async (rateValue) => {
+              if (!fxRate) throw new Error("The exchange rate is unavailable for this fiscal year.");
+              const saved = await updateFxRate({ ...fxRate, rateValue });
+              setFxRate(saved);
+              return saved;
+            }}
 
             onCloseGuide={() => setGuideOpen(false)}
             onOpenGuide={() => setGuideOpen(true)}

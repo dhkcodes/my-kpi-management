@@ -21,13 +21,22 @@ import {
   forecastCandidateKey,
   saveAccountsWorkloadsHierarchy,
 } from "../../data/accountsWorkloadsApi";
+import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
+import {
+  OpportunityCurrencyField,
+  updateOpportunityCurrencyPair,
+} from "./opportunityCurrency";
 
 type Props = Readonly<{
   canWrite: boolean;
   breadcrumb?: ComponentChildren;
   onDraftStateChange?: (active: boolean) => void;
   initialSearch?: string;
+  fxRate: FxRateRecord | null;
+  fxLoading: boolean;
+  fxError: string;
+  onFxRateChange: (rateValue: number) => Promise<FxRateRecord>;
 }>;
 type AwField = "account" | "workload" | "plan" | "lastUpdated" | "notes";
 type DealField =
@@ -172,6 +181,10 @@ export function AccountsWorkloadsPage({
   breadcrumb,
   onDraftStateChange,
   initialSearch = "",
+  fxRate,
+  fxLoading,
+  fxError,
+  onFxRateChange,
 }: Props) {
   const nextTempId = useRef(-1);
   const editSnapshot = useRef("");
@@ -192,6 +205,8 @@ export function AccountsWorkloadsPage({
     [],
   );
   const [notice, setNotice] = useState("");
+  const [fxDraft, setFxDraft] = useState("");
+  const [fxSaving, setFxSaving] = useState(false);
   const [dirtyAccounts, setDirtyAccounts] = useState<Set<number>>(new Set());
   const [dirtyWorkloads, setDirtyWorkloads] = useState<Set<number>>(new Set());
   const [pendingDeleteWorkloadIds, setPendingDeleteWorkloadIds] = useState<
@@ -254,6 +269,10 @@ export function AccountsWorkloadsPage({
       pendingDeleteWorkloadIds.size >
     0;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
+
+  useEffect(() => {
+    if (!fxSaving) setFxDraft(fxRate ? String(fxRate.rateValue) : "");
+  }, [fxRate, fxSaving]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1223,11 +1242,17 @@ export function AccountsWorkloadsPage({
         const match = /^(FY\d{2}) Q([1-4])$/.exec(value);
         deal.targetFiscalYear = match?.[1] ?? null;
         deal.targetQuarter = match ? Number(match[2]) : null;
-      } else if (
-        ["arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability"].includes(
-          field,
-        )
-      )
+      } else if (["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field)) {
+        Object.assign(
+          deal,
+          updateOpportunityCurrencyPair(
+            deal,
+            field as OpportunityCurrencyField,
+            value,
+            fxRate?.rateValue,
+          ),
+        );
+      } else if (field === "winProbability")
         (deal as any)[field] = numberValue(value);
       else if (
         [
@@ -1244,6 +1269,24 @@ export function AccountsWorkloadsPage({
       next.set(key, { ...draft, deal });
       return next;
     });
+  };
+  const saveFxRate = async () => {
+    const rateValue = Number(fxDraft);
+    if (!Number.isFinite(rateValue) || rateValue <= 0) {
+      setError("Enter a valid positive USD → KRW exchange rate.");
+      return;
+    }
+    setFxSaving(true);
+    setError("");
+    try {
+      const saved = await onFxRateChange(rateValue);
+      setFxDraft(String(saved.rateValue));
+      setNotice(`Exchange rate updated to ${saved.rateValue.toLocaleString("en-US")} KRW per USD.`);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+    } finally {
+      setFxSaving(false);
+    }
   };
   const addDeal = (workloadId: number) => {
     if (dealSaveLock.isLocked() || workloadId < 0) return;
@@ -1674,6 +1717,33 @@ export function AccountsWorkloadsPage({
           <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
         </div>
         <div class="consumption-import-actions accounts-workloads-header-actions">
+          <form
+            class="accounts-workloads-fx-rate"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveFxRate();
+            }}
+          >
+            <label for="accountsWorkloadsFxRate">USD → KRW</label>
+            <input
+              id="accountsWorkloadsFxRate"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={fxDraft}
+              aria-label="USD to KRW exchange rate"
+              disabled={!canWrite || fxLoading || fxSaving}
+              onInput={(event) => setFxDraft(event.currentTarget.value)}
+            />
+            <button
+              type="submit"
+              class="accounts-workloads-button"
+              disabled={!canWrite || fxLoading || fxSaving || !fxDraft.trim()}
+            >
+              {fxSaving ? "Updating…" : "Update rate"}
+            </button>
+            {fxError && <span class="accounts-workloads-fx-error">{fxError}</span>}
+          </form>
           <oj-button
             chroming="outlined"
             disabled={!canWrite || saving}

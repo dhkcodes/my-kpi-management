@@ -3727,7 +3727,11 @@ h4.weekly-activity-section-label--next-week,
 .accounts-hierarchy-page { gap: 10px; }
 .accounts-hierarchy-page .accounts-workloads-header { align-items: flex-end; margin: 0; padding-bottom: 0; }
 .accounts-hierarchy-page .accounts-workloads-header h1 { margin: 2px 0 0; }
-.accounts-workloads-header-actions { align-self: flex-end; }
+.accounts-workloads-header-actions { align-items: flex-end; align-self: flex-end; display: flex; flex-wrap: wrap; gap: 8px; }
+.accounts-workloads-fx-rate { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 6px; }
+.accounts-workloads-fx-rate label { color: var(--oj-core-text-color-secondary); font-size: .75rem; font-weight: 700; }
+.accounts-workloads-fx-rate input { box-sizing: border-box; min-height: 34px; padding: 5px 8px; width: 112px; }
+.accounts-workloads-fx-error { color: var(--oj-core-danger-1, #b3261e); font-size: .72rem; max-width: 210px; }
 .accounts-workloads-toolbar--compact { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; min-height: 0; padding: 10px 12px; }
 .accounts-workloads-toolbar--compact .accounts-workloads-search { flex: 1 1 320px; max-width: 560px; }
 .accounts-workloads-toolbar--compact .accounts-workloads-search input { width: 100%; }
