@@ -7,6 +7,7 @@ const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelecte
 const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelSelected"));
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
 const cancelHandler = page.slice(page.indexOf("const cancelSelected"), page.indexOf("const saveAwDrafts"));
+const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 
 assert.match(page, /type AwField = "account" \| "workload" \| "plan" \| "lastUpdated" \| "notes"/);
 assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
@@ -67,10 +68,14 @@ assert.match(page, /accounts-workloads-child-row/);
 assert.match(page, /Oppty Name/);
 assert.match(page, /Oppty ID/);
 assert.match(page, /Add Opportunity/);
-assert.match(page, /deals: \[dealWrite\(draft\.deal, draft\.workloadId, draft\.original\)\]/,
-  "an opportunity row Save sends only that opportunity operation and its original baseline");
-assert.match(page, /const mergeDeals[\s\S]*setHierarchy\(\(current\) => mergeDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeDeals\(current\)\)/,
-  "an opportunity Save merges only that workload's server-confirmed deals and preserves unrelated AW/opportunity drafts");
+assert.match(page, /const drafts = \[\.\.\.dealDrafts\.values\(\)\]\.filter\(isDealDraftChanged\)[\s\S]*deals: drafts\.map\(\(draft\) => dealWrite/,
+  "one opportunity Save sends every changed opportunity draft in one atomic hierarchy request");
+assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setDealDrafts\(\(current\) =>/,
+  "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
+assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
+  "a completed request cannot clear opportunity drafts created or changed while it was in flight");
+assert.match(page, /const updateDealDraft[\s\S]*if \(saving\) return/,
+  "opportunity draft mutation is blocked while a save is in flight");
 assert.match(page, /cancelDeal\(activeDraft\.key\)/,
   "an opportunity row Cancel is isolated to that opportunity draft");
 assert.doesNotMatch(page, /const hasNewDeal =|const hasNewAw =/,
@@ -81,8 +86,8 @@ assert.match(page, /setHierarchy\(\(current\) =>[\s\S]*accounts: \[/,
   "multiple new AW rows remain in hierarchy state until saved or cancelled");
 assert.match(page, /<oj-input-date/,
   "opportunity date editing uses the Oracle JET calendar");
-assert.match(page, /\{ length: 16 \}[\s\S]*FY\$\{24 \+ Math\.floor/,
-  "new Target selections stop at FY27 Q4");
+assert.match(page, /targetOptionsFor[\s\S]*fiscalYear - 1} Q3[\s\S]*fiscalYear \+ 1} Q2/,
+  "Target Quarter offers previous FY H2, current FY and next FY H1");
 assert.match(page, /Save the parent AW before adding opportunities/);
 assert.doesNotMatch(page, /notes: draft\.deal\.notes/,
   "opportunity Notes is excluded from the editor and save payload");
@@ -112,8 +117,16 @@ assert.match(page, /field === "revenueType"[\s\S]*value=\{value\}[\s\S]*<option 
   "Revenue Type editing selects the current value");
 assert.match(styles, /accounts-workloads-child-row > td \{[^}]*padding: 14px 14px 14px 62px/,
   "expanded opportunity boxes keep equal top and bottom spacing");
-assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(5\)[\s\S]*left:\s*540px[^}]*position:\s*sticky/,
-  "Plan Number remains fixed beside Account and Workload during horizontal scrolling");
+assert.match(styles, /accounts-workloads-grid-wrap\.accounts-workloads-grid-wrap--compact\s*\{[^}]*overflow:\s*visible/,
+  "the parent AW table no longer creates a horizontal scroll container");
+assert.match(styles, /accounts-workloads-grid\.accounts-workloads-aw-grid\s*\{[^}]*min-width:\s*0/,
+  "the high-specificity legacy AW minimum width is reset");
+assert.match(styles, /accounts-workloads-grid\.accounts-workloads-aw-grid th,[\s\S]*accounts-workloads-grid\.accounts-workloads-aw-grid td\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*none/,
+  "legacy per-column minimum widths cannot force horizontal overflow");
+assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(-n \+ 5\),[\s\S]*position:\s*static/,
+  "AW identity and Plan columns explicitly override legacy sticky selectors");
+assert.match(styles, /accounts-workloads-aw-grid[\s\S]*table-layout:\s*fixed[\s\S]*width:\s*100%/,
+  "AW columns fit the available width rather than being clipped");
 assert.match(page, /data-deal-draft-key[\s\S]*is-editing-cell input,[\s\S]*is-editing-cell textarea,[\s\S]*is-editing-cell select/,
   "opportunity inputs and textareas receive one-time row-scoped focus");
 assert.doesNotMatch(page, /onFocus=\{focusToEnd\}/,
@@ -122,5 +135,19 @@ assert.match(page, /const changed = !baselineWorkload \|\| value !== original/,
   "all cells in a new AW row, including a blank Plan Number, retain draft styling");
 assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
   "ellipsis cells expose the full value on hover only when truncated");
+assert.match(page, /field === "plan"\s*\? \{[\s\S]*plans:/,
+  "only the Plan editor can update the Plan value; Account edits cannot fall through to it");
+assert.match(page, /selectedCount > 0 && !editCell && selectedDirtyCount === 0/,
+  "AW delete actions are hidden whenever a cell is being edited");
+assert.match(page, /selectedDeals\.size > 0 && !dealEditCell/,
+  "Opportunity delete is hidden whenever an opportunity cell is being edited");
+assert.match(page, /is-editing-cell[\s\S]*data-deal-draft-key/,
+  "the active opportunity editor is discoverable by the one-time caret focus effect");
+assert.match(page, /field === "winProbability" && value[\s\S]*}%`/,
+  "WIN PROB. keeps numeric editing but appends percent in display mode");
+assert.match(styles, /is-pending-delete > td:nth-child\(5\)[\s\S]*background:\s*#fff1ed/,
+  "Plan Number receives the same Draft Delete background as the row");
+assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*position:\s*static/,
+  "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");
