@@ -4093,3 +4093,57 @@ h4.weekly-activity-section-label--next-week,
   z-index: auto;
   box-shadow: none;
 }
+
+/* Runtime layout contract: original FX popover, inline deleted toggle, deterministic opportunity columns. */
+.accounts-workloads-include-deleted {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  gap: 0.42rem;
+  white-space: nowrap;
+}
+.accounts-workloads-include-deleted input,
+.accounts-workloads-include-deleted span {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.accounts-workloads-oppty-grid {
+  table-layout: fixed;
+  width: 2575px;
+  min-width: 2575px;
+}
+.accounts-workloads-oppty-column--name { width: 260px; }
+.accounts-workloads-oppty-column--id { width: 165px; }
+.accounts-workloads-oppty-column--revenue { width: 170px; }
+.accounts-workloads-oppty-column--probability { width: 150px; }
+.accounts-workloads-oppty-column--target { width: 160px; }
+.accounts-workloads-oppty-column--arr-usd,
+.accounts-workloads-oppty-column--arr-krw,
+.accounts-workloads-oppty-column--acr-usd,
+.accounts-workloads-oppty-column--acr-krw { width: 155px; }
+.accounts-workloads-oppty-column--status { width: 150px; }
+.accounts-workloads-oppty-column--date { width: 180px; }
+.accounts-workloads-oppty-column--update { width: 360px; }
+.accounts-workloads-oppty-grid th:nth-child(1),
+.accounts-workloads-oppty-grid td:nth-child(1) {
+  left: 0;
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  overflow: hidden;
+}
+.accounts-workloads-oppty-grid th:nth-child(2),
+.accounts-workloads-oppty-grid td:nth-child(2) {
+  left: 260px;
+  width: 165px;
+  min-width: 165px;
+  max-width: 165px;
+  overflow: hidden;
+}
+.accounts-workloads-oppty-grid th:nth-child(n + 3),
+.accounts-workloads-oppty-grid td:nth-child(n + 3) {
+  position: static;
+  left: auto;
+}

@@ -149,6 +149,16 @@ assert.match(styles, /is-pending-delete > td:nth-child\(5\)[\s\S]*background:\s*
   "Plan Number receives the same Draft Delete background as the row");
 assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*position:\s*static/,
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
+assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
+  "the original pre-Opportunities exchange-rate button and popover UI are preserved");
+assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
+  "Include Deleted keeps its checkbox and text in one explicit inline label structure");
+assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
+  "opportunity identity and scrolling columns have explicit widths");
+assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*inline-flex[^}]*flex-direction:\s*row[^}]*white-space:\s*nowrap/,
+  "Include Deleted cannot wrap its label below the checkbox");
+assert.match(styles, /\.accounts-workloads-oppty-grid\s*\{[^}]*table-layout:\s*fixed/,
+  "opportunity column width and sticky offsets use one deterministic fixed layout");
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,
   "Opportunity save owns a synchronous mutation lock");
 assert.match(page, /const beginDealEdit[\s\S]*?if \(!canWrite \|\| dealSaveLock\.isLocked\(\)\) return;/);

@@ -205,7 +205,11 @@ export function AccountsWorkloadsPage({
     [],
   );
   const [notice, setNotice] = useState("");
-  const [fxDraft, setFxDraft] = useState("");
+  const initialFxRate = fxRate?.rateValue ?? 0;
+  const [savedFxRateValue, setSavedFxRateValue] = useState(initialFxRate);
+  const [fxRateValue, setFxRateValue] = useState(initialFxRate);
+  const [fxDraft, setFxDraft] = useState(String(initialFxRate || ""));
+  const [fxPopoverOpen, setFxPopoverOpen] = useState(false);
   const [fxSaving, setFxSaving] = useState(false);
   const [dirtyAccounts, setDirtyAccounts] = useState<Set<number>>(new Set());
   const [dirtyWorkloads, setDirtyWorkloads] = useState<Set<number>>(new Set());
@@ -262,17 +266,22 @@ export function AccountsWorkloadsPage({
       );
     }),
   );
+  const fxDirty = fxRateValue > 0 && fxRateValue !== savedFxRateValue;
   const dirty =
     changedAccountIds.size +
       changedWorkloadIds.size +
       [...dealDrafts.values()].filter(isDealDraftChanged).length +
       pendingDeleteWorkloadIds.size >
-    0;
+      0 || fxDirty;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
   useEffect(() => {
-    if (!fxSaving) setFxDraft(fxRate ? String(fxRate.rateValue) : "");
-  }, [fxRate, fxSaving]);
+    if (fxSaving || fxDirty) return;
+    const nextRate = fxRate?.rateValue ?? 0;
+    setSavedFxRateValue(nextRate);
+    setFxRateValue(nextRate);
+    setFxDraft(String(nextRate || ""));
+  }, [fxRate, fxSaving, fxDirty]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1094,41 +1103,56 @@ export function AccountsWorkloadsPage({
           );
         }
       }
+    const hasAwDrafts =
+      request.accounts.length +
+        request.workloads.length +
+        request.workloadPlans.length >
+      0;
     setSaving(true);
     setError("");
     setSaveErrors([]);
     try {
-      const saved = await saveAccountsWorkloadsHierarchy(request);
-      const withoutArchived = {
-        ...saved,
-        accounts: saved.accounts.map((account) => ({
-          ...account,
-          workloads: account.workloads.filter(
-            (workload) => !archivedIds.has(workload.id),
-          ),
-        })),
-      };
-      setHierarchy(withoutArchived);
-      setBaseline(withoutArchived);
-      setDirtyAccounts(new Set());
-      setDirtyWorkloads(new Set());
-      setDealDrafts(
-        (current) =>
-          new Map(
-            [...current].filter(
-              ([, draft]) => !archivedIds.has(draft.workloadId),
+      if (hasAwDrafts) {
+        const saved = await saveAccountsWorkloadsHierarchy(request);
+        const withoutArchived = {
+          ...saved,
+          accounts: saved.accounts.map((account) => ({
+            ...account,
+            workloads: account.workloads.filter(
+              (workload) => !archivedIds.has(workload.id),
             ),
-          ),
-      );
-      setPendingDeleteWorkloadIds(new Set());
-      setSelectedRows(new Set());
-      setNotice("AW changes saved.");
+          })),
+        };
+        setHierarchy(withoutArchived);
+        setBaseline(withoutArchived);
+        setDirtyAccounts(new Set());
+        setDirtyWorkloads(new Set());
+        setDealDrafts(
+          (current) =>
+            new Map(
+              [...current].filter(
+                ([, draft]) => !archivedIds.has(draft.workloadId),
+              ),
+            ),
+        );
+        setPendingDeleteWorkloadIds(new Set());
+        setSelectedRows(new Set());
+      }
+      if (fxDirty) {
+        setFxSaving(true);
+        const savedRate = await onFxRateChange(fxRateValue);
+        setSavedFxRateValue(savedRate.rateValue);
+        setFxRateValue(savedRate.rateValue);
+        setFxDraft(String(savedRate.rateValue));
+      }
+      setNotice(hasAwDrafts && fxDirty ? "AW and exchange rate changes saved." : fxDirty ? "Exchange rate saved." : "AW changes saved.");
     } catch (saveError) {
       setError(friendlyError(saveError));
       setSaveErrors(
         saveError instanceof AccountsWorkloadsApiError ? saveError.errors : [],
       );
     } finally {
+      setFxSaving(false);
       setSaving(false);
     }
   };
@@ -1249,7 +1273,7 @@ export function AccountsWorkloadsPage({
             deal,
             field as OpportunityCurrencyField,
             value,
-            fxRate?.rateValue,
+            fxRateValue,
           ),
         );
       } else if (field === "winProbability")
@@ -1270,23 +1294,16 @@ export function AccountsWorkloadsPage({
       return next;
     });
   };
-  const saveFxRate = async () => {
+  const applyFxRate = () => {
     const rateValue = Number(fxDraft);
     if (!Number.isFinite(rateValue) || rateValue <= 0) {
-      setError("Enter a valid positive USD → KRW exchange rate.");
+      setError("Exchange rate must be a positive number.");
       return;
     }
-    setFxSaving(true);
     setError("");
-    try {
-      const saved = await onFxRateChange(rateValue);
-      setFxDraft(String(saved.rateValue));
-      setNotice(`Exchange rate updated to ${saved.rateValue.toLocaleString("en-US")} KRW per USD.`);
-    } catch (requestError) {
-      setError(friendlyError(requestError));
-    } finally {
-      setFxSaving(false);
-    }
+    setFxRateValue(rateValue);
+    setFxDraft(String(rateValue));
+    setFxPopoverOpen(false);
   };
   const addDeal = (workloadId: number) => {
     if (dealSaveLock.isLocked() || workloadId < 0) return;
@@ -1697,7 +1714,7 @@ export function AccountsWorkloadsPage({
         dirtyWorkloads.has(row.workload.id)),
   ).length;
   const savableAwDraftCount =
-    dirtyAccounts.size + dirtyWorkloads.size + pendingDeleteWorkloadIds.size;
+    dirtyAccounts.size + dirtyWorkloads.size + pendingDeleteWorkloadIds.size + (fxDirty ? 1 : 0);
 
   return (
     <section
@@ -1717,33 +1734,60 @@ export function AccountsWorkloadsPage({
           <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
         </div>
         <div class="consumption-import-actions accounts-workloads-header-actions">
-          <form
-            class="accounts-workloads-fx-rate"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveFxRate();
-            }}
-          >
-            <label for="accountsWorkloadsFxRate">USD → KRW</label>
-            <input
-              id="accountsWorkloadsFxRate"
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={fxDraft}
-              aria-label="USD to KRW exchange rate"
-              disabled={!canWrite || fxLoading || fxSaving}
-              onInput={(event) => setFxDraft(event.currentTarget.value)}
-            />
+          <div class="accounts-workloads-fx">
             <button
-              type="submit"
-              class="accounts-workloads-button"
-              disabled={!canWrite || fxLoading || fxSaving || !fxDraft.trim()}
+              type="button"
+              class="accounts-workloads-fx__button"
+              disabled={!canWrite || fxLoading || fxSaving || saving}
+              aria-expanded={fxPopoverOpen ? "true" : "false"}
+              onClick={() => {
+                setFxDraft(String(fxRateValue || ""));
+                setFxPopoverOpen((value) => !value);
+              }}
             >
-              {fxSaving ? "Updating…" : "Update rate"}
+              <span>Exchange Rate (USD to KRW)</span>
+              <strong>1 USD = KRW {fmtUsd.format(fxRateValue)}</strong>
             </button>
-            {fxError && <span class="accounts-workloads-fx-error">{fxError}</span>}
-          </form>
+            {fxPopoverOpen && (
+              <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
+                <label>
+                  <span>Exchange Rate (USD to KRW)</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={fxDraft}
+                    disabled={!canWrite || fxLoading || fxSaving || saving}
+                    onInput={(event) => setFxDraft(event.currentTarget.value)}
+                  />
+                </label>
+                <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
+                {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
+                {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
+                <div class="accounts-workloads-popover-actions">
+                  <button
+                    type="button"
+                    class="accounts-workloads-button accounts-workloads-button--primary"
+                    disabled={!canWrite || fxLoading || fxSaving || saving}
+                    onClick={applyFxRate}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    class="accounts-workloads-button"
+                    disabled={fxSaving || saving}
+                    onClick={() => {
+                      setFxDraft(String(fxRateValue || ""));
+                      setFxPopoverOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <oj-button
             chroming="outlined"
             disabled={!canWrite || saving}
@@ -1793,7 +1837,7 @@ export function AccountsWorkloadsPage({
             disabled={dirty || loading || saving}
             onChange={(event) => setIncludeDeleted(event.currentTarget.checked)}
           />
-          Include Deleted
+          <span>Include Deleted</span>
         </label>
         <span class="accounts-workloads-toolbar-spacer" />
         {savableAwDraftCount > 0 && (
@@ -1806,8 +1850,19 @@ export function AccountsWorkloadsPage({
             {saving ? "Saving…" : "Save"}
           </button>
         )}
-        {selectedDirtyCount > 0 && (
-          <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelSelected}>
+        {(selectedDirtyCount > 0 || fxDirty) && (
+          <button
+            type="button"
+            class="accounts-workloads-button"
+            disabled={saving}
+            onClick={() => {
+              if (selectedDirtyCount > 0) cancelSelected();
+              if (fxDirty) {
+                setFxRateValue(savedFxRateValue);
+                setFxDraft(String(savedFxRateValue || ""));
+              }
+            }}
+          >
             Cancel
           </button>
         )}
@@ -2082,6 +2137,22 @@ export function AccountsWorkloadsPage({
                                 data-opportunity-scroll={workload.id}
                               >
                                 <table class="accounts-workloads-oppty-grid">
+                                  <colgroup class="accounts-workloads-oppty-columns">
+                                    <col class="accounts-workloads-oppty-column--name" />
+                                    <col class="accounts-workloads-oppty-column--id" />
+                                    <col class="accounts-workloads-oppty-column--revenue" />
+                                    <col class="accounts-workloads-oppty-column--probability" />
+                                    <col class="accounts-workloads-oppty-column--target" />
+                                    <col class="accounts-workloads-oppty-column--arr-usd" />
+                                    <col class="accounts-workloads-oppty-column--arr-krw" />
+                                    <col class="accounts-workloads-oppty-column--acr-usd" />
+                                    <col class="accounts-workloads-oppty-column--acr-krw" />
+                                    <col class="accounts-workloads-oppty-column--status" />
+                                    <col class="accounts-workloads-oppty-column--date" />
+                                    <col class="accounts-workloads-oppty-column--date" />
+                                    <col class="accounts-workloads-oppty-column--date" />
+                                    <col class="accounts-workloads-oppty-column--update" />
+                                  </colgroup>
                                   <thead>
                                     <tr>
                                       {[
