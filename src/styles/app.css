@@ -3842,7 +3842,7 @@ h4.weekly-activity-section-label--next-week,
   background: #e8f2fb;
   box-shadow: none;
 }
-.accounts-workloads-parent-row.is-selected.is-pending-delete > td { background: #eef1f4; }
+.accounts-workloads-parent-row.is-selected.is-pending-delete > td { background: #fff1ed; }
 .accounts-workloads-oppty-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -3887,7 +3887,7 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-parent-row.is-selected > td:nth-child(-n+4) { background: #e8f2fb; }
 .accounts-workloads-parent-row.is-selected.is-pending-delete,
 .accounts-workloads-parent-row.is-selected.is-pending-delete > td,
-.accounts-workloads-parent-row.is-selected.is-pending-delete > td:nth-child(-n+4) { background: #eef1f4; }
+.accounts-workloads-parent-row.is-selected.is-pending-delete > td:nth-child(-n+4) { background: #fff1ed; }
 
 /* Accounts & Workloads additional interaction and layout refinements. */
 .accounts-workloads-header-actions { display: none; }
@@ -3909,6 +3909,10 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-grid tr.is-selected:hover > td { background: #e8f2fb; }
 .accounts-workloads-parent-row.is-pending-delete > td,
 .accounts-workloads-parent-row.is-pending-delete > td:nth-child(-n+4) { background: #fff1ed; }
+.accounts-workloads-oppty-grid tr.is-draft-delete > td,
+.accounts-workloads-oppty-grid tr.is-draft-delete > td:nth-child(-n+2),
+.accounts-workloads-oppty-grid tr.is-draft-delete.is-selected > td,
+.accounts-workloads-oppty-grid tr.is-draft-delete.is-selected > td:nth-child(-n+2) { background: #fff1ed; }
 .accounts-workloads-aw-grid .is-plan { min-width: 9.5rem; width: 9.5rem; }
 .accounts-workloads-aw-grid thead th { top: 0; z-index: 22; }
 .accounts-workloads-opportunities { border-left-color: #c74634; }

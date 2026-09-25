@@ -84,6 +84,19 @@ const targetPeriod = (deal: AccountWorkloadDeal) =>
   deal.targetFiscalYear && deal.targetQuarter
     ? `${deal.targetFiscalYear} Q${deal.targetQuarter}`
     : "";
+const isDealDraftChanged = (draft: DealDraft) => {
+  if (!draft.original) return true;
+  return (
+    [
+      "name", "opportunityNo", "revenueType", "status", "targetFiscalYear",
+      "targetQuarter", "actualCloseDate", "contractStartDate", "contractEndDate",
+      "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability", "latestUpdate",
+    ] as const
+  ).some(
+    (field) =>
+      String(draft.deal[field] ?? "") !== String(draft.original?.[field] ?? ""),
+  );
+};
 const targetOptions = Array.from(
   { length: 16 },
   (_, index) => `FY${24 + Math.floor(index / 4)} Q${(index % 4) + 1}`,
@@ -208,10 +221,36 @@ export function AccountsWorkloadsPage({
     Set<string>
   >(new Set());
 
+  const changedAccountIds = new Set(
+    [...dirtyAccounts].filter((id) => {
+      const current = hierarchy.accounts.find((account) => account.id === id);
+      const original = baseline.accounts.find((account) => account.id === id);
+      return Boolean(current && (!original || current.name !== original.name));
+    }),
+  );
+  const changedWorkloadIds = new Set(
+    [...dirtyWorkloads].filter((id) => {
+      const current = hierarchy.accounts
+        .flatMap((account) => account.workloads)
+        .find((workload) => workload.id === id);
+      const original = baseline.accounts
+        .flatMap((account) => account.workloads)
+        .find((workload) => workload.id === id);
+      if (!current) return false;
+      if (!original) return true;
+      return (
+        current.name !== original.name ||
+        (current.lastUpdated ?? "") !== (original.lastUpdated ?? "") ||
+        (current.notes ?? "") !== (original.notes ?? "") ||
+        (current.plans[0]?.sourcePlanNumber?.trim() ?? "") !==
+          (original.plans[0]?.sourcePlanNumber?.trim() ?? "")
+      );
+    }),
+  );
   const dirty =
-    dirtyAccounts.size +
-      dirtyWorkloads.size +
-      dealDrafts.size +
+    changedAccountIds.size +
+      changedWorkloadIds.size +
+      [...dealDrafts.values()].filter(isDealDraftChanged).length +
       pendingDeleteWorkloadIds.size >
     0;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
@@ -645,6 +684,19 @@ export function AccountsWorkloadsPage({
     setSaving(true);
     setError("");
     const pageScrollY = window.scrollY;
+    const deletedDealIds = new Set(targets.map((deal) => deal.id));
+    const firstTarget = targets[0];
+    const currentDeals = hierarchy.accounts
+      .flatMap((account) => account.workloads)
+      .find((workload) => workload.id === firstTarget.workloadId)?.deals ?? [];
+    const targetIndex = currentDeals.findIndex((deal) => deal.id === firstTarget.id);
+    const adjacentDeal =
+      currentDeals
+        .slice(Math.max(targetIndex, 0) + 1)
+        .find((deal) => !deletedDealIds.has(deal.id)) ??
+      [...currentDeals.slice(0, Math.max(targetIndex, 0))]
+        .reverse()
+        .find((deal) => !deletedDealIds.has(deal.id));
     const scrollPositions = new Map(
       [...new Set(targets.map((deal) => deal.workloadId))].map((workloadId) => [
         workloadId,
@@ -670,6 +722,17 @@ export function AccountsWorkloadsPage({
           const scroller = document.querySelector<HTMLElement>(`[data-opportunity-scroll="${workloadId}"]`);
           if (scroller) scroller.scrollLeft = left;
         });
+        const focusTarget = adjacentDeal
+          ? document.querySelector<HTMLElement>(
+              `[data-opportunity-deal-id="${adjacentDeal.id}"]`,
+            )
+          : document.querySelector<HTMLElement>(
+              `[data-opportunity-scroll="${firstTarget.workloadId}"]`,
+            );
+        if (focusTarget) {
+          if (!adjacentDeal) focusTarget.tabIndex = -1;
+          focusTarget.focus({ preventScroll: true });
+        }
       });
       setNotice(`${targets.length} opportunity deleted.`);
     } catch (requestError) {
@@ -890,7 +953,7 @@ export function AccountsWorkloadsPage({
           continue;
         }
         if (
-          dirtyAccounts.has(account.id) &&
+          changedAccountIds.has(account.id) &&
           !request.accounts.some(
             (write) =>
               write.id === account.id ||
@@ -904,7 +967,7 @@ export function AccountsWorkloadsPage({
             name: account.name,
             action: "UPSERT",
           });
-        if (dirtyWorkloads.has(workload.id)) {
+        if (changedWorkloadIds.has(workload.id)) {
           if (!account.name.trim() || !workload.name.trim()) {
             setError("Account and Workload are required.");
             return;
@@ -1188,19 +1251,7 @@ export function AccountsWorkloadsPage({
         : field === "status"
           ? deal.status
           : String((deal as any)[field] ?? "");
-  const isDealDraftChanged = (draft: DealDraft) => {
-    if (!draft.original) return true;
-    return (
-      [
-        "name", "opportunityNo", "revenueType", "status", "targetFiscalYear",
-        "targetQuarter", "actualCloseDate", "contractStartDate", "contractEndDate",
-        "arrUsd", "arrKrw", "acrUsd", "acrKrw", "winProbability", "latestUpdate",
-      ] as const
-    ).some(
-      (field) =>
-        String(draft.deal[field] ?? "") !== String(draft.original?.[field] ?? ""),
-    );
-  };
+
   const renderDealCell = (
     workloadId: number,
     deal: AccountWorkloadDeal,
@@ -1871,6 +1922,8 @@ export function AccountsWorkloadsPage({
                                       return (
                                         <tr
                                           key={draftKey}
+                                          data-opportunity-deal-id={deal.id}
+                                          tabIndex={0}
                                           class={`${draft ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}${selectedDeals.has(deal.id) ? " is-selected" : ""}`}
                                           onClick={(event) => {
                                             if (isInteractive(event.target)) return;
