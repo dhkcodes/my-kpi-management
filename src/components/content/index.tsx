@@ -69,6 +69,7 @@ type Props = Readonly<{
   onCloseGuide: () => void;
   onOpenGuide: () => void;
   onSaveGuide: (draft: KpiGuideRecord) => Promise<KpiGuideRecord>;
+  onFxRateChange: (rateValue: number) => Promise<FxRateRecord>;
   onAccountsWorkloadsRowsChange: (rows: AccountWorkloadRow[], permanentDeleteIds: string[], fxRate?: FxRateRecord) => Promise<AccountsWorkloadsBatchSaveResponse>;
   onAccountsWorkloadsQueryChange: (query: Omit<AccountsWorkloadsListQuery, "fiscalYear">) => void;
   onAccountsWorkloadsDraftStateChange: (active: boolean) => void;
@@ -326,6 +327,7 @@ export function Content({
   onCloseGuide,
   onOpenGuide,
   onSaveGuide,
+  onFxRateChange,
 
   onAccountsWorkloadsRowsChange,
   onAccountsWorkloadsQueryChange,
@@ -635,6 +637,10 @@ export function Content({
           canWrite={canWrite}
           initialSearch={accountsWorkloadsQuery.search}
           onDraftStateChange={onAccountsWorkloadsDraftStateChange}
+          fxRate={fxRate}
+          fxLoading={fxLoading}
+          fxError={fxError}
+          onFxRateChange={onFxRateChange}
           breadcrumb={pageNavigation}
         />
       ) : activeRoute.module === "weeklyActivities" ? (
