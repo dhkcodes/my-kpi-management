@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 const page = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelected"), page.indexOf("const deleteSelected"));
-const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelSelected"));
+const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelAllDrafts"));
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
-const cancelHandler = page.slice(page.indexOf("const cancelSelected"), page.indexOf("const saveAwDrafts"));
+const cancelHandler = page.slice(page.indexOf("const cancelAllDrafts"), page.indexOf("const planWriteFor"));
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 
 assert.match(page, /type AwField = "account" \| "workload" \| "plan" \| "lastUpdated" \| "notes"/);
@@ -32,8 +32,12 @@ assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!remov
   "unsaved workload deletion is local removal");
 assert.match(page, /const rows = allRows/,
   "visible hierarchy rows are derived from the server response");
-assert.match(cancelHandler, /savedAccount = baseline\.accounts\.find/);
-assert.match(cancelHandler, /savedAccount\?\.workloads\.find/);
+assert.match(cancelHandler, /setHierarchy\(baseline\)/,
+  "AW Cancel restores the complete last-saved hierarchy without depending on row selection");
+assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
+assert.match(cancelHandler, /setPendingDeleteWorkloadIds\(new Set\(\)\)/);
+assert.match(cancelHandler, /setFxRateValue\(savedFxRateValue\)/,
+  "AW Cancel clears opportunity drafts, delete drafts and unsaved FX state together");
 assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW moved to Draft Delete/,
   "server-accepted Draft Delete reports completion immediately");
 assert.match(page, /<oj-dialog/);
@@ -70,14 +74,22 @@ assert.match(page, /Oppty ID/);
 assert.match(page, /Add Opportunity/);
 assert.match(page, /const changedDrafts = \[\.\.\.dealDrafts\.values\(\)\]\.filter\(isDealDraftChanged\)[\s\S]*const drafts = dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*deals: drafts\.map\(\(draft\) => dealWrite/,
   "one opportunity Save sends every changed opportunity draft in one atomic hierarchy request");
-assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setDealDrafts\(\(current\) =>/,
+assert.match(page, /const mergeConfirmedDeals[\s\S]*setHierarchy\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*setBaseline\(\(current\) => mergeConfirmedDeals\(current\)\)[\s\S]*clearSubmittedDrafts\(\)/,
   "successful opportunity batch save merges confirmed deals without discarding unrelated AW drafts");
+assert.match(page, /validateConfirmedOpportunityWrites\(submittedWrites, confirmedWorkloads, baselineWorkloads\)[\s\S]*catch\s*\{[\s\S]*fetchAccountsWorkloadsHierarchy\(\{[\s\S]*includeDeletedDeals:\s*true/,
+  "an incomplete save response is rechecked with an unfiltered server reload before it is treated as unconfirmed");
+assert.match(page, /if \(saveAccepted\)[\s\S]*clearSubmittedDrafts\(\)[\s\S]*Drafts were cleared to prevent duplicate creation/,
+  "post-commit confirmation failures are distinguished from save failures and cannot leave retryable duplicate-creation drafts");
 assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
 assert.match(page, /const updateDealDraft[\s\S]*if \(dealSaveLock\.isLocked\(\)\) return/,
   "opportunity draft mutation is blocked immediately while a save is in flight");
 assert.match(page, /cancelDeal\(activeDraft\.key\)/,
   "an opportunity row Cancel is isolated to that opportunity draft");
+assert.match(cancelHandler, /setError\(""\)[\s\S]*setSaveErrors\(\[\]\)/,
+  "global Cancel clears stale validation feedback after restoring saved state");
+assert.match(page, /aria-label="Dismiss error"[\s\S]*setError\(""\)[\s\S]*setSaveErrors\(\[\]\)/,
+  "validation feedback has an accessible dismiss action without changing validation rules");
 assert.doesNotMatch(page, /const hasNewDeal =|const hasNewAw =/,
   "new AW and opportunity drafts are not globally single-row locked");
 assert.match(page, /new Map\(current\)\.set\(key, \{ key, workloadId, original: null, deal \}\)/,
@@ -117,14 +129,19 @@ assert.match(page, /field === "revenueType"[\s\S]*value=\{value\}[\s\S]*<option 
   "Revenue Type editing selects the current value");
 assert.match(styles, /accounts-workloads-child-row > td \{[^}]*padding: 14px 14px 14px 62px/,
   "expanded opportunity boxes keep equal top and bottom spacing");
-assert.match(styles, /accounts-workloads-grid-wrap\.accounts-workloads-grid-wrap--compact\s*\{[^}]*overflow:\s*visible/,
-  "the parent AW table no longer creates a horizontal scroll container");
+const awScrollFrame = styles.match(
+  /\.accounts-workloads-grid-wrap\.accounts-workloads-grid-wrap--compact\s*\{([^}]*)\}/,
+)?.[1] ?? "";
+assert.match(awScrollFrame, /overflow:\s*auto/,
+  "the bounded AW table owns scrolling so the page frame and last row are not clipped by the footer");
+assert.match(awScrollFrame, /min-height:\s*0/);
+assert.match(awScrollFrame, /flex:\s*1\s+1\s+auto/);
 assert.match(styles, /accounts-workloads-grid\.accounts-workloads-aw-grid\s*\{[^}]*min-width:\s*0/,
   "the high-specificity legacy AW minimum width is reset");
 assert.match(styles, /accounts-workloads-grid\.accounts-workloads-aw-grid th,[\s\S]*accounts-workloads-grid\.accounts-workloads-aw-grid td\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*none/,
   "legacy per-column minimum widths cannot force horizontal overflow");
-assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(-n \+ 5\),[\s\S]*position:\s*static/,
-  "AW identity and Plan columns explicitly override legacy sticky selectors");
+assert.match(styles, /accounts-workloads-aw-grid\s*>\s*thead[\s\S]*position:\s*static/,
+  "AW-only layout resets are scoped to direct parent-table cells and cannot leak into nested Opportunities");
 assert.match(styles, /accounts-workloads-aw-grid[\s\S]*table-layout:\s*fixed[\s\S]*width:\s*100%/,
   "AW columns fit the available width rather than being clipped");
 assert.match(page, /data-deal-draft-key[\s\S]*is-editing-cell input,[\s\S]*is-editing-cell textarea,[\s\S]*is-editing-cell select/,
@@ -137,7 +154,7 @@ assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
   "ellipsis cells expose the full value on hover only when truncated");
 assert.match(page, /field === "plan"\s*\? \{[\s\S]*plans:/,
   "only the Plan editor can update the Plan value; Account edits cannot fall through to it");
-assert.match(page, /selectedCount > 0 && !editCell && selectedDirtyCount === 0/,
+assert.match(page, /selectedCount > 0 && !editCell && !dirty/,
   "AW delete actions are hidden whenever a cell is being edited");
 assert.match(page, /selectedDeals\.size > 0 && !dealEditCell/,
   "Opportunity delete is hidden whenever an opportunity cell is being edited");
@@ -159,6 +176,30 @@ assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*i
   "Include Deleted cannot wrap its label below the checkbox");
 assert.match(styles, /\.accounts-workloads-oppty-grid\s*\{[^}]*table-layout:\s*fixed/,
   "opportunity column width and sticky offsets use one deterministic fixed layout");
+assert.match(styles, /\.accounts-workloads-oppty-grid th:nth-child\(1\),[\s\S]*position:\s*sticky/,
+  "the final cascade explicitly keeps Oppty Name and Oppty ID sticky");
+assert.match(styles, /\.accounts-workloads-oppty-grid td:nth-child\(n \+ 3\)\s*\{[^}]*position:\s*relative/,
+  "scrolling opportunity cells establish their own containing block for the changed-cell marker");
+assert.match(styles, /\.accounts-workloads-aw-grid \.accounts-workloads-oppty-grid td:nth-child\(n \+ 3\)\s*\{[^}]*z-index:\s*auto/,
+  "leaked parent-table z-index cannot place scrolling opportunity cells above the two sticky identity columns");
+assert.match(styles, /\.accounts-workloads-page\.accounts-hierarchy-page\s*\{[^}]*height:\s*calc\([^}]*overflow:\s*hidden/,
+  "the AW page remains a bounded flex frame so its table owns scrolling above the footer");
+assert.match(page, /changedAccountIds\.has\(account\.id\) && !account\.name\.trim\(\)/,
+  "blank Account values are rejected before any save request is sent");
+assert.match(page, /aria-required=\{field === "account" \|\| field === "workload" \? "true" : undefined\}/,
+  "required AW editors expose their requirement to assistive technology");
+assert.match(styles, /\.accounts-workloads-oppty-grid td\.is-unsaved-cell::after\s*\{[^}]*left:\s*\.35rem[^}]*right:\s*\.35rem/,
+  "the draft line remains visible but is bounded to the changed opportunity cell");
+assert.match(page, /type="button"[\s\S]*class="accounts-workloads-add-aw"[\s\S]*onClick=\{addAw\}/,
+  "Add Account & Workload cannot submit the search form");
+assert.match(page, /\(field === "account" \|\| field === "workload"\) && \([\s\S]*accounts-workloads-required-marker/,
+  "AW required fields are identified where values are entered");
+assert.match(page, /Oppty Name[\s\S]*?<span class="accounts-workloads-required-marker"/,
+  "Opportunity Name is visibly identified as required");
+assert.match(styles, /\.accounts-workloads-header\s*\{[^}]*z-index:\s*40/,
+  "the header establishes a stacking context above sticky table headers");
+assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
+  "the complete exchange-rate popover stays above table content");
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,
   "Opportunity save owns a synchronous mutation lock");
 assert.match(page, /const beginDealEdit[\s\S]*?if \(!canWrite \|\| dealSaveLock\.isLocked\(\)\) return;/);
