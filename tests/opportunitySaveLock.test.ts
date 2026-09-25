@@ -105,6 +105,27 @@ const run = async () => {
     true,
     "editing is restored after failure",
   );
+
+  const uncertainLock = createOpportunitySaveLock();
+  const uncertainSnapshot = uncertainLock.tryStart([submitted]);
+  assert.ok(uncertainSnapshot);
+  uncertainLock.markAwaitingConfirmation();
+  uncertainLock.release();
+  assert.equal(uncertainLock.isAwaitingConfirmation(), true,
+    "an unknown POST result enters a distinct pending-confirmation state");
+  assert.equal(uncertainLock.isLocked(), true,
+    "ordinary finally cleanup cannot unlock an uncertain POST result");
+  assert.deepEqual(uncertainLock.pendingSnapshot(), [submitted],
+    "the exact submitted draft snapshot remains in memory while confirmation is pending");
+  assert.equal(uncertainLock.tryStart([submitted]), null,
+    "Save cannot resend while GET confirmation is pending");
+  assert.equal(uncertainLock.tryMutation(() => undefined), false,
+    "draft edits cannot invalidate the pending submission snapshot");
+  uncertainLock.confirmReconciled();
+  assert.equal(uncertainLock.isAwaitingConfirmation(), false);
+  assert.equal(uncertainLock.isLocked(), false,
+    "only explicit reconciliation releases the pending-confirmation gate");
+  assert.equal(uncertainLock.pendingSnapshot(), null);
 };
 
 void run().catch((error) => {
