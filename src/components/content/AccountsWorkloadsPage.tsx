@@ -255,6 +255,28 @@ export function AccountsWorkloadsPage({
     0;
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!editCell && !dealEditCell) return;
+    const frame = window.requestAnimationFrame(() => {
+      const selector = editCell
+        ? `[data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell input, [data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell textarea`
+        : `[data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell input, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell select`;
+      const editor = document.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector);
+      editor?.focus();
+      if (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) {
+        const end = editor.value.length;
+        editor.setSelectionRange(end, end);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editCell, dealEditCell]);
+
   const reload = async () => {
     setLoading(true);
     setError("");
@@ -391,9 +413,33 @@ export function AccountsWorkloadsPage({
             },
       ),
     }));
-    if (field === "account")
-      setDirtyAccounts((current) => new Set(current).add(accountId));
-    else setDirtyWorkloads((current) => new Set(current).add(workloadId));
+    const currentAccount = hierarchy.accounts.find((item) => item.id === accountId);
+    const currentWorkload = currentAccount?.workloads.find((item) => item.id === workloadId);
+    const baselineAccount = baseline.accounts.find((item) => item.id === accountId);
+    const baselineWorkload = baselineAccount?.workloads.find((item) => item.id === workloadId);
+    if (field === "account") {
+      setDirtyAccounts((current) => {
+        const next = new Set(current);
+        if (accountId < 0 || value !== (baselineAccount?.name ?? "")) next.add(accountId);
+        else next.delete(accountId);
+        return next;
+      });
+    } else {
+      const nextName = field === "workload" ? value : (currentWorkload?.name ?? "");
+      const nextPlan = field === "plan" ? value : (currentWorkload?.plans[0]?.sourcePlanNumber ?? "");
+      const nextUpdated = field === "lastUpdated" ? value : (currentWorkload?.lastUpdated ?? "");
+      const nextNotes = field === "notes" ? value : (currentWorkload?.notes ?? "");
+      const changed = workloadId < 0 || !baselineWorkload ||
+        nextName !== baselineWorkload.name ||
+        nextPlan !== (baselineWorkload.plans[0]?.sourcePlanNumber ?? "") ||
+        nextUpdated !== (baselineWorkload.lastUpdated ?? "") ||
+        nextNotes !== (baselineWorkload.notes ?? "");
+      setDirtyWorkloads((current) => {
+        const next = new Set(current);
+        if (changed) next.add(workloadId); else next.delete(workloadId);
+        return next;
+      });
+    }
   };
 
   const awValue = (
@@ -806,6 +852,31 @@ export function AccountsWorkloadsPage({
           ? requestError.errors
           : [],
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restoreSelected = async () => {
+    const targets = rows.filter((row) => selectedRows.has(row.key) && row.workload.id > 0 && row.workload.archived);
+    if (!targets.length) return;
+    setSaving(true);
+    setError("");
+    try {
+      await saveAccountsWorkloadsHierarchy({
+        accounts: [], deals: [], workloadPlans: [],
+        workloads: targets.map((row) => ({
+          id: row.workload.id, clientId: null, accountRef: String(row.account.id),
+          versionNo: row.workload.versionNo, name: row.workload.name,
+          lastUpdated: row.workload.lastUpdated, notes: row.workload.notes,
+          highlighted: row.workload.highlighted, action: "RESTORE",
+        })),
+      });
+      setSelectedRows(new Set());
+      await reload();
+      setNotice(`${targets.length} AW restored.`);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
     } finally {
       setSaving(false);
     }
@@ -1513,8 +1584,7 @@ export function AccountsWorkloadsPage({
   };
 
   const selectedCount = rows.filter((row) => selectedRows.has(row.key)).length;
-  const hasNewAw = allRows.some((row) => row.workload.id < 0);
-  const hasNewDeal = [...dealDrafts.values()].some((draft) => !draft.original);
+  const selectedArchivedCount = rows.filter((row) => selectedRows.has(row.key) && row.workload.archived).length;
   const selectedDirtyCount = allRows.filter(
     (row) =>
       selectedRows.has(row.key) &&
@@ -1546,7 +1616,7 @@ export function AccountsWorkloadsPage({
         <div class="consumption-import-actions accounts-workloads-header-actions">
           <oj-button
             chroming="outlined"
-            disabled={!canWrite || saving || hasNewAw}
+            disabled={!canWrite || saving}
             onojAction={() => void openForecast()}
           >
             <span slot="startIcon" class="oj-ux-ico-plus" />
@@ -1554,7 +1624,7 @@ export function AccountsWorkloadsPage({
           </oj-button>
           <oj-button
             chroming="callToAction"
-            disabled={!canWrite || saving || hasNewAw}
+            disabled={!canWrite || saving}
             onojAction={addAw}
           >
             Add Account & Workload
@@ -1602,25 +1672,7 @@ export function AccountsWorkloadsPage({
           />
           Include Deleted
         </label>
-        {selectedCount > 0 && rows.some((row) => selectedRows.has(row.key) && row.workload.id > 0) && (
-          <button
-            type="button"
-            class="accounts-workloads-button"
-            disabled={!canWrite || saving}
-            onClick={deleteSelected}
-          >
-            Delete
-          </button>
-        )}
-        {selectedDirtyCount > 0 && (
-          <button
-            type="button"
-            class="accounts-workloads-button"
-            onClick={cancelSelected}
-          >
-            Cancel
-          </button>
-        )}
+        <span class="accounts-workloads-toolbar-spacer" />
         {savableAwDraftCount > 0 && (
           <button
             type="button"
@@ -1631,13 +1683,21 @@ export function AccountsWorkloadsPage({
             {saving ? "Saving…" : "Save"}
           </button>
         )}
-        <span class="accounts-workloads-toolbar-spacer" />
-        <oj-button chroming="outlined" disabled={!canWrite || saving || hasNewAw} onojAction={() => void openForecast()}>
-          Account Recommendations
-        </oj-button>
-        <oj-button chroming="callToAction" disabled={!canWrite || saving || hasNewAw} onojAction={addAw}>
-          Add Account & Workload
-        </oj-button>
+        {selectedDirtyCount > 0 && (
+          <button type="button" class="accounts-workloads-button" onClick={cancelSelected}>
+            Cancel
+          </button>
+        )}
+        {selectedCount > 0 && selectedDirtyCount === 0 && selectedArchivedCount > 0 && (
+          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
+            Restore
+          </button>
+        )}
+        {selectedCount > 0 && selectedDirtyCount === 0 && (
+          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
+            {selectedArchivedCount > 0 ? "Delete" : "Draft Delete"}
+          </button>
+        )}
       </form>
       <div class="accounts-workloads-table-summary">
         <span>{hierarchy.accounts.length} accounts</span>
@@ -1737,6 +1797,7 @@ export function AccountsWorkloadsPage({
                 return (
                   <Fragment key={key}>
                     <tr
+                      data-aw-row-key={key}
                       class={`accounts-workloads-parent-row${workload.highlighted ? " is-highlighted" : ""}${selectedRows.has(key) ? " is-selected" : ""}${pendingDelete ? " is-pending-delete" : ""}`}
                       onClick={(event) => {
                         if (isInteractive(event.target)) return;
@@ -1844,8 +1905,7 @@ export function AccountsWorkloadsPage({
                                   type="button"
                                   disabled={
                                     !canWrite ||
-                                    workload.id < 0 ||
-                                    hasNewDeal
+                                    workload.id < 0
                                   }
                                   onClick={() => addDeal(workload.id)}
                                 >
@@ -1922,6 +1982,7 @@ export function AccountsWorkloadsPage({
                                       return (
                                         <tr
                                           key={draftKey}
+                                          data-deal-draft-key={draftKey}
                                           data-opportunity-deal-id={deal.id}
                                           tabIndex={0}
                                           class={`${draft ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}${selectedDeals.has(deal.id) ? " is-selected" : ""}`}

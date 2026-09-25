@@ -3935,3 +3935,63 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-grid tr.is-selected > td,
 .accounts-workloads-oppty-grid tr.is-selected > td:nth-child(-n+2) { background: #fdeceb; }
 .kap-header-wordmark { height: 2.6rem; width: min(19rem, 52vw); }
+
+/* Additional revision 4: one authoritative cascade for the AW workspace. */
+.accounts-workloads-header-actions { display: flex; align-self: flex-end; }
+.accounts-workloads-toolbar--compact {
+  display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0;
+}
+.accounts-workloads-toolbar--compact .accounts-workloads-search {
+  flex: 0 1 31rem; width: min(31rem, 58vw); min-width: 20rem;
+}
+.accounts-workloads-toolbar--compact .accounts-workloads-search input {
+  border-radius: .35rem 0 0 .35rem; border-right: 0;
+}
+.accounts-workloads-toolbar--compact .consumption-range-apply {
+  align-self: flex-end; margin: 0 .8rem 0 0; height: 2.25rem;
+  border-radius: 0 .35rem .35rem 0; border-color: #8091a5;
+  background: #52677f; color: #fff;
+}
+.accounts-workloads-toolbar--compact .consumption-range-apply:hover { background: #40556d; }
+.accounts-workloads-include-deleted { align-self: center; margin: 0 0 0 .15rem; }
+.accounts-workloads-page #accountsWorkloadsTitle { font-size: clamp(1.7rem, 2.2vw, 2.25rem); }
+
+.accounts-workloads-parent-row.is-highlighted:not(.is-selected) > td,
+.accounts-workloads-parent-row.is-highlighted:hover:not(.is-selected) > td { background: #fff; }
+.accounts-workloads-highlight.is-active,
+.accounts-workloads-highlight[aria-pressed="true"] { color: #e1a900; }
+.accounts-workloads-aw-grid th:nth-child(4), .accounts-workloads-aw-grid td:nth-child(4) {
+  min-width: 270px; width: 270px;
+}
+.accounts-workloads-aw-grid th:nth-child(5), .accounts-workloads-aw-grid td:nth-child(5),
+.accounts-workloads-aw-grid .is-plan { min-width: 9.5rem; width: 9.5rem; max-width: 9.5rem; }
+.accounts-workloads-aw-grid th:nth-child(9), .accounts-workloads-aw-grid td:nth-child(9),
+.accounts-workloads-aw-grid th:nth-child(10), .accounts-workloads-aw-grid td:nth-child(10) {
+  min-width: 240px; width: 240px; max-width: 240px;
+}
+.accounts-workloads-cell-display, .accounts-workloads-ellipsis {
+  display: block; min-width: 0; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.accounts-workloads-table-wrap { position: relative; overflow: auto; isolation: isolate; }
+.accounts-workloads-aw-grid thead { position: sticky; top: 0; z-index: 30; }
+.accounts-workloads-aw-grid thead th { background: #f4f6f8; }
+.accounts-workloads-parent-row.is-pending-delete > td,
+.accounts-workloads-parent-row.is-pending-delete:hover > td,
+.accounts-workloads-parent-row.is-pending-delete > td:nth-child(-n+4),
+.accounts-workloads-parent-row.is-pending-delete:hover > td:nth-child(-n+4) { background: #fff1ed; }
+.accounts-workloads-parent-row.is-pending-delete.is-selected > td,
+.accounts-workloads-parent-row.is-pending-delete.is-selected > td:nth-child(-n+4) { background: #fbd5ce; }
+
+.accounts-workloads-oppty-grid { table-layout: fixed; }
+.accounts-workloads-oppty-grid th:nth-child(-n+2),
+.accounts-workloads-oppty-grid td:nth-child(-n+2) { background: #fff; background-clip: border-box; }
+.accounts-workloads-oppty-grid tbody tr:not(.is-selected):not(.is-draft-delete) > td { background: #fff; }
+.accounts-workloads-oppty-grid tr.is-selected > td,
+.accounts-workloads-oppty-grid tr.is-selected:hover > td,
+.accounts-workloads-oppty-grid tr.is-selected > td:nth-child(-n+2) { background: #fde0dd; }
+.accounts-workloads-oppty-grid tr.is-draft-delete > td,
+.accounts-workloads-oppty-grid tr.is-draft-delete:hover > td,
+.accounts-workloads-oppty-grid tr.is-draft-delete > td:nth-child(-n+2) { background: #fff1ed; }
+.accounts-workloads-oppty-grid th:nth-child(5), .accounts-workloads-oppty-grid td:nth-child(5) { min-width: 148px; width: 148px; }
+.accounts-workloads-oppty-grid th:nth-child(6), .accounts-workloads-oppty-grid td:nth-child(6) { min-width: 120px; width: 120px; }
