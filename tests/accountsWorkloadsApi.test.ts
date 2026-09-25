@@ -11,6 +11,7 @@ import {
   persistAccountWorkloadChanges,
   persistAndReconcileAccountWorkloadChanges,
   restoreAccountWorkload,
+  saveAccountsWorkloadsHierarchyWithResults,
   saveAccountsWorkloadsBatch,
   AccountsWorkloadsPersistenceError,
   AccountsWorkloadsApiError,
@@ -520,6 +521,27 @@ async function run() {
     })),
     /malformed/i,
     "preview candidates without source version must be rejected"
+  );
+
+  const hierarchySave = await saveAccountsWorkloadsHierarchyWithResults(
+    { accounts: [], workloads: [], deals: [], workloadPlans: [] },
+    async () => response({
+      hierarchy: { fiscalYear: null, accounts: [] },
+      dealResults: [
+        { clientId: "draft:-8", serverId: 808, workloadId: 51, action: "UPSERT" }
+      ]
+    })
+  );
+  assert.deepEqual(hierarchySave.dealResults, [
+    { clientId: "draft:-8", serverId: 808, workloadId: 51, action: "UPSERT" }
+  ], "hierarchy saves expose deal correlation results without depending on response order");
+  await assert.rejects(
+    () => saveAccountsWorkloadsHierarchyWithResults(
+      { accounts: [], workloads: [], deals: [], workloadPlans: [] },
+      async () => response({ hierarchy: { fiscalYear: null, accounts: [] } })
+    ),
+    /Malformed Accounts & Workloads save response/,
+    "a save response without deal correlation results is rejected"
   );
 
   delete (globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string }).__KPI_API_BASE_URL__;
