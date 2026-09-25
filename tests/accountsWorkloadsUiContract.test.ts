@@ -14,10 +14,8 @@ assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
   "Latest Update and Notes retain multiline editors");
 assert.match(page, /accounts-workloads-ellipsis/);
-assert.match(page, /accounts-workloads-instant-tooltip/,
-  "truncated cells use the overflow-safe zero-delay tooltip");
-assert.doesNotMatch(page, /class="accounts-workloads-ellipsis" title=/,
-  "truncated cells do not fall back to the delayed native title tooltip");
+assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
+  "truncated cells expose their complete value through the browser tooltip");
 assert.doesNotMatch(page, /Double-click to edit/);
 assert.match(page, /Account[\s\S]*Workload[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
 assert.match(page, /sortField === "arrUsd"/);
@@ -114,8 +112,15 @@ assert.match(page, /field === "revenueType"[\s\S]*value=\{value\}[\s\S]*<option 
   "Revenue Type editing selects the current value");
 assert.match(styles, /accounts-workloads-child-row > td \{[^}]*padding: 14px 14px 14px 62px/,
   "expanded opportunity boxes keep equal top and bottom spacing");
-assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(4\)/);
-assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(5\)/,
-  "Account and Workload columns remain fixed");
+assert.match(styles, /accounts-workloads-aw-grid th:nth-child\(5\)[\s\S]*left:\s*540px[^}]*position:\s*sticky/,
+  "Plan Number remains fixed beside Account and Workload during horizontal scrolling");
+assert.match(page, /data-deal-draft-key[\s\S]*is-editing-cell input,[\s\S]*is-editing-cell textarea,[\s\S]*is-editing-cell select/,
+  "opportunity inputs and textareas receive one-time row-scoped focus");
+assert.doesNotMatch(page, /onFocus=\{focusToEnd\}/,
+  "focus handlers do not repeatedly force the caret after the initial edit focus");
+assert.match(page, /const changed = !baselineWorkload \|\| value !== original/,
+  "all cells in a new AW row, including a blank Plan Number, retain draft styling");
+assert.match(page, /element\.scrollWidth > element\.clientWidth \? value : ""/,
+  "ellipsis cells expose the full value on hover only when truncated");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");

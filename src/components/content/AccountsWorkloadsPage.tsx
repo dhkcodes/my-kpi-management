@@ -72,11 +72,6 @@ const friendlyError = (error: unknown) =>
 const isInteractive = (target: EventTarget | null) =>
   target instanceof Element &&
   Boolean(target.closest("input,select,textarea,button,a,oj-button"));
-const focusToEnd = (event: FocusEvent) => {
-  const target = event.currentTarget as HTMLInputElement | HTMLTextAreaElement;
-  const end = target.value.length;
-  requestAnimationFrame(() => target.setSelectionRange(end, end));
-};
 const fmtUsd = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const fmtMoney = (value: number | null) =>
   value === null ? "—" : fmtUsd.format(value);
@@ -266,7 +261,7 @@ export function AccountsWorkloadsPage({
     const frame = window.requestAnimationFrame(() => {
       const selector = editCell
         ? `[data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell input, [data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell textarea`
-        : `[data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell input, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell select`;
+        : `[data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell input, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell textarea, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell select`;
       const editor = document.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector);
       editor?.focus();
       if (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) {
@@ -488,13 +483,15 @@ export function AccountsWorkloadsPage({
     }
   };
   const tooltip = (value: string, empty = "—") => (
-    <span class="accounts-workloads-ellipsis" tabIndex={value ? 0 : undefined}>
-      <span>{value || empty}</span>
-      {value && (
-        <span class="accounts-workloads-instant-tooltip" role="tooltip">
-          {value}
-        </span>
-      )}
+    <span
+      class="accounts-workloads-ellipsis"
+      tabIndex={value ? 0 : undefined}
+      onMouseEnter={(event) => {
+        const element = event.currentTarget;
+        element.title = value && element.scrollWidth > element.clientWidth ? value : "";
+      }}
+    >
+      {value || empty}
     </span>
   );
   const truncatedWorkload = (value: string) => (
@@ -526,7 +523,7 @@ export function AccountsWorkloadsPage({
       baselineAccount && baselineWorkload
         ? awValue(baselineAccount, baselineWorkload, field)
         : "";
-    const changed = value !== original;
+    const changed = !baselineWorkload || value !== original;
     return (
       <td
         class={`${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
@@ -540,7 +537,6 @@ export function AccountsWorkloadsPage({
           field === "lastUpdated" || field === "notes" ? (
             <textarea
               autoFocus
-              onFocus={focusToEnd}
               class="accounts-workloads-edit-field"
               value={value}
               onInput={(event) =>
@@ -559,7 +555,6 @@ export function AccountsWorkloadsPage({
           ) : (
             <input
               autoFocus
-              onFocus={focusToEnd}
               class="accounts-workloads-edit-field"
               value={value}
               onInput={(event) =>
@@ -1350,6 +1345,9 @@ export function AccountsWorkloadsPage({
             }
             onBlur={() => setDealEditCell(null)}
           >
+            {value && !["NEW", "EXPANSION", "RENEWAL"].includes(value) && (
+              <option value={value}>{value}</option>
+            )}
             <option value="NEW">New</option>
             <option value="EXPANSION">Expansion</option>
             <option value="RENEWAL">Renewal</option>
@@ -1412,7 +1410,6 @@ export function AccountsWorkloadsPage({
         editor = (
           <input
             autoFocus
-            onFocus={focusToEnd}
             type="number"
             value={value}
             onInput={(event) =>
@@ -1425,7 +1422,6 @@ export function AccountsWorkloadsPage({
         editor = (
           <textarea
             autoFocus
-            onFocus={focusToEnd}
             value={value}
             onInput={(event) =>
               updateDealDraft(key, field, event.currentTarget.value)
@@ -1437,7 +1433,6 @@ export function AccountsWorkloadsPage({
         editor = (
           <input
             autoFocus
-            onFocus={focusToEnd}
             value={value}
             onInput={(event) =>
               updateDealDraft(key, field, event.currentTarget.value)
@@ -1985,7 +1980,7 @@ export function AccountsWorkloadsPage({
                                           data-deal-draft-key={draftKey}
                                           data-opportunity-deal-id={deal.id}
                                           tabIndex={0}
-                                          class={`${draft ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}${selectedDeals.has(deal.id) ? " is-selected" : ""}`}
+                                          class={`${draft && isDealDraftChanged(draft) ? "is-draft" : ""}${draft?.deal.deleted || deal.deleted ? " is-draft-delete" : ""}${selectedDeals.has(deal.id) ? " is-selected" : ""}`}
                                           onClick={(event) => {
                                             if (isInteractive(event.target)) return;
                                             event.stopPropagation();
