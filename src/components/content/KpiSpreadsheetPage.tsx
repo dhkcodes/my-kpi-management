@@ -471,10 +471,10 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   let editor: h.JSX.Element;
   if (field.type === "workload") {
     editor = <div class="kpi-workload-launcher">
-      <input id={`kpi-workload-launcher-${state.generation}`} ref={workloadInputRef} type="search" value={query} role="combobox" aria-label="Search Account, Workload, or Oppty.No"
+      <input id={`kpi-workload-launcher-${state.generation}`} ref={workloadInputRef} type="search" value={query} role="combobox" aria-label="Search Account, Workload, or Oppty"
         aria-controls={`kpi-workload-options-${state.generation}`} aria-expanded={workloadActive}
         aria-activedescendant={`kpi-workload-option-${state.generation}-${activeWorkloadIndex}`}
-        placeholder={row.accountWorkload || "Search Account, Workload, or Oppty.No"}
+        placeholder={row.accountWorkload || "Search Account, Workload, or Oppty"}
         onInput={(event) => { setQuery((event.currentTarget as HTMLInputElement).value); setActiveWorkloadIndex(0); setWorkloadActive(true); }}
         onClick={() => { setWorkloadActive(true); openPopup(); }} onKeyDown={blockContractKey} onKeyUp={keyContract} />
       <oj-popup ref={workloadPopupRef} class="kpi-workload-results-popup" autoDismiss="focusLoss" initialFocus="none" modality="modeless" tail="none">
@@ -482,7 +482,8 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
           onScroll={(event) => { const target = event.currentTarget as HTMLDivElement; if (target.scrollTop + target.clientHeight >= target.scrollHeight - 8) loadMore(); }}>
           <button id={`kpi-workload-option-${state.generation}-0`} type="button" role="option" aria-selected={activeWorkloadIndex === 0} tabIndex={-1}
             class="kpi-workload-reset-option" onMouseDown={(event) => event.preventDefault()} onClick={resetWorkload}>
-            <strong>선택 안함</strong><small>기존 값으로 되돌리기</small>
+            <strong>{row.workloadId != null ? row.accountWorkload : "선택 안함"}</strong>
+            <small>{row.workloadId != null ? "현재 연결 유지" : "기존 값으로 되돌리기"}</small>
           </button>
           {options.map((option, index) => <button key={option.selectionId} id={`kpi-workload-option-${state.generation}-${index + 1}`} type="button" role="option"
             aria-selected={activeWorkloadIndex === index + 1} tabIndex={-1} title={formatKpiWorkloadOption(option)}

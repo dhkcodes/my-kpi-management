@@ -27,27 +27,16 @@ assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,
 assert.match(page, /key: rowKey\(account\.id, workload\.id\)/,
   "selection, expansion and sorting use stable entity IDs");
 const api = readFileSync("src/data/accountsWorkloadsApi.ts", "utf8");
-assert.match(page, /pendingDeleteWorkloadIds/,
-  "saved workloads use an explicit local pending-delete draft state");
-assert.match(page, /setPendingDeleteWorkloadIds/);
-assert.match(deleteHandler, /if \(permanentTargets\.length\)[\s\S]*permanentDeleteDialogRef\.current\?\.open\(\)[\s\S]*return;[\s\S]*const newlyPendingIds = draftTargets/,
-  "the first Delete stays local; only re-deleting an already pending workload reaches the permanent-delete API path");
+assert.match(deleteHandler, /row\.workload\.archived[\s\S]*action: "ARCHIVE"[\s\S]*await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*await reload\(\)/,
+  "the first Delete immediately persists Draft Delete and refreshes the list");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!removedWorkloadIds\.has\(workload\.id\)/,
   "unsaved workload deletion is local removal");
 assert.match(page, /const rows = allRows/,
-  "pending-delete workloads remain visible so pre-save aggregates stay based on the existing saved data");
-assert.match(page, /is-pending-delete[\s\S]*Draft Delete/,
-  "pending-delete workloads are visibly marked until Save or Cancel");
+  "visible hierarchy rows are derived from the server response");
 assert.match(cancelHandler, /savedAccount = baseline\.accounts\.find/);
 assert.match(cancelHandler, /savedAccount\?\.workloads\.find/);
-assert.match(cancelHandler, /setPendingDeleteWorkloadIds/,
-  "Cancel clears pending-delete state and restores edited workload children from baseline");
-assert.match(page, /pendingDeleteWorkloadIds\.has\(workload\.id\)[\s\S]*action: "ARCHIVE"/,
-  "Save turns the pending-delete draft into one workload-level logical delete action");
-assert.match(page, /archivedIds[\s\S]*workloads\.filter\([\s\S]*!archivedIds\.has\(workload\.id\)/,
-  "a successful logical delete remains absent even if the save response contains the archived workload");
-assert.match(page, /setPendingDeleteWorkloadIds\(new Set\(\)\)[\s\S]*setSelectedRows\(new Set\(\)\)/,
-  "a successful logical delete clears local pending-delete state only after the server accepts it");
+assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW moved to Draft Delete/,
+  "server-accepted Draft Delete reports completion immediately");
 assert.match(page, /<oj-dialog/);
 assert.match(page, /Permanently delete/);
 assert.match(page, /confirmPermanentDelete/,
