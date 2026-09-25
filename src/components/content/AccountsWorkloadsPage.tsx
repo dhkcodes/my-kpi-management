@@ -21,6 +21,7 @@ import {
   forecastCandidateKey,
   saveAccountsWorkloadsHierarchy,
 } from "../../data/accountsWorkloadsApi";
+import { createOpportunitySaveLock } from "./opportunitySaveLock";
 
 type Props = Readonly<{
   canWrite: boolean;
@@ -185,7 +186,7 @@ export function AccountsWorkloadsPage({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const dealSavingRef = useRef(false);
+  const dealSaveLock = useRef(createOpportunitySaveLock()).current;
   const [error, setError] = useState("");
   const [saveErrors, setSaveErrors] = useState<AccountsWorkloadsFieldError[]>(
     [],
@@ -589,6 +590,7 @@ export function AccountsWorkloadsPage({
   };
 
   const addAw = () => {
+    if (dealSaveLock.isLocked()) return;
     const accountId = nextTempId.current--;
     const workloadId = nextTempId.current--;
     setHierarchy((current) => ({
@@ -610,6 +612,7 @@ export function AccountsWorkloadsPage({
     setEditCell({ key: rowKey(accountId, workloadId), field: "account" });
   };
   const removeUnsavedSelected = (selected: ReadonlySet<string>) => {
+    if (dealSaveLock.isLocked()) return;
     const removedWorkloadIds = new Set(
       allRows
         .filter((row) => selected.has(row.key) && row.workload.id < 0)
@@ -643,6 +646,7 @@ export function AccountsWorkloadsPage({
   };
 
   const confirmPermanentDelete = async () => {
+    if (dealSaveLock.isLocked()) return;
     const permanentTargets = rows.filter((row) =>
       permanentDeleteTargets.includes(row.key),
     );
@@ -724,6 +728,7 @@ export function AccountsWorkloadsPage({
   };
 
   const confirmDealDelete = async () => {
+    if (dealSaveLock.isLocked()) return;
     const targets = dealDeleteTargets;
     dealDeleteDialogRef.current?.close();
     setDealDeleteTargets([]);
@@ -795,6 +800,7 @@ export function AccountsWorkloadsPage({
   };
 
   const requestDealDelete = () => {
+    if (dealSaveLock.isLocked()) return;
     const targets = [...selectedDeals.values()].filter((deal) => deal.id > 0);
     if (!targets.length) return;
     setDealDeleteTargets(targets);
@@ -802,6 +808,7 @@ export function AccountsWorkloadsPage({
   };
 
   const deleteSelected = async () => {
+    if (dealSaveLock.isLocked()) return;
     const selected = new Set(selectedRows);
     const savedRows = rows.filter(
       (row) => selected.has(row.key) && row.workload.id > 0,
@@ -859,6 +866,7 @@ export function AccountsWorkloadsPage({
   };
 
   const restoreSelected = async () => {
+    if (dealSaveLock.isLocked()) return;
     const targets = rows.filter((row) => selectedRows.has(row.key) && row.workload.id > 0 && row.workload.archived);
     if (!targets.length) return;
     setSaving(true);
@@ -884,6 +892,7 @@ export function AccountsWorkloadsPage({
   };
 
   const cancelSelected = () => {
+    if (dealSaveLock.isLocked()) return;
     const selected = selectedRows;
     const selectedWorkloadIds = new Set(
       allRows
@@ -1000,6 +1009,7 @@ export function AccountsWorkloadsPage({
   };
 
   const saveAwDrafts = async () => {
+    if (dealSaveLock.isLocked()) return;
     const archivedIds = new Set(pendingDeleteWorkloadIds);
     const request: AccountsWorkloadsHierarchySaveRequest = {
       accounts: [],
@@ -1188,7 +1198,7 @@ export function AccountsWorkloadsPage({
     deal: AccountWorkloadDeal,
     field: DealField,
   ) => {
-    if (!canWrite || dealSavingRef.current) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
     setDealDrafts((current) => {
       if (current.has(key)) return current;
@@ -1204,7 +1214,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field });
   };
   const updateDealDraft = (key: string, field: DealField, value: string) => {
-    if (dealSavingRef.current) return;
+    if (dealSaveLock.isLocked()) return;
     setDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
@@ -1236,7 +1246,7 @@ export function AccountsWorkloadsPage({
     });
   };
   const addDeal = (workloadId: number) => {
-    if (dealSavingRef.current || workloadId < 0) return;
+    if (dealSaveLock.isLocked() || workloadId < 0) return;
     const id = nextTempId.current--;
     const deal = emptyDeal(id, workloadId);
     const key = `draft:${id}`;
@@ -1246,7 +1256,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field: "name" });
   };
   const cancelDeal = (key: string) => {
-    if (dealSavingRef.current) return;
+    if (dealSaveLock.isLocked()) return;
     setDealDrafts((current) => {
       const next = new Map(current);
       next.delete(key);
@@ -1255,14 +1265,19 @@ export function AccountsWorkloadsPage({
     if (dealEditCell?.key === key) setDealEditCell(null);
   };
   const saveDealDrafts = async () => {
-    if (dealSavingRef.current) return;
-    const drafts = [...dealDrafts.values()].filter(isDealDraftChanged);
-    if (!drafts.length) return;
-    if (drafts.some((draft) => !draft.deal.deleted && !draft.deal.name.trim())) {
+    if (dealSaveLock.isLocked()) return;
+    const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
+    if (!changedDrafts.length) return;
+    if (
+      changedDrafts.some(
+        (draft) => !draft.deal.deleted && !draft.deal.name.trim(),
+      )
+    ) {
       setError("Oppty Name is required.");
       return;
     }
-    dealSavingRef.current = true;
+    const drafts = dealSaveLock.tryStart(changedDrafts);
+    if (!drafts) return;
     setSaving(true);
     setError("");
     const pageScrollY = window.scrollY;
@@ -1346,7 +1361,7 @@ export function AccountsWorkloadsPage({
           : [],
       );
     } finally {
-      dealSavingRef.current = false;
+      dealSaveLock.release();
       setSaving(false);
     }
   };
@@ -1543,6 +1558,7 @@ export function AccountsWorkloadsPage({
     }
   };
   const addCandidates = () => {
+    if (dealSaveLock.isLocked()) return;
     const selected = missingCandidates.filter((item) =>
       selectedCandidateKeys.has(forecastCandidateKey(item)),
     );
@@ -1721,7 +1737,7 @@ export function AccountsWorkloadsPage({
           </button>
         )}
         {selectedDirtyCount > 0 && (
-          <button type="button" class="accounts-workloads-button" onClick={cancelSelected}>
+          <button type="button" class="accounts-workloads-button" disabled={saving} onClick={cancelSelected}>
             Cancel
           </button>
         )}
@@ -1950,6 +1966,7 @@ export function AccountsWorkloadsPage({
                                   type="button"
                                   disabled={
                                     !canWrite ||
+                                    saving ||
                                     workload.id < 0
                                   }
                                   onClick={() => addDeal(workload.id)}
