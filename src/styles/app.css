@@ -4094,25 +4094,18 @@ h4.weekly-activity-section-label--next-week,
   box-shadow: none;
 }
 
-/* Runtime layout contract: original FX popover, inline deleted toggle, deterministic opportunity columns. */
+/* Runtime layout contract: dedicated AW toolbar and deterministic opportunity columns. */
 .accounts-workloads-include-deleted {
   align-self: center;
-  display: inline-flex;
-  flex-direction: row;
+  display: flex;
   align-items: center;
   flex: 0 0 auto;
-  flex-wrap: nowrap;
-  width: auto;
   gap: 0.42rem;
   line-height: 1rem;
   margin: 0 0 0 .15rem;
   white-space: nowrap;
 }
-.accounts-workloads-include-deleted input,
-.accounts-workloads-include-deleted span {
-  flex: 0 0 auto;
-  margin: 0;
-}
+.accounts-workloads-include-deleted input { margin: 0; }
 .accounts-workloads-add-aw {
   background: var(--kpi-brand);
   border: 1px solid var(--kpi-brand);
@@ -4177,10 +4170,13 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-cell-content {
   box-sizing: border-box;
   min-width: 0;
-  position: relative;
   width: 100%;
 }
-.accounts-workloads-cell-content.is-unsaved-content::after {
+.accounts-workloads-aw-grid > tbody > tr.accounts-workloads-parent-row > td.is-unsaved-cell {
+  position: relative;
+}
+.accounts-workloads-aw-grid td.is-unsaved-cell::after,
+.accounts-workloads-oppty-grid td.is-unsaved-cell::after {
   background: var(--kap-grid-draft-line);
   bottom: 0;
   content: "";
@@ -4188,21 +4184,15 @@ h4.weekly-activity-section-label--next-week,
   left: .35rem;
   position: absolute;
   right: .35rem;
+  z-index: 2;
 }
 .accounts-workloads-oppty-grid thead th:nth-child(-n + 2) {
   background: #f4f6f8;
 }
-.accounts-workloads-table-controls {
-  align-items: center;
-  display: flex;
-  flex: 0 0 auto;
-  justify-content: flex-end;
-  min-height: 2.25rem;
-}
-.accounts-workloads-table-controls .accounts-workloads-fx {
+.accounts-workloads-table-summary .accounts-workloads-fx {
   width: auto;
 }
-.accounts-workloads-table-controls .accounts-workloads-fx__button {
+.accounts-workloads-table-summary .accounts-workloads-fx__button {
   align-items: center;
   display: inline-flex;
   gap: .55rem;
@@ -4211,16 +4201,31 @@ h4.weekly-activity-section-label--next-week,
   padding: .35rem .6rem;
   width: auto;
 }
-.accounts-workloads-table-controls .accounts-workloads-fx__button span {
+.accounts-workloads-table-summary .accounts-workloads-fx__button span {
   font-size: .65rem;
 }
-.accounts-workloads-table-controls .accounts-workloads-fx__button strong {
+.accounts-workloads-table-summary .accounts-workloads-fx__button strong {
   font-size: .8rem;
   white-space: nowrap;
 }
 @media (max-width: 1024px) {
-  .accounts-workloads-table-controls .accounts-workloads-fx,
-  .accounts-workloads-table-controls .accounts-workloads-fx__button { width: auto; }
-  .accounts-workloads-table-controls .accounts-workloads-fx-popover { left: auto; right: 0; }
-  .accounts-workloads-include-deleted { flex-wrap: nowrap; white-space: nowrap; }
+  .accounts-workloads-table-summary .accounts-workloads-fx,
+  .accounts-workloads-table-summary .accounts-workloads-fx__button { width: auto; }
+  .accounts-workloads-table-summary .accounts-workloads-fx-popover { left: auto; right: 0; }
+}
+.accounts-workloads-toast {
+  background: #f0f7f1;
+  border: 1px solid #8fbd98;
+  border-radius: .3rem;
+  bottom: calc(var(--kpi-footer-reserved-height) + 1rem);
+  box-shadow: 0 8px 24px rgba(22, 21, 19, .16);
+  color: #234b2b;
+  font-size: .82rem;
+  font-weight: 750;
+  left: 1rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  padding: .6rem .8rem;
+  pointer-events: none;
+  position: fixed;
+  z-index: 10000;
 }

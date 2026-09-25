@@ -574,9 +574,9 @@ export function AccountsWorkloadsPage({
     <span
       class="accounts-workloads-ellipsis"
       tabIndex={value ? 0 : undefined}
-      onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value)}
+      onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
       onMouseLeave={() => setLatestUpdateTooltip(null)}
-      onFocus={(event) => showImmediateTooltip(event.currentTarget, value)}
+      onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
       onBlur={() => setLatestUpdateTooltip(null)}
     >
       {value || empty}
@@ -615,6 +615,7 @@ export function AccountsWorkloadsPage({
     const changed = !baselineWorkload || value !== original;
     return (
       <td
+        data-aw-field={field}
         class={`${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onDblClick={(event) => {
           if (isInteractive(event.target)) return;
@@ -622,7 +623,7 @@ export function AccountsWorkloadsPage({
           beginAwEdit(key, field, value);
         }}
       >
-        <div class={`accounts-workloads-cell-content${changed ? " is-unsaved-content" : ""}`}>
+        <div class="accounts-workloads-cell-content">
         {editing ? (
           field === "lastUpdated" || field === "notes" ? (
             <textarea
@@ -1722,6 +1723,7 @@ export function AccountsWorkloadsPage({
     }
     return (
       <td
+        data-deal-field={field}
         class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onClick={(event) => {
           if (dealEditCell && (dealEditCell.key !== key || dealEditCell.field !== field) && !isInteractive(event.target)) {
@@ -1740,16 +1742,16 @@ export function AccountsWorkloadsPage({
           }
         }}
       >
-        <div class={`accounts-workloads-cell-content${changed ? " is-unsaved-content" : ""}`}>
+        <div class="accounts-workloads-cell-content">
         {editing
           ? editor
           : field === "latestUpdate"
             ? <span
                 class="accounts-workloads-ellipsis"
                 tabIndex={value ? 0 : undefined}
-                onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value)}
+                onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
                 onMouseLeave={() => setLatestUpdateTooltip(null)}
-                onFocus={(event) => showImmediateTooltip(event.currentTarget, value)}
+                onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
                 onBlur={() => setLatestUpdateTooltip(null)}
               >
                 {value || "—"}
@@ -1904,7 +1906,7 @@ export function AccountsWorkloadsPage({
         </div>
       </header>
       <form
-        class="accounts-workloads-toolbar consumption-range-bar accounts-workloads-toolbar--compact"
+        class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
         onSubmit={(event) => {
           event.preventDefault();
           if (dirty) {
@@ -1986,41 +1988,6 @@ export function AccountsWorkloadsPage({
       </form>
       <div class="accounts-workloads-table-summary">
         <span>{hierarchy.accounts.length} accounts</span>
-      </div>
-      {error && (
-        <div
-          class="accounts-workloads-banner accounts-workloads-banner--error"
-          role="alert"
-        >
-          <strong>{error}</strong>
-          <button
-            type="button"
-            class="accounts-workloads-banner__dismiss"
-            aria-label="Dismiss error"
-            onClick={() => {
-              setError("");
-              setSaveErrors([]);
-            }}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-          {saveErrors.length > 0 && (
-            <ul>
-              {saveErrors.map((item) => (
-                <li>
-                  {item.entity} · {item.field}: {item.message}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      {notice && (
-        <div class="accounts-workloads-banner" role="status">
-          {notice}
-        </div>
-      )}
-      <div class="accounts-workloads-table-controls">
         <div class="accounts-workloads-fx">
           <button
             type="button"
@@ -2076,6 +2043,34 @@ export function AccountsWorkloadsPage({
           )}
         </div>
       </div>
+      {error && (
+        <div
+          class="accounts-workloads-banner accounts-workloads-banner--error"
+          role="alert"
+        >
+          <strong>{error}</strong>
+          <button
+            type="button"
+            class="accounts-workloads-banner__dismiss"
+            aria-label="Dismiss error"
+            onClick={() => {
+              setError("");
+              setSaveErrors([]);
+            }}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+          {saveErrors.length > 0 && (
+            <ul>
+              {saveErrors.map((item) => (
+                <li>
+                  {item.entity} · {item.field}: {item.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {loading ? (
         <div class="accounts-workloads-loading">
           <oj-progress-circle value={-1} size="md" /> Loading hierarchy…
@@ -2655,6 +2650,12 @@ export function AccountsWorkloadsPage({
           }}
         >
           {latestUpdateTooltip.text}
+        </div>,
+        document.body,
+      )}
+      {notice && typeof document !== "undefined" && createPortal(
+        <div class="accounts-workloads-toast" role="status">
+          {notice}
         </div>,
         document.body,
       )}

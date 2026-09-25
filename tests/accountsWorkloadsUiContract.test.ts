@@ -7,6 +7,7 @@ const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelecte
 const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelAllDrafts"));
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
 const cancelHandler = page.slice(page.indexOf("const cancelAllDrafts"), page.indexOf("const planWriteFor"));
+const saveAwHandler = page.slice(page.indexOf("const saveAwDrafts"), page.indexOf("const toggleHighlight"));
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
@@ -126,6 +127,8 @@ assert.match(page, /setSaveErrors\(/,
   "AW drafts survive failed saves");
 assert.match(page, /accounts-workloads-toolbar--compact/,
   "AW uses a compact title/search/action/table rhythm without importing Consumption filters");
+assert.doesNotMatch(page, /accounts-workloads-toolbar[^"\n]*consumption-range-bar/,
+  "AW toolbar does not inherit Consumption label layout rules");
 assert.doesNotMatch(page, /selectedPillar|selectedQuarter|consumption-pillar-selector|consumption-plan-filter/,
   "Consumption Records contributes positioning and spacing only, not its filter controls or behavior");
 assert.match(styles, /\.accounts-workloads-toolbar--compact/);
@@ -181,15 +184,14 @@ assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*posi
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
   "the exchange-rate button retains its Apply and Cancel popover behavior");
-assert.match(page, /class="accounts-workloads-table-controls"[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
-  "the compact exchange-rate control sits at the far-right table edge immediately above the table state");
+assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
+  "account count and the compact exchange-rate control share one summary row above the table state");
 assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
   "Include Deleted keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
   "opportunity identity and scrolling columns have explicit widths");
-assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*inline-flex[^}]*flex-direction:\s*row[^}]*white-space:\s*nowrap/,
+assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*white-space:\s*nowrap/,
   "Include Deleted cannot wrap its label below the checkbox");
-assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*flex-wrap:\s*nowrap/);
 assert.match(styles, /\.accounts-workloads-oppty-grid\s*\{[^}]*table-layout:\s*fixed/,
   "opportunity column width and sticky offsets use one deterministic fixed layout");
 assert.match(styles, /\.accounts-workloads-oppty-grid th:nth-child\(1\),[\s\S]*position:\s*sticky/,
@@ -204,10 +206,23 @@ assert.match(page, /changedAccountIds\.has\(account\.id\) && !account\.name\.tri
   "blank Account values are rejected before any save request is sent");
 assert.match(page, /aria-required=\{field === "account" \|\| field === "workload" \? "true" : undefined\}/,
   "required AW editors expose their requirement to assistive technology");
-assert.match(styles, /\.accounts-workloads-cell-content\.is-unsaved-content::after\s*\{[^}]*left:\s*\.35rem[^}]*right:\s*\.35rem/,
-  "the draft line is bounded to an inner changed-content wrapper");
-assert.doesNotMatch(styles, /accounts-workloads[^\n{]*td\.is-unsaved-cell::after/,
-  "Accounts draft underlines are never positioned from a table cell pseudo-element");
+assert.match(styles, /\.accounts-workloads-aw-grid td\.is-unsaved-cell::after,[\s\S]*\.accounts-workloads-oppty-grid td\.is-unsaved-cell::after\s*\{[^}]*bottom:\s*0[^}]*height:\s*3px[^}]*left:\s*\.35rem[^}]*right:\s*\.35rem/,
+  "AW and Opportunity draft markers use the KPI cell-bottom marker principle");
+assert.doesNotMatch(page, /is-unsaved-content/,
+  "changed-cell markers are not attached to inner inline wrappers");
+assert.doesNotMatch(styles, /accounts-workloads-cell-content\.is-unsaved-content/);
+assert.match(page, /showImmediateTooltip\(event\.currentTarget, value, true\)/,
+  "Latest Update and Notes use the rendered element overflow gate");
+assert.match(page, /onlyIfClipped && element\.scrollWidth <= element\.clientWidth/,
+  "tooltip clipping is determined from scrollWidth and clientWidth");
+assert.match(page, /createPortal\([\s\S]*accounts-workloads-toast[\s\S]*document\.body/,
+  "informational notices render through a body-level toast portal");
+assert.match(styles, /\.accounts-workloads-toast\s*\{[^}]*pointer-events:\s*none[^}]*position:\s*fixed/,
+  "the auto-dismiss toast is out of document flow and cannot cover interactive hit targets");
+assert.match(page, /if \(!notice\) return;[\s\S]*window\.setTimeout\(\(\) => setNotice\(""\), 2600\)/,
+  "the fixed informational toast auto-dismisses");
+assert.match(saveAwHandler, /const saved = await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*setBaseline\(withoutArchived\)[\s\S]*setNotice\(/,
+  "AW save success appears only after the authoritative save response is adopted");
 assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
   "sticky Opportunity identity headers share the other header background");
 assert.match(page, /type="button"[\s\S]*class="accounts-workloads-add-aw"[\s\S]*onClick=\{addAw\}/,
