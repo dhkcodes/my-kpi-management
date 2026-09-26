@@ -45,6 +45,10 @@ const movementAxisConverter = {
   parse: (value: string) => Number(value.replace(/[^0-9.-]/g, ""))
 };
 const amountK = (amount: number) => `${currencyK.format(toK(amount))} K`;
+const contributionPercentText = (percentage: number | null) => percentage === null ? "—" : `${percentage.toFixed(1)}%`;
+const contributionBarWidth = (percentage: number | null) => percentage === null ? 0 : Math.max(0, Math.min(100, percentage));
+const actualEntryText = (status: "PROVIDED" | "MISSING", amount: number) => status === "MISSING"
+  ? "Actual not entered" : amount === 0 ? "Actual 0 entered" : "Actual only";
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
@@ -302,6 +306,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const forecastExposureBase = Math.max(0, analysis.portfolio.totalAmount - (analysis.mtdSummary?.amount ?? 0));
   const forecastExposure = forecastExposureBase === 0 ? 0 : analysis.portfolio.forecastAmount / forecastExposureBase * 100;
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
+  const contributionPeriodLabel = analysis.periodCoverage.actualPeriods.length === 0
+    ? "No finalized Actual period"
+    : `Finalized Actual periods: ${analysis.periodCoverage.actualPeriods.join(", ")} · MTD excluded`;
   const contextTrendLabel = selectedAccountContext ? `${ALL_ACCOUNTS} · ${selectedAccountContext} filter` : ALL_ACCOUNTS;
   const selectedMovementPoint = selectedMovement ? analysis.movementBridge.find((point) => point.quarter === selectedMovement.quarter) ?? null : null;
   const selectedMovementAccounts = selectedMovement && selectedMovementPoint
@@ -563,17 +570,17 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="consumption-insights-contribution" aria-label="Account to Plan contribution">
-      <span class="kpi-section-label">Account Contribution → Plan Contribution</span>
+      <span class="kpi-section-label">Account Contribution → Plan Contribution · ACTUAL ONLY</span>
       <div class="consumption-insights-contribution-grid">
-        <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution</h2><p>{selectedContextLabel}</p></div></div>
+        <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution</h2><p>{selectedContextLabel} · {contributionPeriodLabel}</p></div></div>
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
             class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
             onClick={() => setSelectedAccountName(account.account)}>
-            <span>{account.account} · {account.salesRep}</span><strong>{amountK(account.totalAmount)}</strong><small>{account.percentage.toFixed(1)}% · {splitLabel(account)}{account.forecastEntryStatus === "MISSING" ? " · Forecast missing" : account.forecastEntryStatus === "ZERO" ? " · Forecast 0 entered" : ""}</small><i><b style={`width:${Math.max(0, Math.min(100, account.percentage))}%`}></b></i>
+            <span>{account.account} · {account.salesRep}</span><strong>{amountK(account.actualAmount)}</strong><small>{contributionPercentText(account.percentage)} · {actualEntryText(account.actualEntryStatus, account.actualAmount)}</small><i><b style={`width:${contributionBarWidth(account.percentage)}%`}></b></i>
           </button>)}</div>
         </section>
-        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {plan.percentage.toFixed(1)}% of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${plan.percentage.toFixed(1)}% of ${percentageContext}; ${planSplitLabel(plan)}`}><div class="consumption-insights-split-bar" style={`width:${Math.max(0, Math.min(100, plan.percentage))}%`}><i class="is-actual" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.actualAmount / plan.totalAmount * 100)}%`}></i><i class="is-forecast" style={`width:${plan.totalAmount === 0 ? 0 : Math.max(0, plan.forecastAmount / plan.totalAmount * 100)}%`}></i></div></div><span>{planSplitLabel(plan)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"} · {contributionPeriodLabel}</p></div></div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentage)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentage)} of ${percentageContext}; ACTUAL ${currency.format(plan.actualAmount)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidth(plan.percentage)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {currency.format(plan.actualAmount)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmount)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>

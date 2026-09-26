@@ -174,11 +174,16 @@ assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoin
 assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
 assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
+assert.match(insightsPage, /ACTUAL ONLY[\s\S]*account\.actualAmount[\s\S]*plan\.actualAmount/, "both Contribution cards render Actual-only amounts");
+assert.match(insightsPage, /contributionPercentText\(account\.percentage\)[\s\S]*contributionPercentText\(plan\.percentage\)/, "both Contribution cards render nullable Actual-only percentages");
+assert.match(insightsPage, /Finalized Actual periods:[^`]+actualPeriods\.join/, "Contribution discloses the exact finalized Actual periods");
+assert.match(insightsPage, /Actual not entered[\s\S]*Actual 0 entered/, "Contribution distinguishes missing Actual from an entered zero");
+assert.doesNotMatch(insightsPage.slice(insightsPage.indexOf('aria-label="Account to Plan contribution"')), /splitLabel\(account\)|planSplitLabel\(plan\)|is-forecast/, "Contribution amount, label, and bars do not use Forecast");
 assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^\n]+\?\? null/, "account contribution starts unselected without falling back to the first account");
 assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Mixed quarter consumption<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names its Actual-first Forecast-fallback meaning");
 assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Consumption Analysis removes the aggregate Other Accounts contract and UI");
-assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
+assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*contributionPercentText\(plan\.percentage\)\} of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
 assert.match(insightsPage, /\{!isUnmappedConsumptionLabel\(workload\) && <>\s*<b>\{workload\}<\/b> · <\/?>\}Plan \{plan\.planId\}/, "Plan Contribution keeps actual workload names while omitting unmapped labels regardless of case or surrounding whitespace");
 assert.doesNotMatch(insightsPage, /<b>\{workload\}<\/b> · Plan \{plan\.planId\}/, "Plan Contribution does not render the workload label unconditionally");
 assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/, "the Consumption API excludes the removed Other Accounts response fields");
@@ -444,7 +449,7 @@ assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
 assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\{`Severity[^`]+`\}/, "Alert type and severity badges expose explicit accessible labels");
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
-assert.match(insightsPage, /plan\.percentage\.toFixed\(1\)\}% of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{Math\.max\(0, Math\.min\(100, plan\.percentage\)\)\}%/, "Plan Contribution uses each Plan percentage on a common group-wide 0–100 track");
+assert.match(insightsPage, /contributionPercentText\(plan\.percentage\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidth\(plan\.percentage\)\}%/, "Plan Contribution uses each Plan percentage on a common group-wide 0–100 track");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
