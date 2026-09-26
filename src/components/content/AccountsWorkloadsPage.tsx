@@ -141,11 +141,11 @@ export const targetOptionsFor = (fiscalYear = currentFiscalYear()) => [
   `FY${fiscalYear + 1} Q1`, `FY${fiscalYear + 1} Q2`,
 ];
 const targetOptions = targetOptionsFor();
-const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
+const emptyWorkload = (id: number, name = "", salesRep: string | null = null): AccountWorkload => ({
   id,
   versionNo: 0,
   name,
-  salesRep: null,
+  salesRep,
   lastUpdated: null,
   notes: null,
   highlighted: false,
@@ -1878,7 +1878,7 @@ export function AccountsWorkloadsPage({
         groups.set(identity, group);
       }
       const workloadId = nextTempId.current--;
-      const workload = emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME);
+      const workload = emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME, candidate.salesRep);
       if (candidate.planId !== null || candidate.planNumber !== null)
         Object.assign(workload, {
           plans: [
@@ -2682,6 +2682,7 @@ export function AccountsWorkloadsPage({
                   <tr>
                     <th />
                     <th>Account</th>
+                    <th>Sales Rep</th>
                     <th>Plan ID(Number)</th>
                   </tr>
                 </thead>
@@ -2705,6 +2706,7 @@ export function AccountsWorkloadsPage({
                           />
                         </td>
                         <td>{candidate.accountName}</td>
+                        <td>{candidate.salesRep ?? "—"}</td>
                         <td>{candidate.planNumber ?? "No Plan Number"}</td>
                       </tr>
                     );

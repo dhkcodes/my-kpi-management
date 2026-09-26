@@ -120,6 +120,7 @@ export type AccountsWorkloadsHierarchy = Readonly<{
 export type ForecastCandidate = Readonly<{
   accountName: string;
   normalizedAccount: string;
+  salesRep: string | null;
   planId: number | null;
   planNumber: string | null;
   linked: boolean;
@@ -569,6 +570,7 @@ export const fetchForecastCandidates = async (
     const value = requiredObject(entry, `Malformed Forecast candidate ${index + 1}`);
     const linkedWorkloadIds = value.linkedWorkloadIds;
     if (typeof value.accountName !== "string" || typeof value.normalizedAccount !== "string" ||
+        !(value.salesRep === null || typeof value.salesRep === "string") ||
         !(value.planId === null || isPositiveInteger(value.planId)) ||
         !(value.planNumber === null || typeof value.planNumber === "string") ||
         typeof value.linked !== "boolean" || !Array.isArray(linkedWorkloadIds) ||
