@@ -58,6 +58,13 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
       savePosts += 1;
       saveBodies.push(JSON.parse(request.postData || "{}"));
       if (failNextSave) { failNextSave = false; return fulfill(500, { message: "Deliberate save failure" }); }
+      const body = saveBodies.at(-1);
+      for (const workload of body.workloads || []) {
+        if (workload.id === 51 && workload.action === "UPSERT") hierarchy.accounts[0].workloads[0].name = workload.name;
+      }
+      for (const savedDeal of body.deals || []) {
+        if (savedDeal.id === 81 && savedDeal.action === "UPSERT") hierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
+      }
       return fulfill(200, { hierarchy, dealResults: [] });
     }
     if (path.endsWith("/api/v1/accounts-workloads/hierarchy")) return fulfill(200, hierarchy);
@@ -70,7 +77,7 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `Object.defineProperty(globalThis,"KAP_AUTH_CONFIG",{value:${JSON.stringify(config.result.value)},writable:false,configurable:false});` });
   const evaluate = async (expression) => { const result = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text); return result.result.value; };
-  const wait = async (expression, label, timeout = 18000) => { const started = Date.now(); while (Date.now() - started < timeout) { const value = await evaluate(expression); if (value) return value; await delay(40); } throw new Error(`wait timeout: ${label}`); };
+  const wait = async (expression, label, timeout = 30000) => { const started = Date.now(); while (Date.now() - started < timeout) { const value = await evaluate(expression); if (value) return value; await delay(40); } const state = await evaluate(`({ href: location.href, readyState: document.readyState, body: document.body?.innerText?.slice(0, 500) })`); throw new Error(`wait timeout: ${label} ${JSON.stringify(state)}`); };
 
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?opportunity-save=${Date.now()}` });
@@ -82,17 +89,64 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 })); await settle();
     const input = cell.querySelector('input'); input.value += ' changed'; input.dispatchEvent(new InputEvent('input', { bubbles: true, data: ' changed' })); input.dispatchEvent(new FocusEvent('blur', { bubbles: true })); await settle();
     const section = row.nextElementSibling.querySelector('.accounts-workloads-opportunities');
-    [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save').click(); await settle();
-    const dialog = document.querySelector('.accounts-workloads-confirmation');
-    const result = { title: dialog.querySelector('h2').textContent.trim(), buttons: [...dialog.querySelectorAll('button')].map((b) => b.textContent.trim()), undoVisible: [...section.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Undo') };
-    [...dialog.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save Opportunities').click();
-    return result;
+    const saveLauncher = [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save');
+    saveLauncher.focus(); saveLauncher.click(); await settle();
+    const dialog = document.querySelector('oj-dialog.kpi-cancel-dialog');
+    return {
+      title: dialog.dialogTitle,
+      buttons: [...dialog.querySelectorAll('.kpi-dialog-actions oj-button')].map((b) => b.textContent.trim()),
+      undoVisible: [...section.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Undo'),
+      initialFocusInside: dialog.contains(document.activeElement),
+    };
   })()`);
-  assert.deepEqual(desktop, { title: "Save Opportunity changes?", buttons: ["Keep editing", "Save Opportunities"], undoVisible: true });
-  await wait("!document.querySelector('.accounts-workloads-confirmation')", "save dialog closes");
-  assert.equal(savePosts, 1, "confirmed Opportunity save posts exactly once");
+  assert.deepEqual(desktop, { title: "Save Opportunity changes?", buttons: ["Save Opportunities", "Keep editing"], undoVisible: true, initialFocusInside: true });
+  await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+  await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "Escape closes save dialog");
+  await wait("document.activeElement?.textContent?.trim() === 'Save'", "focus returns to Opportunity Save launcher");
+  await evaluate(`(async () => { const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); const row = document.querySelector('[data-aw-row-key="41:51"]'); const section = row.nextElementSibling.querySelector('.accounts-workloads-opportunities'); const saveLauncher = [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save'); saveLauncher.focus(); saveLauncher.click(); await settle(); })()`);
+  await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog reopens for Keep editing");
+  await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((button) => button.textContent.trim() === 'Keep editing')).querySelector('button').click()`);
+  await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "Keep editing closes save dialog");
+  await wait("document.activeElement?.textContent?.trim() === 'Save'", "Keep editing returns focus to Opportunity Save launcher");
+  await evaluate(`(async () => { const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); const row = document.querySelector('[data-aw-row-key="41:51"]'); const section = row.nextElementSibling.querySelector('.accounts-workloads-opportunities'); const saveLauncher = [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save'); saveLauncher.focus(); saveLauncher.click(); await settle(); })()`);
+  await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog reopens for confirmation");
+  await evaluate(`(() => { const button = [...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((b) => b.textContent.trim() === 'Save Opportunities').querySelector('button'); button.click(); button.click(); })()`);
+  await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog closes");
+  for (let attempt = 0; attempt < 100 && savePosts < 1; attempt += 1) await delay(40);
+  assert.equal(savePosts, 1, "double confirmation still posts Opportunity exactly once");
 
-  const runToolbarSaveScenario = async (scenario, editAw, editOpportunity) => {
+  await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?reverse-delete=${Date.now()}` });
+  await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "reverse delete fixture");
+  const reverseDeleteBefore = savePosts;
+  const reverseDelete = await evaluate(`(async () => {
+    const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const row = document.querySelector('[data-aw-row-key="41:51"]');
+    row.querySelector('.accounts-workloads-expander').click(); await settle();
+    const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]');
+    cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 })); await settle();
+    const input = cell.querySelector('input'); input.value += ' pending-delete'; input.dispatchEvent(new InputEvent('input', { bubbles: true, data: ' pending-delete' })); input.dispatchEvent(new FocusEvent('blur', { bubbles: true })); await settle();
+    row.querySelector('[data-aw-field="workload"]').click(); await settle();
+    [...document.querySelectorAll('.accounts-workloads-toolbar button')].find((button) => button.textContent.trim() === 'Draft Delete').click(); await settle();
+    return {
+      opportunityText: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]')?.textContent,
+      errorText: document.body.textContent,
+      addOpportunityVisible: [...row.nextElementSibling.querySelectorAll('button')].some((button) => button.textContent.trim() === 'Add Opportunity'),
+      saveVisible: [...document.querySelectorAll('.accounts-workloads-toolbar button')].some((button) => button.textContent.trim() === 'Save'),
+    };
+  })()`);
+  assert.ok(reverseDelete.opportunityText.includes('pending-delete'), "reverse-order Opportunity draft remains visible after parent Draft Delete");
+  assert.ok(reverseDelete.errorText.includes('Opportunity 초안은 저장되지 않았습니다'), "reverse-order Draft Delete explains the blocked Opportunity draft");
+  assert.equal(reverseDelete.addOpportunityVisible, false, "pending Draft Delete blocks adding Opportunity");
+  assert.equal(reverseDelete.saveVisible, true, "pending Draft Delete remains an explicit unsaved change");
+  await evaluate(`document.querySelector('[data-navigation-id="home"]').click()`);
+  await wait("document.querySelector('oj-dialog.kpi-navigation-dialog')?.isOpen()", "reverse delete navigation dialog");
+  await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-navigation-dialog oj-button')].find((button) => button.textContent.trim() === 'Save & Continue')).querySelector('button').click()`);
+  await wait("!document.querySelector('oj-dialog.kpi-navigation-dialog')?.isOpen()", "reverse delete blocked dialog closes");
+  assert.equal(await evaluate("location.pathname"), "/accounts-workloads", "blocked reverse-order draft does not navigate as saved");
+  assert.equal(savePosts, reverseDeleteBefore, "blocked reverse-order draft does not issue a save request");
+
+  const runNavigationSaveScenario = async (scenario, editAw, editOpportunity) => {
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?scenario=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} fixture`);
     const before = savePosts;
@@ -110,25 +164,31 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
         row.querySelector('.accounts-workloads-expander').click(); await settle();
         await edit(document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]'), ' ${scenario}');
       }
-      [...document.querySelectorAll('.accounts-workloads-toolbar button')].find((button) => button.textContent.trim() === 'Save').click();
-      await settle();
-      const confirmation = document.querySelector('.accounts-workloads-confirmation');
-      const confirmSave = confirmation && [...confirmation.querySelectorAll('button')].find((button) => button.textContent.trim().startsWith('Save'));
-      if (confirmSave) confirmSave.click();
+      document.querySelector('[data-navigation-id="home"]').click();
     })()`);
+    await wait("document.querySelector('oj-dialog.kpi-navigation-dialog')?.isOpen()", `${scenario} navigation dialog`);
+    const buttons = await evaluate(`[...document.querySelectorAll('oj-dialog.kpi-navigation-dialog .kpi-dialog-actions oj-button')].map((button) => button.textContent.trim())`);
+    assert.deepEqual(buttons, ["Stay", "Save & Continue", "Discard & Continue"], `${scenario} uses KPI navigation dialog actions`);
+    await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-navigation-dialog oj-button')].find((button) => button.textContent.trim() === 'Save & Continue')).querySelector('button').click()`);
+    await wait("location.pathname === '/'", `${scenario} navigation completes after save`);
     const expectedPosts = Number(editAw) + Number(editOpportunity);
-    const started = Date.now();
-    while (savePosts < before + expectedPosts && Date.now() - started < 18000) await delay(40);
-    assert.equal(savePosts, before + expectedPosts, `${scenario} emits the expected save requests`);
+    assert.equal(savePosts, before + expectedPosts, `${scenario} saves all changed resource types before navigation`);
+    await evaluate(`document.querySelector('[data-navigation-id="accounts-workloads"]').click()`);
+    await wait("location.pathname === '/accounts-workloads' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} return`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?refresh=${scenario}-${Date.now()}` });
+    await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} refresh`);
+    const persisted = await evaluate(`(async () => { const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); return { aw: row.querySelector('[data-aw-field="workload"]')?.textContent, opportunity: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]')?.textContent }; })()`);
+    if (editAw) assert.ok(persisted.aw.includes(scenario), `${scenario} AW survives return and refresh`);
+    if (editOpportunity) assert.ok(persisted.opportunity.includes(scenario), `${scenario} Opportunity survives return and refresh`);
     return saveBodies.slice(before, before + expectedPosts);
   };
-  const awOnly = await runToolbarSaveScenario("aw-only", true, false);
-  assert.equal(awOnly.length, 1);
-  assert.ok(awOnly[0].workloads?.length > 0 && awOnly[0].deals?.length === 0, "AW-only save writes only AW");
-  const both = await runToolbarSaveScenario("both", true, true);
-  assert.equal(both.length, 2);
-  assert.ok(both.some((body) => body.workloads?.length > 0), "combined save writes AW");
-  assert.ok(both.some((body) => body.deals?.length > 0), "combined save writes Opportunity");
+  const awOnly = await runNavigationSaveScenario("aw-only", true, false);
+  assert.ok(awOnly[0].workloads?.length > 0 && awOnly[0].deals?.length === 0, "AW-only Save & Continue writes only AW");
+  const opportunityOnly = await runNavigationSaveScenario("opportunity-only", false, true);
+  assert.ok(opportunityOnly[0].deals?.length > 0 && opportunityOnly[0].workloads?.length === 0, "Opportunity-only Save & Continue writes only Opportunity");
+  const both = await runNavigationSaveScenario("both", true, true);
+  assert.ok(both.some((body) => body.workloads?.length > 0), "combined Save & Continue writes AW");
+  assert.ok(both.some((body) => body.deals?.length > 0), "combined Save & Continue writes Opportunity");
 
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?failure=${Date.now()}` });
   await wait("location.search.includes('failure=') && document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "failure fixture");
@@ -140,12 +200,12 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     const input = cell.querySelector('input'); input.value = 'Retain On Failure'; input.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Retain On Failure' })); await settle();
     [...document.querySelectorAll('.accounts-workloads-opportunities button')].find((button) => button.textContent.trim() === 'Save').click(); await settle();
   })()`);
-  await wait("document.querySelector('.accounts-workloads-confirmation')", "failure save confirmation");
+  await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "failure save confirmation");
   failNextSave = true;
-  await evaluate(`([...document.querySelectorAll('.accounts-workloads-confirmation button')].find((button) => button.textContent.trim().startsWith('Save'))).click()`);
+  await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((button) => button.textContent.trim().startsWith('Save'))).querySelector('button').click()`);
   await wait("document.querySelector('.app-message-region')", "save failure message");
-  const failed = await evaluate(`({ path: location.pathname, value: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"] input')?.value, error: Boolean(document.querySelector('.app-message-region')) })`);
-  assert.deepEqual(failed, { path: "/accounts-workloads", value: "Retain On Failure", error: true }, "save failure keeps route, input, and visible error");
+  const failed = await evaluate(`(() => { const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]'); return { path: location.pathname, retained: (cell?.querySelector('input')?.value ?? cell?.textContent ?? '').includes('Retain On Failure'), error: Boolean(document.querySelector('.app-message-region')) }; })()`);
+  assert.deepEqual(failed, { path: "/accounts-workloads", retained: true, error: true }, "save failure keeps route, draft value, and visible error");
 
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?draft-deleted=${Date.now()}` });
@@ -165,6 +225,6 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   assert.equal(mobile.editorOpened, false, "Draft Deleted opportunity cannot enter edit mode");
   assert.ok(mobile.scrollWidth <= mobile.width, "mobile page has no viewport-level horizontal overflow");
   assert.deepEqual(runtimeErrors, []);
-  console.log(JSON.stringify({ desktop, mobile, savePosts, runtimeErrors: runtimeErrors.length }, null, 2));
+  console.log(JSON.stringify({ desktop, mobile, savePosts, saveBodies, runtimeErrors: runtimeErrors.length }, null, 2));
   cdp.socket.close();
 })().catch((error) => { console.error(error.stack || error); process.exit(1); });

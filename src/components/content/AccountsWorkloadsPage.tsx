@@ -1,6 +1,8 @@
 import { ComponentChildren, Fragment, h } from "preact";
 import { createPortal } from "preact/compat";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import Context = require("ojs/ojcontext");
+import { ojDialog } from "ojs/ojdialog";
 import "ojs/ojbutton";
 import "ojs/ojdialog";
 import "ojs/ojdatetimepicker";
@@ -263,6 +265,13 @@ export function AccountsWorkloadsPage({
   const highlightRequests = useRef(new Set<number>());
   const permanentDeleteDialogRef = useRef<any>(null);
   const dealDeleteDialogRef = useRef<any>(null);
+  const actionConfirmationDialogRef = useRef<ojDialog | null>(null);
+  const navigationConfirmationDialogRef = useRef<ojDialog | null>(null);
+  const confirmationActionPendingRef = useRef(false);
+  const actionDialogReturnFocusRef = useRef<HTMLElement | null>(null);
+  const navigationDialogReturnFocusRef = useRef<HTMLElement | null>(null);
+  const actionKeepEditingButtonRef = useRef<any>(null);
+  const navigationStayButtonRef = useRef<any>(null);
   const [hierarchy, setHierarchy] = useState<AccountsWorkloadsHierarchy>(EMPTY);
   const [baseline, setBaseline] = useState<AccountsWorkloadsHierarchy>(EMPTY);
   const [searchInput, setSearchInput] = useState(initialSearch);
@@ -354,9 +363,41 @@ export function AccountsWorkloadsPage({
       pendingDeleteWorkloadIds.size >
       0 || fxDirty || fxDraftDirty;
   const isDraftDeletedWorkload = (workloadId: number) =>
+    pendingDeleteWorkloadIds.has(workloadId) ||
     hierarchy.accounts
       .flatMap((account) => account.workloads)
       .some((workload) => workload.id === workloadId && workload.archived);
+
+  const settleDialogClosed = useCallback(async (dialog: ojDialog | null): Promise<boolean> => {
+    if (!dialog) return true;
+    try {
+      const busyContext = Context.getContext(dialog).getBusyContext();
+      await busyContext.whenReady();
+      if (!dialog.isOpen()) return true;
+      const closed = new Promise<void>((resolve) =>
+        dialog.addEventListener("ojClose", () => resolve(), { once: true }),
+      );
+      dialog.close();
+      await closed;
+      await busyContext.whenReady();
+      return !dialog.isOpen();
+    } catch (dialogError) {
+      console.error("Accounts & Workloads dialog close failed", dialogError);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!actionConfirmation) return;
+    const frame = window.requestAnimationFrame(() => actionConfirmationDialogRef.current?.open());
+    return () => window.cancelAnimationFrame(frame);
+  }, [actionConfirmation]);
+
+  useEffect(() => {
+    if (!pendingNavigation) return;
+    const frame = window.requestAnimationFrame(() => navigationConfirmationDialogRef.current?.open());
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingNavigation]);
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
   useEffect(() => {
@@ -494,6 +535,10 @@ export function AccountsWorkloadsPage({
     field: AwField,
     value: string,
   ) => {
+    if (isDraftDeletedWorkload(workloadId)) {
+      setError("Draft Deleted AW는 수정할 수 없습니다. 삭제만 가능합니다.");
+      return;
+    }
     setHierarchy((current) => ({
       ...current,
       accounts: current.accounts.map((account) =>
@@ -684,7 +729,7 @@ export function AccountsWorkloadsPage({
         data-aw-field={field}
         class={`${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onDblClick={(event) => {
-          if (isInteractive(event.target)) return;
+          if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginAwEdit(key, field, value);
         }}
@@ -1043,40 +1088,27 @@ export function AccountsWorkloadsPage({
       return;
     }
 
-    const request: AccountsWorkloadsHierarchySaveRequest = {
-      accounts: [],
-      deals: [],
-      workloadPlans: [],
-      workloads: draftTargets.map((row) => ({
-        id: row.workload.id,
-        clientId: null,
-        accountRef: String(row.account.id),
-        versionNo: row.workload.versionNo,
-        name: row.workload.name,
-        salesRep: row.workload.salesRep,
-        lastUpdated: row.workload.lastUpdated,
-        notes: row.workload.notes,
-        highlighted: row.workload.highlighted,
-        action: "ARCHIVE",
-      })),
-    };
-    setSaving(true);
-    setError("");
-    try {
-      await saveAccountsWorkloadsHierarchy(request);
-      setSelectedRows(new Set());
-      await reload();
-      setNotice(`${draftTargets.length} AW moved to Draft Delete.`);
-    } catch (requestError) {
-      setError(friendlyError(requestError));
-      setSaveErrors(
-        requestError instanceof AccountsWorkloadsApiError
-          ? requestError.errors
-          : [],
-      );
-    } finally {
-      setSaving(false);
+    const targetIds = new Set(draftTargets.map((row) => row.workload.id));
+    const targetRowKeys = new Set(draftTargets.map((row) => row.key));
+    const hasChangedOpportunity = [...dealDrafts.values()].some(
+      (draft) => targetIds.has(draft.workloadId) && isDealDraftChanged(draft),
+    );
+    setPendingDeleteWorkloadIds(
+      (current) => new Set([...current, ...targetIds]),
+    );
+    setSelectedRows(new Set());
+    if (editCell && targetRowKeys.has(editCell.key)) setEditCell(null);
+    if (dealEditCell) {
+      const draft = dealDrafts.get(dealEditCell.key);
+      if (draft && targetIds.has(draft.workloadId)) setDealEditCell(null);
     }
+    setNotice(`${draftTargets.length} AW marked as Draft Deleted. Save changes to apply.`);
+    if (hasChangedOpportunity) {
+      setError("Draft Deleted AW 아래 Opportunity 초안은 저장되지 않았습니다. Opportunity 변경을 Undo하거나 삭제한 뒤 다시 저장하세요.");
+    } else {
+      setError("");
+    }
+    setSaveErrors([]);
   };
 
   const restoreSelected = async () => {
@@ -1304,6 +1336,28 @@ export function AccountsWorkloadsPage({
     }
   };
 
+  const openActionConfirmation = (action: "save" | "cancel" | "opportunity-save") => {
+    actionDialogReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setActionConfirmation(action);
+  };
+
+  const restoreActionDialogFocus = () => {
+    const target = actionDialogReturnFocusRef.current;
+    actionDialogReturnFocusRef.current = null;
+    requestAnimationFrame(() => {
+      if (target?.isConnected) target.focus();
+    });
+  };
+
+  const restoreNavigationDialogFocus = () => {
+    const target = navigationDialogReturnFocusRef.current;
+    navigationDialogReturnFocusRef.current = null;
+    requestAnimationFrame(() => {
+      if (target?.isConnected) target.focus();
+    });
+  };
+
   useEffect(() => {
     if (!onNavigationGuardChange) return;
     if (!dirty) {
@@ -1313,6 +1367,8 @@ export function AccountsWorkloadsPage({
     const guard: NavigationGuard = (label, action) => {
       if (saving) return;
       setActionConfirmation(null);
+      navigationDialogReturnFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setPendingNavigation({ label, action });
     };
     onNavigationGuardChange(guard, true);
@@ -1320,42 +1376,69 @@ export function AccountsWorkloadsPage({
   }, [dirty, onNavigationGuardChange, saving]);
 
   const saveAllDrafts = async (): Promise<boolean> => {
+    const blockedOpportunityDraft = [...dealDrafts.values()].some(
+      (draft) => isDealDraftChanged(draft) && !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId),
+    );
+    if (blockedOpportunityDraft) {
+      setError("Draft Deleted AW 아래 Opportunity 변경은 저장할 수 없습니다. Opportunity 초안을 Undo한 뒤 다시 시도하세요.");
+      return false;
+    }
     const awSaved = await saveAwDrafts();
     if (!awSaved) return false;
     return await saveDealDrafts();
   };
 
   const confirmPrimaryAction = async () => {
-    if (actionConfirmation === "save") {
-      setActionConfirmation(null);
-      await saveAllDrafts();
-      return;
-    }
-    if (actionConfirmation === "opportunity-save") {
-      setActionConfirmation(null);
-      await saveDealDrafts();
-      return;
-    }
-    if (actionConfirmation === "cancel") {
-      cancelAllDrafts();
-      setActionConfirmation(null);
-      setNotice("Changes discarded.");
+    const action = actionConfirmation;
+    if (!action || confirmationActionPendingRef.current) return;
+    confirmationActionPendingRef.current = true;
+    try {
+      if (!await settleDialogClosed(actionConfirmationDialogRef.current)) {
+        setError("Dialog could not close. Keep editing and retry.");
+        return;
+      }
+      if (action === "save") {
+        await saveAllDrafts();
+        return;
+      }
+      if (action === "opportunity-save") {
+        await saveDealDrafts();
+        return;
+      }
+      if (action === "cancel") {
+        cancelAllDrafts();
+        setNotice("Changes discarded.");
+      }
+    } finally {
+      confirmationActionPendingRef.current = false;
     }
   };
 
   const saveAndContinue = async () => {
     const pending = pendingNavigation;
-    if (!pending || saving) return;
-    const saved = await saveAllDrafts();
-    if (!saved) return;
-    setPendingNavigation(null);
-    pending.action();
+    if (!pending || saving || confirmationActionPendingRef.current) return;
+    confirmationActionPendingRef.current = true;
+    try {
+      if (!await settleDialogClosed(navigationConfirmationDialogRef.current)) {
+        setError("Dialog could not close. Navigation was cancelled.");
+        return;
+      }
+      const saved = await saveAllDrafts();
+      if (!saved) return;
+      pending.action();
+    } finally {
+      confirmationActionPendingRef.current = false;
+    }
   };
 
   const toggleHighlight = async (
     account: AccountHierarchyAccount,
     workload: AccountWorkload,
   ) => {
+    if (isDraftDeletedWorkload(workload.id)) {
+      setError("Draft Deleted AW는 수정할 수 없습니다. 삭제만 가능합니다.");
+      return;
+    }
     if (workload.id < 0) {
       setHierarchy((current) => ({
         ...current,
@@ -2112,7 +2195,7 @@ export function AccountsWorkloadsPage({
             type="button"
             class="accounts-workloads-button accounts-workloads-button--primary"
             disabled={!canWrite || saving}
-            onClick={() => setActionConfirmation("save")}
+            onClick={() => openActionConfirmation("save")}
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -2122,7 +2205,7 @@ export function AccountsWorkloadsPage({
             type="button"
             class="accounts-workloads-button"
             disabled={saving}
-            onClick={() => setActionConfirmation("cancel")}
+            onClick={() => openActionConfirmation("cancel")}
           >
             Cancel
           </button>
@@ -2132,7 +2215,7 @@ export function AccountsWorkloadsPage({
             Restore
           </button>
         )}
-        {selectedCount > 0 && !editCell && !dirty && (
+        {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
             {selectedArchivedCount > 0 ? "Delete" : "Draft Delete"}
           </button>
@@ -2349,6 +2432,7 @@ export function AccountsWorkloadsPage({
                           type="button"
                           class="accounts-workloads-highlight"
                           aria-pressed={workload.highlighted}
+                          disabled={!canWrite || saving || pendingDelete}
                           onClick={() =>
                             void toggleHighlight(account, workload)
                           }
@@ -2413,7 +2497,7 @@ export function AccountsWorkloadsPage({
                                 >
                                   ›
                                 </button>
-                                {!workload.archived && <button
+                                {!pendingDelete && <button
                                   type="button"
                                   disabled={
                                     !canWrite ||
@@ -2448,12 +2532,12 @@ export function AccountsWorkloadsPage({
                                       : "저장 확인 대기 — GET 확인"}
                                   </button>
                                 )}
-                                {activeDraft && !workload.archived && (
+                                {activeDraft && !pendingDelete && (
                                   <>
                                     <button
                                       type="button"
                                       disabled={saving || Boolean(pendingDealConfirmation)}
-                                      onClick={() => setActionConfirmation("opportunity-save")}
+                                      onClick={() => openActionConfirmation("opportunity-save")}
                                     >
                                       Save
                                     </button>
@@ -2805,62 +2889,100 @@ export function AccountsWorkloadsPage({
           </section>
         </div>
       )}
-      {actionConfirmation && (
-        <div class="accounts-workloads-confirmation-backdrop" role="presentation">
-          <section class="accounts-workloads-confirmation" role="dialog" aria-modal="true" aria-labelledby="accountsWorkloadsActionTitle">
-            <h2 id="accountsWorkloadsActionTitle">
-              {actionConfirmation === "save"
-                ? "Save changes?"
-                : actionConfirmation === "opportunity-save"
-                  ? "Save Opportunity changes?"
-                  : "Discard changes?"}
-            </h2>
-            <p>
-              {actionConfirmation === "save"
-                ? "Save all current Accounts & Workloads changes?"
-                : actionConfirmation === "opportunity-save"
-                  ? "Save the current Opportunity changes?"
-                  : "Discard all unsaved Accounts & Workloads changes?"}
-            </p>
-            <footer>
-              <button type="button" disabled={saving} onClick={() => setActionConfirmation(null)}>Keep editing</button>
-              <button type="button" disabled={saving} onClick={() => void confirmPrimaryAction()}>
-                {actionConfirmation === "save"
-                  ? "Save changes"
-                  : actionConfirmation === "opportunity-save"
-                    ? "Save Opportunities"
-                    : "Discard changes"}
-              </button>
-            </footer>
-          </section>
+      <oj-dialog
+        ref={actionConfirmationDialogRef}
+        class="kpi-cancel-dialog"
+        dialogTitle={actionConfirmation === "opportunity-save" ? "Save Opportunity changes?" : actionConfirmation === "cancel" ? "Discard changes?" : "Save changes?"}
+        initialVisibility="hide"
+        modality="modal"
+        cancelBehavior="icon"
+        onojOpen={() => actionKeepEditingButtonRef.current?.focus()}
+        onojClose={() => {
+          setActionConfirmation(null);
+          restoreActionDialogFocus();
+        }}
+      >
+        <div slot="body">
+          <p>
+            {actionConfirmation === "opportunity-save"
+              ? "Save the current Opportunity changes?"
+              : actionConfirmation === "cancel"
+                ? "Discard all unsaved Accounts & Workloads changes?"
+                : "Save all current Accounts & Workloads changes?"}
+          </p>
         </div>
-      )}
-      {pendingNavigation && (
-        <div class="accounts-workloads-confirmation-backdrop" role="presentation">
-          <section class="accounts-workloads-confirmation" role="dialog" aria-modal="true" aria-labelledby="accountsWorkloadsNavigationTitle">
-            <h2 id="accountsWorkloadsNavigationTitle">Unsaved changes</h2>
-            <p>Save changes before moving to {pendingNavigation.label}?</p>
-            <footer>
-              <button type="button" disabled={saving} onClick={() => setPendingNavigation(null)}>Stay</button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => {
-                  const pending = pendingNavigation;
+        <div slot="footer" class="kpi-dialog-actions">
+          <oj-button
+            disabled={saving}
+            chroming={actionConfirmation === "cancel" ? "danger" : undefined}
+            onojAction={() => void confirmPrimaryAction()}
+          >
+            {actionConfirmation === "opportunity-save"
+              ? "Save Opportunities"
+              : actionConfirmation === "cancel"
+                ? "Discard changes"
+                : "Save changes"}
+          </oj-button>
+          <oj-button
+            ref={actionKeepEditingButtonRef}
+            disabled={saving}
+            onojAction={() => actionConfirmationDialogRef.current?.close()}
+          >
+            Keep editing
+          </oj-button>
+        </div>
+      </oj-dialog>
+      <oj-dialog
+        ref={navigationConfirmationDialogRef}
+        class="kpi-navigation-dialog"
+        dialogTitle="Unsaved changes"
+        initialVisibility="hide"
+        modality="modal"
+        cancelBehavior="icon"
+        onojOpen={() => navigationStayButtonRef.current?.focus()}
+        onojClose={() => {
+          setPendingNavigation(null);
+          restoreNavigationDialogFocus();
+        }}
+      >
+        <div slot="body">
+          <p>Save changes before moving to {pendingNavigation?.label}?</p>
+        </div>
+        <div slot="footer" class="kpi-dialog-actions">
+          <oj-button
+            ref={navigationStayButtonRef}
+            disabled={saving}
+            onojAction={() => navigationConfirmationDialogRef.current?.close()}
+          >
+            Stay
+          </oj-button>
+          <oj-button disabled={saving} onojAction={() => void saveAndContinue()}>
+            {saving ? "Saving…" : "Save & Continue"}
+          </oj-button>
+          <oj-button
+            disabled={saving}
+            onojAction={() => {
+              const pending = pendingNavigation;
+              void (async () => {
+                if (!pending || confirmationActionPendingRef.current) return;
+                confirmationActionPendingRef.current = true;
+                try {
+                  if (!await settleDialogClosed(navigationConfirmationDialogRef.current)) {
+                    setError("Dialog could not close. Navigation was cancelled.");
+                    return;
+                  }
                   cancelAllDrafts();
-                  setPendingNavigation(null);
                   pending.action();
-                }}
-              >
-                Discard and Continue
-              </button>
-              <button type="button" disabled={saving} onClick={() => void saveAndContinue()}>
-                {saving ? "Saving…" : "Save and Continue"}
-              </button>
-            </footer>
-          </section>
+                } finally {
+                  confirmationActionPendingRef.current = false;
+                }
+              })();
+            }}
+          >
+            Discard & Continue
+          </oj-button>
         </div>
-      )}
+      </oj-dialog>
       {latestUpdateTooltip && typeof document !== "undefined" && createPortal(
         <div
           class="accounts-workloads-latest-tooltip"
