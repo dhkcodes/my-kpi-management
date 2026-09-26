@@ -95,6 +95,7 @@ export type AccountWorkload = Readonly<{
   id: number;
   versionNo: number;
   name: string;
+  salesRep: string | null;
   lastUpdated: string | null;
   notes: string | null;
   highlighted: boolean;
@@ -119,6 +120,7 @@ export type AccountsWorkloadsHierarchy = Readonly<{
 export type ForecastCandidate = Readonly<{
   accountName: string;
   normalizedAccount: string;
+  salesRep: string | null;
   planId: number | null;
   planNumber: string | null;
   linked: boolean;
@@ -171,7 +173,7 @@ export const filterForecastCandidates = (
 export type AccountWrite = Readonly<{ id: number | null; clientId: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
 export type WorkloadWrite = Readonly<{
   id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null;
-  name: string | null; lastUpdated: string | null; notes: string | null; highlighted?: boolean | null; action: HierarchyWriteAction;
+  name: string | null; salesRep: string | null; lastUpdated: string | null; notes: string | null; highlighted?: boolean | null; action: HierarchyWriteAction;
 }>;
 export type DealWrite = Readonly<{
   id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;
@@ -568,6 +570,7 @@ export const fetchForecastCandidates = async (
     const value = requiredObject(entry, `Malformed Forecast candidate ${index + 1}`);
     const linkedWorkloadIds = value.linkedWorkloadIds;
     if (typeof value.accountName !== "string" || typeof value.normalizedAccount !== "string" ||
+        !(value.salesRep === null || typeof value.salesRep === "string") ||
         !(value.planId === null || isPositiveInteger(value.planId)) ||
         !(value.planNumber === null || typeof value.planNumber === "string") ||
         typeof value.linked !== "boolean" || !Array.isArray(linkedWorkloadIds) ||

@@ -50,7 +50,7 @@ type Props = Readonly<{
   fxError: string;
   onFxRateChange: (rateValue: number) => Promise<FxRateRecord>;
 }>;
-type AwField = "account" | "workload" | "plan" | "lastUpdated" | "notes";
+type AwField = "account" | "workload" | "salesRep" | "plan" | "lastUpdated" | "notes";
 type DealField =
   | "name"
   | "opportunityNo"
@@ -141,10 +141,11 @@ export const targetOptionsFor = (fiscalYear = currentFiscalYear()) => [
   `FY${fiscalYear + 1} Q1`, `FY${fiscalYear + 1} Q2`,
 ];
 const targetOptions = targetOptionsFor();
-const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
+const emptyWorkload = (id: number, name = "", salesRep: string | null = null): AccountWorkload => ({
   id,
   versionNo: 0,
   name,
+  salesRep,
   lastUpdated: null,
   notes: null,
   highlighted: false,
@@ -176,6 +177,35 @@ const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({
   deletedAt: null,
   sourceCommitmentId: null,
 });
+const mergeSearchResultWithAwDrafts = (
+  result: AccountsWorkloadsHierarchy,
+  current: AccountsWorkloadsHierarchy,
+  dirtyAccountIds: ReadonlySet<number>,
+  dirtyWorkloadIds: ReadonlySet<number>,
+): AccountsWorkloadsHierarchy => {
+  const currentAccounts = new Map(current.accounts.map((account) => [account.id, account]));
+  const accounts = result.accounts.map((account) => {
+    const currentAccount = currentAccounts.get(account.id);
+    if (!currentAccount) return account;
+    const currentWorkloads = new Map(currentAccount.workloads.map((workload) => [workload.id, workload]));
+    const workloads = account.workloads.map((workload) =>
+      dirtyWorkloadIds.has(workload.id) ? currentWorkloads.get(workload.id) ?? workload : workload);
+    currentAccount.workloads.forEach((workload) => {
+      if ((workload.id < 0 || dirtyWorkloadIds.has(workload.id))
+        && !workloads.some((candidate) => candidate.id === workload.id)) workloads.push(workload);
+    });
+    return {
+      ...account,
+      name: dirtyAccountIds.has(account.id) ? currentAccount.name : account.name,
+      workloads,
+    };
+  });
+  current.accounts.forEach((account) => {
+    if ((account.id < 0 || dirtyAccountIds.has(account.id))
+      && !accounts.some((candidate) => candidate.id === account.id)) accounts.unshift(account);
+  });
+  return { ...result, accounts };
+};
 const dealWrite = (
   deal: AccountWorkloadDeal,
   workloadId: number,
@@ -220,6 +250,10 @@ export function AccountsWorkloadsPage({
   onFxRateChange,
 }: Props) {
   const nextTempId = useRef(-1);
+  const reloadGeneration = useRef(0);
+  const preserveDraftsForNextReload = useRef(false);
+  const appliedSearchRef = useRef(initialSearch);
+  const searchComposingRef = useRef(false);
   const editSnapshot = useRef("");
   const highlightRequests = useRef(new Set<number>());
   const permanentDeleteDialogRef = useRef<any>(null);
@@ -294,6 +328,8 @@ export function AccountsWorkloadsPage({
       if (!original) return true;
       return (
         current.name !== original.name ||
+        (current.salesRep ?? "").trim() !==
+          (original.salesRep ?? "").trim() ||
         (current.lastUpdated ?? "") !== (original.lastUpdated ?? "") ||
         (current.notes ?? "") !== (original.notes ?? "") ||
         (current.plans[0]?.sourcePlanNumber?.trim() ?? "") !==
@@ -343,6 +379,9 @@ export function AccountsWorkloadsPage({
   }, [editCell, dealEditCell]);
 
   const reload = async () => {
+    const generation = ++reloadGeneration.current;
+    const preserveDrafts = preserveDraftsForNextReload.current;
+    preserveDraftsForNextReload.current = false;
     setLoading(true);
     setError("");
     try {
@@ -351,22 +390,37 @@ export function AccountsWorkloadsPage({
         includeArchived: includeDeleted,
         includeDeletedDeals: includeDeleted,
       });
-      setHierarchy(result);
+      if (generation !== reloadGeneration.current) return;
+      setHierarchy((current) => preserveDrafts
+        ? mergeSearchResultWithAwDrafts(result, current, dirtyAccounts, dirtyWorkloads)
+        : result);
       setBaseline(result);
-      setDirtyAccounts(new Set());
-      setDirtyWorkloads(new Set());
-      setPendingDeleteWorkloadIds(new Set());
-      setSelectedRows(new Set());
-      setEditCell(null);
+      if (!preserveDrafts) {
+        setDirtyAccounts(new Set());
+        setDirtyWorkloads(new Set());
+        setPendingDeleteWorkloadIds(new Set());
+        setSelectedRows(new Set());
+        setEditCell(null);
+      }
     } catch (requestError) {
+      if (generation !== reloadGeneration.current) return;
       setError(friendlyError(requestError));
     } finally {
-      setLoading(false);
+      if (generation === reloadGeneration.current) setLoading(false);
     }
   };
   useEffect(() => {
     void reload();
   }, [search, includeDeleted]);
+
+  const applySearch = (value: string) => {
+    const nextSearch = value.trim();
+    if (nextSearch === appliedSearchRef.current) return;
+    preserveDraftsForNextReload.current = nextSearch === "";
+    appliedSearchRef.current = nextSearch;
+    reloadGeneration.current++;
+    setSearch(nextSearch);
+  };
 
   const allRows = useMemo(() => {
     const flattened = hierarchy.accounts.flatMap((account) =>
@@ -380,6 +434,7 @@ export function AccountsWorkloadsPage({
       const deals = item.workload.deals.filter((deal) => !deal.deleted);
       if (sortField === "account") return item.account.name;
       if (sortField === "workload") return item.workload.name;
+      if (sortField === "salesRep") return item.workload.salesRep ?? "";
       if (sortField === "plan")
         return item.workload.plans[0]?.sourcePlanNumber ?? "";
       if (sortField === "lastUpdated") return item.workload.lastUpdated ?? "";
@@ -447,6 +502,8 @@ export function AccountsWorkloadsPage({
                   ? workload
                   : field === "workload"
                     ? { ...workload, name: value }
+                    : field === "salesRep"
+                      ? { ...workload, salesRep: value }
                     : field === "lastUpdated"
                       ? { ...workload, lastUpdated: nullable(value) }
                       : field === "notes"
@@ -493,11 +550,13 @@ export function AccountsWorkloadsPage({
       });
     } else {
       const nextName = field === "workload" ? value : (currentWorkload?.name ?? "");
+      const nextSalesRep = field === "salesRep" ? value : (currentWorkload?.salesRep ?? "");
       const nextPlan = field === "plan" ? value : (currentWorkload?.plans[0]?.sourcePlanNumber ?? "");
       const nextUpdated = field === "lastUpdated" ? value : (currentWorkload?.lastUpdated ?? "");
       const nextNotes = field === "notes" ? value : (currentWorkload?.notes ?? "");
       const changed = workloadId < 0 || !baselineWorkload ||
         nextName !== baselineWorkload.name ||
+        nextSalesRep.trim() !== (baselineWorkload.salesRep ?? "").trim() ||
         nextPlan !== (baselineWorkload.plans[0]?.sourcePlanNumber ?? "") ||
         nextUpdated !== (baselineWorkload.lastUpdated ?? "") ||
         nextNotes !== (baselineWorkload.notes ?? "");
@@ -518,6 +577,8 @@ export function AccountsWorkloadsPage({
       ? account.name
       : field === "workload"
         ? workload.name
+        : field === "salesRep"
+          ? (workload.salesRep ?? "")
         : field === "plan"
           ? (workload.plans[0]?.sourcePlanNumber ?? "")
           : field === "lastUpdated"
@@ -647,9 +708,10 @@ export function AccountsWorkloadsPage({
             <input
               autoFocus
               class="accounts-workloads-edit-field"
-              aria-label={`${field === "account" ? "Account" : field === "workload" ? "Workload" : field}${field === "account" || field === "workload" ? " (required)" : ""}`}
+              aria-label={`${field === "account" ? "Account" : field === "workload" ? "Workload" : field === "salesRep" ? "Sales Rep" : field}${field === "account" || field === "workload" ? " (required)" : ""}`}
               aria-required={field === "account" || field === "workload" ? "true" : undefined}
               placeholder={field === "account" ? "Account *" : field === "workload" ? "Workload *" : undefined}
+              maxLength={field === "salesRep" ? 200 : undefined}
               value={value}
               onInput={(event) =>
                 updateAw(
@@ -667,7 +729,9 @@ export function AccountsWorkloadsPage({
           )
         ) : field === "lastUpdated" || field === "notes" ? (
           tooltip(value)
-        ) : field === "workload" ? (
+        ) : field === "salesRep" && !value ? (
+          "미지정"
+        ) : field === "workload" || field === "salesRep" ? (
           truncatedWorkload(value)
         ) : (
           value || "—"
@@ -752,6 +816,7 @@ export function AccountsWorkloadsPage({
         accountRef: String(row.account.id),
         versionNo: row.workload.versionNo,
         name: row.workload.name,
+        salesRep: row.workload.salesRep,
         lastUpdated: row.workload.lastUpdated,
         notes: row.workload.notes,
         highlighted: row.workload.highlighted,
@@ -983,6 +1048,7 @@ export function AccountsWorkloadsPage({
         accountRef: String(row.account.id),
         versionNo: row.workload.versionNo,
         name: row.workload.name,
+        salesRep: row.workload.salesRep,
         lastUpdated: row.workload.lastUpdated,
         notes: row.workload.notes,
         highlighted: row.workload.highlighted,
@@ -1019,7 +1085,7 @@ export function AccountsWorkloadsPage({
         accounts: [], deals: [], workloadPlans: [],
         workloads: targets.map((row) => ({
           id: row.workload.id, clientId: null, accountRef: String(row.account.id),
-          versionNo: row.workload.versionNo, name: row.workload.name,
+          versionNo: row.workload.versionNo, name: row.workload.name, salesRep: row.workload.salesRep,
           lastUpdated: row.workload.lastUpdated, notes: row.workload.notes,
           highlighted: row.workload.highlighted, action: "RESTORE",
         })),
@@ -1125,6 +1191,7 @@ export function AccountsWorkloadsPage({
               accountRef: refFor(account.id, "account"),
               versionNo: workload.versionNo,
               name: workload.name,
+              salesRep: workload.salesRep,
               lastUpdated: workload.lastUpdated,
               notes: workload.notes,
               highlighted: workload.highlighted,
@@ -1158,6 +1225,7 @@ export function AccountsWorkloadsPage({
             accountRef: refFor(account.id, "account"),
             versionNo: workload.id > 0 ? workload.versionNo : null,
             name: workload.name,
+            salesRep: workload.salesRep,
             lastUpdated: workload.lastUpdated,
             notes: workload.notes,
             highlighted: workload.highlighted,
@@ -1266,6 +1334,7 @@ export function AccountsWorkloadsPage({
           accountRef: String(account.id),
           versionNo: workload.versionNo,
           name: savedWorkload.name,
+          salesRep: savedWorkload.salesRep,
           lastUpdated: savedWorkload.lastUpdated,
           notes: savedWorkload.notes,
           highlighted: !workload.highlighted,
@@ -1809,7 +1878,7 @@ export function AccountsWorkloadsPage({
         groups.set(identity, group);
       }
       const workloadId = nextTempId.current--;
-      const workload = emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME);
+      const workload = emptyWorkload(workloadId, CANDIDATE_WORKLOAD_NAME, candidate.salesRep);
       if (candidate.planId !== null || candidate.planNumber !== null)
         Object.assign(workload, {
           plans: [
@@ -1889,31 +1958,36 @@ export function AccountsWorkloadsPage({
       }}
     >
       <header class="accounts-workloads-header consumption-page__header">
-        <div>
-          {breadcrumb}
-          <span class="kpi-eyebrow">My Customers 360</span>
-          <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
+        <div class="accounts-workloads-header-topline">
+          <div class="accounts-workloads-header-navigation">
+            {breadcrumb}
+            <span class="kpi-eyebrow">My Customers 360</span>
+          </div>
+          <div class="consumption-import-actions accounts-workloads-header-actions">
+            <oj-button
+              chroming="outlined"
+              aria-label="Account Recommendations"
+              disabled={!canWrite || saving}
+              onojAction={() => void openForecast()}
+            >
+              <span slot="startIcon" class="oj-ux-ico-plus" />
+              <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
+              <span class="accounts-workloads-recommendations-label--mobile">Account Recomm.</span>
+            </oj-button>
+          </div>
         </div>
-        <div class="consumption-import-actions accounts-workloads-header-actions">
-          <oj-button
-            chroming="outlined"
-            disabled={!canWrite || saving}
-            onojAction={() => void openForecast()}
-          >
-            <span slot="startIcon" class="oj-ux-ico-plus" />
-            Account Recommendations
-          </oj-button>
-        </div>
+        <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
       </header>
       <form
         class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
         onSubmit={(event) => {
           event.preventDefault();
+          if (searchComposingRef.current) return;
           if (dirty) {
             setError("Save or cancel drafts before searching.");
             return;
           }
-          setSearch(searchInput.trim());
+          applySearch(searchInput);
         }}
       >
         <label
@@ -1926,17 +2000,26 @@ export function AccountsWorkloadsPage({
             type="search"
             value={searchInput}
             placeholder="Account, workload, opportunity, or Plan"
-            onInput={(event) => setSearchInput(event.currentTarget.value)}
+            onCompositionStart={() => { searchComposingRef.current = true; }}
+            onCompositionEnd={(event) => {
+              searchComposingRef.current = false;
+              setSearchInput(event.currentTarget.value);
+            }}
+            onInput={(event) => {
+              const value = event.currentTarget.value;
+              setSearchInput(value);
+              if (!value && appliedSearchRef.current) applySearch("");
+            }}
           />
+          <button
+            type="submit"
+            class="consumption-record-search__submit"
+            disabled={loading || saving}
+          >
+            <span class="oj-ux-ico-search" aria-hidden="true" />
+            <span class="oj-helper-hidden-accessible">Search</span>
+          </button>
         </label>
-        <button
-          type="submit"
-          class="consumption-range-apply"
-          disabled={loading || saving}
-        >
-          <span class="oj-ux-ico-search" aria-hidden="true" />
-          <span class="oj-helper-hidden-accessible">Search</span>
-        </button>
         <label class="accounts-workloads-include-deleted">
           <input
             type="checkbox"
@@ -1987,8 +2070,12 @@ export function AccountsWorkloadsPage({
         </button>
       </form>
       <div class="accounts-workloads-table-summary">
-        <span>{hierarchy.accounts.length} accounts</span>
-        <div class="accounts-workloads-fx">
+        <strong class="consumption-table-title">
+          Account / Workload / Opportunity
+          <small class="consumption-table-plan-count">{hierarchy.accounts.length} accounts</small>
+        </strong>
+        <div class="accounts-workloads-table-summary__meta">
+          <div class="accounts-workloads-fx">
           <button
             type="button"
             class="accounts-workloads-fx__button"
@@ -2041,6 +2128,7 @@ export function AccountsWorkloadsPage({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
       {error && (
@@ -2096,6 +2184,7 @@ export function AccountsWorkloadsPage({
                   [
                     ["account", "Account"],
                     ["workload", "Workload"],
+                    ["salesRep", "Sales Rep"],
                     ["plan", "Plan Number"],
                     ["arrUsd", "ARR($)"],
                     ["acrUsd", "ACR($)"],
@@ -2196,6 +2285,7 @@ export function AccountsWorkloadsPage({
                       </td>
                       {renderAwCell(account, workload, "account")}
                       {renderAwCell(account, workload, "workload")}
+                      {renderAwCell(account, workload, "salesRep")}
                       {renderAwCell(account, workload, "plan")}
                       <td class="accounts-workloads-number-cell">
                         {fmtMoney(arr)}
@@ -2211,7 +2301,7 @@ export function AccountsWorkloadsPage({
                     </tr>
                     {expanded && (
                       <tr class="accounts-workloads-child-row">
-                        <td colSpan={10}>
+                        <td colSpan={11}>
                           <section
                             class="accounts-workloads-opportunities"
                             aria-label={`${account.name} ${workload.name} opportunities`}
@@ -2592,6 +2682,7 @@ export function AccountsWorkloadsPage({
                   <tr>
                     <th />
                     <th>Account</th>
+                    <th>Sales Rep</th>
                     <th>Plan ID(Number)</th>
                   </tr>
                 </thead>
@@ -2615,6 +2706,7 @@ export function AccountsWorkloadsPage({
                           />
                         </td>
                         <td>{candidate.accountName}</td>
+                        <td>{candidate.salesRep ?? "—"}</td>
                         <td>{candidate.planNumber ?? "No Plan Number"}</td>
                       </tr>
                     );

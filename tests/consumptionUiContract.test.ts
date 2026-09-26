@@ -301,7 +301,9 @@ assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyCon
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
 assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
-assert.match(recordsPage, /<button type="button" class=\{`consumption-range-apply[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "mobile Apply uses a stable native button instead of a late-upgrading custom element");
+assert.match(recordsPage, /consumption-record-search__submit[\s\S]*aria-label="Apply filters and search"[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "filter-and-search uses an input-adjacent native icon button");
+assert.doesNotMatch(recordsPage, /class=\{?`?consumption-range-apply/,
+  "Consumption removes the standalone Apply button");
 assert.match(styles, /\.consumption-import-actions \{[^}]*display: flex;/, "Export and Import keep Redwood spacing and wrap instead of touching or overflowing");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-actions \{[^}]*align-self: stretch;[^}]*justify-content: flex-start;[^}]*width: 100%;/, "narrow Consumption Records layouts keep the action group visible and naturally wrapped");
 assert.match(recordsPage, /saveConsumptionForecasts[\s\S]*ConsumptionConflictError[\s\S]*Saved baseline[\s\S]*My draft[\s\S]*Current server/, "Forecast Save and HTTP 409 comparison remain intact");
@@ -315,18 +317,30 @@ assert.match(recordsPage, /applyForecastComposition[\s\S]*parseForecastCompositi
 assert.match(recordsPage, /<form onSubmit=\{\(event\) => \{ event\.preventDefault\(\); applyForecastComposition\(\); \}\}[\s\S]*event\.key === "Escape"[\s\S]*cancelForecastComposition/, "submit applies and Escape cancels the Forecast composition popover");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
 assert.match(recordsPage, /onNavigationGuardChange[\s\S]*window\.confirm\(/, "unsaved Forecast changes retain route protection");
-assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid[\s\S]*Apply/, "Data keeps its independent Quarter range");
+assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid/, "Data keeps its independent Quarter range");
 assert.match(recordsPage, /expandConsumptionQuarterOptions[\s\S]*setAvailableQuarterOptions/, "every represented Fiscal Year exposes Q1 through Q4 in the mobile-compatible native selects");
-assert.match(recordsPage, /selectPillar[\s\S]*loadRecordsPage\(false, \{ fromQuarter, toQuarter, search: appliedSearch \}, pillar\)/, "pillar changes retain the applied From and To range");
+assert.match(recordsPage, /selectPillar[\s\S]*runRecordsQuery\(\{ fromQuarter, toQuarter, search: appliedSearch \}, pillar\)/, "pillar changes immediately retain the applied From and To range");
+assert.match(recordsPage, /selectQuarterRange[\s\S]*setFromQuarter\(nextFromQuarter\)[\s\S]*setToQuarter\(nextToQuarter\)[\s\S]*isConsumptionQuarterRangeValid[\s\S]*runRecordsQuery/,
+  "each valid From or To selection applies immediately while invalid ranges remain local for validation");
 assert.match(recordsPage, /consumption-range-bar[\s\S]*consumption-range-pillar[\s\S]*consumption-pillar-selector[\s\S]*consumptionFromQuarter/, "Pillar is immediately before the From Quarter control in the compact range bar");
 assert.match(recordsPage, /filterVisibleConsumptionPlans\(group\.plans, page\.fromQuarter, page\.toQuarter\)/, "the client defensively applies the same selected-range nonzero Actual or Forecast-presence rule as the backend");
-assert.match(recordsPage, /submitRecordsQuery[\s\S]*loadRecordsPage\(false, query\)/, "quarter and search changes replace only the Records data region");
+assert.match(recordsPage, /submitRecordsQuery[\s\S]*runRecordsQuery\(\{ fromQuarter, toQuarter, search: draftSearch\.trim\(\) \}\)/, "search icon submits the current quarter and search query atomically");
 assert.match(recordsPage, /const \[draftSearch, setDraftSearch\][\s\S]*const \[appliedSearch, setAppliedSearch\]/, "Consumption Records separates draft and applied search state");
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*search:\s*requestQuery\.search/, "only the captured applied query reaches the records API");
 assert.doesNotMatch(recordsPage, /debouncedRecordSearch|setTimeout[\s\S]*recordSearch/, "typing does not debounce into a records fetch");
-assert.match(recordsPage, /onCompositionStart[\s\S]*setSearchComposing\(true\)[\s\S]*onCompositionEnd/, "search tracks Korean IME composition without submitting");
-assert.match(recordsPage, /submitRecordsQuery[\s\S]*fromQuarter[\s\S]*toQuarter[\s\S]*draftSearch\.trim\(\)[\s\S]*loadRecordsPage\(false, query\)/, "Apply submits quarter and search atomically");
-assert.match(recordsPage, /event\.key === "Enter"[\s\S]*!event\.isComposing[\s\S]*submitRecordsQuery/, "Enter submits the same atomic records query after IME composition");
+assert.match(recordsPage, /onCompositionStart[\s\S]*searchComposingRef\.current = true[\s\S]*onCompositionEnd[\s\S]*searchComposingRef\.current = false/, "search tracks Korean IME composition synchronously");
+assert.match(recordsPage, /submitRecordsQuery[\s\S]*fromQuarter[\s\S]*toQuarter[\s\S]*draftSearch\.trim\(\)[\s\S]*runRecordsQuery\(/, "search icon submits quarter and search atomically");
+assert.match(recordsPage, /event\.key === "Enter"[\s\S]*!event\.isComposing[\s\S]*!searchComposingRef\.current[\s\S]*submitRecordsQuery/, "Enter submits the same atomic records query after IME composition, including same-render-tick composition end");
+assert.match(recordsPage, /activeRecordsQueryRef\.current\?\.key === requestKey[\s\S]*activeRecordsQueryRef\.current = \{ key: requestKey, generation: actionGeneration, search: requestQuery\.search \}/,
+  "a synchronous active-query key prevents duplicate same-render-tick requests");
+assert.match(recordsPage, /const clearingSearch = requestQuery\.search === ""[\s\S]*appliedSearchRef\.current !== "" \|\| Boolean\(activeRecordsQueryRef\.current\?\.search\)[\s\S]*\(!clearingSearch && \(hasDraftChanges \|\| forecastEditor \|\| searchComposingRef\.current\)\)/,
+  "native clear bypasses dirty and composition UI state without weakening ordinary query guards");
+assert.match(recordsPage, /onInput=\{\(event\) => \{[\s\S]*if \(!value && \(appliedSearchRef\.current \|\| activeRecordsQueryRef\.current\?\.search\)\)[\s\S]*runRecordsQuery\(\{ fromQuarter, toQuarter, search: "" \}, selectedPillar\)/,
+  "native clear immediately reapplies the current quarter and pillar, including while the first search is in flight");
+assert.match(recordsPage, /activeRecordsQueryRef\.current = \{ key: requestKey, generation: actionGeneration, search: requestQuery\.search \}[\s\S]*loadRecordsPage\(false, requestQuery, pillar, "query", clearingSearch\)/,
+  "Consumption records the in-flight search synchronously and marks clear refreshes for draft preservation");
+assert.match(recordsPage, /mergeRefreshedControlsWithDrafts\(refreshedControls, savedControlTotalsRef\.current, draftControlTotalsRef\.current\)/,
+  "Consumption clear refresh merges refreshed results without wiping unsaved Forecast controls");
 assert.match(recordsPage, /initialConsumptionRecordsBatchSize\(window\.innerHeight\)/, "the initial records request is sized to the viewport");
 assert.match(recordsPage, /type RecordsLoadingPhase = "idle" \| "initial" \| "query" \| "append"[\s\S]*blockingRecordsLoading = recordsLoadingPhase === "initial"/, "only initial records loading replaces the page shell");
 assert.match(recordsPage, /recordsLoadingPhase === "query"[\s\S]*consumption-results-refresh[\s\S]*Refreshing results/, "replacement queries retain the Records header and controls while the results region refreshes");
@@ -337,12 +351,12 @@ const recordsFreshnessIndex = recordsPage.indexOf("if (generation !== recordsReq
 const recordsQueryCommitIndex = recordsPage.indexOf("recordsQueryRef.current = requestQuery");
 assert.ok(recordsFetchIndex >= 0 && recordsFreshnessIndex > recordsFetchIndex && recordsQueryCommitIndex > recordsFreshnessIndex, "a replacement query becomes append-authoritative only after its response succeeds and remains current");
 assert.match(recordsPage, /if \(!append\) \{\s*recordsQueryRef\.current = requestQuery;\s*setFromQuarter\(page\.fromQuarter\);\s*setToQuarter\(page\.toQuarter\);\s*setRangeInitialized\(true\);\s*setRangeTouched\(false\);\s*\}/, "append responses never overwrite query controls that remain editable during background loading");
-assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase\)/, "ETag changes restart paging with the same applied query before snapshots can be mixed");
+assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase, preserveDrafts\)/, "ETag changes restart paging with the same applied query and draft-preservation mode before snapshots can be mixed");
 assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:\s*"ACCOUNT"[\s\S]*direction:\s*"ASC"/, "records paging uses a stable server order without user-facing sort controls");
 assert.match(recordsPage, /new Map[\s\S]*page\.accountGroups[\s\S]*setSavedPlans[\s\S]*setDraftPlans/, "loaded account pages append with account and plan deduplication");
-assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{hasDraftChanges \|\| rangeLoading \|\| blockingRecordsLoading\}/, "search preserves its draft and remains stable during background append loading");
+assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{blockingRecordsLoading\}/, "search stays available for native clear during dirty or background-query states and blocks only initial replacement loading");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}[\s\S]*id="consumptionToQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}/, "From and To controls do not change enabled state during background append loading");
-assert.match(recordsPage, /class=\{`consumption-range-apply[\s\S]*disabled=\{!isConsumptionQuarterRangeValid\(fromQuarter, toQuarter\) \|\| rangeLoading \|\| blockingRecordsLoading/, "Apply does not change enabled or opacity state during background append loading");
+assert.match(recordsPage, /consumption-record-search__submit[\s\S]*disabled=\{!isConsumptionQuarterRangeValid\(fromQuarter, toQuarter\) \|\| rangeLoading \|\| blockingRecordsLoading/, "search icon does not change enabled or opacity state during background append loading");
 assert.match(recordsPage, /useEffect\(\(\) => \{[\s\S]*new IntersectionObserver[\s\S]*\}, \{ root:[\s\S]*\}, \[recordsHasMore, hasDraftChanges\]\);/, "pagination observer is not recreated for offsets, loading transitions, ETags, or draft filter changes");
 assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-bottom scroll and Load More request the next server page");
 assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.current\(\)[\s\S]*root:\s*tableScrollRef\.current/, "the actual table scroll root observes a paging sentinel through the latest append callback");

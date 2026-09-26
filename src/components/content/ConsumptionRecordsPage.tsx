@@ -97,6 +97,23 @@ const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: 
   const rightByKey = new Map(right.map((control) => [controlKey(control), control.controlAmount]));
   return left.every((control) => rightByKey.get(controlKey(control)) === control.controlAmount);
 };
+const mergeRefreshedControlsWithDrafts = (
+  refreshed: readonly ConsumptionApiControlTotal[],
+  saved: readonly ConsumptionApiControlTotal[],
+  draft: readonly ConsumptionApiControlTotal[],
+) => {
+  const savedByKey = new Map(saved.map((control) => [controlKey(control), control]));
+  const draftByKey = new Map(draft.map((control) => [controlKey(control), control]));
+  const dirtyKeys = new Set([...savedByKey.keys(), ...draftByKey.keys()].filter((key) =>
+    savedByKey.get(key)?.controlAmount !== draftByKey.get(key)?.controlAmount));
+  const merged = new Map(refreshed.map((control) => [controlKey(control), { ...control }]));
+  dirtyKeys.forEach((key) => {
+    const draftControl = draftByKey.get(key);
+    if (draftControl) merged.set(key, { ...draftControl });
+    else merged.delete(key);
+  });
+  return [...merged.values()].sort((left, right) => controlKey(left).localeCompare(controlKey(right)));
+};
 const isExactReplayPreview = (preview: ConsumptionImportPreview) =>
   preview.files.length > 0 && preview.exactReplayFileCount === preview.files.length;
 const forecastCompositionUnavailable = (composition: ConsumptionAccountForecast) =>
@@ -410,11 +427,19 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   const exportingRef = useRef(false);
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
+  const recordsQueryActionGeneration = useRef(0);
+  const activeRecordsQueryRef = useRef<Readonly<{ key: string; generation: number; search: string }> | null>(null);
+  const appliedSearchRef = useRef("");
+  const searchComposingRef = useRef(false);
   const recordsLoadingRef = useRef(false);
   const recordsQueryRef = useRef<RecordsQuery>({ fromQuarter: "", toQuarter: "", search: "", pillar: "ALL" });
   const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
   const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals) || draftForecastCompositions.size > 0;
   const hasDraftChanges = hasControlDraftChanges;
+  const savedControlTotalsRef = useRef(savedControlTotals);
+  const draftControlTotalsRef = useRef(draftControlTotals);
+  savedControlTotalsRef.current = savedControlTotals;
+  draftControlTotalsRef.current = draftControlTotals;
 
   useEffect(() => {
     if (hasDraftChanges || !dismissedMessageIds.has("records-draft")) return;
@@ -473,7 +498,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     append: boolean,
     query = { fromQuarter, toQuarter, search: appliedSearch },
     pillar: ConsumptionPillar = selectedPillar,
-    loadingPhase: RecordsLoadingPhase = append ? "append" : "query"
+    loadingPhase: RecordsLoadingPhase = append ? "append" : "query",
+    preserveDrafts = false,
   ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
@@ -491,7 +517,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
       });
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase);
+        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts);
       }
       const pageForecastControls = accountForecastControls(page);
       const visibleGroups = page.accountGroups.map((group) => ({
@@ -523,8 +549,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         pageForecastControls.forEach((control) => keyed.set(`${control.account}::${control.periodKey}`, control));
         return [...keyed.values()];
       };
-      setSavedControlTotals((current) => cloneControlTotals(mergeControls(current)));
-      setDraftControlTotals((current) => cloneControlTotals(mergeControls(current)));
+      const refreshedControls = cloneControlTotals(mergeControls(savedControlTotalsRef.current));
+      setSavedControlTotals(refreshedControls);
+      setDraftControlTotals(preserveDrafts
+        ? mergeRefreshedControlsWithDrafts(refreshedControls, savedControlTotalsRef.current, draftControlTotalsRef.current)
+        : cloneControlTotals(refreshedControls));
       setForecastVariances((current) => append ? [...current, ...page.forecastVariances] : [...page.forecastVariances]);
       setAccountForecasts((current) => {
         const keyed = new Map((append ? current : []).map((forecast) => [`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast]));
@@ -811,33 +840,56 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     if (plan) setSelectedSeriesId(plan.id);
   };
 
-  const selectPillar = async (pillar: ConsumptionPillar) => {
-    if (pillar === selectedPillar || hasDraftChanges || forecastEditor || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle") return;
-    setImportError("");
-    try {
-      await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, pillar);
-      setSelectedSignalId("");
-      setSelectedSeriesId("__all__");
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Consumption pillar could not be loaded.");
-    }
-  };
-
-  const submitRecordsQuery = async () => {
-    if (!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || forecastEditor || searchComposing) return;
-    const query = { fromQuarter, toQuarter, search: draftSearch.trim() };
+  const runRecordsQuery = async (
+    query: { fromQuarter: string; toQuarter: string; search: string },
+    pillar: ConsumptionPillar = selectedPillar,
+  ) => {
+    const requestQuery = { ...query, search: query.search.trim(), pillar };
+    const clearingSearch = requestQuery.search === ""
+      && (appliedSearchRef.current !== "" || Boolean(activeRecordsQueryRef.current?.search));
+    if (!isConsumptionQuarterRangeValid(query.fromQuarter, query.toQuarter)
+      || blockingRecordsLoading || (!clearingSearch && (hasDraftChanges || forecastEditor || searchComposingRef.current))
+      || importPhase !== "idle") return;
+    const requestKey = JSON.stringify(requestQuery);
+    if (activeRecordsQueryRef.current?.key === requestKey) return;
+    const actionGeneration = ++recordsQueryActionGeneration.current;
+    activeRecordsQueryRef.current = { key: requestKey, generation: actionGeneration, search: requestQuery.search };
     setRangeLoading(true);
     setImportError("");
     try {
-      await loadRecordsPage(false, query);
-      setAppliedSearch(query.search);
+      await loadRecordsPage(false, requestQuery, pillar, "query", clearingSearch);
+      if (actionGeneration !== recordsQueryActionGeneration.current) return;
+      appliedSearchRef.current = requestQuery.search;
+      setAppliedSearch(requestQuery.search);
       setSelectedSignalId("");
       setSelectedSeriesId("__all__");
     } catch (error) {
+      if (actionGeneration !== recordsQueryActionGeneration.current) return;
       setImportError(error instanceof Error ? error.message : "Consumption records could not be loaded.");
     } finally {
-      setRangeLoading(false);
+      if (activeRecordsQueryRef.current?.generation === actionGeneration) activeRecordsQueryRef.current = null;
+      if (actionGeneration === recordsQueryActionGeneration.current) setRangeLoading(false);
     }
+  };
+
+  const selectPillar = async (pillar: ConsumptionPillar) => {
+    if (pillar === selectedPillar) return;
+    await runRecordsQuery({ fromQuarter, toQuarter, search: appliedSearch }, pillar);
+  };
+
+  const submitRecordsQuery = async () =>
+    runRecordsQuery({ fromQuarter, toQuarter, search: draftSearch.trim() });
+
+  const selectQuarterRange = (nextFromQuarter: string, nextToQuarter: string) => {
+    setRangeTouched(true);
+    setFromQuarter(nextFromQuarter);
+    setToQuarter(nextToQuarter);
+    if (!isConsumptionQuarterRangeValid(nextFromQuarter, nextToQuarter)) return;
+    void runRecordsQuery({
+      fromQuarter: nextFromQuarter,
+      toQuarter: nextToQuarter,
+      search: appliedSearch,
+    });
   };
 
   const toggleAccount = (customer: string) => {
@@ -1379,26 +1431,33 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
           </div>
         </div>
         <label htmlFor="consumptionFromQuarter">From Quarter
-          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setFromQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => selectQuarterRange((event.currentTarget as HTMLSelectElement).value, toQuarter)}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label htmlFor="consumptionToQuarter">To Quarter
-          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => { setRangeTouched(true); setToQuarter((event.currentTarget as HTMLSelectElement).value); }}>
+          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => selectQuarterRange(fromQuarter, (event.currentTarget as HTMLSelectElement).value)}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label class="consumption-record-search" htmlFor="consumptionRecordSearch">Search
           <input id="consumptionRecordSearch" type="search" value={draftSearch} placeholder="Account, workload, end user, or Plan"
-            disabled={hasDraftChanges || rangeLoading || blockingRecordsLoading}
-            onCompositionStart={() => setSearchComposing(true)}
-            onCompositionEnd={(event) => { setDraftSearch(event.currentTarget.value); setSearchComposing(false); }}
-            onInput={(event) => setDraftSearch(event.currentTarget.value)}
-            onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposing) { event.preventDefault(); void submitRecordsQuery(); } }} />
+            disabled={blockingRecordsLoading}
+            onCompositionStart={() => { searchComposingRef.current = true; setSearchComposing(true); }}
+            onCompositionEnd={(event) => { searchComposingRef.current = false; setDraftSearch(event.currentTarget.value); setSearchComposing(false); }}
+            onInput={(event) => {
+              const value = event.currentTarget.value;
+              setDraftSearch(value);
+              if (!value && (appliedSearchRef.current || activeRecordsQueryRef.current?.search))
+                void runRecordsQuery({ fromQuarter, toQuarter, search: "" }, selectedPillar);
+            }}
+            onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposingRef.current) { event.preventDefault(); void submitRecordsQuery(); } }} />
+          <button type="button" class="consumption-record-search__submit" aria-label="Apply filters and search" title="Apply filters and search"
+            disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || !!forecastEditor || searchComposing || dataMode !== "backend"}
+            onClick={() => void submitRecordsQuery()}>
+            {rangeLoading ? <oj-progress-circle value={-1} size="sm" /> : <span class="oj-ux-ico-search" aria-hidden="true" />}
+          </button>
         </label>
-        <button type="button" class={`consumption-range-apply`} disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || !!forecastEditor || searchComposing || dataMode !== "backend"} onClick={() => void submitRecordsQuery()}>
-          {rangeLoading ? "Applying…" : "Apply"}
-        </button>
 
       </section>
 

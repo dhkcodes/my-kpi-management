@@ -11,7 +11,7 @@ const saveAwHandler = page.slice(page.indexOf("const saveAwDrafts"), page.indexO
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
-assert.match(page, /type AwField = "account" \| "workload" \| "plan" \| "lastUpdated" \| "notes"/);
+assert.match(page, /type AwField = "account" \| "workload" \| "salesRep" \| "plan" \| "lastUpdated" \| "notes"/);
 assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
   "saved AW cells remain display-first and enter edit mode only on double-click");
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
@@ -22,7 +22,19 @@ assert.match(page, /showImmediateTooltip[\s\S]*createPortal\([\s\S]*accounts-wor
 assert.doesNotMatch(page, /\.title\s*=/,
   "AW text does not also install a delayed native title tooltip");
 assert.doesNotMatch(page, /Double-click to edit/);
-assert.match(page, /Account[\s\S]*Workload[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
+assert.match(page, /Account[\s\S]*Workload[\s\S]*Sales Rep[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
+assert.match(page, /field === "salesRep"[\s\S]*salesRep: value/,
+  "Sales Rep is editable and preserves an explicit blank clear signal for the API");
+assert.match(page, /field === "salesRep" && !value[\s\S]*"미지정"/,
+  "blank Sales Rep is rendered as 미지정");
+assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
+  "Sales Rep participates in the existing AW batch save flow");
+assert.match(page, /\(current\.salesRep \?\? ""\)\.trim\(\)[\s\S]*\(original\.salesRep \?\? ""\)\.trim\(\)/,
+  "Sales-Rep-only edits and clears participate in AW dirty tracking");
+assert.match(page, /aria-label={`\$\{field === "account"[\s\S]*field === "salesRep" \? "Sales Rep"/,
+  "the Sales Rep editor has a human-readable accessible label");
+assert.match(page, /maxLength={field === "salesRep" \? 200 : undefined}/,
+  "the Sales Rep editor enforces the Oracle column limit");
 assert.match(page, /sortField === "arrUsd"/);
 assert.match(page, /sortField === "acrUsd"/);
 assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,
@@ -62,11 +74,12 @@ assert.match(page, /action: "RESTORE"/,
   "included Draft Delete rows can be restored without recreating data");
 assert.doesNotMatch(page, />Archive<\/button>|Include archived/,
   "legacy Archive wording is not exposed");
-assert.match(page, /<div>[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<h1 id="accountsWorkloadsTitle">/,
-  "the menu path is rendered above the page title");
+assert.match(page, /<div class="accounts-workloads-header-topline">[\s\S]*<div class="accounts-workloads-header-navigation">[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<\/div>[\s\S]*<h1 id="accountsWorkloadsTitle">/,
+  "the menu path and recommendation action share the top line above the page title");
 assert.match(page, /highlighted: !workload\.highlighted/);
 assert.match(page, /const savedWorkload = baseline\.accounts/);
 assert.match(page, /name: savedWorkload\.name/);
+assert.match(page, /salesRep: savedWorkload\.salesRep/);
 assert.match(page, /lastUpdated: savedWorkload\.lastUpdated/);
 assert.match(page, /notes: savedWorkload\.notes/,
   "Highlight persistence does not commit unrelated unsaved AW field edits");
@@ -127,6 +140,16 @@ assert.match(page, /setSaveErrors\(/,
   "AW drafts survive failed saves");
 assert.match(page, /accounts-workloads-toolbar--compact/,
   "AW uses a compact title/search/action/table rhythm without importing Consumption filters");
+assert.match(page, /<strong class="consumption-table-title">\s*Account \/ Workload \/ Opportunity\s*<small class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts<\/small>\s*<\/strong>/,
+  "AW uses the exact approved subtitle text and the Consumption table-title element semantics");
+assert.match(styles, /\.accounts-workloads-table-summary \.consumption-table-title\s*\{[^}]*color:\s*var\(--kpi-ink\)[^}]*margin:\s*0/,
+  "AW overrides the summary's secondary inherited color to match the Consumption subtitle");
+assert.match(styles, /\.accounts-workloads-toolbar--compact\s*\{\s*margin-bottom:\s*0;/,
+  "AW removes its legacy toolbar margin before applying the Consumption half-rem heading rhythm");
+assert.match(styles, /\.accounts-workloads-table-summary\s*\{\s*margin:\s*\.5rem 0 \.25rem;/,
+  "AW uses the compact Consumption toolbar-to-table spacing rhythm");
+assert.doesNotMatch(styles, /14\.73px/,
+  "fixture-only spacing is never encoded as an actual-screen CSS measurement");
 assert.doesNotMatch(page, /accounts-workloads-toolbar[^"\n]*consumption-range-bar/,
   "AW toolbar does not inherit Consumption label layout rules");
 assert.doesNotMatch(page, /selectedPillar|selectedQuarter|consumption-pillar-selector|consumption-plan-filter/,
@@ -184,8 +207,30 @@ assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*posi
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
   "the exchange-rate button retains its Apply and Cancel popover behavior");
-assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
+assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
   "account count and the compact exchange-rate control share one summary row above the table state");
+assert.match(page, /class="consumption-record-search accounts-workloads-search"[\s\S]*type="search"[\s\S]*class="consumption-record-search__submit"[\s\S]*oj-ux-ico-search[\s\S]*<\/label>/,
+  "AW uses the same integrated input-and-icon search control as Consumption Records");
+assert.doesNotMatch(page, /class="consumption-range-apply"[\s\S]*oj-ux-ico-search/,
+  "AW no longer renders a detached search button");
+assert.match(styles, /\.consumption-record-search\s*\{[^}]*flex:\s*0 1 17rem;[^}]*max-width:\s*17rem;/,
+  "Consumption Records search is widened slightly and remains the shared AW width baseline");
+assert.match(page, /const applySearch = \(value: string\)[\s\S]*nextSearch === appliedSearchRef\.current[\s\S]*reloadGeneration\.current\+\+[\s\S]*setSearch\(nextSearch\)/,
+  "AW synchronously deduplicates applied search changes and invalidates older responses before rerender");
+assert.match(page, /onSubmit=\{\(event\) => \{[\s\S]*if \(searchComposingRef\.current\) return;[\s\S]*applySearch\(searchInput\)/,
+  "AW form submission keeps Enter and the icon on one IME-safe submit path");
+assert.match(page, /onCompositionStart=\{\(\) => \{ searchComposingRef\.current = true; \}\}[\s\S]*onCompositionEnd=\{\(event\) => \{[\s\S]*searchComposingRef\.current = false;/,
+  "AW search tracks IME composition synchronously");
+assert.match(page, /type="search"[\s\S]*onInput=\{\(event\) => \{[\s\S]*if \(!value && appliedSearchRef\.current\) applySearch\(""\)/,
+  "AW native clear immediately removes only the applied search without a dirty or loading gate");
+assert.match(page, /mergeSearchResultWithAwDrafts\(result, current, dirtyAccounts, dirtyWorkloads\)[\s\S]*if \(!preserveDrafts\) \{[\s\S]*setPendingDeleteWorkloadIds\(new Set\(\)\)/,
+  "AW clear refresh merges server results around row drafts and does not reset dirty or pending-delete state");
+assert.match(page, /preserveDraftsForNextReload\.current = nextSearch === ""/,
+  "AW limits draft-preserving refresh behavior to search clear");
+assert.match(page, /mergeSearchResultWithAwDrafts[\s\S]*dirtyWorkloadIds\.has\(workload\.id\)[\s\S]*workload\.id < 0[\s\S]*dirtyAccountIds\.has\(account\.id\)/,
+  "AW clear reconciliation preserves edited fields and newly added draft rows");
+assert.match(page, /const generation = \+\+reloadGeneration\.current[\s\S]*if \(generation !== reloadGeneration\.current\) return;[\s\S]*if \(generation === reloadGeneration\.current\) setLoading\(false\)/,
+  "AW stale hierarchy responses cannot overwrite the latest search or filter results");
 assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
   "Include Deleted keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
@@ -233,6 +278,32 @@ assert.match(page, /Oppty Name[\s\S]*?<span class="accounts-workloads-required-m
   "Opportunity Name is visibly identified as required");
 assert.match(styles, /\.accounts-workloads-header\s*\{[^}]*z-index:\s*40/,
   "the header establishes a stacking context above sticky table headers");
+assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*display:\s*block/,
+  "the AW header owns an explicit two-row layout instead of inheriting the shared flex stack");
+assert.match(styles, /\.accounts-workloads-header-topline\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*space-between[^}]*min-width:\s*0/,
+  "the breadcrumb and recommendation action share the first header row");
+assert.match(styles, /\.accounts-workloads-header-navigation\s*\{[^}]*flex:\s*1 1 auto[^}]*min-width:\s*0/,
+  "the breadcrumb region may shrink without pushing the action out of the viewport");
+assert.match(styles, /\.accounts-workloads-header-navigation \.kpi-page-menu\s*\{[^}]*overflow-x:\s*auto/,
+  "only the breadcrumb region scrolls horizontally on narrow screens");
+assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*flex:\s*0 0 auto[^}]*width:\s*auto/,
+  "the recommendation action remains visible and does not shrink or clip");
+assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?<div class="accounts-workloads-header-topline">[\s\S]*?<div class="accounts-workloads-header-navigation">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">[\s\S]*?<\/div>\s*<\/div>\s*<h1 id="accountsWorkloadsTitle">/,
+  "breadcrumb and recommendation action precede the page title in a dedicated first row");
+assert.match(page, /<oj-button[\s\S]*?aria-label="Account Recommendations"[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
+  "Account Recommendations exposes its full accessible name and preserves its permission gate and action handler");
+assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Account Recomm\.<\/span>/,
+  "the recommendation action provides the full desktop label and Account Recomm. on mobile");
+assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*none/,
+  "the compact recommendation label stays hidden on desktop");
+assert.match(styles, /@media \(max-width: 1024px\)\s*\{[\s\S]*?\.accounts-workloads-recommendations-label--desktop\s*\{[^}]*display:\s*none[^}]*\}[\s\S]*?\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*inline/,
+  "the existing mobile breakpoint swaps only the visible recommendation label");
+assert.doesNotMatch(styles, /\.accounts-workloads-header,\s*\.accounts-workloads-footer-actions\s*\{[^}]*flex-direction:\s*column/,
+  "the 1024px rule no longer forces the AW header into a vertical stack");
+assert.doesNotMatch(styles, /\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*flex-direction:\s*column/,
+  "the 720px rule no longer forces the AW header into a vertical stack");
+assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,
+  "AW title and page menu remain left aligned in the mobile scope");
 assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
   "the complete exchange-rate popover stays above table content");
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,
