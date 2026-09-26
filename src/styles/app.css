@@ -1787,7 +1787,6 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .accounts-workloads-header,
   .accounts-workloads-footer-actions { align-items: stretch; flex-direction: column; }
   .accounts-workloads-toolbar { grid-template-columns: 1fr; }
   .accounts-workloads-fx { width: 100%; }
@@ -3724,9 +3723,32 @@ h4.weekly-activity-section-label--next-week,
   min-height: 0;
   overflow: hidden;
 }
-.accounts-hierarchy-page .accounts-workloads-header { align-items: flex-start; margin: 0; padding-bottom: 0; }
+.accounts-hierarchy-page .accounts-workloads-header { display: block; margin: 0; padding-bottom: 0; }
 .accounts-hierarchy-page .accounts-workloads-header h1 { margin: 2px 0 0; }
-.accounts-workloads-header-actions { align-items: center; align-self: flex-start; display: flex; flex-wrap: wrap; gap: .75rem; }
+.accounts-workloads-header-topline {
+  align-items: flex-start;
+  display: flex;
+  gap: .75rem;
+  justify-content: space-between;
+  min-width: 0;
+  width: 100%;
+}
+.accounts-workloads-header-navigation { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.accounts-workloads-header-navigation .kpi-page-menu {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  width: 100%;
+}
+.accounts-workloads-header-actions {
+  align-items: center;
+  align-self: flex-start;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: .75rem;
+  width: auto;
+}
 
 .accounts-workloads-fx-rate { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 6px; }
 .accounts-workloads-fx-rate label { color: var(--oj-core-text-color-secondary); font-size: .75rem; font-weight: 700; }
@@ -4269,8 +4291,6 @@ h4.weekly-activity-section-label--next-week,
 .consumption-record-search__submit oj-progress-circle { block-size: 1rem; inline-size: 1rem; }
 @media (max-width: 720px) {
   .accounts-workloads-page .accounts-workloads-header {
-    align-items: stretch;
-    flex-direction: column;
     text-align: left;
   }
   .kpi-shell:has(.accounts-workloads-page) .kpi-page-menu {

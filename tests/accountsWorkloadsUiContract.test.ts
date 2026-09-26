@@ -74,7 +74,7 @@ assert.match(page, /action: "RESTORE"/,
   "included Draft Delete rows can be restored without recreating data");
 assert.doesNotMatch(page, />Archive<\/button>|Include archived/,
   "legacy Archive wording is not exposed");
-assert.match(page, /<div>[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<h1 id="accountsWorkloadsTitle">/,
+assert.match(page, /<div class="accounts-workloads-header-navigation">[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<\/div>[\s\S]*<h1 id="accountsWorkloadsTitle">/,
   "the menu path is rendered above the page title");
 assert.match(page, /highlighted: !workload\.highlighted/);
 assert.match(page, /const savedWorkload = baseline\.accounts/);
@@ -278,12 +278,18 @@ assert.match(page, /Oppty Name[\s\S]*?<span class="accounts-workloads-required-m
   "Opportunity Name is visibly identified as required");
 assert.match(styles, /\.accounts-workloads-header\s*\{[^}]*z-index:\s*40/,
   "the header establishes a stacking context above sticky table headers");
-assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-start/,
-  "the AW action area aligns with the breadcrumb row above the page title");
-assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*align-self:\s*flex-start/,
-  "Account Recommendations uses the same top-right action alignment as Consumption import and export");
-assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">/,
-  "Account Recommendations remains in the header action region opposite the breadcrumb");
+assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*display:\s*block/,
+  "the AW header owns an explicit two-row layout instead of inheriting the shared flex stack");
+assert.match(styles, /\.accounts-workloads-header-topline\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*space-between[^}]*min-width:\s*0/,
+  "the breadcrumb and recommendation action share the first header row");
+assert.match(styles, /\.accounts-workloads-header-navigation\s*\{[^}]*flex:\s*1 1 auto[^}]*min-width:\s*0/,
+  "the breadcrumb region may shrink without pushing the action out of the viewport");
+assert.match(styles, /\.accounts-workloads-header-navigation \.kpi-page-menu\s*\{[^}]*overflow-x:\s*auto/,
+  "only the breadcrumb region scrolls horizontally on narrow screens");
+assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*flex:\s*0 0 auto[^}]*width:\s*auto/,
+  "the recommendation action remains visible and does not shrink or clip");
+assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?<div class="accounts-workloads-header-topline">[\s\S]*?<div class="accounts-workloads-header-navigation">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">[\s\S]*?<\/div>\s*<\/div>\s*<h1 id="accountsWorkloadsTitle">/,
+  "breadcrumb and recommendation action precede the page title in a dedicated first row");
 assert.match(page, /<oj-button[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
   "Account Recommendations preserves its permission gate and existing action handler");
 assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Recommendations<\/span>/,
@@ -292,10 +298,12 @@ assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}
   "the compact recommendation label stays hidden on desktop");
 assert.match(styles, /@media \(max-width: 1024px\)\s*\{[\s\S]*?\.accounts-workloads-recommendations-label--desktop\s*\{[^}]*display:\s*none[^}]*\}[\s\S]*?\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*inline/,
   "the existing mobile breakpoint swaps only the visible recommendation label");
-assert.doesNotMatch(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-end/,
-  "the AW header no longer anchors Account Recommendations beside the title");
+assert.doesNotMatch(styles, /\.accounts-workloads-header,\s*\.accounts-workloads-footer-actions\s*\{[^}]*flex-direction:\s*column/,
+  "the 1024px rule no longer forces the AW header into a vertical stack");
+assert.doesNotMatch(styles, /\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*flex-direction:\s*column/,
+  "the 720px rule no longer forces the AW header into a vertical stack");
 assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,
-  "AW title and page menu align left only in the same mobile scope used by Consumption");
+  "AW title and page menu remain left aligned in the mobile scope");
 assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
   "the complete exchange-rate popover stays above table content");
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,

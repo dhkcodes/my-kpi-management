@@ -1958,22 +1958,24 @@ export function AccountsWorkloadsPage({
       }}
     >
       <header class="accounts-workloads-header consumption-page__header">
-        <div>
-          {breadcrumb}
-          <span class="kpi-eyebrow">My Customers 360</span>
-          <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
+        <div class="accounts-workloads-header-topline">
+          <div class="accounts-workloads-header-navigation">
+            {breadcrumb}
+            <span class="kpi-eyebrow">My Customers 360</span>
+          </div>
+          <div class="consumption-import-actions accounts-workloads-header-actions">
+            <oj-button
+              chroming="outlined"
+              disabled={!canWrite || saving}
+              onojAction={() => void openForecast()}
+            >
+              <span slot="startIcon" class="oj-ux-ico-plus" />
+              <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
+              <span class="accounts-workloads-recommendations-label--mobile">Recommendations</span>
+            </oj-button>
+          </div>
         </div>
-        <div class="consumption-import-actions accounts-workloads-header-actions">
-          <oj-button
-            chroming="outlined"
-            disabled={!canWrite || saving}
-            onojAction={() => void openForecast()}
-          >
-            <span slot="startIcon" class="oj-ux-ico-plus" />
-            <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
-            <span class="accounts-workloads-recommendations-label--mobile">Recommendations</span>
-          </oj-button>
-        </div>
+        <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
       </header>
       <form
         class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
