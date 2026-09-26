@@ -317,6 +317,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     ? account.newAmount : selectedMovement?.category === "Expansion" ? account.expansionAmount : -account.reductionAmount;
   const periodRange = (periods: readonly string[]) => periods.length === 0 ? "not provided"
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
+  const attentionCoverageLabel = `Finalized Actual ${periodRange(analysis.periodCoverage.actualPeriods)} + opened Forecast periods ${periodRange(analysis.periodCoverage.forecastPeriods)} · MTD excluded`;
   const displayedActualAmount = analysis.portfolio.actualAmount;
   const actualLabel = includeMtd && analysis.mtdSummary !== null ? "Actual (MTD 포함)" : "Actual";
 
@@ -561,10 +562,14 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{amountK(account.actualGrowthAmount)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
         </div>
       </section>
-      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2></div></div>
+      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2><p>{attentionCoverageLabel}</p></div></div>
         <div class="consumption-sales-attention-list">{attentionAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}>
           <span><strong>{account.account}</strong><small>{account.salesRep} · {account.attentionReasons.join(" · ")}</small></span>
-          <span>{amountK(account.actualAmount)}<small>{account.forecastEntryStatus === "MISSING" ? "Forecast missing" : account.forecastEntryStatus === "ZERO" ? "Forecast entered as 0" : `FY Expected ${amountK(account.totalAmount)}`}</small></span>
+          <span class="consumption-sales-attention-amounts"><strong>Actual {amountK(account.actualAmount)}</strong><small>{account.forecastEntryStatus === "MISSING"
+            ? "Forecast missing · Covered-period expected unavailable"
+            : account.forecastEntryStatus === "ZERO"
+              ? <>Forecast {amountK(account.forecastAmount)} (entered as 0) · Covered-period expected {amountK(account.actualAmount + account.forecastAmount)}</>
+              : <>Forecast {amountK(account.forecastAmount)} · Covered-period expected {amountK(account.actualAmount + account.forecastAmount)}</>}</small></span>
         </button>)}{attentionAccounts.length === 0 && <p class="consumption-empty-state">No Accounts require attention for this context.</p>}</div>
       </section>
     </section>

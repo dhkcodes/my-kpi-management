@@ -2765,9 +2765,10 @@ h4.weekly-activity-section-label--next-week,
 .consumption-sales-movement-columns h3 { color: var(--kpi-muted); font-size: .75rem; margin: 0 0 .45rem; text-transform: uppercase; }
 .consumption-sales-movement-columns button, .consumption-sales-attention-list button { align-items: center; background: transparent; border: 0; border-bottom: 1px solid var(--oj-core-divider-color); color: inherit; cursor: pointer; display: flex; gap: .75rem; justify-content: space-between; padding: .55rem 0; text-align: left; width: 100%; }
 .consumption-sales-movement-columns button:hover, .consumption-sales-attention-list button:hover { background: var(--oj-core-bg-color-hover); }
-.consumption-sales-attention-list button > span { display: grid; gap: .15rem; }
+.consumption-sales-attention-list button { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, .85fr); }
+.consumption-sales-attention-list button > span { display: grid; gap: .15rem; min-width: 0; }
 .consumption-sales-attention-list button > span:last-child { text-align: right; }
-.consumption-sales-attention-list small { color: var(--kpi-muted); }
+.consumption-sales-attention-list small { color: var(--kpi-muted); overflow-wrap: anywhere; }
 .consumption-sales-attention-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: .35rem; }
 .consumption-insights-options { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-border-color-enabled); box-shadow: var(--oj-core-box-shadow-md, 0 .5rem 1.5rem rgb(0 0 0 / 16%)); display: grid; left: 0; max-height: 18rem; overflow-y: auto; position: absolute; right: 0; top: calc(100% + .2rem); z-index: 30; }
 .consumption-insights-options button { background: transparent; border: 0; border-bottom: 1px solid var(--oj-core-divider-color); color: inherit; cursor: pointer; display: grid; gap: .15rem; padding: .6rem .7rem; text-align: left; }
@@ -2935,6 +2936,8 @@ h4.weekly-activity-section-label--next-week,
   .consumption-insights-page { padding: .7rem; }
   .consumption-insights-kpis, .consumption-insights-qoq-cards { grid-template-columns: minmax(0, 1fr); }
   .consumption-insights-page .consumption-insights-kpis .kpi-panel + .kpi-panel { border-left: 0; border-top: 1px solid #e7e3de; }
+  .consumption-sales-attention-list button { grid-template-columns: minmax(0, 1fr); }
+  .consumption-sales-attention-list button > span:last-child { text-align: left; }
 }
 
 /* Dense Category Matrix: anchored, modeless Oracle JET popup navigation. */
