@@ -74,8 +74,8 @@ assert.match(page, /action: "RESTORE"/,
   "included Draft Delete rows can be restored without recreating data");
 assert.doesNotMatch(page, />Archive<\/button>|Include archived/,
   "legacy Archive wording is not exposed");
-assert.match(page, /<div class="accounts-workloads-header-navigation">[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<\/div>[\s\S]*<h1 id="accountsWorkloadsTitle">/,
-  "the menu path is rendered above the page title");
+assert.match(page, /<div class="accounts-workloads-header-topline">[\s\S]*<div class="accounts-workloads-header-navigation">[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<\/div>[\s\S]*<h1 id="accountsWorkloadsTitle">/,
+  "the menu path and recommendation action share the top line above the page title");
 assert.match(page, /highlighted: !workload\.highlighted/);
 assert.match(page, /const savedWorkload = baseline\.accounts/);
 assert.match(page, /name: savedWorkload\.name/);

@@ -61,7 +61,6 @@ assert.doesNotMatch(toolbarSource, /Customer Management/, "the page menu never i
 assert.match(contentSource, /const pageNavigation = <PageNavigationToolbar activeRoute=\{activeRoute\} profile=\{profile\}/, "the shared page menu is created once from route and menu-permission state");
 assert.doesNotMatch(contentSource, /\n\s*<PageNavigationToolbar activeRoute=\{activeRoute\}/, "the page menu is not rendered as a detached content sibling");
 for (const file of [
-  "AccountsWorkloadsPage.tsx",
   "AccountsWorkloadsPulseV2.tsx",
   "AttainmentPage.tsx",
   "ConsumptionAnalysisPage.tsx",
@@ -75,6 +74,9 @@ for (const file of [
   const pageSource = readFileSync(`src/components/content/${file}`, "utf8");
   assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the page menu inside its title surface`);
 }
+const accountsWorkloadsSource = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
+assert.match(accountsWorkloadsSource, /\{breadcrumb\}[\s\S]{0,1000}<h[12]/,
+  "AccountsWorkloadsPage.tsx keeps the menu and adjacent recommendation action inside its title surface");
 assert.match(stylesSource, /\.kpi-page-menu \+ \.kpi-eyebrow \{ display: none; \}/, "the integrated page menu replaces the old duplicated route eyebrow");
 assert.doesNotMatch(stylesSource, /\.kpi-page-menu__item\.is-current::after/, "the current page never uses an underline indicator");
 assert.match(stylesSource, /\.kpi-page-menu__item\.is-current\s*\{[\s\S]*font-weight:\s*700;[\s\S]*color:/, "the current page uses restrained weight and color emphasis");
