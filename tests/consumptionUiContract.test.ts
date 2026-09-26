@@ -5,6 +5,7 @@ const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
+const sharedMessageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
 const content = readFileSync("src/components/content/index.tsx", "utf8");
 const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
@@ -12,9 +13,10 @@ const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", 
 const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
-assert.match(messageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
-assert.match(messageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
-assert.match(styles, /\.consumption-message-region\s*\{[^}]*position:\s*fixed[^}]*top:[^;}]+[^}]*right:[^;}]+[^}]*z-index:[^;}]+/, "Consumption notices are a top-right fixed overlay and do not shift page layout");
+assert.match(messageBanner, /AppMessageBanner/, "Consumption notices use the shared notification adapter");
+assert.match(sharedMessageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
+assert.match(sharedMessageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
+assert.match(styles, /\.app-message-region,\s*\.consumption-message-region\s*\{[^}]*position:\s*fixed[^}]*top:[^;}]+[^}]*right:[^;}]+[^}]*z-index:[^;}]+/, "Consumption notices are a top-right fixed overlay and do not shift page layout");
 assert.match(recordsPage, /const \[dismissedMessageIds, setDismissedMessageIds\] = useState<Set<string>>[\s\S]*pageMessages\.filter\(\(message\) => !dismissedMessageIds\.has\(message\.id\)\)[\s\S]*setDismissedMessageIds\(\(current\) => new Set\(current\)\.add\(messageId\)\)/,
   "closing a Consumption notice only dismisses that overlay message");
 assert.match(recordsPage, /if \(messageId === "records-operation-error"\) \{\s*setImportError\(""\);\s*return;/,

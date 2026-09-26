@@ -39,11 +39,15 @@ import {
   OpportunityCurrencyField,
   updateOpportunityCurrencyPair,
 } from "./opportunityCurrency";
+import { AppMessageBanner } from "./AppMessageBanner";
+
+type NavigationGuard = (label: string, action: () => void) => void;
 
 type Props = Readonly<{
   canWrite: boolean;
   breadcrumb?: ComponentChildren;
   onDraftStateChange?: (active: boolean) => void;
+  onNavigationGuardChange?: (guard: NavigationGuard | null, hasUnsavedChanges: boolean) => void;
   initialSearch?: string;
   fxRate: FxRateRecord | null;
   fxLoading: boolean;
@@ -243,6 +247,7 @@ export function AccountsWorkloadsPage({
   canWrite,
   breadcrumb,
   onDraftStateChange,
+  onNavigationGuardChange,
   initialSearch = "",
   fxRate,
   fxLoading,
@@ -272,6 +277,8 @@ export function AccountsWorkloadsPage({
     [],
   );
   const [notice, setNotice] = useState("");
+  const [actionConfirmation, setActionConfirmation] = useState<"save" | "cancel" | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<Readonly<{ label: string; action: () => void }> | null>(null);
   const initialFxRate = fxRate?.rateValue ?? 0;
   const [savedFxRateValue, setSavedFxRateValue] = useState(initialFxRate);
   const [fxRateValue, setFxRateValue] = useState(initialFxRate);
@@ -355,12 +362,6 @@ export function AccountsWorkloadsPage({
     setFxRateValue(nextRate);
     setFxDraft(String(nextRate || ""));
   }, [fxRate, fxSaving, fxDirty]);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 2600);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   useEffect(() => {
     if (!editCell && !dealEditCell) return;
@@ -1164,15 +1165,21 @@ export function AccountsWorkloadsPage({
       : [];
   };
 
-  const saveAwDrafts = async () => {
-    if (dealSaveLock.isLocked()) return;
+  const saveAwDrafts = async (): Promise<boolean> => {
+    if (dealSaveLock.isLocked()) return false;
     if (
       hierarchy.accounts.some(
-        (account) => changedAccountIds.has(account.id) && !account.name.trim(),
+        (account) =>
+          (changedAccountIds.has(account.id) && !account.name.trim()) ||
+          account.workloads.some(
+            (workload) =>
+              changedWorkloadIds.has(workload.id) &&
+              (!account.name.trim() || !workload.name.trim()),
+          ),
       )
     ) {
       setError("Account and Workload are required.");
-      return;
+      return false;
     }
     const archivedIds = new Set(pendingDeleteWorkloadIds);
     const request: AccountsWorkloadsHierarchySaveRequest = {
@@ -1215,10 +1222,6 @@ export function AccountsWorkloadsPage({
             action: "UPSERT",
           });
         if (changedWorkloadIds.has(workload.id)) {
-          if (!account.name.trim() || !workload.name.trim()) {
-            setError("Account and Workload are required.");
-            return;
-          }
           request.workloads.push({
             id: workload.id > 0 ? workload.id : null,
             clientId: workload.id > 0 ? null : refFor(workload.id, "workload"),
@@ -1284,15 +1287,54 @@ export function AccountsWorkloadsPage({
         setFxDraft(String(savedRate.rateValue));
       }
       setNotice(hasAwDrafts && fxDirty ? "AW and exchange rate changes saved." : fxDirty ? "Exchange rate saved." : "AW changes saved.");
+      return true;
     } catch (saveError) {
       setError(friendlyError(saveError));
       setSaveErrors(
         saveError instanceof AccountsWorkloadsApiError ? saveError.errors : [],
       );
+      return false;
     } finally {
       setFxSaving(false);
       setSaving(false);
     }
+  };
+
+  useEffect(() => {
+    if (!onNavigationGuardChange) return;
+    if (!dirty) {
+      onNavigationGuardChange(null, false);
+      return;
+    }
+    const guard: NavigationGuard = (label, action) => {
+      if (saving) return;
+      setActionConfirmation(null);
+      setPendingNavigation({ label, action });
+    };
+    onNavigationGuardChange(guard, true);
+    return () => onNavigationGuardChange(null, false);
+  }, [dirty, onNavigationGuardChange, saving]);
+
+  const confirmPrimaryAction = async () => {
+    if (actionConfirmation === "save") {
+      setActionConfirmation(null);
+      await saveAwDrafts();
+      return;
+    }
+    if (actionConfirmation === "cancel") {
+      cancelAllDrafts();
+      setActionConfirmation(null);
+      setNotice("Changes discarded.");
+    }
+  };
+
+  const saveAndContinue = async () => {
+    const pending = pendingNavigation;
+    if (!pending || saving) return;
+    const saved = await saveAwDrafts();
+    if (!saved) return;
+    setPendingNavigation(null);
+    pending.action();
   };
 
   const toggleHighlight = async (
@@ -2035,7 +2077,7 @@ export function AccountsWorkloadsPage({
             type="button"
             class="accounts-workloads-button accounts-workloads-button--primary"
             disabled={!canWrite || saving}
-            onClick={() => void saveAwDrafts()}
+            onClick={() => setActionConfirmation("save")}
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -2045,7 +2087,7 @@ export function AccountsWorkloadsPage({
             type="button"
             class="accounts-workloads-button"
             disabled={saving}
-            onClick={cancelAllDrafts}
+            onClick={() => setActionConfirmation("cancel")}
           >
             Cancel
           </button>
@@ -2131,32 +2173,28 @@ export function AccountsWorkloadsPage({
           </div>
         </div>
       </div>
-      {error && (
-        <div
-          class="accounts-workloads-banner accounts-workloads-banner--error"
-          role="alert"
-        >
-          <strong>{error}</strong>
-          <button
-            type="button"
-            class="accounts-workloads-banner__dismiss"
-            aria-label="Dismiss error"
-            onClick={() => {
-              setError("");
-              setSaveErrors([]);
-            }}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-          {saveErrors.length > 0 && (
-            <ul>
-              {saveErrors.map((item) => (
-                <li>
-                  {item.entity} · {item.field}: {item.message}
-                </li>
-              ))}
-            </ul>
-          )}
+      {!canWrite && <div class="accounts-workloads-read-only">Read-only access. Write permission is required.</div>}
+      <AppMessageBanner
+        messages={[
+          ...(error ? [{ id: "accounts-workloads-error", severity: "error" as const, summary: error, persistence: "sticky" as const }] : []),
+          ...(notice ? [{ id: "accounts-workloads-notice", severity: "confirmation" as const, summary: notice, persistence: "auto" as const }] : []),
+        ]}
+        onClose={(id) => {
+          if (id === "accounts-workloads-error") {
+            setError("");
+            setSaveErrors([]);
+          } else {
+            setNotice("");
+          }
+        }}
+      />
+      {saveErrors.length > 0 && (
+        <div class="accounts-workloads-inline-validation" role="status">
+          <ul>
+            {saveErrors.map((item) => (
+              <li>{item.entity} · {item.field}: {item.message}</li>
+            ))}
+          </ul>
         </div>
       )}
       {loading ? (
@@ -2732,6 +2770,52 @@ export function AccountsWorkloadsPage({
           </section>
         </div>
       )}
+      {actionConfirmation && (
+        <div class="accounts-workloads-confirmation-backdrop" role="presentation">
+          <section class="accounts-workloads-confirmation" role="dialog" aria-modal="true" aria-labelledby="accountsWorkloadsActionTitle">
+            <h2 id="accountsWorkloadsActionTitle">
+              {actionConfirmation === "save" ? "Save changes?" : "Discard changes?"}
+            </h2>
+            <p>
+              {actionConfirmation === "save"
+                ? "Save all current Accounts & Workloads changes?"
+                : "Discard all unsaved Accounts & Workloads changes?"}
+            </p>
+            <footer>
+              <button type="button" disabled={saving} onClick={() => setActionConfirmation(null)}>Keep editing</button>
+              <button type="button" disabled={saving} onClick={() => void confirmPrimaryAction()}>
+                {actionConfirmation === "save" ? "Save changes" : "Discard changes"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+      {pendingNavigation && (
+        <div class="accounts-workloads-confirmation-backdrop" role="presentation">
+          <section class="accounts-workloads-confirmation" role="dialog" aria-modal="true" aria-labelledby="accountsWorkloadsNavigationTitle">
+            <h2 id="accountsWorkloadsNavigationTitle">Unsaved changes</h2>
+            <p>Save changes before moving to {pendingNavigation.label}?</p>
+            <footer>
+              <button type="button" disabled={saving} onClick={() => setPendingNavigation(null)}>Stay</button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  const pending = pendingNavigation;
+                  cancelAllDrafts();
+                  setPendingNavigation(null);
+                  pending.action();
+                }}
+              >
+                Discard and Continue
+              </button>
+              <button type="button" disabled={saving} onClick={() => void saveAndContinue()}>
+                {saving ? "Saving…" : "Save and Continue"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       {latestUpdateTooltip && typeof document !== "undefined" && createPortal(
         <div
           class="accounts-workloads-latest-tooltip"
@@ -2742,12 +2826,6 @@ export function AccountsWorkloadsPage({
           }}
         >
           {latestUpdateTooltip.text}
-        </div>,
-        document.body,
-      )}
-      {notice && typeof document !== "undefined" && createPortal(
-        <div class="accounts-workloads-toast" role="status">
-          {notice}
         </div>,
         document.body,
       )}

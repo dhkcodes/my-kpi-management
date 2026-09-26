@@ -3232,12 +3232,57 @@ h4.weekly-activity-section-label--next-week,
 .attainment-loading { display: flex; align-items: center; justify-content: center; gap: .75rem; }
 .consumption-initial-state { display: grid; gap: .75rem; }
 .consumption-initial-loading { display: inline-flex; align-items: center; gap: .5rem; min-height: 2rem; color: var(--oj-core-text-color-secondary, #52606d); font-size: .875rem; }
+.accounts-workloads-confirmation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.42);
+}
+
+.accounts-workloads-confirmation {
+  width: min(34rem, 100%);
+  border-radius: var(--oj-core-border-radius-lg, 0.5rem);
+  background: var(--oj-core-bg-color-content, #fff);
+  color: var(--oj-core-text-color-primary, #161513);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.25);
+  padding: 1.25rem;
+}
+
+.accounts-workloads-confirmation h2 {
+  margin: 0 0 0.75rem;
+}
+
+.accounts-workloads-confirmation footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.accounts-workloads-inline-validation {
+  margin-block: 0.5rem;
+  color: var(--oj-core-danger-1, #b3261e);
+}
+
+.app-message-region,
 .consumption-message-region {
   position: fixed;
   top: 1rem;
   right: 1rem;
-  z-index: 1000;
+  z-index: 1200;
   width: min(28rem, calc(100vw - 2rem));
+}
+@media (max-width: 600px) {
+  .app-message-region,
+  .consumption-message-region {
+    top: .5rem;
+    right: .5rem;
+    width: calc(100vw - 1rem);
+  }
 }
 .consumption-analysis-period { color: var(--oj-core-text-color-secondary, #52606d); font-size: .75rem; line-height: 1.35; }
 .attainment-inline-error { padding: .75rem 1rem; border-radius: .5rem; background: var(--oj-core-danger-1); color: var(--oj-core-danger-3); }

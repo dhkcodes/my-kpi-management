@@ -637,6 +637,7 @@ export function Content({
           canWrite={canWrite}
           initialSearch={accountsWorkloadsQuery.search}
           onDraftStateChange={onAccountsWorkloadsDraftStateChange}
+          onNavigationGuardChange={onKpiNavigationGuardChange}
           fxRate={fxRate}
           fxLoading={fxLoading}
           fxError={fxError}
