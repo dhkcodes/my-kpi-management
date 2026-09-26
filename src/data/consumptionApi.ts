@@ -410,11 +410,13 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
   const split = parseAmountSplit(value);
   const raw = value as Record<string, unknown>;
   const forecastEntryStatus = (raw.forecastEntryStatus ?? "PROVIDED") as "PROVIDED" | "UNAVAILABLE";
+  const actualEntryStatus = raw.actualEntryStatus as "PROVIDED" | "MISSING";
   if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
-    || !isFiniteNumber(raw.percentage) || !["PROVIDED", "UNAVAILABLE"].includes(String(forecastEntryStatus))) return malformedAnalysis();
+    || !isNullableFiniteNumber(raw.percentage) || !["PROVIDED", "MISSING"].includes(String(actualEntryStatus))
+    || !["PROVIDED", "UNAVAILABLE"].includes(String(forecastEntryStatus))) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
     dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociDataCenterCount),
-    percentage: raw.percentage, forecastEntryStatus,
+    percentage: raw.percentage, actualEntryStatus, forecastEntryStatus,
     actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const organicGrowthCategories: readonly ConsumptionOrganicGrowthCategory[] = [
@@ -539,19 +541,21 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
     const split = parseAmountSplit(value); const account = value as Record<string, unknown>;
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
-      || !isFiniteNumber(account.percentage) || !isFiniteNumber(account.priorActualAmount)
+      || !isNullableFiniteNumber(account.percentage) || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
+      || !isFiniteNumber(account.priorActualAmount)
       || !isNullableFiniteNumber(account.actualGrowthAmount) || !isNullableFiniteNumber(account.actualGrowthPercent)
       || !["MISSING", "ZERO", "ENTERED"].includes(String(account.forecastEntryStatus))
       || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
       || !Array.isArray(account.workloads)) return malformedAnalysis();
     const workloads = account.workloads.map((value) => {
       const workloadSplit = parseAmountSplit(value); const workload = value as Record<string, unknown>;
-      if (!isNonEmptyString(workload.workload) || !isFiniteNumber(workload.percentage) || !Array.isArray(workload.plans)) return malformedAnalysis();
+      if (!isNonEmptyString(workload.workload) || !isNullableFiniteNumber(workload.percentage) || !Array.isArray(workload.plans)) return malformedAnalysis();
       return { ...workloadSplit, workload: workload.workload, percentage: workload.percentage,
         plans: workload.plans.map((plan) => parseAnalysisPlan(plan, allowedTrendYears)) };
     });
     if (new Set(workloads.map((workload) => workload.workload)).size !== workloads.length) return malformedAnalysis();
     return { ...split, account: account.account, salesRep: account.salesRep, percentage: account.percentage,
+      actualEntryStatus: account.actualEntryStatus,
       priorActualAmount: account.priorActualAmount, actualGrowthAmount: account.actualGrowthAmount,
       actualGrowthPercent: account.actualGrowthPercent, forecastEntryStatus: account.forecastEntryStatus,
       attentionReasons: account.attentionReasons, workloads } as ConsumptionAnalysisAccount;

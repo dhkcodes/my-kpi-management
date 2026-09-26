@@ -62,12 +62,12 @@ const analysis = {
   }],
   accounts: [{
     account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
-    priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
+    actualEntryStatus: "PROVIDED", priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
     forecastEntryStatus: "ENTERED", attentionReasons: ["Recent actual above usual"],
     workloads: [{
       workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
       plans: [{ serverPlanId: 1, planId: "P1", endUser: "Acme", dataCenter: "IAD", actualAmount: 600, forecastAmount: 400,
-        totalAmount: 1000, status: "MIXED", percentage: 100,
+        totalAmount: 1000, status: "MIXED", percentage: 100, actualEntryStatus: "PROVIDED",
         actualTrend: [
           { periodKey: "FY26-MAR", actualAmount: null, alertCalculationMonth: false },
           { periodKey: "FY26-APR", actualAmount: 20, alertCalculationMonth: false },

@@ -41,15 +41,17 @@ export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAm
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
   dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
-  percentage: number;
+  percentage: number | null;
+  actualEntryStatus: "PROVIDED" | "MISSING";
   forecastEntryStatus: "PROVIDED" | "UNAVAILABLE";
   actualTrend: readonly ConsumptionActualTrendPoint[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
-  workload: string; percentage: number; plans: readonly ConsumptionAnalysisPlan[];
+  workload: string; percentage: number | null; plans: readonly ConsumptionAnalysisPlan[];
 }>;
 export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
-  account: string; salesRep: string; percentage: number;
+  account: string; salesRep: string; percentage: number | null;
+  actualEntryStatus: "PROVIDED" | "MISSING";
   priorActualAmount: number; actualGrowthAmount: number | null; actualGrowthPercent: number | null;
   forecastEntryStatus: "MISSING" | "ZERO" | "ENTERED";
   attentionReasons: readonly string[];
