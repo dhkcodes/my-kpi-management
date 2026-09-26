@@ -277,7 +277,7 @@ export function AccountsWorkloadsPage({
     [],
   );
   const [notice, setNotice] = useState("");
-  const [actionConfirmation, setActionConfirmation] = useState<"save" | "cancel" | null>(null);
+  const [actionConfirmation, setActionConfirmation] = useState<"save" | "cancel" | "opportunity-save" | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<Readonly<{ label: string; action: () => void }> | null>(null);
   const initialFxRate = fxRate?.rateValue ?? 0;
   const [savedFxRateValue, setSavedFxRateValue] = useState(initialFxRate);
@@ -353,6 +353,10 @@ export function AccountsWorkloadsPage({
       [...dealDrafts.values()].filter(isDealDraftChanged).length +
       pendingDeleteWorkloadIds.size >
       0 || fxDirty || fxDraftDirty;
+  const isDraftDeletedWorkload = (workloadId: number) =>
+    hierarchy.accounts
+      .flatMap((account) => account.workloads)
+      .some((workload) => workload.id === workloadId && workload.archived);
   useEffect(() => onDraftStateChange?.(dirty), [dirty, onDraftStateChange]);
 
   useEffect(() => {
@@ -1315,10 +1319,21 @@ export function AccountsWorkloadsPage({
     return () => onNavigationGuardChange(null, false);
   }, [dirty, onNavigationGuardChange, saving]);
 
+  const saveAllDrafts = async (): Promise<boolean> => {
+    const awSaved = await saveAwDrafts();
+    if (!awSaved) return false;
+    return await saveDealDrafts();
+  };
+
   const confirmPrimaryAction = async () => {
     if (actionConfirmation === "save") {
       setActionConfirmation(null);
-      await saveAwDrafts();
+      await saveAllDrafts();
+      return;
+    }
+    if (actionConfirmation === "opportunity-save") {
+      setActionConfirmation(null);
+      await saveDealDrafts();
       return;
     }
     if (actionConfirmation === "cancel") {
@@ -1331,7 +1346,7 @@ export function AccountsWorkloadsPage({
   const saveAndContinue = async () => {
     const pending = pendingNavigation;
     if (!pending || saving) return;
-    const saved = await saveAwDrafts();
+    const saved = await saveAllDrafts();
     if (!saved) return;
     setPendingNavigation(null);
     pending.action();
@@ -1422,6 +1437,10 @@ export function AccountsWorkloadsPage({
     deal: AccountWorkloadDeal,
     field: DealField,
   ) => {
+    if (isDraftDeletedWorkload(workloadId)) {
+      setError("Draft Deleted AW의 Opportunity는 수정할 수 없습니다. 삭제만 가능합니다.");
+      return;
+    }
     if (!canWrite || dealSaveLock.isLocked()) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
     setDealDrafts((current) => {
@@ -1439,6 +1458,11 @@ export function AccountsWorkloadsPage({
   };
   const updateDealDraft = (key: string, field: DealField, value: string) => {
     if (dealSaveLock.isLocked()) return;
+    const existing = dealDrafts.get(key);
+    if (existing && isDraftDeletedWorkload(existing.workloadId)) {
+      setError("Draft Deleted AW의 Opportunity는 수정할 수 없습니다. 삭제만 가능합니다.");
+      return;
+    }
     setDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
@@ -1489,7 +1513,12 @@ export function AccountsWorkloadsPage({
     setFxPopoverOpen(false);
   };
   const addDeal = (workloadId: number) => {
-    if (dealSaveLock.isLocked() || workloadId < 0) return;
+    if (dealSaveLock.isLocked() || workloadId < 0 || isDraftDeletedWorkload(workloadId)) {
+      if (isDraftDeletedWorkload(workloadId)) {
+        setError("Draft Deleted AW에서는 Opportunity를 추가할 수 없습니다. 삭제만 가능합니다.");
+      }
+      return;
+    }
     const id = nextTempId.current--;
     const deal = emptyDeal(id, workloadId);
     const key = `draft:${id}`;
@@ -1593,19 +1622,23 @@ export function AccountsWorkloadsPage({
     }
   };
   const saveDealDrafts = async () => {
-    if (dealSaveLock.isLocked()) return;
+    if (dealSaveLock.isLocked()) return false;
     const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
-    if (!changedDrafts.length) return;
+    if (!changedDrafts.length) return true;
+    if (changedDrafts.some((draft) => !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId))) {
+      setError("Draft Deleted AW 아래 Opportunity 변경은 저장할 수 없습니다. 삭제만 가능합니다.");
+      return false;
+    }
     if (
       changedDrafts.some(
         (draft) => !draft.deal.deleted && !draft.deal.name.trim(),
       )
     ) {
       setError("Oppty Name is required.");
-      return;
+      return false;
     }
     const drafts = dealSaveLock.tryStart(changedDrafts);
-    if (!drafts) return;
+    if (!drafts) return false;
     setSaving(true);
     setError("");
     const pageScrollY = window.scrollY;
@@ -1672,6 +1705,7 @@ export function AccountsWorkloadsPage({
           element.scrollLeft = opportunityScrolls.get(element.dataset.opportunityScroll ?? "") ?? 0;
         });
       });
+      return true;
     } catch (requestError) {
       const confirmedRejection = !saveAccepted && isDefiniteWriteRejection(requestError);
       if (!confirmedRejection) {
@@ -1695,6 +1729,7 @@ export function AccountsWorkloadsPage({
           requestError instanceof AccountsWorkloadsApiError ? requestError.errors : [],
         );
       }
+      return false;
     } finally {
       dealSaveLock.release();
       setSaving(false);
@@ -1842,7 +1877,7 @@ export function AccountsWorkloadsPage({
           }
         }}
         onDblClick={(event) => {
-          if (isInteractive(event.target)) return;
+          if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginDealEdit(workloadId, effective, field);
         }}
@@ -2378,7 +2413,7 @@ export function AccountsWorkloadsPage({
                                 >
                                   ›
                                 </button>
-                                <button
+                                {!workload.archived && <button
                                   type="button"
                                   disabled={
                                     !canWrite ||
@@ -2389,7 +2424,7 @@ export function AccountsWorkloadsPage({
                                   onClick={() => addDeal(workload.id)}
                                 >
                                   Add Opportunity
-                                </button>
+                                </button>}
                                 {selectedDeals.size > 0 && !dealEditCell && (
                                   <button
                                     type="button"
@@ -2413,12 +2448,12 @@ export function AccountsWorkloadsPage({
                                       : "저장 확인 대기 — GET 확인"}
                                   </button>
                                 )}
-                                {activeDraft && (
+                                {activeDraft && !workload.archived && (
                                   <>
                                     <button
                                       type="button"
                                       disabled={saving || Boolean(pendingDealConfirmation)}
-                                      onClick={() => void saveDealDrafts()}
+                                      onClick={() => setActionConfirmation("opportunity-save")}
                                     >
                                       Save
                                     </button>
@@ -2427,7 +2462,7 @@ export function AccountsWorkloadsPage({
                                       disabled={saving || Boolean(pendingDealConfirmation)}
                                       onClick={() => cancelDeal(activeDraft.key)}
                                     >
-                                      Cancel
+                                      Undo
                                     </button>
                                   </>
                                 )}
@@ -2774,17 +2809,27 @@ export function AccountsWorkloadsPage({
         <div class="accounts-workloads-confirmation-backdrop" role="presentation">
           <section class="accounts-workloads-confirmation" role="dialog" aria-modal="true" aria-labelledby="accountsWorkloadsActionTitle">
             <h2 id="accountsWorkloadsActionTitle">
-              {actionConfirmation === "save" ? "Save changes?" : "Discard changes?"}
+              {actionConfirmation === "save"
+                ? "Save changes?"
+                : actionConfirmation === "opportunity-save"
+                  ? "Save Opportunity changes?"
+                  : "Discard changes?"}
             </h2>
             <p>
               {actionConfirmation === "save"
                 ? "Save all current Accounts & Workloads changes?"
-                : "Discard all unsaved Accounts & Workloads changes?"}
+                : actionConfirmation === "opportunity-save"
+                  ? "Save the current Opportunity changes?"
+                  : "Discard all unsaved Accounts & Workloads changes?"}
             </p>
             <footer>
               <button type="button" disabled={saving} onClick={() => setActionConfirmation(null)}>Keep editing</button>
               <button type="button" disabled={saving} onClick={() => void confirmPrimaryAction()}>
-                {actionConfirmation === "save" ? "Save changes" : "Discard changes"}
+                {actionConfirmation === "save"
+                  ? "Save changes"
+                  : actionConfirmation === "opportunity-save"
+                    ? "Save Opportunities"
+                    : "Discard changes"}
               </button>
             </footer>
           </section>

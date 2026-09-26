@@ -315,7 +315,7 @@ assert.match(page, /const beginDealEdit[\s\S]*?if \(!canWrite \|\| dealSaveLock\
 assert.match(page, /const updateDealDraft[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
 assert.match(page, /const addDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
 assert.match(page, /const cancelDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
-assert.match(saveDealHandler, /if \(dealSaveLock\.isLocked\(\)\) return;[\s\S]*dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*finally \{\s*dealSaveLock\.release\(\);\s*setSaving\(false\);/,
+assert.match(saveDealHandler, /if \(dealSaveLock\.isLocked\(\)\) return false;[\s\S]*dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*finally \{\s*dealSaveLock\.release\(\);\s*setSaving\(false\);/,
   "save blocks duplicate submission immediately and releases the lock on success or failure");
 assert.match(page, /저장 확인 대기/,
   "unknown POST outcomes are presented as a distinct save-confirmation-pending state");
@@ -337,5 +337,25 @@ assert.match(page, /저장 결과 확인 불가 — 관리자 확인 필요/,
   "the UI does not promise GET recovery when a new-row correlation was lost");
 assert.doesNotMatch(page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete")), /setDealDrafts\(new Map\(\)\)/,
   "deleting selected opportunities cannot erase unrelated drafts");
+assert.match(page, /const saveAllDrafts = async \(\): Promise<boolean> => \{[\s\S]*await saveAwDrafts\(\)[\s\S]*await saveDealDrafts\(\)/,
+  "Save & Continue persists both AW and Opportunity drafts before navigating");
+assert.match(page, /const saveAndContinue = async \(\) => \{[\s\S]*const saved = await saveAllDrafts\(\)[\s\S]*if \(!saved\) return;[\s\S]*pending\.action\(\)/,
+  "navigation is deferred until every pending write succeeds");
+assert.match(page, /opportunity-save[\s\S]*Save Opportunity changes\?[\s\S]*Save Opportunities/,
+  "direct Opportunity save asks for an explicit confirmation");
+assert.match(page, /onClick=\{\(\) => setActionConfirmation\("opportunity-save"\)\}/,
+  "the direct Opportunity Save action opens the confirmation rather than posting immediately");
+assert.match(page, /activeDraft && !workload\.archived/,
+  "Draft Deleted AWs do not expose Opportunity Save or Undo controls");
+assert.match(page, /!workload\.archived && <button[\s\S]*Add Opportunity/,
+  "Draft Deleted AWs hide the Opportunity Add action");
+assert.match(page, /isDraftDeletedWorkload\(workloadId\) \|\| isInteractive\(event\.target\)/,
+  "Draft Deleted Opportunity cells cannot enter edit mode through double click");
+assert.match(page, /const beginDealEdit[\s\S]*isDraftDeletedWorkload\(workloadId\)/,
+  "the UI blocks programmatic edit entry for Draft Deleted Opportunity rows");
+assert.match(page, /const updateDealDraft[\s\S]*isDraftDeletedWorkload\(existing\.workloadId\)/,
+  "Draft Deleted Opportunity drafts are rejected before local mutation");
+assert.match(page, />\s*Undo\s*<\/button>/,
+  "Opportunity row-level reversion is labelled Undo rather than Cancel");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");
