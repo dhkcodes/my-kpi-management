@@ -76,6 +76,22 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   const config = await cdp.send("Runtime.evaluate", { expression: "globalThis.KAP_AUTH_CONFIG", returnByValue: true });
   await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*api/v1/*", requestStage: "Request" }] });
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `Object.defineProperty(globalThis,"KAP_AUTH_CONFIG",{value:${JSON.stringify(config.result.value)},writable:false,configurable:false});` });
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    globalThis.__kapSaveDialogStates = [];
+    const nativeFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input?.url;
+      const method = String(init?.method || (typeof input === 'object' && input?.method) || 'GET').toUpperCase();
+      if (method === 'POST' && String(url || '').includes('/api/v1/accounts-workloads/hierarchy/save')) {
+        const open = (selector) => {
+          const dialog = document.querySelector(selector);
+          return Boolean(dialog && typeof dialog.isOpen === 'function' && dialog.isOpen());
+        };
+        globalThis.__kapSaveDialogStates.push({ cancelOpen: open('oj-dialog.kpi-cancel-dialog'), navigationOpen: open('oj-dialog.kpi-navigation-dialog') });
+      }
+      return nativeFetch(input, init);
+    };
+  })();` });
   const evaluate = async (expression) => { const result = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text); return result.result.value; };
   const wait = async (expression, label, timeout = 30000) => { const started = Date.now(); while (Date.now() - started < timeout) { const value = await evaluate(expression); if (value) return value; await delay(40); } const state = await evaluate(`({ href: location.href, readyState: document.readyState, body: document.body?.innerText?.slice(0, 500) })`); throw new Error(`wait timeout: ${label} ${JSON.stringify(state)}`); };
 
@@ -110,11 +126,29 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "Keep editing closes save dialog");
   await wait("document.activeElement?.textContent?.trim() === 'Save'", "Keep editing returns focus to Opportunity Save launcher");
   await evaluate(`(async () => { const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); const row = document.querySelector('[data-aw-row-key="41:51"]'); const section = row.nextElementSibling.querySelector('.accounts-workloads-opportunities'); const saveLauncher = [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save'); saveLauncher.focus(); saveLauncher.click(); await settle(); })()`);
+  await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog reopens for X close");
+  const closeControl = await evaluate(`(() => {
+    const wrapper = document.querySelector('oj-dialog.kpi-cancel-dialog oj-button.oj-dialog-header-close-wrapper[title="Close"]');
+    const button = wrapper?.querySelector('button');
+    const labelledBy = button?.getAttribute('aria-labelledby');
+    const accessibleName = labelledBy
+      ? labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent?.trim() ?? '').join(' ').trim()
+      : button?.getAttribute('aria-label') ?? wrapper?.getAttribute('title') ?? '';
+    button?.click();
+    return button ? { accessibleName } : null;
+  })()`);
+  assert.ok(closeControl, "JET dialog X control must be rendered");
+  assert.equal(closeControl.accessibleName, "Close", "JET dialog X control must have an accessible name");
+  await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "X closes save dialog");
+  await wait("document.activeElement?.textContent?.trim() === 'Save'", "X close returns focus to Opportunity Save launcher");
+  await evaluate(`(async () => { const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); const row = document.querySelector('[data-aw-row-key="41:51"]'); const section = row.nextElementSibling.querySelector('.accounts-workloads-opportunities'); const saveLauncher = [...section.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save'); saveLauncher.focus(); saveLauncher.click(); await settle(); })()`);
   await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog reopens for confirmation");
+  const confirmationStateIndex = await evaluate("globalThis.__kapSaveDialogStates.length");
   await evaluate(`(() => { const button = [...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((b) => b.textContent.trim() === 'Save Opportunities').querySelector('button'); button.click(); button.click(); })()`);
   await wait("!document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "save dialog closes");
   for (let attempt = 0; attempt < 100 && savePosts < 1; attempt += 1) await delay(40);
   assert.equal(savePosts, 1, "double confirmation still posts Opportunity exactly once");
+  assert.deepEqual(await evaluate(`globalThis.__kapSaveDialogStates.slice(${confirmationStateIndex})`), [{ cancelOpen: false, navigationOpen: false }], "save request starts only after the confirmation dialog closes");
 
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?reverse-delete=${Date.now()}` });
   await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "reverse delete fixture");
@@ -130,13 +164,13 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     [...document.querySelectorAll('.accounts-workloads-toolbar button')].find((button) => button.textContent.trim() === 'Draft Delete').click(); await settle();
     return {
       opportunityText: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]')?.textContent,
-      errorText: document.body.textContent,
       addOpportunityVisible: [...row.nextElementSibling.querySelectorAll('button')].some((button) => button.textContent.trim() === 'Add Opportunity'),
       saveVisible: [...document.querySelectorAll('.accounts-workloads-toolbar button')].some((button) => button.textContent.trim() === 'Save'),
     };
   })()`);
   assert.ok(reverseDelete.opportunityText.includes('pending-delete'), "reverse-order Opportunity draft remains visible after parent Draft Delete");
-  assert.ok(reverseDelete.errorText.includes('Opportunity 초안은 저장되지 않았습니다'), "reverse-order Draft Delete explains the blocked Opportunity draft");
+  await wait("document.body.textContent.includes('Opportunity 초안은 저장되지 않았습니다')", "reverse-order Draft Delete explanation");
+  assert.equal(await evaluate("document.body.textContent.includes('Opportunity 초안은 저장되지 않았습니다')"), true, "reverse-order Draft Delete explains the blocked Opportunity draft");
   assert.equal(reverseDelete.addOpportunityVisible, false, "pending Draft Delete blocks adding Opportunity");
   assert.equal(reverseDelete.saveVisible, true, "pending Draft Delete remains an explicit unsaved change");
   await evaluate(`document.querySelector('[data-navigation-id="home"]').click()`);
@@ -150,6 +184,7 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?scenario=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} fixture`);
     const before = savePosts;
+    const stateBefore = await evaluate("globalThis.__kapSaveDialogStates.length");
     await evaluate(`(async () => {
       const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const edit = async (cell, suffix) => {
@@ -169,10 +204,11 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     await wait("document.querySelector('oj-dialog.kpi-navigation-dialog')?.isOpen()", `${scenario} navigation dialog`);
     const buttons = await evaluate(`[...document.querySelectorAll('oj-dialog.kpi-navigation-dialog .kpi-dialog-actions oj-button')].map((button) => button.textContent.trim())`);
     assert.deepEqual(buttons, ["Stay", "Save & Continue", "Discard & Continue"], `${scenario} uses KPI navigation dialog actions`);
-    await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-navigation-dialog oj-button')].find((button) => button.textContent.trim() === 'Save & Continue')).querySelector('button').click()`);
+    await evaluate(`(() => { const button = [...document.querySelectorAll('oj-dialog.kpi-navigation-dialog oj-button')].find((candidate) => candidate.textContent.trim() === 'Save & Continue').querySelector('button'); button.click(); button.click(); })()`);
     await wait("location.pathname === '/'", `${scenario} navigation completes after save`);
     const expectedPosts = Number(editAw) + Number(editOpportunity);
-    assert.equal(savePosts, before + expectedPosts, `${scenario} saves all changed resource types before navigation`);
+    assert.equal(savePosts, before + expectedPosts, `${scenario} rapid duplicate confirmation saves each changed resource exactly once`);
+    assert.ok((await evaluate(`globalThis.__kapSaveDialogStates.slice(${stateBefore})`)).every(({ cancelOpen, navigationOpen }) => !cancelOpen && !navigationOpen), `${scenario} save requests start only after the navigation dialog closes`);
     await evaluate(`document.querySelector('[data-navigation-id="accounts-workloads"]').click()`);
     await wait("location.pathname === '/accounts-workloads' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} return`);
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?refresh=${scenario}-${Date.now()}` });
