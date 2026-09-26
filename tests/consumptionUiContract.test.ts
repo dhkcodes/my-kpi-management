@@ -13,6 +13,20 @@ const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", 
 const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
+assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
+  "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
+assert.match(insightsPage, /<strong>Actual \{amountK\(account\.actualAmount\)\}<\/strong>/,
+  "Attention Accounts labels finalized Actual separately");
+assert.match(insightsPage, /Forecast \{amountK\(account\.forecastAmount\)\} · Covered-period expected \{amountK\(account\.actualAmount \+ account\.forecastAmount\)\}/,
+  "entered Forecast and covered-period expected use separate fields without changing contribution totals");
+assert.match(insightsPage, /Forecast missing · Covered-period expected unavailable/,
+  "missing Forecast remains distinct and does not fabricate an expected amount");
+assert.match(insightsPage, /Forecast \{amountK\(account\.forecastAmount\)\} \(entered as 0\) · Covered-period expected \{amountK\(account\.actualAmount \+ account\.forecastAmount\)\}/,
+  "an explicit zero Forecast remains distinct while showing the covered-period sum");
+assert.doesNotMatch(insightsPage, /FY Expected/, "partial-year coverage is never presented as a full-year expectation");
+assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.consumption-sales-attention-list button\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*\}/,
+  "mobile Attention Account rows stack long labels and amounts instead of overlapping");
+
 assert.match(messageBanner, /AppMessageBanner/, "Consumption notices use the shared notification adapter");
 assert.match(sharedMessageBanner, /if \(uniqueMessages\.length === 0\) return null/, "the shared banner leaves no empty layout when there are no messages");
 assert.match(sharedMessageBanner, /oj-c-message-banner/, "Consumption notices use the Oracle JET message banner");
