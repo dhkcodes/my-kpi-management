@@ -1966,12 +1966,13 @@ export function AccountsWorkloadsPage({
           <div class="consumption-import-actions accounts-workloads-header-actions">
             <oj-button
               chroming="outlined"
+              aria-label="Account Recommendations"
               disabled={!canWrite || saving}
               onojAction={() => void openForecast()}
             >
               <span slot="startIcon" class="oj-ux-ico-plus" />
               <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
-              <span class="accounts-workloads-recommendations-label--mobile">Recommendations</span>
+              <span class="accounts-workloads-recommendations-label--mobile">Account Recomm.</span>
             </oj-button>
           </div>
         </div>

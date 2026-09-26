@@ -290,10 +290,10 @@ assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*flex:\s*0 0 a
   "the recommendation action remains visible and does not shrink or clip");
 assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?<div class="accounts-workloads-header-topline">[\s\S]*?<div class="accounts-workloads-header-navigation">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">[\s\S]*?<\/div>\s*<\/div>\s*<h1 id="accountsWorkloadsTitle">/,
   "breadcrumb and recommendation action precede the page title in a dedicated first row");
-assert.match(page, /<oj-button[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
-  "Account Recommendations preserves its permission gate and existing action handler");
-assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Recommendations<\/span>/,
-  "the recommendation action provides full desktop and compact mobile labels");
+assert.match(page, /<oj-button[\s\S]*?aria-label="Account Recommendations"[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
+  "Account Recommendations exposes its full accessible name and preserves its permission gate and action handler");
+assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Account Recomm\.<\/span>/,
+  "the recommendation action provides the full desktop label and Account Recomm. on mobile");
 assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*none/,
   "the compact recommendation label stays hidden on desktop");
 assert.match(styles, /@media \(max-width: 1024px\)\s*\{[\s\S]*?\.accounts-workloads-recommendations-label--desktop\s*\{[^}]*display:\s*none[^}]*\}[\s\S]*?\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*inline/,
