@@ -176,6 +176,35 @@ const emptyDeal = (id: number, workloadId: number): AccountWorkloadDeal => ({
   deletedAt: null,
   sourceCommitmentId: null,
 });
+const mergeSearchResultWithAwDrafts = (
+  result: AccountsWorkloadsHierarchy,
+  current: AccountsWorkloadsHierarchy,
+  dirtyAccountIds: ReadonlySet<number>,
+  dirtyWorkloadIds: ReadonlySet<number>,
+): AccountsWorkloadsHierarchy => {
+  const currentAccounts = new Map(current.accounts.map((account) => [account.id, account]));
+  const accounts = result.accounts.map((account) => {
+    const currentAccount = currentAccounts.get(account.id);
+    if (!currentAccount) return account;
+    const currentWorkloads = new Map(currentAccount.workloads.map((workload) => [workload.id, workload]));
+    const workloads = account.workloads.map((workload) =>
+      dirtyWorkloadIds.has(workload.id) ? currentWorkloads.get(workload.id) ?? workload : workload);
+    currentAccount.workloads.forEach((workload) => {
+      if ((workload.id < 0 || dirtyWorkloadIds.has(workload.id))
+        && !workloads.some((candidate) => candidate.id === workload.id)) workloads.push(workload);
+    });
+    return {
+      ...account,
+      name: dirtyAccountIds.has(account.id) ? currentAccount.name : account.name,
+      workloads,
+    };
+  });
+  current.accounts.forEach((account) => {
+    if ((account.id < 0 || dirtyAccountIds.has(account.id))
+      && !accounts.some((candidate) => candidate.id === account.id)) accounts.unshift(account);
+  });
+  return { ...result, accounts };
+};
 const dealWrite = (
   deal: AccountWorkloadDeal,
   workloadId: number,
@@ -220,6 +249,10 @@ export function AccountsWorkloadsPage({
   onFxRateChange,
 }: Props) {
   const nextTempId = useRef(-1);
+  const reloadGeneration = useRef(0);
+  const preserveDraftsForNextReload = useRef(false);
+  const appliedSearchRef = useRef(initialSearch);
+  const searchComposingRef = useRef(false);
   const editSnapshot = useRef("");
   const highlightRequests = useRef(new Set<number>());
   const permanentDeleteDialogRef = useRef<any>(null);
@@ -343,6 +376,9 @@ export function AccountsWorkloadsPage({
   }, [editCell, dealEditCell]);
 
   const reload = async () => {
+    const generation = ++reloadGeneration.current;
+    const preserveDrafts = preserveDraftsForNextReload.current;
+    preserveDraftsForNextReload.current = false;
     setLoading(true);
     setError("");
     try {
@@ -351,22 +387,37 @@ export function AccountsWorkloadsPage({
         includeArchived: includeDeleted,
         includeDeletedDeals: includeDeleted,
       });
-      setHierarchy(result);
+      if (generation !== reloadGeneration.current) return;
+      setHierarchy((current) => preserveDrafts
+        ? mergeSearchResultWithAwDrafts(result, current, dirtyAccounts, dirtyWorkloads)
+        : result);
       setBaseline(result);
-      setDirtyAccounts(new Set());
-      setDirtyWorkloads(new Set());
-      setPendingDeleteWorkloadIds(new Set());
-      setSelectedRows(new Set());
-      setEditCell(null);
+      if (!preserveDrafts) {
+        setDirtyAccounts(new Set());
+        setDirtyWorkloads(new Set());
+        setPendingDeleteWorkloadIds(new Set());
+        setSelectedRows(new Set());
+        setEditCell(null);
+      }
     } catch (requestError) {
+      if (generation !== reloadGeneration.current) return;
       setError(friendlyError(requestError));
     } finally {
-      setLoading(false);
+      if (generation === reloadGeneration.current) setLoading(false);
     }
   };
   useEffect(() => {
     void reload();
   }, [search, includeDeleted]);
+
+  const applySearch = (value: string) => {
+    const nextSearch = value.trim();
+    if (nextSearch === appliedSearchRef.current) return;
+    preserveDraftsForNextReload.current = nextSearch === "";
+    appliedSearchRef.current = nextSearch;
+    reloadGeneration.current++;
+    setSearch(nextSearch);
+  };
 
   const allRows = useMemo(() => {
     const flattened = hierarchy.accounts.flatMap((account) =>
@@ -1909,11 +1960,12 @@ export function AccountsWorkloadsPage({
         class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
         onSubmit={(event) => {
           event.preventDefault();
+          if (searchComposingRef.current) return;
           if (dirty) {
             setError("Save or cancel drafts before searching.");
             return;
           }
-          setSearch(searchInput.trim());
+          applySearch(searchInput);
         }}
       >
         <label
@@ -1926,7 +1978,16 @@ export function AccountsWorkloadsPage({
             type="search"
             value={searchInput}
             placeholder="Account, workload, opportunity, or Plan"
-            onInput={(event) => setSearchInput(event.currentTarget.value)}
+            onCompositionStart={() => { searchComposingRef.current = true; }}
+            onCompositionEnd={(event) => {
+              searchComposingRef.current = false;
+              setSearchInput(event.currentTarget.value);
+            }}
+            onInput={(event) => {
+              const value = event.currentTarget.value;
+              setSearchInput(value);
+              if (!value && appliedSearchRef.current) applySearch("");
+            }}
           />
         </label>
         <button
@@ -1987,8 +2048,10 @@ export function AccountsWorkloadsPage({
         </button>
       </form>
       <div class="accounts-workloads-table-summary">
-        <span>{hierarchy.accounts.length} accounts</span>
-        <div class="accounts-workloads-fx">
+        <strong class="consumption-table-title">Account / Workload / Opportunity Overview</strong>
+        <div class="accounts-workloads-table-summary__meta">
+          <span>{hierarchy.accounts.length} accounts</span>
+          <div class="accounts-workloads-fx">
           <button
             type="button"
             class="accounts-workloads-fx__button"
@@ -2041,6 +2104,7 @@ export function AccountsWorkloadsPage({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
       {error && (

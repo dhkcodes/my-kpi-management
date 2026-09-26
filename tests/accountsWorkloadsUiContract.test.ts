@@ -127,6 +127,16 @@ assert.match(page, /setSaveErrors\(/,
   "AW drafts survive failed saves");
 assert.match(page, /accounts-workloads-toolbar--compact/,
   "AW uses a compact title/search/action/table rhythm without importing Consumption filters");
+assert.match(page, /<strong class="consumption-table-title">Account \/ Workload \/ Opportunity Overview<\/strong>/,
+  "AW uses the exact approved subtitle text and the Consumption table-title element semantics");
+assert.match(styles, /\.accounts-workloads-table-summary \.consumption-table-title\s*\{[^}]*color:\s*var\(--kpi-ink\)[^}]*margin:\s*0/,
+  "AW overrides the summary's secondary inherited color to match the Consumption subtitle");
+assert.match(styles, /\.accounts-workloads-toolbar--compact\s*\{\s*margin-bottom:\s*0;/,
+  "AW removes its legacy toolbar margin before applying the Consumption half-rem heading rhythm");
+assert.match(styles, /\.accounts-workloads-table-summary\s*\{\s*margin:\s*\.5rem 0 \.25rem;/,
+  "AW uses the compact Consumption toolbar-to-table spacing rhythm");
+assert.doesNotMatch(styles, /14\.73px/,
+  "fixture-only spacing is never encoded as an actual-screen CSS measurement");
 assert.doesNotMatch(page, /accounts-workloads-toolbar[^"\n]*consumption-range-bar/,
   "AW toolbar does not inherit Consumption label layout rules");
 assert.doesNotMatch(page, /selectedPillar|selectedQuarter|consumption-pillar-selector|consumption-plan-filter/,
@@ -186,6 +196,22 @@ assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(
   "the exchange-rate button retains its Apply and Cancel popover behavior");
 assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
   "account count and the compact exchange-rate control share one summary row above the table state");
+assert.match(page, /const applySearch = \(value: string\)[\s\S]*nextSearch === appliedSearchRef\.current[\s\S]*reloadGeneration\.current\+\+[\s\S]*setSearch\(nextSearch\)/,
+  "AW synchronously deduplicates applied search changes and invalidates older responses before rerender");
+assert.match(page, /onSubmit=\{\(event\) => \{[\s\S]*if \(searchComposingRef\.current\) return;[\s\S]*applySearch\(searchInput\)/,
+  "AW form submission keeps Enter and the icon on one IME-safe submit path");
+assert.match(page, /onCompositionStart=\{\(\) => \{ searchComposingRef\.current = true; \}\}[\s\S]*onCompositionEnd=\{\(event\) => \{[\s\S]*searchComposingRef\.current = false;/,
+  "AW search tracks IME composition synchronously");
+assert.match(page, /type="search"[\s\S]*onInput=\{\(event\) => \{[\s\S]*if \(!value && appliedSearchRef\.current\) applySearch\(""\)/,
+  "AW native clear immediately removes only the applied search without a dirty or loading gate");
+assert.match(page, /mergeSearchResultWithAwDrafts\(result, current, dirtyAccounts, dirtyWorkloads\)[\s\S]*if \(!preserveDrafts\) \{[\s\S]*setPendingDeleteWorkloadIds\(new Set\(\)\)/,
+  "AW clear refresh merges server results around row drafts and does not reset dirty or pending-delete state");
+assert.match(page, /preserveDraftsForNextReload\.current = nextSearch === ""/,
+  "AW limits draft-preserving refresh behavior to search clear");
+assert.match(page, /mergeSearchResultWithAwDrafts[\s\S]*dirtyWorkloadIds\.has\(workload\.id\)[\s\S]*workload\.id < 0[\s\S]*dirtyAccountIds\.has\(account\.id\)/,
+  "AW clear reconciliation preserves edited fields and newly added draft rows");
+assert.match(page, /const generation = \+\+reloadGeneration\.current[\s\S]*if \(generation !== reloadGeneration\.current\) return;[\s\S]*if \(generation === reloadGeneration\.current\) setLoading\(false\)/,
+  "AW stale hierarchy responses cannot overwrite the latest search or filter results");
 assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
   "Include Deleted keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
@@ -233,6 +259,8 @@ assert.match(page, /Oppty Name[\s\S]*?<span class="accounts-workloads-required-m
   "Opportunity Name is visibly identified as required");
 assert.match(styles, /\.accounts-workloads-header\s*\{[^}]*z-index:\s*40/,
   "the header establishes a stacking context above sticky table headers");
+assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,
+  "AW title and page menu align left only in the same mobile scope used by Consumption");
 assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
   "the complete exchange-rate popover stays above table content");
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,

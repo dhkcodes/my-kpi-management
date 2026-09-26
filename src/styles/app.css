@@ -4213,6 +4213,80 @@ h4.weekly-activity-section-label--next-week,
   .accounts-workloads-table-summary .accounts-workloads-fx__button { width: auto; }
   .accounts-workloads-table-summary .accounts-workloads-fx-popover { left: auto; right: 0; }
 }
+
+/* Keep the Accounts & Workloads table heading aligned with Consumption Records. */
+.accounts-workloads-table-summary {
+  margin: .5rem 0 .25rem;
+}
+.accounts-workloads-table-summary .consumption-table-title {
+  color: var(--kpi-ink);
+  margin: 0;
+}
+.accounts-workloads-toolbar--compact { margin-bottom: 0; }
+.accounts-workloads-table-summary__meta {
+  align-items: center;
+  display: flex;
+  gap: .5rem;
+  margin-inline-start: auto;
+  min-width: 0;
+}
+.accounts-workloads-table-summary .accounts-workloads-fx__button {
+  min-height: 1.8rem;
+  padding: .2rem .45rem;
+}
+.consumption-record-search {
+  position: relative;
+}
+.consumption-record-search input {
+  box-sizing: border-box;
+  padding-inline-end: 2.5rem;
+}
+.consumption-record-search__submit {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--kpi-brand);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.25rem;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  right: .2rem;
+  top: calc(100% - 1.125rem);
+  transform: translateY(-50%);
+  width: 2.1rem;
+}
+.consumption-record-search__submit:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
+  outline-offset: 1px;
+}
+.consumption-record-search__submit:disabled {
+  color: var(--kpi-muted);
+  cursor: not-allowed;
+}
+.consumption-record-search__submit oj-progress-circle { block-size: 1rem; inline-size: 1rem; }
+@media (max-width: 720px) {
+  .accounts-workloads-page .accounts-workloads-header {
+    align-items: stretch;
+    flex-direction: column;
+    text-align: left;
+  }
+  .kpi-shell:has(.accounts-workloads-page) .kpi-page-menu {
+    min-width: 0;
+    text-align: left;
+    width: 100%;
+  }
+  .kpi-shell:has(.accounts-workloads-page) .kpi-page-menu oj-toolbar {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+  .accounts-workloads-table-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .accounts-workloads-table-summary__meta { margin-inline-start: 0; }
+}
 .accounts-workloads-toast {
   background: #f0f7f1;
   border: 1px solid #8fbd98;
