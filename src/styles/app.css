@@ -2431,7 +2431,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-range-apply:disabled { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
 .consumption-range-apply:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
 .consumption-range-apply:disabled { cursor: not-allowed; opacity: .55; }
-.consumption-record-search { flex: 0 1 16rem; max-width: 16rem; }
+.consumption-record-search { flex: 0 1 17rem; max-width: 17rem; }
 .consumption-range-error { color: var(--kpi-danger); font-size: .78rem; font-weight: 750; }
 .consumption-range-note { color: var(--kpi-muted); font-size: .78rem; }
 .consumption-summary-cards { display: grid; gap: .75rem; grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -4010,15 +4010,10 @@ h4.weekly-activity-section-label--next-week,
   box-sizing: border-box;
 }
 .accounts-workloads-toolbar--compact .accounts-workloads-search {
-  flex: 0 1 20.5rem;
-  width: min(20.5rem, 32vw);
+  flex: 0 1 17rem;
+  width: min(17rem, 32vw);
   min-width: 13rem;
   align-self: center;
-}
-.accounts-workloads-toolbar--compact .consumption-range-apply {
-  align-self: center;
-  margin-top: 0;
-  margin-bottom: 0;
 }
 .accounts-workloads-toolbar--compact .accounts-workloads-add-aw {
   flex: 0 0 auto;

@@ -1989,15 +1989,15 @@ export function AccountsWorkloadsPage({
               if (!value && appliedSearchRef.current) applySearch("");
             }}
           />
+          <button
+            type="submit"
+            class="consumption-record-search__submit"
+            disabled={loading || saving}
+          >
+            <span class="oj-ux-ico-search" aria-hidden="true" />
+            <span class="oj-helper-hidden-accessible">Search</span>
+          </button>
         </label>
-        <button
-          type="submit"
-          class="consumption-range-apply"
-          disabled={loading || saving}
-        >
-          <span class="oj-ux-ico-search" aria-hidden="true" />
-          <span class="oj-helper-hidden-accessible">Search</span>
-        </button>
         <label class="accounts-workloads-include-deleted">
           <input
             type="checkbox"
@@ -2048,9 +2048,11 @@ export function AccountsWorkloadsPage({
         </button>
       </form>
       <div class="accounts-workloads-table-summary">
-        <strong class="consumption-table-title">Account / Workload / Opportunity Overview</strong>
+        <strong class="consumption-table-title">
+          Account / Workload / Opportunity
+          <small class="consumption-table-plan-count">{hierarchy.accounts.length} accounts</small>
+        </strong>
         <div class="accounts-workloads-table-summary__meta">
-          <span>{hierarchy.accounts.length} accounts</span>
           <div class="accounts-workloads-fx">
           <button
             type="button"

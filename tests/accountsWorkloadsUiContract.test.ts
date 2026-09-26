@@ -127,7 +127,7 @@ assert.match(page, /setSaveErrors\(/,
   "AW drafts survive failed saves");
 assert.match(page, /accounts-workloads-toolbar--compact/,
   "AW uses a compact title/search/action/table rhythm without importing Consumption filters");
-assert.match(page, /<strong class="consumption-table-title">Account \/ Workload \/ Opportunity Overview<\/strong>/,
+assert.match(page, /<strong class="consumption-table-title">\s*Account \/ Workload \/ Opportunity\s*<small class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts<\/small>\s*<\/strong>/,
   "AW uses the exact approved subtitle text and the Consumption table-title element semantics");
 assert.match(styles, /\.accounts-workloads-table-summary \.consumption-table-title\s*\{[^}]*color:\s*var\(--kpi-ink\)[^}]*margin:\s*0/,
   "AW overrides the summary's secondary inherited color to match the Consumption subtitle");
@@ -194,8 +194,14 @@ assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*posi
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
   "the exchange-rate button retains its Apply and Cancel popover behavior");
-assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
+assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
   "account count and the compact exchange-rate control share one summary row above the table state");
+assert.match(page, /class="consumption-record-search accounts-workloads-search"[\s\S]*type="search"[\s\S]*class="consumption-record-search__submit"[\s\S]*oj-ux-ico-search[\s\S]*<\/label>/,
+  "AW uses the same integrated input-and-icon search control as Consumption Records");
+assert.doesNotMatch(page, /class="consumption-range-apply"[\s\S]*oj-ux-ico-search/,
+  "AW no longer renders a detached search button");
+assert.match(styles, /\.consumption-record-search\s*\{[^}]*flex:\s*0 1 17rem;[^}]*max-width:\s*17rem;/,
+  "Consumption Records search is widened slightly and remains the shared AW width baseline");
 assert.match(page, /const applySearch = \(value: string\)[\s\S]*nextSearch === appliedSearchRef\.current[\s\S]*reloadGeneration\.current\+\+[\s\S]*setSearch\(nextSearch\)/,
   "AW synchronously deduplicates applied search changes and invalidates older responses before rerender");
 assert.match(page, /onSubmit=\{\(event\) => \{[\s\S]*if \(searchComposingRef\.current\) return;[\s\S]*applySearch\(searchInput\)/,
