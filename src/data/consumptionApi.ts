@@ -385,6 +385,14 @@ const parseAmountSplit = (value: unknown, allowedStatuses: ReadonlySet<string> =
   return { actualAmount: raw.actualAmount, forecastAmount: raw.forecastAmount, totalAmount: raw.totalAmount,
     status: raw.status as ConsumptionAmountSplit["status"] };
 };
+const parseContributionAmountSplit = (value: unknown): ConsumptionAmountSplit => {
+  const split = parseAmountSplit(value, amountStatuses, false);
+  // Contribution is Actual-only. Accept the former additive wire total during a rolling
+  // API/browser-cache transition, but never expose Forecast through totalAmount.
+  if (!nearlyEqual(split.totalAmount, split.actualAmount)
+    && !nearlyEqual(split.totalAmount, split.actualAmount + split.forecastAmount)) return malformedAnalysis();
+  return { ...split, totalAmount: split.actualAmount };
+};
 const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>): ConsumptionActualTrendPoint[] => {
   if (!Array.isArray(value)) return malformedAnalysis();
   const actualTrend = value.map((point) => {
@@ -407,7 +415,7 @@ const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>
   return actualTrend;
 };
 const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string>) => {
-  const split = parseAmountSplit(value);
+  const split = parseContributionAmountSplit(value);
   const raw = value as Record<string, unknown>;
   const forecastEntryStatus = (raw.forecastEntryStatus ?? "PROVIDED") as "PROVIDED" | "UNAVAILABLE";
   const actualEntryStatus = raw.actualEntryStatus as "PROVIDED" | "MISSING";
@@ -539,7 +547,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   });
   if (quarters.length !== 4 || quarters.some((quarter, index) => quarter.quarter !== `Q${index + 1}`)) return malformedAnalysis();
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
-    const split = parseAmountSplit(value); const account = value as Record<string, unknown>;
+    const split = parseContributionAmountSplit(value); const account = value as Record<string, unknown>;
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
       || !isNullableFiniteNumber(account.percentage) || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
       || !isFiniteNumber(account.priorActualAmount)
@@ -548,7 +556,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
       || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
       || !Array.isArray(account.workloads)) return malformedAnalysis();
     const workloads = account.workloads.map((value) => {
-      const workloadSplit = parseAmountSplit(value); const workload = value as Record<string, unknown>;
+      const workloadSplit = parseContributionAmountSplit(value); const workload = value as Record<string, unknown>;
       if (!isNonEmptyString(workload.workload) || !isNullableFiniteNumber(workload.percentage) || !Array.isArray(workload.plans)) return malformedAnalysis();
       return { ...workloadSplit, workload: workload.workload, percentage: workload.percentage,
         plans: workload.plans.map((plan) => parseAnalysisPlan(plan, allowedTrendYears)) };
