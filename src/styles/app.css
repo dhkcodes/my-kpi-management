@@ -3724,14 +3724,9 @@ h4.weekly-activity-section-label--next-week,
   min-height: 0;
   overflow: hidden;
 }
-.accounts-hierarchy-page .accounts-workloads-header { align-items: flex-end; margin: 0; padding-bottom: 0; }
+.accounts-hierarchy-page .accounts-workloads-header { align-items: flex-start; margin: 0; padding-bottom: 0; }
 .accounts-hierarchy-page .accounts-workloads-header h1 { margin: 2px 0 0; }
-.accounts-workloads-header-actions { align-items: flex-end; align-self: flex-end; display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* Keep the AW path/title anchored left when the existing narrow header stacks. */
-@media (max-width: 1024px) {
-  .accounts-hierarchy-page .accounts-workloads-header { align-items: stretch; }
-}
+.accounts-workloads-header-actions { align-items: center; align-self: flex-start; display: flex; flex-wrap: wrap; gap: .75rem; }
 
 .accounts-workloads-fx-rate { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 6px; }
 .accounts-workloads-fx-rate label { color: var(--oj-core-text-color-secondary); font-size: .75rem; font-weight: 700; }
@@ -3945,7 +3940,7 @@ h4.weekly-activity-section-label--next-week,
 .kap-header-wordmark { height: 2.6rem; width: min(19rem, 52vw); }
 
 /* Additional revision 4: one authoritative cascade for the AW workspace. */
-.accounts-workloads-header-actions { display: flex; align-self: flex-end; }
+.accounts-workloads-header-actions { display: flex; align-self: flex-start; }
 .accounts-workloads-toolbar--compact {
   display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0;
 }

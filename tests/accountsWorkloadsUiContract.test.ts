@@ -278,8 +278,12 @@ assert.match(page, /Oppty Name[\s\S]*?<span class="accounts-workloads-required-m
   "Opportunity Name is visibly identified as required");
 assert.match(styles, /\.accounts-workloads-header\s*\{[^}]*z-index:\s*40/,
   "the header establishes a stacking context above sticky table headers");
-assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-end[^}]*\}[\s\S]*@media \(max-width: 1024px\)\s*\{\s*\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*stretch/,
-  "the stacked AW header overrides its later desktop end alignment so the path and title remain left anchored");
+assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-start/,
+  "the AW action area aligns with the breadcrumb row above the page title");
+assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*align-self:\s*flex-start/,
+  "Account Recommendations uses the same top-right action alignment as Consumption import and export");
+assert.doesNotMatch(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-end/,
+  "the AW header no longer anchors Account Recommendations beside the title");
 assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,
   "AW title and page menu align left only in the same mobile scope used by Consumption");
 assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
