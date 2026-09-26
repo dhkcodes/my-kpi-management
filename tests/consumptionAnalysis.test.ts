@@ -61,13 +61,13 @@ const analysis = {
     changePercent: 150, reason: "Actual usage exceeded its recent baseline."
   }],
   accounts: [{
-    account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
+    account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 600, status: "MIXED", percentage: 100,
     actualEntryStatus: "PROVIDED", priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
     forecastEntryStatus: "ENTERED", attentionReasons: ["Recent actual above usual"],
     workloads: [{
-      workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", percentage: 100,
+      workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 600, status: "MIXED", percentage: 100,
       plans: [{ serverPlanId: 1, planId: "P1", endUser: "Acme", dataCenter: "IAD", actualAmount: 600, forecastAmount: 400,
-        totalAmount: 1000, status: "MIXED", percentage: 100, actualEntryStatus: "PROVIDED",
+        totalAmount: 600, status: "MIXED", percentage: 100, actualEntryStatus: "PROVIDED",
         actualTrend: [
           { periodKey: "FY26-MAR", actualAmount: null, alertCalculationMonth: false },
           { periodKey: "FY26-APR", actualAmount: 20, alertCalculationMonth: false },
@@ -103,6 +103,12 @@ void (async () => {
   assert.deepEqual(decoded.periodCoverage, analysis.periodCoverage);
   assert.equal(decoded.salesRepOverview[0].yoyComparisonStatus, "AVAILABLE");
   assert.equal(decoded.accounts[0].forecastEntryStatus, "ENTERED");
+  assert.equal(decoded.accounts[0].totalAmount, 600,
+    "Actual-only Account contribution accepts the deployed wire total");
+  assert.equal(decoded.accounts[0].workloads[0].totalAmount, 600,
+    "Actual-only Workload contribution accepts the deployed wire total");
+  assert.equal(decoded.accounts[0].workloads[0].plans[0].totalAmount, 600,
+    "Actual-only Plan contribution accepts the deployed wire total");
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.equal(Object.prototype.hasOwnProperty.call(decoded, "otherContribution"), false,
     "the removed aggregate contribution is not exposed by the frontend API contract");
@@ -192,7 +198,21 @@ void (async () => {
   runtime.fetch = async () => new Response(JSON.stringify(signedAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
   const signedDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
   assert.equal(signedDecoded.portfolio.totalAmount, -50, "valid credits and negative adjustments remain analyzable");
+  assert.equal(signedDecoded.accounts[0].totalAmount, -100,
+    "a legacy additive wire total is normalized to signed Actual during a rolling cache/API transition");
   assert.equal(signedDecoded.accounts[0].percentage, 125, "signed portfolios may produce contribution percentages outside 0–100");
+
+  const zeroDenominatorAnalysis = {
+    ...analysis,
+    accounts: [{ ...analysis.accounts[0], percentage: null,
+      workloads: [{ ...analysis.accounts[0].workloads[0], percentage: null,
+        plans: [{ ...analysis.accounts[0].workloads[0].plans[0], percentage: null }] }] }]
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(zeroDenominatorAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
+  const zeroDenominatorDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.equal(zeroDenominatorDecoded.accounts[0].percentage, null,
+    "a zero Actual denominator remains a valid null contribution percentage");
+  assert.equal(zeroDenominatorDecoded.accounts[0].workloads[0].plans[0].percentage, null);
 
   for (const malformed of [
     { ...analysis, fiscalYear: "2027" },
