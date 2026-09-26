@@ -23,12 +23,18 @@ assert.doesNotMatch(page, /\.title\s*=/,
   "AW text does not also install a delayed native title tooltip");
 assert.doesNotMatch(page, /Double-click to edit/);
 assert.match(page, /Account[\s\S]*Workload[\s\S]*Sales Rep[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
-assert.match(page, /field === "salesRep"[\s\S]*nullable\(value\)/,
-  "Sales Rep is editable and blank input is normalized to null");
+assert.match(page, /field === "salesRep"[\s\S]*salesRep: value/,
+  "Sales Rep is editable and preserves an explicit blank clear signal for the API");
 assert.match(page, /field === "salesRep" && !value[\s\S]*"미지정"/,
   "blank Sales Rep is rendered as 미지정");
 assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
   "Sales Rep participates in the existing AW batch save flow");
+assert.match(page, /\(current\.salesRep \?\? ""\)\.trim\(\)[\s\S]*\(original\.salesRep \?\? ""\)\.trim\(\)/,
+  "Sales-Rep-only edits and clears participate in AW dirty tracking");
+assert.match(page, /aria-label={`\$\{field === "account"[\s\S]*field === "salesRep" \? "Sales Rep"/,
+  "the Sales Rep editor has a human-readable accessible label");
+assert.match(page, /maxLength={field === "salesRep" \? 200 : undefined}/,
+  "the Sales Rep editor enforces the Oracle column limit");
 assert.match(page, /sortField === "arrUsd"/);
 assert.match(page, /sortField === "acrUsd"/);
 assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,

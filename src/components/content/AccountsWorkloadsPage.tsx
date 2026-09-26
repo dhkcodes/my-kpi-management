@@ -328,6 +328,8 @@ export function AccountsWorkloadsPage({
       if (!original) return true;
       return (
         current.name !== original.name ||
+        (current.salesRep ?? "").trim() !==
+          (original.salesRep ?? "").trim() ||
         (current.lastUpdated ?? "") !== (original.lastUpdated ?? "") ||
         (current.notes ?? "") !== (original.notes ?? "") ||
         (current.plans[0]?.sourcePlanNumber?.trim() ?? "") !==
@@ -501,7 +503,7 @@ export function AccountsWorkloadsPage({
                   : field === "workload"
                     ? { ...workload, name: value }
                     : field === "salesRep"
-                      ? { ...workload, salesRep: nullable(value) }
+                      ? { ...workload, salesRep: value }
                     : field === "lastUpdated"
                       ? { ...workload, lastUpdated: nullable(value) }
                       : field === "notes"
@@ -554,7 +556,7 @@ export function AccountsWorkloadsPage({
       const nextNotes = field === "notes" ? value : (currentWorkload?.notes ?? "");
       const changed = workloadId < 0 || !baselineWorkload ||
         nextName !== baselineWorkload.name ||
-        nextSalesRep !== (baselineWorkload.salesRep ?? "") ||
+        nextSalesRep.trim() !== (baselineWorkload.salesRep ?? "").trim() ||
         nextPlan !== (baselineWorkload.plans[0]?.sourcePlanNumber ?? "") ||
         nextUpdated !== (baselineWorkload.lastUpdated ?? "") ||
         nextNotes !== (baselineWorkload.notes ?? "");
@@ -706,9 +708,10 @@ export function AccountsWorkloadsPage({
             <input
               autoFocus
               class="accounts-workloads-edit-field"
-              aria-label={`${field === "account" ? "Account" : field === "workload" ? "Workload" : field}${field === "account" || field === "workload" ? " (required)" : ""}`}
+              aria-label={`${field === "account" ? "Account" : field === "workload" ? "Workload" : field === "salesRep" ? "Sales Rep" : field}${field === "account" || field === "workload" ? " (required)" : ""}`}
               aria-required={field === "account" || field === "workload" ? "true" : undefined}
               placeholder={field === "account" ? "Account *" : field === "workload" ? "Workload *" : undefined}
+              maxLength={field === "salesRep" ? 200 : undefined}
               value={value}
               onInput={(event) =>
                 updateAw(
