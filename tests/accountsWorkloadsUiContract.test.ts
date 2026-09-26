@@ -282,6 +282,10 @@ assert.match(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{
   "the AW action area aligns with the breadcrumb row above the page title");
 assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*align-self:\s*flex-start/,
   "Account Recommendations uses the same top-right action alignment as Consumption import and export");
+assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">/,
+  "Account Recommendations remains in the header action region opposite the breadcrumb");
+assert.match(page, /<oj-button[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
+  "Account Recommendations preserves its permission gate and existing action handler");
 assert.doesNotMatch(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-end/,
   "the AW header no longer anchors Account Recommendations beside the title");
 assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,
