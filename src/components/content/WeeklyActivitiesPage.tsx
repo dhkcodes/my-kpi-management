@@ -11,6 +11,7 @@ import {
 } from "../../data/weeklyActivitiesApi";
 import { FiscalYear } from "../../data/kpiMockData";
 import { SharedWeeklyActivityEditor } from "./SharedWeeklyActivityEditor";
+import { AppMessageBanner } from "./AppMessageBanner";
 import { getWeeklyActivityFiscalYearRange } from "./weeklyActivityFiscalYear";
 import {
   hasWeeklyActivityFormattingParity,
@@ -86,6 +87,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
   const [editError, setEditError] = useState("");
   const [rowError, setRowError] = useState<{ activityId: number; message: string } | null>(null);
   const [mutationWarning, setMutationWarning] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [staleDeleteIds, setStaleDeleteIds] = useState<Set<number>>(() => new Set());
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -326,6 +328,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       if (session.mode === "edit" && !savedMatchesQuery) setTotalElements((current) => Math.max(0, current - 1));
       setEditSession(null);
       focusEditOrAdd(savedMatchesQuery ? saved.activityId : null);
+      setSuccessMessage("Weekly Activity saved.");
 
       const requestId = requestGuardRef.current.begin();
       try {
@@ -377,6 +380,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       );
 
       if (outcome.status === "deleted") {
+        setSuccessMessage("Weekly Activity deleted.");
         if (outcome.page) applyAuthoritativePage(outcome.page);
         if (outcome.refreshError) {
           setMutationWarning("The activity was deleted, but the latest list could not be refreshed. Do not retry the delete; reload the list to confirm current data.");
@@ -478,11 +482,22 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
           <oj-button id="weeklyActivitySearchButton" chroming="callToAction" disabled={Boolean(editSession) || controlsBusy} onojAction={submitSearch}>Search</oj-button>
         </div>
       </section>
-      {filterError && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{filterError}</div>}
-      {error && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{error}</div>}
+      <AppMessageBanner
+        messages={[
+          ...(filterError ? [{ id: "weekly-filter-error", severity: "error" as const, summary: filterError, persistence: "sticky" as const }] : []),
+          ...(error ? [{ id: "weekly-load-error", severity: "error" as const, summary: error, persistence: "sticky" as const }] : []),
+          ...(mutationWarning ? [{ id: "weekly-mutation-warning", severity: "warning" as const, summary: mutationWarning, persistence: "sticky" as const }] : []),
+          ...(successMessage ? [{ id: "weekly-success", severity: "confirmation" as const, summary: successMessage, persistence: "auto" as const }] : []),
+        ]}
+        onClose={(id) => {
+          if (id === "weekly-filter-error") setFilterError("");
+          else if (id === "weekly-load-error") setError("");
+          else if (id === "weekly-mutation-warning") setMutationWarning("");
+          else setSuccessMessage("");
+        }}
+      />
       {mutationWarning && (
-        <div class="weekly-activity-message weekly-activity-message--warning" role="alert">
-          <span>{mutationWarning}</span>
+        <div class="weekly-activity-warning-action">
           <oj-button ref={(element: EventTarget | null) => { reloadTriggerRef.current = element as HTMLElement | null; }} chroming="outlined" disabled={controlsBusy || Boolean(editSession)} onojAction={() => void load(query, false, false)}>Reload list</oj-button>
         </div>
       )}

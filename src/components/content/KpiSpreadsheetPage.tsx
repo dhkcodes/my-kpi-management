@@ -62,6 +62,7 @@ import {
   KPI_OVERVIEW_ROWS,
   KPI_PORTFOLIO_ROWS
 } from "../../data/kpiWorkspaceDefinition";
+import { AppMessageBanner } from "./AppMessageBanner";
 
 const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
 const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
@@ -1144,7 +1145,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
     {pageHeader}
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
-    <p class={apiError ? "kpi-api-status kpi-api-status--error" : "kpi-api-status"} role={apiError ? "alert" : "status"}>{apiMessage}</p>
+    <AppMessageBanner
+      messages={apiMessage ? [{
+        id: "kpi-api-message",
+        severity: apiError ? "error" : /permission|required|could not|failed|unavailable/i.test(apiMessage) ? "warning" : "confirmation",
+        summary: apiMessage,
+        persistence: apiError || /permission|required|could not|failed|unavailable/i.test(apiMessage) ? "sticky" : "auto",
+      }] : []}
+      onClose={() => setApiMessage("")}
+    />
 
     {activeTab === "Overview" ? <Fragment>
       <div class="kpi-overview-metrics" aria-label={`${fiscalYear} KPI activity overview metrics`}>

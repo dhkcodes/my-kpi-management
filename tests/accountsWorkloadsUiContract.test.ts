@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
+const messageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelected"), page.indexOf("const deleteSelected"));
 const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelAllDrafts"));
@@ -115,8 +116,10 @@ assert.match(page, /cancelDeal\(activeDraft\.key\)/,
   "an opportunity row Cancel is isolated to that opportunity draft");
 assert.match(cancelHandler, /setError\(""\)[\s\S]*setSaveErrors\(\[\]\)/,
   "global Cancel clears stale validation feedback after restoring saved state");
-assert.match(page, /aria-label="Dismiss error"[\s\S]*setError\(""\)[\s\S]*setSaveErrors\(\[\]\)/,
-  "validation feedback has an accessible dismiss action without changing validation rules");
+assert.match(page, /<AppMessageBanner[\s\S]*id: "accounts-workloads-error"[\s\S]*persistence: "sticky"[\s\S]*setError\(""\)[\s\S]*setSaveErrors\(\[\]\)/,
+  "validation feedback uses the shared sticky error banner and clears related state on close");
+assert.match(messageBanner, /ono[jJ]Close[\s\S]*onClose\?\.\(String\(event\.detail\.key\)\)/,
+  "the shared banner forwards Oracle JET close events to screen-level state");
 assert.doesNotMatch(page, /const hasNewDeal =|const hasNewAw =/,
   "new AW and opportunity drafts are not globally single-row locked");
 assert.match(page, /new Map\(current\)\.set\(key, \{ key, workloadId, original: null, deal \}\)/,
@@ -260,12 +263,12 @@ assert.match(page, /showImmediateTooltip\(event\.currentTarget, value, true\)/,
   "Latest Update and Notes use the rendered element overflow gate");
 assert.match(page, /onlyIfClipped && element\.scrollWidth <= element\.clientWidth/,
   "tooltip clipping is determined from scrollWidth and clientWidth");
-assert.match(page, /createPortal\([\s\S]*accounts-workloads-toast[\s\S]*document\.body/,
-  "informational notices render through a body-level toast portal");
-assert.match(styles, /\.accounts-workloads-toast\s*\{[^}]*pointer-events:\s*none[^}]*position:\s*fixed/,
-  "the auto-dismiss toast is out of document flow and cannot cover interactive hit targets");
-assert.match(page, /if \(!notice\) return;[\s\S]*window\.setTimeout\(\(\) => setNotice\(""\), 2600\)/,
-  "the fixed informational toast auto-dismisses");
+assert.match(page, /id: "accounts-workloads-notice"[\s\S]*severity: "confirmation"[\s\S]*persistence: "auto"/,
+  "informational notices use the shared auto-dismiss banner");
+assert.match(styles, /\.app-message-region,[\s\S]*position:\s*fixed[\s\S]*top:\s*1rem[\s\S]*right:\s*1rem/,
+  "the shared notification region is fixed at the top right");
+assert.match(messageBanner, /window\.setTimeout[\s\S]*onClose\?\.\(message\.id\)/,
+  "the shared banner auto-dismisses non-sticky informational notices");
 assert.match(saveAwHandler, /const saved = await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*setBaseline\(withoutArchived\)[\s\S]*setNotice\(/,
   "AW save success appears only after the authoritative save response is adopted");
 assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
