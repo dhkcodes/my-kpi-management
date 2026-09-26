@@ -286,6 +286,12 @@ assert.match(page, /<header class="accounts-workloads-header consumption-page__h
   "Account Recommendations remains in the header action region opposite the breadcrumb");
 assert.match(page, /<oj-button[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
   "Account Recommendations preserves its permission gate and existing action handler");
+assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Recommendations<\/span>/,
+  "the recommendation action provides full desktop and compact mobile labels");
+assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*none/,
+  "the compact recommendation label stays hidden on desktop");
+assert.match(styles, /@media \(max-width: 1024px\)\s*\{[\s\S]*?\.accounts-workloads-recommendations-label--desktop\s*\{[^}]*display:\s*none[^}]*\}[\s\S]*?\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*inline/,
+  "the existing mobile breakpoint swaps only the visible recommendation label");
 assert.doesNotMatch(styles, /\.accounts-hierarchy-page \.accounts-workloads-header\s*\{[^}]*align-items:\s*flex-end/,
   "the AW header no longer anchors Account Recommendations beside the title");
 assert.match(styles, /@media \(max-width: 720px\)\s*\{[\s\S]*\.accounts-workloads-page \.accounts-workloads-header\s*\{[^}]*text-align:\s*left[\s\S]*\.kpi-shell:has\(\.accounts-workloads-page\) \.kpi-page-menu oj-toolbar\s*\{[^}]*justify-content:\s*flex-start/,

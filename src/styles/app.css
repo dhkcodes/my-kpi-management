@@ -3941,6 +3941,8 @@ h4.weekly-activity-section-label--next-week,
 
 /* Additional revision 4: one authoritative cascade for the AW workspace. */
 .accounts-workloads-header-actions { display: flex; align-self: flex-start; }
+.accounts-workloads-recommendations-label--desktop { display: inline; }
+.accounts-workloads-recommendations-label--mobile { display: none; }
 .accounts-workloads-toolbar--compact {
   display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0;
 }
@@ -4209,6 +4211,8 @@ h4.weekly-activity-section-label--next-week,
   .accounts-workloads-table-summary .accounts-workloads-fx,
   .accounts-workloads-table-summary .accounts-workloads-fx__button { width: auto; }
   .accounts-workloads-table-summary .accounts-workloads-fx-popover { left: auto; right: 0; }
+  .accounts-workloads-recommendations-label--desktop { display: none; }
+  .accounts-workloads-recommendations-label--mobile { display: inline; }
 }
 
 /* Keep the Accounts & Workloads table heading aligned with Consumption Records. */

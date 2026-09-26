@@ -1970,7 +1970,8 @@ export function AccountsWorkloadsPage({
             onojAction={() => void openForecast()}
           >
             <span slot="startIcon" class="oj-ux-ico-plus" />
-            Account Recommendations
+            <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
+            <span class="accounts-workloads-recommendations-label--mobile">Recommendations</span>
           </oj-button>
         </div>
       </header>
