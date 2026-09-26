@@ -43,8 +43,12 @@ assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,
 assert.match(page, /key: rowKey\(account\.id, workload\.id\)/,
   "selection, expansion and sorting use stable entity IDs");
 const api = readFileSync("src/data/accountsWorkloadsApi.ts", "utf8");
-assert.match(deleteHandler, /row\.workload\.archived[\s\S]*action: "ARCHIVE"[\s\S]*await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*await reload\(\)/,
-  "the first Delete immediately persists Draft Delete and refreshes the list");
+assert.match(deleteHandler, /setPendingDeleteWorkloadIds\([\s\S]*targetIds/,
+  "the first Delete stages Draft Delete locally so Opportunity drafts cannot be lost during an immediate refresh");
+assert.match(saveAwHandler, /pendingDeleteWorkloadIds\.has\(workload\.id\)[\s\S]*action: "ARCHIVE"/,
+  "staged Draft Delete is persisted through the normal AW save flow");
+assert.match(deleteHandler, /hasChangedOpportunity[\s\S]*Opportunity 초안은 저장되지 않았습니다/,
+  "reverse-order Opportunity edit then AW Draft Delete remains visible as an explicit blocked draft");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!removedWorkloadIds\.has\(workload\.id\)/,
   "unsaved workload deletion is local removal");
 assert.match(page, /const rows = allRows/,
@@ -55,8 +59,8 @@ assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
 assert.match(cancelHandler, /setPendingDeleteWorkloadIds\(new Set\(\)\)/);
 assert.match(cancelHandler, /setFxRateValue\(savedFxRateValue\)/,
   "AW Cancel clears opportunity drafts, delete drafts and unsaved FX state together");
-assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW moved to Draft Delete/,
-  "server-accepted Draft Delete reports completion immediately");
+assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW marked as Draft Deleted\. Save changes to apply\.`/,
+  "staged Draft Delete reports that Save is still required");
 assert.match(page, /<oj-dialog/);
 assert.match(page, /Permanently delete/);
 assert.match(page, /confirmPermanentDelete/,
@@ -196,8 +200,8 @@ assert.match(page, /element\.scrollWidth <= element\.clientWidth[\s\S]*setLatest
   "ellipsis cells expose the full value only when truncated");
 assert.match(page, /field === "plan"\s*\? \{[\s\S]*plans:/,
   "only the Plan editor can update the Plan value; Account edits cannot fall through to it");
-assert.match(page, /selectedCount > 0 && !editCell && !dirty/,
-  "AW delete actions are hidden whenever a cell is being edited");
+assert.match(page, /selectedCount > 0 && !editCell && \(selectedArchivedCount === 0 \|\| !dirty\)/,
+  "active AW Draft Delete remains available after an Opportunity edit, while permanent delete stays blocked during dirty state");
 assert.match(page, /selectedDeals\.size > 0 && !dealEditCell/,
   "Opportunity delete is hidden whenever an opportunity cell is being edited");
 assert.match(page, /is-editing-cell[\s\S]*data-deal-draft-key/,
@@ -343,16 +347,24 @@ assert.match(page, /const saveAndContinue = async \(\) => \{[\s\S]*const saved =
   "navigation is deferred until every pending write succeeds");
 assert.match(page, /opportunity-save[\s\S]*Save Opportunity changes\?[\s\S]*Save Opportunities/,
   "direct Opportunity save asks for an explicit confirmation");
-assert.match(page, /onClick=\{\(\) => setActionConfirmation\("opportunity-save"\)\}/,
+assert.match(page, /onClick=\{\(\) => openActionConfirmation\("opportunity-save"\)\}/,
   "the direct Opportunity Save action opens the confirmation rather than posting immediately");
-assert.match(page, /activeDraft && !workload\.archived/,
-  "Draft Deleted AWs do not expose Opportunity Save or Undo controls");
-assert.match(page, /!workload\.archived && <button[\s\S]*Add Opportunity/,
+assert.match(page, /activeDraft && !pendingDelete/,
+  "saved or pending Draft Deleted AWs do not expose Opportunity Save or Undo controls");
+assert.match(page, /!pendingDelete && <button[\s\S]*Add Opportunity/,
   "Draft Deleted AWs hide the Opportunity Add action");
 assert.match(page, /isDraftDeletedWorkload\(workloadId\) \|\| isInteractive\(event\.target\)/,
   "Draft Deleted Opportunity cells cannot enter edit mode through double click");
 assert.match(page, /const beginDealEdit[\s\S]*isDraftDeletedWorkload\(workloadId\)/,
   "the UI blocks programmatic edit entry for Draft Deleted Opportunity rows");
+assert.match(page, /const isDraftDeletedWorkload[\s\S]*pendingDeleteWorkloadIds\.has\(workloadId\)/,
+  "pending Draft Delete is guarded before its archive request is persisted");
+assert.match(page, /const updateAw[\s\S]*isDraftDeletedWorkload\(workloadId\)/,
+  "Draft Deleted AW fields cannot be mutated through an already-open editor");
+assert.match(page, /class="kpi-cancel-dialog"[\s\S]*class="kpi-dialog-actions"[\s\S]*Save Opportunities[\s\S]*Keep editing/,
+  "Opportunity confirmation uses the KPI Activities dialog and button treatment");
+assert.match(page, /class="kpi-navigation-dialog"[\s\S]*Stay[\s\S]*Save & Continue[\s\S]*Discard & Continue/,
+  "navigation confirmation uses the KPI Activities action order and styles");
 assert.match(page, /const updateDealDraft[\s\S]*isDraftDeletedWorkload\(existing\.workloadId\)/,
   "Draft Deleted Opportunity drafts are rejected before local mutation");
 assert.match(page, />\s*Undo\s*<\/button>/,
