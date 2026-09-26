@@ -4064,14 +4064,15 @@ h4.weekly-activity-section-label--next-week,
 }
 .accounts-workloads-aw-grid th:nth-child(1), .accounts-workloads-aw-grid td:nth-child(1) { width: 3%; }
 .accounts-workloads-aw-grid th:nth-child(2), .accounts-workloads-aw-grid td:nth-child(2) { width: 3%; }
-.accounts-workloads-aw-grid th:nth-child(3), .accounts-workloads-aw-grid td:nth-child(3) { width: 12%; }
-.accounts-workloads-aw-grid th:nth-child(4), .accounts-workloads-aw-grid td:nth-child(4) { width: 18%; }
+.accounts-workloads-aw-grid th:nth-child(3), .accounts-workloads-aw-grid td:nth-child(3) { width: 11%; }
+.accounts-workloads-aw-grid th:nth-child(4), .accounts-workloads-aw-grid td:nth-child(4) { width: 16%; }
 .accounts-workloads-aw-grid th:nth-child(5), .accounts-workloads-aw-grid td:nth-child(5) { width: 10%; }
-.accounts-workloads-aw-grid th:nth-child(6), .accounts-workloads-aw-grid td:nth-child(6),
-.accounts-workloads-aw-grid th:nth-child(7), .accounts-workloads-aw-grid td:nth-child(7) { width: 8%; }
-.accounts-workloads-aw-grid th:nth-child(8), .accounts-workloads-aw-grid td:nth-child(8) { width: 7%; }
-.accounts-workloads-aw-grid th:nth-child(9), .accounts-workloads-aw-grid td:nth-child(9),
-.accounts-workloads-aw-grid th:nth-child(10), .accounts-workloads-aw-grid td:nth-child(10) { width: 14%; min-width: 0; max-width: none; }
+.accounts-workloads-aw-grid th:nth-child(6), .accounts-workloads-aw-grid td:nth-child(6) { width: 9%; }
+.accounts-workloads-aw-grid th:nth-child(7), .accounts-workloads-aw-grid td:nth-child(7),
+.accounts-workloads-aw-grid th:nth-child(8), .accounts-workloads-aw-grid td:nth-child(8) { width: 8%; }
+.accounts-workloads-aw-grid th:nth-child(9), .accounts-workloads-aw-grid td:nth-child(9) { width: 7%; }
+.accounts-workloads-aw-grid th:nth-child(10), .accounts-workloads-aw-grid td:nth-child(10),
+.accounts-workloads-aw-grid th:nth-child(11), .accounts-workloads-aw-grid td:nth-child(11) { width: 12.5%; min-width: 0; max-width: none; }
 .accounts-workloads-parent-row.is-pending-delete > td:nth-child(5),
 .accounts-workloads-parent-row.is-pending-delete:hover > td:nth-child(5) { background: #fff1ed; }
 .accounts-workloads-parent-row.is-pending-delete.is-selected > td:nth-child(5) { background: #fbd5ce; }
@@ -4079,9 +4080,9 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-aw-grid td:nth-child(n+3),
 .accounts-workloads-oppty-grid th,
 .accounts-workloads-oppty-grid td { text-align: left; }
-.accounts-workloads-aw-grid th:nth-child(6), .accounts-workloads-aw-grid td:nth-child(6),
 .accounts-workloads-aw-grid th:nth-child(7), .accounts-workloads-aw-grid td:nth-child(7),
 .accounts-workloads-aw-grid th:nth-child(8), .accounts-workloads-aw-grid td:nth-child(8),
+.accounts-workloads-aw-grid th:nth-child(9), .accounts-workloads-aw-grid td:nth-child(9),
 .accounts-workloads-oppty-grid th:nth-child(4), .accounts-workloads-oppty-grid td:nth-child(4),
 .accounts-workloads-oppty-grid th:nth-child(6), .accounts-workloads-oppty-grid td:nth-child(6),
 .accounts-workloads-oppty-grid th:nth-child(7), .accounts-workloads-oppty-grid td:nth-child(7),

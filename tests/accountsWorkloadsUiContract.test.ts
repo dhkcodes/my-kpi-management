@@ -11,7 +11,7 @@ const saveAwHandler = page.slice(page.indexOf("const saveAwDrafts"), page.indexO
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
-assert.match(page, /type AwField = "account" \| "workload" \| "plan" \| "lastUpdated" \| "notes"/);
+assert.match(page, /type AwField = "account" \| "workload" \| "salesRep" \| "plan" \| "lastUpdated" \| "notes"/);
 assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
   "saved AW cells remain display-first and enter edit mode only on double-click");
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
@@ -22,7 +22,13 @@ assert.match(page, /showImmediateTooltip[\s\S]*createPortal\([\s\S]*accounts-wor
 assert.doesNotMatch(page, /\.title\s*=/,
   "AW text does not also install a delayed native title tooltip");
 assert.doesNotMatch(page, /Double-click to edit/);
-assert.match(page, /Account[\s\S]*Workload[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
+assert.match(page, /Account[\s\S]*Workload[\s\S]*Sales Rep[\s\S]*Plan Number[\s\S]*ARR\(\$\)[\s\S]*ACR\(\$\)[\s\S]*Oppty Count[\s\S]*Latest Update[\s\S]*Notes/);
+assert.match(page, /field === "salesRep"[\s\S]*nullable\(value\)/,
+  "Sales Rep is editable and blank input is normalized to null");
+assert.match(page, /field === "salesRep" && !value[\s\S]*"미지정"/,
+  "blank Sales Rep is rendered as 미지정");
+assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
+  "Sales Rep participates in the existing AW batch save flow");
 assert.match(page, /sortField === "arrUsd"/);
 assert.match(page, /sortField === "acrUsd"/);
 assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,
@@ -67,6 +73,7 @@ assert.match(page, /<div>[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[
 assert.match(page, /highlighted: !workload\.highlighted/);
 assert.match(page, /const savedWorkload = baseline\.accounts/);
 assert.match(page, /name: savedWorkload\.name/);
+assert.match(page, /salesRep: savedWorkload\.salesRep/);
 assert.match(page, /lastUpdated: savedWorkload\.lastUpdated/);
 assert.match(page, /notes: savedWorkload\.notes/,
   "Highlight persistence does not commit unrelated unsaved AW field edits");

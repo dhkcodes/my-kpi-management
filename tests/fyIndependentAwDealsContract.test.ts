@@ -48,12 +48,12 @@ async function run() {
   const existingAccounts = [{
     id: 1, versionNo: 1, name: "Acme", archived: false,
     workloads: [{
-      id: 2, versionNo: 1, name: "Database", lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [],
+      id: 2, versionNo: 1, name: "Database", salesRep: null, lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [],
       plans: [{ id: 3, workloadId: 2, sourcePlanId: 8, sourcePlanNumber: "PLAN-8", versionNo: 1 }]
     }]
   }, {
     id: -1, versionNo: 0, name: "  Draft only  ", archived: false,
-    workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [], plans: [] }]
+    workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", salesRep: null, lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [], plans: [] }]
   }];
   assert.deepEqual(
     filterForecastCandidates([
@@ -74,7 +74,7 @@ async function run() {
 
   const saveRequest: AccountsWorkloadsHierarchySaveRequest = {
     accounts: [{ id: null, clientId: "account-1", versionNo: null, name: "Acme", action: "UPSERT" }],
-    workloads: [{ id: null, clientId: "workload-2", accountRef: "account-1", versionNo: null, name: "Database", lastUpdated: null, notes: null, action: "UPSERT" }],
+    workloads: [{ id: null, clientId: "workload-2", accountRef: "account-1", versionNo: null, name: "Database", salesRep: null, lastUpdated: null, notes: null, action: "UPSERT" }],
     deals: [], workloadPlans: []
   };
   let saveUrl = "";

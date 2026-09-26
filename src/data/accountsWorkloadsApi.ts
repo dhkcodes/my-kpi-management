@@ -95,6 +95,7 @@ export type AccountWorkload = Readonly<{
   id: number;
   versionNo: number;
   name: string;
+  salesRep: string | null;
   lastUpdated: string | null;
   notes: string | null;
   highlighted: boolean;
@@ -171,7 +172,7 @@ export const filterForecastCandidates = (
 export type AccountWrite = Readonly<{ id: number | null; clientId: string | null; versionNo: number | null; name: string | null; action: HierarchyWriteAction }>;
 export type WorkloadWrite = Readonly<{
   id: number | null; clientId: string | null; accountRef: string | null; versionNo: number | null;
-  name: string | null; lastUpdated: string | null; notes: string | null; highlighted?: boolean | null; action: HierarchyWriteAction;
+  name: string | null; salesRep: string | null; lastUpdated: string | null; notes: string | null; highlighted?: boolean | null; action: HierarchyWriteAction;
 }>;
 export type DealWrite = Readonly<{
   id: number | null; clientId: string | null; workloadRef: string | null; versionNo: number | null;

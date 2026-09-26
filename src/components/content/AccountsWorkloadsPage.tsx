@@ -50,7 +50,7 @@ type Props = Readonly<{
   fxError: string;
   onFxRateChange: (rateValue: number) => Promise<FxRateRecord>;
 }>;
-type AwField = "account" | "workload" | "plan" | "lastUpdated" | "notes";
+type AwField = "account" | "workload" | "salesRep" | "plan" | "lastUpdated" | "notes";
 type DealField =
   | "name"
   | "opportunityNo"
@@ -145,6 +145,7 @@ const emptyWorkload = (id: number, name = ""): AccountWorkload => ({
   id,
   versionNo: 0,
   name,
+  salesRep: null,
   lastUpdated: null,
   notes: null,
   highlighted: false,
@@ -431,6 +432,7 @@ export function AccountsWorkloadsPage({
       const deals = item.workload.deals.filter((deal) => !deal.deleted);
       if (sortField === "account") return item.account.name;
       if (sortField === "workload") return item.workload.name;
+      if (sortField === "salesRep") return item.workload.salesRep ?? "";
       if (sortField === "plan")
         return item.workload.plans[0]?.sourcePlanNumber ?? "";
       if (sortField === "lastUpdated") return item.workload.lastUpdated ?? "";
@@ -498,6 +500,8 @@ export function AccountsWorkloadsPage({
                   ? workload
                   : field === "workload"
                     ? { ...workload, name: value }
+                    : field === "salesRep"
+                      ? { ...workload, salesRep: nullable(value) }
                     : field === "lastUpdated"
                       ? { ...workload, lastUpdated: nullable(value) }
                       : field === "notes"
@@ -544,11 +548,13 @@ export function AccountsWorkloadsPage({
       });
     } else {
       const nextName = field === "workload" ? value : (currentWorkload?.name ?? "");
+      const nextSalesRep = field === "salesRep" ? value : (currentWorkload?.salesRep ?? "");
       const nextPlan = field === "plan" ? value : (currentWorkload?.plans[0]?.sourcePlanNumber ?? "");
       const nextUpdated = field === "lastUpdated" ? value : (currentWorkload?.lastUpdated ?? "");
       const nextNotes = field === "notes" ? value : (currentWorkload?.notes ?? "");
       const changed = workloadId < 0 || !baselineWorkload ||
         nextName !== baselineWorkload.name ||
+        nextSalesRep !== (baselineWorkload.salesRep ?? "") ||
         nextPlan !== (baselineWorkload.plans[0]?.sourcePlanNumber ?? "") ||
         nextUpdated !== (baselineWorkload.lastUpdated ?? "") ||
         nextNotes !== (baselineWorkload.notes ?? "");
@@ -569,6 +575,8 @@ export function AccountsWorkloadsPage({
       ? account.name
       : field === "workload"
         ? workload.name
+        : field === "salesRep"
+          ? (workload.salesRep ?? "")
         : field === "plan"
           ? (workload.plans[0]?.sourcePlanNumber ?? "")
           : field === "lastUpdated"
@@ -718,7 +726,9 @@ export function AccountsWorkloadsPage({
           )
         ) : field === "lastUpdated" || field === "notes" ? (
           tooltip(value)
-        ) : field === "workload" ? (
+        ) : field === "salesRep" && !value ? (
+          "미지정"
+        ) : field === "workload" || field === "salesRep" ? (
           truncatedWorkload(value)
         ) : (
           value || "—"
@@ -803,6 +813,7 @@ export function AccountsWorkloadsPage({
         accountRef: String(row.account.id),
         versionNo: row.workload.versionNo,
         name: row.workload.name,
+        salesRep: row.workload.salesRep,
         lastUpdated: row.workload.lastUpdated,
         notes: row.workload.notes,
         highlighted: row.workload.highlighted,
@@ -1034,6 +1045,7 @@ export function AccountsWorkloadsPage({
         accountRef: String(row.account.id),
         versionNo: row.workload.versionNo,
         name: row.workload.name,
+        salesRep: row.workload.salesRep,
         lastUpdated: row.workload.lastUpdated,
         notes: row.workload.notes,
         highlighted: row.workload.highlighted,
@@ -1070,7 +1082,7 @@ export function AccountsWorkloadsPage({
         accounts: [], deals: [], workloadPlans: [],
         workloads: targets.map((row) => ({
           id: row.workload.id, clientId: null, accountRef: String(row.account.id),
-          versionNo: row.workload.versionNo, name: row.workload.name,
+          versionNo: row.workload.versionNo, name: row.workload.name, salesRep: row.workload.salesRep,
           lastUpdated: row.workload.lastUpdated, notes: row.workload.notes,
           highlighted: row.workload.highlighted, action: "RESTORE",
         })),
@@ -1176,6 +1188,7 @@ export function AccountsWorkloadsPage({
               accountRef: refFor(account.id, "account"),
               versionNo: workload.versionNo,
               name: workload.name,
+              salesRep: workload.salesRep,
               lastUpdated: workload.lastUpdated,
               notes: workload.notes,
               highlighted: workload.highlighted,
@@ -1209,6 +1222,7 @@ export function AccountsWorkloadsPage({
             accountRef: refFor(account.id, "account"),
             versionNo: workload.id > 0 ? workload.versionNo : null,
             name: workload.name,
+            salesRep: workload.salesRep,
             lastUpdated: workload.lastUpdated,
             notes: workload.notes,
             highlighted: workload.highlighted,
@@ -1317,6 +1331,7 @@ export function AccountsWorkloadsPage({
           accountRef: String(account.id),
           versionNo: workload.versionNo,
           name: savedWorkload.name,
+          salesRep: savedWorkload.salesRep,
           lastUpdated: savedWorkload.lastUpdated,
           notes: savedWorkload.notes,
           highlighted: !workload.highlighted,
@@ -2162,6 +2177,7 @@ export function AccountsWorkloadsPage({
                   [
                     ["account", "Account"],
                     ["workload", "Workload"],
+                    ["salesRep", "Sales Rep"],
                     ["plan", "Plan Number"],
                     ["arrUsd", "ARR($)"],
                     ["acrUsd", "ACR($)"],
@@ -2262,6 +2278,7 @@ export function AccountsWorkloadsPage({
                       </td>
                       {renderAwCell(account, workload, "account")}
                       {renderAwCell(account, workload, "workload")}
+                      {renderAwCell(account, workload, "salesRep")}
                       {renderAwCell(account, workload, "plan")}
                       <td class="accounts-workloads-number-cell">
                         {fmtMoney(arr)}
@@ -2277,7 +2294,7 @@ export function AccountsWorkloadsPage({
                     </tr>
                     {expanded && (
                       <tr class="accounts-workloads-child-row">
-                        <td colSpan={10}>
+                        <td colSpan={11}>
                           <section
                             class="accounts-workloads-opportunities"
                             aria-label={`${account.name} ${workload.name} opportunities`}
