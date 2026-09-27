@@ -1,4 +1,6 @@
 import assert = require("assert");
+import * as fs from "fs";
+import * as path from "path";
 import {
   buildAccountManagementOverview,
   fiscalPeriodForDate,
@@ -64,4 +66,20 @@ assert.strictEqual(target.pipeline.newArr.enteredAcr, 8000);
 
 const searched = overview.targetFor("PRIORITY", "beta", new Date("2026-09-27T00:00:00Z"));
 assert.strictEqual(searched.deals.length, 2);
+
+const pageSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/components/content/AccountManagementOverviewPage.tsx"),
+  "utf8"
+);
+const appCss = fs.readFileSync(path.resolve(process.cwd(), "src/styles/app.css"), "utf8");
+assert.match(pageSource, /list="accountOverviewOptions"/, "account search must expose selectable account suggestions");
+assert.match(pageSource, /role="tooltip"/, "latest updates must expose their full text through a custom immediate tooltip");
+assert.match(pageSource, /onMouseEnter=.*showLatestUpdate/, "latest update tooltip must open immediately on mouse enter");
+assert.match(pageSource, /Revenue measure/, "quarter controls must expose the All\/ARR\/ACR measure selector");
+assert.match(pageSource, /actualMeasure === "ALL" \? \(\["ARR", "ACR"\] as const\)/, "All must keep ARR and ACR visually separate");
+assert.match(pageSource, /account-overview__bar-item/, "quarter bars must render numeric labels");
+assert.match(pageSource, /account-overview__target-footer/, "open deal list must keep a footer outside the scrolling rows");
+assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*overflow:\s*auto/s, "open deal rows must scroll internally");
+assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*auto/s, "account hierarchy must scroll internally");
+assert.match(appCss, /\.account-overview__latest-update\s*\{[^}]*text-overflow:\s*ellipsis/s, "latest update must stay on one line");
 console.log("accountManagementOverview tests passed");
