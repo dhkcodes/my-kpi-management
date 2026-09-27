@@ -84,6 +84,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const current = currentFiscalPeriod();
   const [actualFy, setActualFy] = useState(current.fiscalYear);
   const [actualQuarter, setActualQuarter] = useState<ActualQuarterFilter>("ALL");
@@ -96,7 +97,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchAccountsWorkloadsHierarchy({ includeArchived: true, includeDeletedDeals: false })
+    fetchAccountsWorkloadsHierarchy({ includeArchived: false, includeDeletedDeals: false })
       .then((value) => { if (active) { setHierarchy(value); setError(""); } })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Overview data could not be loaded."); })
       .finally(() => { if (active) setLoading(false); });
@@ -115,10 +116,14 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const visibleMeasures = actualMeasure === "ALL" ? (["ARR", "ACR"] as const) : [actualMeasure];
   const quarterSeries = ([1, 2, 3, 4] as const).map((quarter) => {
     const deals = (actualYear?.deals ?? []).filter((item) => item.actualPeriod?.quarter === quarter);
-    return { quarter, values: revenueKinds.flatMap((kind) => visibleMeasures.map((measure) => ({ kind, measure, value: sumMeasure(deals, kind, measure) }))) };
+    return { quarter, bars: visibleMeasures.map((measure) => ({
+      measure,
+      segments: revenueKinds.map((kind) => ({ kind, value: sumMeasure(deals, kind, measure) })),
+    })) };
   });
-  const maxQuarter = Math.max(1, ...quarterSeries.flatMap((quarter) => quarter.values.map((item) => item.value)));
-  const accountNames = [...new Set((hierarchy?.accounts ?? []).map((account) => account.name))].sort((a, b) => a.localeCompare(b));
+  const maxQuarter = Math.max(1, ...quarterSeries.flatMap((quarter) => quarter.bars.map((bar) => bar.segments.reduce((sum, item) => sum + item.value, 0))));
+  const accountNames = [...new Set((hierarchy?.accounts ?? []).filter((account) => !account.archived && account.workloads.some((workload) => !workload.archived)).map((account) => account.name))].sort((a, b) => a.localeCompare(b));
+  const filteredAccountNames = accountNames.filter((account) => account.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const targetPrimaryTotal = (target?.deals ?? []).reduce((sum, item) => sum + (primaryAmount(item) ?? 0), 0);
   const targetPeriods = [...new Set((overview?.targetDeals ?? [])
     .filter((item) => item.deal.targetFiscalYear && item.deal.targetQuarter)
@@ -153,8 +158,14 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
         <div class="account-overview__top-row">
           <div class="account-overview__search">
             <label for="accountOverviewSearch">Account</label>
-            <div class="account-overview__search-field"><span class="oj-ux-ico-search" aria-hidden="true"></span><input id="accountOverviewSearch" type="search" list="accountOverviewOptions" value={search} placeholder="Search or select an account..." autoComplete="off" onInput={(event) => setSearch((event.currentTarget as HTMLInputElement).value)} />{search && <button type="button" aria-label="Clear account" onClick={() => setSearch("")}>Clear</button>}</div>
-            <datalist id="accountOverviewOptions">{accountNames.map((account) => <option key={account} value={account} />)}</datalist>
+            <div class="account-overview__search-combobox">
+              <div class="account-overview__search-field"><span class="oj-ux-ico-search" aria-hidden="true"></span><input id="accountOverviewSearch" type="search" role="combobox" aria-autocomplete="list" aria-expanded={searchOpen} aria-controls="accountOverviewOptions" value={search} placeholder="Search Account" autoComplete="off" onFocus={() => setSearchOpen(true)} onInput={(event) => { setSearch((event.currentTarget as HTMLInputElement).value); setSearchOpen(true); }} />{search && <button type="button" aria-label="Clear account" onClick={() => { setSearch(""); setSearchOpen(true); }}>Clear</button>}</div>
+              {searchOpen && <div id="accountOverviewOptions" class="account-overview__search-options" role="listbox">
+                <button type="button" role="option" aria-selected={!search} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearch(""); setSearchOpen(false); }}><strong>All Accounts</strong><small>Active Account &amp; Workload only</small></button>
+                {filteredAccountNames.map((account) => <button type="button" role="option" key={account} aria-selected={search === account} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearch(account); setSearchOpen(false); }}><strong>{account}</strong><small>Account &amp; Workload</small></button>)}
+                {filteredAccountNames.length === 0 && <p>No matching Accounts.</p>}
+              </div>}
+            </div>
             <small>Search the account list or select an account to filter the overview.</small>
           </div>
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
@@ -172,13 +183,13 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           </div>
 
           <div class="account-overview__kpis">
-            {revenueKinds.map((kind) => <article key={kind}><span>{kind === "NEW" ? "New" : kind === "EXPANSION" ? "Expansion" : "Renewal"}</span><div class="account-overview__metric-lines">{visibleMeasures.map((measure) => <strong key={measure}><small>{measure}</small>{fmtUsd(sumMeasure(actual!.deals, kind, measure))}</strong>)}</div><small>{actual!.deals.filter((item) => item.deal.revenueType.toUpperCase() === kind).length} WON deals · USD K</small></article>)}
+            {([null, ...revenueKinds] as const).map((kind) => { const scoped = kind === null ? actual!.deals : actual!.deals.filter((item) => item.deal.revenueType.toUpperCase() === kind); return <article key={kind ?? "TOTAL"}><span>{kind === null ? "Total" : kind === "NEW" ? "New" : kind === "EXPANSION" ? "Expansion" : "Renewal"}</span><div class="account-overview__metric-lines">{visibleMeasures.map((measure) => <strong key={measure}><small>{measure}</small>{fmtUsd(kind === null ? revenueKinds.reduce((sum, revenueKind) => sum + sumMeasure(actual!.deals, revenueKind, measure), 0) : sumMeasure(actual!.deals, kind, measure))}</strong>)}</div><small>{scoped.length} WON deals · USD K</small></article>; })}
           </div>
 
           <div class="account-overview__actual-details">
             <article class="account-overview__panel account-overview__quarter-chart">
-              <div class="account-overview__panel-heading"><div><h3>{actualFy} quarterly comparison</h3><p>ARR / ACR grouped values · not cumulative · USD K</p></div><div class="account-overview__legend">{revenueKinds.map((kind) => visibleMeasures.map((measure) => <span key={`${kind}-${measure}`} class={`is-${kind.toLocaleLowerCase()} is-${measure.toLocaleLowerCase()}`}>{kind === "NEW" ? "New" : kind === "EXPANSION" ? "Expansion" : "Renewal"} {measure}</span>))}</div></div>
-              <div class="account-overview__vertical-chart"><div class="account-overview__axis"><span>{fmtUsd(maxQuarter)}</span><span>{fmtUsd(maxQuarter * .67)}</span><span>{fmtUsd(maxQuarter * .33)}</span><span>$0K</span></div><div class="account-overview__plot">{quarterSeries.map((item) => <div key={item.quarter} class={`account-overview__bar-group ${actualQuarter === item.quarter ? "is-selected" : ""}`}><div class="account-overview__bar-columns">{item.values.map((bar) => <span key={`${bar.kind}-${bar.measure}`} class="account-overview__bar-item" title={`${bar.kind} ${bar.measure} ${fmtUsd(bar.value)}`}><small>{fmtUsd(bar.value)}</small><i class={`is-${bar.kind.toLocaleLowerCase()} is-${bar.measure.toLocaleLowerCase()}`} style={{ height: `${Math.max(1, bar.value / maxQuarter * 100)}%` }}></i></span>)}</div><strong>Q{item.quarter}</strong></div>)}</div></div>
+              <div class="account-overview__panel-heading"><div><h3>{actualFy} quarterly comparison</h3><p>ARR / ACR measure bars stacked by New / Expansion / Renewal · not cumulative · USD K</p></div><div class="account-overview__legend">{revenueKinds.map((kind) => <span key={kind} class={`is-${kind.toLocaleLowerCase()}`}>{kind === "NEW" ? "New" : kind === "EXPANSION" ? "Expansion" : "Renewal"}</span>)}</div></div>
+              <div class="account-overview__vertical-chart"><div class="account-overview__axis"><span>{fmtUsd(maxQuarter)}</span><span>{fmtUsd(maxQuarter * .67)}</span><span>{fmtUsd(maxQuarter * .33)}</span><span>$0K</span></div><div class="account-overview__plot">{quarterSeries.map((item) => <div key={item.quarter} class={`account-overview__bar-group ${actualQuarter === item.quarter ? "is-selected" : ""}`}><div class="account-overview__bar-columns">{item.bars.map((bar) => { const total = bar.segments.reduce((sum, segment) => sum + segment.value, 0); return <span key={bar.measure} class="account-overview__bar-item" title={`${bar.measure} total ${fmtUsd(total)}`}><small>{fmtUsd(total)}</small><span class="account-overview__bar-stack" style={{ height: `${Math.max(1, total / maxQuarter * 100)}%` }}>{bar.segments.map((segment) => <i key={segment.kind} class={`is-${segment.kind.toLocaleLowerCase()}`} title={`${segment.kind} ${bar.measure} ${fmtUsd(segment.value)}`} style={{ flexGrow: segment.value, minHeight: segment.value ? "2px" : "0" }}></i>)}</span><b>{bar.measure}</b></span>; })}</div><strong>Q{item.quarter}</strong></div>)}</div></div>
             </article>
 
             <article class="account-overview__panel account-overview__hierarchy">
@@ -212,7 +223,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
           <article class="account-overview__panel account-overview__target-list"><div class="account-overview__panel-heading"><div><h3>Open Deal action list</h3><p>{target!.deals.length} deals in the selected target scope</p></div></div>
             <div class="account-overview__target-head"><span>Account / Workload / Deal</span><span>Type</span><span>Target FY/Q</span><span>Amount</span><span>Status</span><span>To target-quarter end</span><span>Latest update</span></div>
-            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN deals in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.deal.name}</strong><small>{item.account.name} · {item.workload.name}</small></span><span>{item.deal.revenueType}</span><span>{displayTarget(item)}</span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{daysToTargetEnd(item)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
+            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN deals in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.account.name} ({item.workload.name})</strong><small>{item.deal.name} ({item.deal.opportunityNo ?? "No Opportunity ID"})</small></span><span>{item.deal.revenueType}</span><span>{displayTarget(item)}</span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{daysToTargetEnd(item)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
             <footer class="account-overview__target-footer"><span>{target!.deals.length} open deals</span><strong>Selected total {fmtUsd(targetPrimaryTotal)}</strong></footer>
             {latestUpdateTooltip && <div id="accountOverviewLatestUpdateTooltip" class="account-overview__latest-tooltip" role="tooltip" style={{ left: `${latestUpdateTooltip.left}px`, top: `${latestUpdateTooltip.top}px` }}>{latestUpdateTooltip.text}</div>}
           </article>
