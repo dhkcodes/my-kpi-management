@@ -9,6 +9,8 @@ const app = read("src/components/app.tsx");
 const header = read("src/components/header.tsx");
 const profile = read("src/components/content/ProfilePage.tsx");
 const users = read("src/components/content/UsersPage.tsx");
+assert.match(users, /Account Management — Overview & Account & Workload/,
+  "user permissions expose the complete Account Management area under its existing user-level grant");
 const content = read("src/components/content/index.tsx");
 const routes = read("src/components/navigationRoutes.ts");
 const passwordPolicy = read("src/auth/passwordPolicy.ts");

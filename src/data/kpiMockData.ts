@@ -80,7 +80,7 @@ export const activityNavItems: NavigationItem[] = [
 ];
 export const accountManagementNavItems: NavigationItem[] = [
   { id: "account-management-overview", label: "Overview", icon: "oj-ux-ico-dashboard" },
-  { id: "accounts-workloads", label: "Accounts & Workloads", icon: "oj-ux-ico-cloud" }
+  { id: "accounts-workloads", label: "Account & Workload", icon: "oj-ux-ico-cloud" }
 ];
 /** Legacy export retained for consumers that still refer to the previous group name. */
 export const customerNavItems = accountManagementNavItems;

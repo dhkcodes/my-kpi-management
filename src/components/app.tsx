@@ -132,6 +132,13 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
     useEffect(() => {
       if (typeof window === "undefined") return;
+      if (!canAccessRoute(profile, requestedInitialRoute)) {
+        const fallbackRoute = getNavigationRoute("home");
+        const fallbackUrl = `${getNavigationPath(fallbackRoute)}${window.location.search}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", fallbackUrl);
+        activeLocationHrefRef.current = window.location.href;
+        return;
+      }
       const canonicalPath = getCanonicalNavigationPath(window.location.pathname);
       const currentPath = window.location.pathname === "/" ? "/" : window.location.pathname.replace(/\/$/, "");
       if (canonicalPath !== currentPath) {
@@ -345,6 +352,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           download: anchor.hasAttribute("download")
         }, window.location.href)) return;
         const destinationHref = anchor.href;
+        const destinationRoute = getNavigationRouteFromPath(new URL(destinationHref).pathname);
+        if (!canAccessRoute(profile, destinationRoute)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         const sameDocumentNavigation = isSameDocumentNavigation(window.location.href, destinationHref);
         if (kpiWriteActiveRef.current && !sameDocumentNavigation) {
           event.preventDefault();
@@ -357,7 +370,6 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           event.stopImmediatePropagation();
           return;
         }
-        const destinationRoute = getNavigationRouteFromPath(new URL(destinationHref).pathname);
         if (sameDocumentNavigation) {
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -391,6 +403,21 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           return;
         }
         const route = getNavigationRouteFromPath(window.location.pathname);
+        if (!canAccessRoute(profile, route)) {
+          const fallbackRoute = getNavigationRoute("home");
+          const fallbackHref = new URL(getNavigationPath(fallbackRoute), window.location.href).href;
+          window.history.replaceState(
+            withHistoryIndex(event.state, getHistoryIndex(event.state) ?? historyIndexRef.current),
+            "",
+            fallbackHref
+          );
+          activeRouteRef.current = fallbackRoute;
+          activeRouteModuleRef.current = fallbackRoute.module;
+          activeLocationHrefRef.current = fallbackHref;
+          setActiveRoute(fallbackRoute);
+          setSelectedNavigationId(fallbackRoute.id);
+          return;
+        }
         const canonicalPath = getCanonicalNavigationPath(window.location.pathname);
         if (canonicalPath !== window.location.pathname) {
           const canonicalUrl = new URL(window.location.href);
@@ -483,6 +510,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     };
     const handleNavigate = (navigationId: string, onAccepted?: () => void) => {
       const route = getNavigationRoute(navigationId);
+      if (!canAccessRoute(profile, route)) return;
       const destinationHref = new URL(getNavigationPath(route), window.location.href).href;
       const destinationChanged = hasNavigationDestinationChanged(
         activeRouteRef.current.id,

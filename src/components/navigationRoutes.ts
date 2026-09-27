@@ -30,7 +30,7 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "activity-h", module: "kpiPage", pageTitle: "[H] Technical blogs" },
   { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "account-management-overview", module: "accountManagementOverview", pageTitle: "Account Management Overview" },
-  { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Accounts & Workloads" },
+  { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Account & Workload" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
   { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },
   { id: "attainment", module: "consumptionAttainment", pageTitle: "Consumption Attainment", path: "/consumption/attainment" },
