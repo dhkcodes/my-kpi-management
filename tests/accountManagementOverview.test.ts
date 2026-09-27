@@ -90,4 +90,6 @@ assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*height:\s*24rem/s, "open deal list must have a fixed desktop height");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*height:\s*21rem/s, "hierarchy must have a fixed desktop height");
 assert.match(appCss, /\.account-overview__latest-update\s*\{[^}]*text-overflow:\s*ellipsis/s, "latest update must stay on one line");
+assert.doesNotMatch(appCss, /\.account-management-overview\s*\{[^}]*background:\s*#f7f8fa/s, "later cascade rules must not override the white overview background");
+assert.doesNotMatch(appCss, /\.account-overview__metric-lines\s*\{[^}]*grid-template-columns:\s*repeat\(2/s, "ARR and ACR must remain vertically stacked on mobile");
 console.log("accountManagementOverview tests passed");
