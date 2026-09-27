@@ -4562,7 +4562,8 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__exceptions { grid-template-columns: repeat(3,minmax(0,1fr)); gap: .55rem; }
 .account-overview__exceptions button { min-height: 0; padding: .65rem .7rem; border: 1px solid #e4c9c2; border-radius: 5px; background: #fff9f7; }
 .account-overview__exceptions button:nth-child(n+2) { border-color: #eadfb7; background: #fffdf4; }
-.account-overview__exceptions strong { font-size: .75rem; white-space: nowrap; }
+.account-overview__exceptions strong { font-size: .9rem; line-height: 1.3; white-space: normal; }
+.account-overview__exceptions strong b { font-size: 1.65rem; }
 .account-overview__exception-icon { width: 25px; height: 25px; flex-basis: 25px; }
 .account-overview__section { gap: .7rem; padding: .85rem; border: 1px solid #d8dde6; border-radius: 6px; background: #f3f7fd; }
 .account-overview__section--target { background: #f8f5fc; }
@@ -4592,20 +4593,20 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__kpis strong, .account-overview__pipeline strong { font-size: 1.18rem; color: #22375c; }
 .account-overview__pipeline strong { color: #55338e; }
 .account-overview__actual-details { display: grid; grid-template-columns: minmax(340px,.9fr) minmax(520px,1.35fr); gap: .7rem; align-items: start; }
-.account-overview__actual-details > .account-overview__panel { height: 18rem; }
+.account-overview__actual-details > .account-overview__panel { height: 21rem; }
 .account-overview__quarter-chart,
 .account-overview__hierarchy { display: flex; flex-direction: column; }
 .account-overview__panel { border: 1px solid #d8dde6; border-radius: 5px; overflow: hidden; }
 .account-overview__panel-heading { padding: .68rem .75rem .55rem; }
 .account-overview__panel-heading h3 { font-size: .8rem; }
 .account-overview__legend { font-size: .58rem; }
-.account-overview__legend span::before { width: 7px; height: 7px; background: #557a61; }
-.account-overview__legend .is-expansion::before { background: #8b6f47; }
-.account-overview__legend .is-renewal::before { background: #765d78; }
-.account-overview__vertical-chart { display: grid; grid-template-columns: 46px 1fr; margin-top: auto; min-height: 205px; padding: .3rem .75rem .7rem .25rem; width: 100%; }
+.account-overview__legend span::before { width: 7px; height: 7px; background: #248cff; }
+.account-overview__legend .is-expansion::before { background: #35c6d0; }
+.account-overview__legend .is-renewal::before { background: #8b7cff; }
+.account-overview__vertical-chart { display: grid; grid-template-columns: 46px 1fr; margin-top: auto; min-height: 245px; padding: .3rem .75rem 1rem .25rem; width: 100%; }
 .account-overview__axis { display: flex; flex-direction: column; justify-content: space-between; padding: 0 .4rem 20px 0; color: #697386; font-size: .58rem; text-align: right; }
-.account-overview__plot { display: grid; grid-template-columns: repeat(4,1fr); gap: .45rem; align-items: end; height: 190px; padding: 0 .4rem; border-bottom: 1px solid #aeb6c2; background: repeating-linear-gradient(to bottom,#fff 0,#fff 62px,#e6e9ef 63px,#fff 64px); }
-.account-overview__bar-group { display: grid; grid-template-rows: 165px 20px; gap: 4px; align-items: end; text-align: center; border-radius: 3px; }
+.account-overview__plot { display: grid; grid-template-columns: repeat(4,1fr); gap: .45rem; align-items: end; height: 230px; padding: 0 .4rem; border-bottom: 1px solid #aeb6c2; background: repeating-linear-gradient(to bottom,#fff 0,#fff 75px,#e6e9ef 76px,#fff 77px); }
+.account-overview__bar-group { display: grid; grid-template-rows: 205px 20px; gap: 4px; align-items: end; text-align: center; border-radius: 3px; }
 .account-overview__bar-group.is-selected { background: #eef4ff; }
 .account-overview__bar-group strong { font-size: .64rem; }
 .account-overview__bar-columns { display: flex; align-items: end; justify-content: center; gap: 3px; height: 100%; }
@@ -4615,8 +4616,10 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__hierarchy-head, .account-overview__tree-row, .account-overview__deal-row { grid-template-columns: minmax(180px,2fr) repeat(3,minmax(75px,.8fr)) minmax(40px,.4fr); gap: .4rem; }
 .account-overview__hierarchy-head { padding: .45rem .65rem; background: #f4f6f8; font-size: .58rem; }
 .account-overview__tree-row { min-height: 34px; padding: .38rem .65rem; border-radius: 0; border-bottom: 1px solid #eceff3; }
-.account-overview__tree-row.is-workload { padding-left: 1.6rem; }
-.account-overview__deal-row { min-height: 38px; padding: .35rem .65rem .35rem 2.65rem; }
+.account-overview__tree-row.is-workload { padding-left: .65rem; }
+.account-overview__tree-row.is-workload > span:first-child { padding-left: .95rem; }
+.account-overview__deal-row { min-height: 38px; padding: .35rem .65rem; }
+.account-overview__deal-row > span:first-child { padding-left: 2rem; }
 .account-overview__target-head { background: #f4f1f8; }
 .account-overview__target-row { min-height: 38px; font-size: .68rem; }
 @media (max-width: 1100px) {
@@ -4738,9 +4741,9 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__bar-item b { color: #35465f; font-size: .58rem; margin-top: 3px; }
 .account-overview__bar-stack { display: flex; flex-direction: column-reverse; max-width: none; overflow: hidden; width: 72%; }
 .account-overview__bar-stack i { display: block; min-height: 0; width: 100%; }
-.account-overview__bar-columns .is-new { background: #557a61; }
-.account-overview__bar-columns .is-expansion { background: #8b6f47; }
-.account-overview__bar-columns .is-renewal { background: #765d78; }
+.account-overview__bar-columns .is-new { background: #248cff; }
+.account-overview__bar-columns .is-expansion { background: #35c6d0; }
+.account-overview__bar-columns .is-renewal { background: #8b7cff; }
 
 .account-overview__search-combobox { position: relative; }
 .account-overview__search-options { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-border-color-enabled); box-shadow: var(--oj-core-box-shadow-md, 0 .5rem 1.5rem rgb(0 0 0 / 16%)); display: grid; left: 0; max-height: 18rem; overflow-y: auto; position: absolute; right: 0; top: calc(100% + .2rem); z-index: 30; }

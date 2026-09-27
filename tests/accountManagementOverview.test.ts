@@ -114,7 +114,7 @@ assert.match(pageSource, /account-overview__target-footer/, "open deal list must
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*overflow:\s*auto/s, "open deal rows must scroll internally");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*auto/s, "account hierarchy must scroll internally");
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*height:\s*24rem/s, "open deal list must have a fixed desktop height");
-assert.match(appCss, /\.account-overview__actual-details > \.account-overview__panel\s*\{[^}]*height:\s*18rem/s, "quarter chart and hierarchy panels must share a reduced desktop height");
+assert.match(appCss, /\.account-overview__actual-details > \.account-overview__panel\s*\{[^}]*height:\s*21rem/s, "quarter chart and hierarchy panels must leave room for Q1-Q4 labels");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*flex:\s*1 1 auto/s, "hierarchy rows must fit the shared panel height and scroll internally");
 assert.match(appCss, /\.account-overview__latest-update\s*\{[^}]*text-overflow:\s*ellipsis/s, "latest update must stay on one line");
 assert.doesNotMatch(appCss, /\.account-management-overview\s*\{[^}]*background:\s*#f7f8fa/s, "later cascade rules must not override the white overview background");
@@ -126,9 +126,16 @@ assert.match(pageSource, /actualFor\(actualFy, actualQuarter, "", selectedAccoun
   "selected account must use its exact filter independently from free-text search");
 assert.match(pageSource, /accountId: selectedAccountId \?\? undefined/,
   "selected account must prefer its stable ID when one is available");
-assert.match(pageSource, /Workload:/, "overview account results must display real workload names");
-assert.match(pageSource, /Plan:/, "overview account results must display real plan numbers");
-assert.match(appCss, /\.account-overview__bar-columns \.is-new\s*\{\s*background:\s*#557a61/, "New bars must use the calm green palette");
-assert.match(appCss, /\.account-overview__bar-columns \.is-expansion\s*\{\s*background:\s*#8b6f47/, "Expansion bars must use the calm amber palette");
-assert.match(appCss, /\.account-overview__bar-columns \.is-renewal\s*\{\s*background:\s*#765d78/, "Renewal bars must use the calm plum palette");
+assert.doesNotMatch(pageSource, /`Workload:|· Plan:/, "overview account results must omit Workload and Plan prefixes");
+assert.match(pageSource, /workload\.name} · \$\{workload\.plans/, "overview account results must retain workload names, plan numbers and separators");
+assert.match(pageSource, />ACR<\/span>/, "hierarchy third amount column must be labelled ACR");
+assert.match(pageSource, /const sumAcr =/, "hierarchy ACR must aggregate every revenue type");
+assert.doesNotMatch(pageSource, /`ACR \$\{fmtUsd/, "deal rows must keep the ACR label in the header rather than the amount cell");
+assert.match(appCss, /\.account-overview__bar-columns \.is-new\s*\{\s*background:\s*#248cff/, "New bars must use a bright cool blue");
+assert.match(appCss, /\.account-overview__bar-columns \.is-expansion\s*\{\s*background:\s*#35c6d0/, "Expansion bars must use a bright cool cyan");
+assert.match(appCss, /\.account-overview__bar-columns \.is-renewal\s*\{\s*background:\s*#8b7cff/, "Renewal bars must use a bright cool violet");
+assert.match(appCss, /\.account-overview__tree-row\.is-workload\s*>\s*span:first-child/, "workload indentation must be limited to the name cell");
+assert.match(appCss, /\.account-overview__deal-row\s*>\s*span:first-child/, "deal indentation must be limited to the name cell");
+assert.match(appCss, /\.account-overview__exceptions strong\s*\{[^}]*font-size:\s*\.9rem/s, "exception wording must be larger");
+assert.match(appCss, /\.account-overview__exceptions strong b\s*\{[^}]*font-size:\s*1\.65rem/s, "exception counts must be larger");
 console.log("accountManagementOverview tests passed");

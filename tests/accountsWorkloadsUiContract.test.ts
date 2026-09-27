@@ -14,6 +14,9 @@ const saveAllHandler = page.slice(page.indexOf("const saveAllDrafts"), page.inde
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
+assert.match(page, /ACCOUNT_NAME_CONFLICT[\s\S]*이미 같은 이름의 활성 Account가 있습니다[\s\S]*입력 내용과 기존 연결은 유지됩니다/,
+  "an Account-name collision is explained in Korean without implying that the duplicate rename succeeded");
+
 assert.match(page, /type AwField = "account" \| "workload" \| "salesRep" \| "plan" \| "lastUpdated" \| "notes"/);
 assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
   "saved AW cells remain display-first and enter edit mode only on double-click");
@@ -44,6 +47,8 @@ assert.match(page, /field === "salesRep" && !value[\s\S]*"미지정"/,
   "blank Sales Rep is rendered as 미지정");
 assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
   "Sales Rep participates in the existing AW batch save flow");
+assert.match(saveAwHandler, /catch \(saveError\)[\s\S]*setError\(friendlyError\(saveError\)\)[\s\S]*return false/,
+  "a rejected Account rename keeps the dirty hierarchy in place for correction");
 assert.match(page, /\(current\.salesRep \?\? ""\)\.trim\(\)[\s\S]*\(original\.salesRep \?\? ""\)\.trim\(\)/,
   "Sales-Rep-only edits and clears participate in AW dirty tracking");
 assert.match(page, /aria-label={`\$\{field === "account"[\s\S]*field === "salesRep" \? "Sales Rep"/,
