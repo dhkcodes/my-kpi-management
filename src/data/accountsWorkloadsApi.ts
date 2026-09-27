@@ -518,6 +518,29 @@ export const fetchAccountsWorkloadsHierarchy = async (
     `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy?${params.toString()}`));
 };
 
+export const reconcileArchivedWorkloads = (
+  local: AccountsWorkloadsHierarchy,
+  confirmed: AccountsWorkloadsHierarchy,
+  targetIds: ReadonlySet<number>,
+  includeDeleted: boolean,
+): AccountsWorkloadsHierarchy => {
+  const confirmedById = new Map(
+    confirmed.accounts.flatMap((account) => account.workloads.map((workload) => [workload.id, workload] as const)),
+  );
+  return {
+    ...local,
+    accounts: local.accounts.map((account) => ({
+      ...account,
+      workloads: account.workloads.flatMap((workload) => {
+        if (!targetIds.has(workload.id)) return [workload];
+        if (!includeDeleted) return [];
+        const saved = confirmedById.get(workload.id);
+        return [saved ? { ...workload, ...saved } : workload];
+      }),
+    })),
+  };
+};
+
 const requestAccountsWorkloadsHierarchySave = async (
   request: AccountsWorkloadsHierarchySaveRequest,
   fetchImpl: FetchLike,

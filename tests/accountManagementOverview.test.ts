@@ -68,6 +68,32 @@ assert.strictEqual(target.pipeline.newArr.enteredAcr, 8000);
 const searched = overview.targetFor("PRIORITY", "beta", new Date("2026-09-27T00:00:00Z"));
 assert.strictEqual(searched.deals.length, 2);
 
+const collisionHierarchy: AccountsWorkloadsHierarchy = {
+  ...hierarchy,
+  accounts: [...hierarchy.accounts, {
+    ...hierarchy.accounts[1],
+    id: 3,
+    name: "Gamma",
+    workloads: [{
+      ...hierarchy.accounts[1].workloads[0],
+      id: 33,
+      name: "Beta",
+      deals: hierarchy.accounts[1].workloads[0].deals.map((deal) => ({
+        ...deal,
+        id: deal.id + 1000,
+        workloadId: 33,
+      })),
+    }],
+  }],
+};
+const collisionOverview = buildAccountManagementOverview(collisionHierarchy, new Date("2026-09-27T00:00:00Z"));
+assert.strictEqual(collisionOverview.targetFor("PRIORITY", "beta", new Date("2026-09-27T00:00:00Z")).deals.length, 4,
+  "free-text search may intentionally match account and workload fields");
+assert.strictEqual(collisionOverview.targetFor("PRIORITY", "", new Date("2026-09-27T00:00:00Z"), "", { accountId: 2, accountName: "wrong fallback" }).deals.length, 2,
+  "selected-account filtering must prefer the stable account ID and exclude free-text collisions");
+assert.strictEqual(collisionOverview.targetFor("PRIORITY", "", new Date("2026-09-27T00:00:00Z"), "", { accountName: "  beta  " }).deals.length, 2,
+  "selected-account filtering must fall back to an exact normalized account name");
+
 const pageSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/components/content/AccountManagementOverviewPage.tsx"),
   "utf8"
@@ -88,8 +114,21 @@ assert.match(pageSource, /account-overview__target-footer/, "open deal list must
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*overflow:\s*auto/s, "open deal rows must scroll internally");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*auto/s, "account hierarchy must scroll internally");
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*height:\s*24rem/s, "open deal list must have a fixed desktop height");
-assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*height:\s*21rem/s, "hierarchy must have a fixed desktop height");
+assert.match(appCss, /\.account-overview__actual-details > \.account-overview__panel\s*\{[^}]*height:\s*18rem/s, "quarter chart and hierarchy panels must share a reduced desktop height");
+assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*flex:\s*1 1 auto/s, "hierarchy rows must fit the shared panel height and scroll internally");
 assert.match(appCss, /\.account-overview__latest-update\s*\{[^}]*text-overflow:\s*ellipsis/s, "latest update must stay on one line");
 assert.doesNotMatch(appCss, /\.account-management-overview\s*\{[^}]*background:\s*#f7f8fa/s, "later cascade rules must not override the white overview background");
 assert.doesNotMatch(appCss, /\.account-overview__metric-lines\s*\{[^}]*grid-template-columns:\s*repeat\(2/s, "ARR and ACR must remain vertically stacked on mobile");
+assert.match(pageSource, /overviewSearchRef/, "overview must track the account combobox for outside-click dismissal");
+assert.match(pageSource, /addEventListener\("pointerdown"/, "overview account results must close on outside pointer interaction");
+assert.match(pageSource, /selectedAccount \|\| "All Accounts"/, "overview input must display All Accounts by default");
+assert.match(pageSource, /actualFor\(actualFy, actualQuarter, "", selectedAccountFilter\)[\s\S]*targetFor\(targetView, "", new Date\(\), targetPeriod, selectedAccountFilter\)/,
+  "selected account must use its exact filter independently from free-text search");
+assert.match(pageSource, /accountId: selectedAccountId \?\? undefined/,
+  "selected account must prefer its stable ID when one is available");
+assert.match(pageSource, /Workload:/, "overview account results must display real workload names");
+assert.match(pageSource, /Plan:/, "overview account results must display real plan numbers");
+assert.match(appCss, /\.account-overview__bar-columns \.is-new\s*\{\s*background:\s*#557a61/, "New bars must use the calm green palette");
+assert.match(appCss, /\.account-overview__bar-columns \.is-expansion\s*\{\s*background:\s*#8b6f47/, "Expansion bars must use the calm amber palette");
+assert.match(appCss, /\.account-overview__bar-columns \.is-renewal\s*\{\s*background:\s*#765d78/, "Renewal bars must use the calm plum palette");
 console.log("accountManagementOverview tests passed");

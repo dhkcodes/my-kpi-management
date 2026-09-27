@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   AccountHierarchyAccount,
   AccountWorkload,
@@ -85,6 +85,9 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const overviewSearchRef = useRef<HTMLDivElement>(null);
   const current = currentFiscalPeriod();
   const [actualFy, setActualFy] = useState(current.fiscalYear);
   const [actualQuarter, setActualQuarter] = useState<ActualQuarterFilter>("ALL");
@@ -104,14 +107,26 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!searchOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!overviewSearchRef.current?.contains(event.target as Node)) setSearchOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [searchOpen]);
+
   const overview = useMemo(() => hierarchy ? buildAccountManagementOverview(hierarchy) : null, [hierarchy]);
   useEffect(() => {
     if (overview && overview.fiscalYears.length && !overview.fiscalYears.includes(actualFy)) setActualFy(overview.fiscalYears[0]);
   }, [overview, actualFy]);
 
-  const actual = overview?.actualFor(actualFy, actualQuarter, search);
-  const actualYear = overview?.actualFor(actualFy, "ALL", search);
-  const target = overview?.targetFor(targetView, search, new Date(), targetPeriod);
+  const selectedAccountFilter = selectedAccount
+    ? { accountId: selectedAccountId ?? undefined, accountName: selectedAccount }
+    : undefined;
+  const actual = overview?.actualFor(actualFy, actualQuarter, "", selectedAccountFilter);
+  const actualYear = overview?.actualFor(actualFy, "ALL", "", selectedAccountFilter);
+  const target = overview?.targetFor(targetView, "", new Date(), targetPeriod, selectedAccountFilter);
   const grouped = groupActual(actual?.deals ?? []);
   const visibleMeasures = actualMeasure === "ALL" ? (["ARR", "ACR"] as const) : [actualMeasure];
   const quarterSeries = ([1, 2, 3, 4] as const).map((quarter) => {
@@ -124,6 +139,10 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const maxQuarter = Math.max(1, ...quarterSeries.flatMap((quarter) => quarter.bars.map((bar) => bar.segments.reduce((sum, item) => sum + item.value, 0))));
   const accountNames = [...new Set((hierarchy?.accounts ?? []).filter((account) => !account.archived && account.workloads.some((workload) => !workload.archived)).map((account) => account.name))].sort((a, b) => a.localeCompare(b));
   const filteredAccountNames = accountNames.filter((account) => account.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const accountDetails = (accountName: string) => hierarchy?.accounts.find((account) => account.name === accountName)?.workloads
+    .filter((workload) => !workload.archived)
+    .map((workload) => `Workload: ${workload.name} · Plan: ${workload.plans.map((plan) => plan.sourcePlanNumber).filter(Boolean).join(", ") || "—"}`)
+    .join(" | ") || "Workload: — · Plan: —";
   const targetPrimaryTotal = (target?.deals ?? []).reduce((sum, item) => sum + (primaryAmount(item) ?? 0), 0);
   const targetPeriods = [...new Set((overview?.targetDeals ?? [])
     .filter((item) => item.deal.targetFiscalYear && item.deal.targetQuarter)
@@ -158,20 +177,20 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
         <div class="account-overview__top-row">
           <div class="account-overview__search">
             <label for="accountOverviewSearch">Account</label>
-            <div class="account-overview__search-combobox">
-              <div class="account-overview__search-field"><span class="oj-ux-ico-search" aria-hidden="true"></span><input id="accountOverviewSearch" type="search" role="combobox" aria-autocomplete="list" aria-expanded={searchOpen} aria-controls="accountOverviewOptions" value={search} placeholder="Search Account" autoComplete="off" onFocus={() => setSearchOpen(true)} onInput={(event) => { setSearch((event.currentTarget as HTMLInputElement).value); setSearchOpen(true); }} />{search && <button type="button" aria-label="Clear account" onClick={() => { setSearch(""); setSearchOpen(true); }}>Clear</button>}</div>
+            <div class="account-overview__search-combobox" ref={overviewSearchRef}>
+              <div class="account-overview__search-field"><span class="oj-ux-ico-search" aria-hidden="true"></span><input id="accountOverviewSearch" type="search" role="combobox" aria-autocomplete="list" aria-expanded={searchOpen} aria-controls="accountOverviewOptions" value={searchOpen ? search : (selectedAccount || "All Accounts")} placeholder="Search Account" autoComplete="off" onFocus={() => setSearchOpen(true)} onClick={(event) => { setSearch(""); setSearchOpen(true); event.currentTarget.select(); }} onInput={(event) => { setSearch((event.currentTarget as HTMLInputElement).value); setSearchOpen(true); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setSearch(""); setSearchOpen(false); event.currentTarget.blur(); } }} />{searchOpen && search && <button type="button" aria-label="Clear account" onClick={() => { setSearch(""); setSearchOpen(true); }}>Clear</button>}</div>
               {searchOpen && <div id="accountOverviewOptions" class="account-overview__search-options" role="listbox">
-                <button type="button" role="option" aria-selected={!search} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearch(""); setSearchOpen(false); }}><strong>All Accounts</strong><small>Active Account &amp; Workload only</small></button>
-                {filteredAccountNames.map((account) => <button type="button" role="option" key={account} aria-selected={search === account} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearch(account); setSearchOpen(false); }}><strong>{account}</strong><small>Account &amp; Workload</small></button>)}
+                <button type="button" role="option" aria-selected={!selectedAccount} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSelectedAccount(""); setSelectedAccountId(null); setSearch(""); setSearchOpen(false); }}><strong>All Accounts</strong><small>Active Account &amp; Workload only</small></button>
+                {filteredAccountNames.map((account) => <button type="button" role="option" key={account} aria-selected={selectedAccount === account} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSelectedAccount(account); setSelectedAccountId(hierarchy?.accounts.find((candidate) => candidate.name === account)?.id ?? null); setSearch(""); setSearchOpen(false); }}><strong>{account}</strong><small>{accountDetails(account)}</small></button>)}
                 {filteredAccountNames.length === 0 && <p>No matching Accounts.</p>}
               </div>}
             </div>
             <small>Search the account list or select an account to filter the overview.</small>
           </div>
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
-            <button type="button" onClick={() => { setTargetView("OVERDUE"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-overdue">!</span><span><strong>{overview.exceptions.overdue} overdue</strong><small>Target quarter ended</small></span></button>
-            <button type="button" onClick={() => { setTargetView("PRIORITY"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-warning">?</span><span><strong>{overview.exceptions.targetNotSet} target not set</strong><small>Open deals without FY/Q</small></span></button>
-            <button type="button" onClick={() => document.getElementById("actualPerformance")?.scrollIntoView({ behavior: "smooth" })}><span class="account-overview__exception-icon is-warning">!</span><span><strong>{overview.exceptions.closeDateMissing} Close Date missing</strong><small>WON deals excluded</small></span></button>
+            <button type="button" onClick={() => { setTargetView("OVERDUE"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> overdue</strong><small>Target quarter ended</small></span></button>
+            <button type="button" onClick={() => { setTargetView("PRIORITY"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> target not set</strong><small>Open deals without FY/Q</small></span></button>
+            <button type="button" onClick={() => document.getElementById("actualPerformance")?.scrollIntoView({ behavior: "smooth" })}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close Date missing</strong><small>WON deals excluded</small></span></button>
           </section>
         </div>
 

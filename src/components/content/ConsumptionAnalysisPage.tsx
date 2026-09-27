@@ -121,6 +121,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const [exportError, setExportError] = useState("");
   const requestGeneration = useRef(0);
   const exportTargetRef = useRef<HTMLElement>(null);
+  const consumptionComboboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSelectedAccountContext("");
@@ -137,6 +138,15 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     const timeout = window.setTimeout(() => setDebouncedCandidateSearch(candidateSearch.trim()), 250);
     return () => window.clearTimeout(timeout);
   }, [candidateComposing, candidateSearch]);
+
+  useEffect(() => {
+    if (!comboboxOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!consumptionComboboxRef.current?.contains(event.target as Node)) setComboboxOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [comboboxOpen]);
 
   useEffect(() => {
     let active = true;
@@ -426,7 +436,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           </div>
           <div class="consumption-insights-filter consumption-insights-filter--account">
             <label htmlFor="consumptionAccountContext">Account</label>
-            <div class="consumption-insights-combobox">
+            <div class="consumption-insights-combobox" ref={consumptionComboboxRef}>
             <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}

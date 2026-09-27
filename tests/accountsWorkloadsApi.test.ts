@@ -10,6 +10,7 @@ import {
   permanentlyDeleteAccountWorkload,
   persistAccountWorkloadChanges,
   persistAndReconcileAccountWorkloadChanges,
+  reconcileArchivedWorkloads,
   restoreAccountWorkload,
   saveAccountsWorkloadsHierarchyWithResults,
   saveAccountsWorkloadsBatch,
@@ -54,6 +55,36 @@ const response = (body: unknown, status = 200) => new Response(JSON.stringify(bo
 });
 
 async function run() {
+  const archiveLocalHierarchy = {
+    fiscalYear: null,
+    accounts: [{
+      id: 1, versionNo: 1, name: "Acme", archived: false,
+      workloads: [
+        { id: 11, versionNo: 1, name: "Target", salesRep: null, lastUpdated: null, notes: "local", highlighted: false, archived: false, plans: [], deals: [] },
+        { id: 12, versionNo: 3, name: "Untouched", salesRep: null, lastUpdated: null, notes: "local draft", highlighted: false, archived: false, plans: [], deals: [] },
+      ],
+    }],
+  };
+  const archiveServerHierarchy = {
+    fiscalYear: null,
+    accounts: [{
+      id: 1, versionNo: 1, name: "Acme", archived: false,
+      workloads: [
+        { id: 11, versionNo: 2, name: "Target", salesRep: null, lastUpdated: null, notes: "server", highlighted: false, archived: true, plans: [], deals: [] },
+        { id: 12, versionNo: 3, name: "Untouched", salesRep: null, lastUpdated: null, notes: "stale server", highlighted: false, archived: false, plans: [], deals: [] },
+      ],
+    }],
+  };
+  const visibleArchived = reconcileArchivedWorkloads(archiveLocalHierarchy, archiveServerHierarchy, new Set([11]), true);
+  assert.equal(visibleArchived.accounts[0].workloads[0].versionNo, 2, "archive reconciliation must keep the server-confirmed version for immediate restore/delete");
+  assert.equal(visibleArchived.accounts[0].workloads[0].archived, true);
+  assert.equal(visibleArchived.accounts[0].workloads[1].notes, "local draft", "archive reconciliation must not overwrite unrelated local state");
+  assert.deepEqual(
+    reconcileArchivedWorkloads(archiveLocalHierarchy, archiveServerHierarchy, new Set([11]), false).accounts[0].workloads.map((workload) => workload.id),
+    [12],
+    "an archived target is hidden only when includeDeleted is false",
+  );
+
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ url: String(input), init });

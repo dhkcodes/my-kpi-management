@@ -56,12 +56,12 @@ assert.match(page, /sortField === "acrUsd"[\s\S]*return deals\.length/,
 assert.match(page, /key: rowKey\(account\.id, workload\.id\)/,
   "selection, expansion and sorting use stable entity IDs");
 const api = readFileSync("src/data/accountsWorkloadsApi.ts", "utf8");
-assert.match(deleteHandler, /setPendingDeleteWorkloadIds\([\s\S]*targetIds/,
-  "the first Delete stages Draft Delete locally so Opportunity drafts cannot be lost during an immediate refresh");
-assert.match(saveAwHandler, /pendingDeleteWorkloadIds\.has\(workload\.id\)[\s\S]*action: "ARCHIVE"/,
-  "staged Draft Delete is persisted through the normal AW save flow");
-assert.match(deleteHandler, /hasChangedOpportunity[\s\S]*Opportunity 초안은 저장되지 않았습니다/,
-  "reverse-order Opportunity edit then AW Draft Delete remains visible as an explicit blocked draft");
+assert.match(deleteHandler, /const savedHierarchy = await saveAccountsWorkloadsHierarchy\(\{[\s\S]*action: "ARCHIVE"/,
+  "Draft Delete persists immediately and retains the server-confirmed hierarchy");
+assert.match(deleteHandler, /reconcileArchivedWorkloads\(source, savedHierarchy, targetIds, includeDeletedRef\.current\)[\s\S]*setHierarchy\([\s\S]*setBaseline\(/,
+  "successful Draft Delete reconciles both visible hierarchy and baseline without a second Save action");
+assert.match(deleteHandler, /setDealDrafts\([\s\S]*!targetIds\.has\(draft\.workloadId\)/,
+  "Draft Delete removes only child Opportunity drafts belonging to the deleted AW");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!removedWorkloadIds\.has\(workload\.id\)/,
   "unsaved workload deletion is local removal");
 assert.match(page, /const rows = allRows/,
@@ -72,8 +72,8 @@ assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
 assert.match(cancelHandler, /setPendingDeleteWorkloadIds\(new Set\(\)\)/);
 assert.match(cancelHandler, /setFxRateValue\(savedFxRateValue\)/,
   "AW Cancel clears opportunity drafts, delete drafts and unsaved FX state together");
-assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW marked as Draft Deleted\. Save changes to apply\.`/,
-  "staged Draft Delete reports that Save is still required");
+assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW deleted\.`/,
+  "immediate Draft Delete reports completion without asking for Save");
 assert.match(page, /<oj-dialog/);
 assert.match(page, /Permanently delete/);
 assert.match(page, /confirmPermanentDelete/,
@@ -386,5 +386,16 @@ assert.match(page, /const updateDealDraft[\s\S]*isDraftDeletedWorkload\(existing
   "Draft Deleted Opportunity drafts are rejected before local mutation");
 assert.match(page, />\s*Undo\s*<\/button>/,
   "Opportunity row-level reversion is labelled Undo rather than Cancel");
+
+assert.match(
+  page,
+  /await saveAccountsWorkloadsHierarchy\(\{[\s\S]*action: "ARCHIVE"[\s\S]*setHierarchy/,
+  "Draft Delete must archive saved AW rows immediately and update the hierarchy",
+);
+assert.doesNotMatch(
+  page,
+  /marked as Draft Deleted\. Save changes to apply/,
+  "Draft Delete must not wait for the separate Save/Cancel lifecycle",
+);
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");
