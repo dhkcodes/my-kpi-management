@@ -134,9 +134,11 @@ export const targetStatus = (item: OverviewDeal, today = new Date()): "OVERDUE" 
 };
 
 export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHierarchy, today = new Date()) => {
-  const flattened = flattenHierarchy(hierarchy).filter((item) => !item.deal.deleted);
+  const flattened = flattenHierarchy(hierarchy).filter((item) =>
+    !item.account.archived && !item.workload.archived && !item.deal.deleted
+  );
   const actualDeals = flattened.filter((item) => item.deal.status === "WON" && item.actualPeriod !== null);
-  const targetDeals = flattened.filter((item) => item.deal.status === "OPEN" && !item.account.archived && !item.workload.archived);
+  const targetDeals = flattened.filter((item) => item.deal.status === "OPEN");
   const fiscalYears = [...new Set(actualDeals.map((item) => item.actualPeriod!.fiscalYear))].sort().reverse();
 
   return {
