@@ -28,7 +28,6 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "activity-d1", module: "kpiPage", pageTitle: "[D1] New workload" },
   { id: "activity-f", module: "kpiPage", pageTitle: "[F] Customer references" },
   { id: "activity-h", module: "kpiPage", pageTitle: "[H] Technical blogs" },
-  { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" },
   { id: "account-management-overview", module: "accountManagementOverview", pageTitle: "Account Management Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Account & Workload" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },

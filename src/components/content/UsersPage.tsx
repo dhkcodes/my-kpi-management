@@ -11,12 +11,12 @@ import {
   cancelUserInvite, deleteUser, disableUser, enableUser, inviteUser, listUsers, lockUser,
   reissueUserInvite, resetUserPassword, unlockUser, updateUserMenuPermissions, type UserActionLink
 } from "../../auth/usersApi";
-import { menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPermission, type MenuPermissionMap, type UserAccess } from "../../auth/authSession";
+import { assignableMenuPermissionIds, menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPermission, type MenuPermissionMap, type UserAccess } from "../../auth/authSession";
 
 type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthSession }> | null;
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
-const menuLabels: Record<MenuPermissionId, string> = {
-  "kpis-overview": "KPI", "weekly-activities": "Weekly", "customers-overview": "Customer 360", "accounts-workloads": "Account Management — Overview & Account & Workload",
+const menuLabels: Record<(typeof assignableMenuPermissionIds)[number], string> = {
+  "kpis-overview": "KPI", "weekly-activities": "Weekly", "accounts-workloads": "Account Management — Overview & Account & Workload",
   analysis: "Consumption Analysis", attainment: "Consumption Attainment", records: "Consumption Records"
 };
 
@@ -227,7 +227,7 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
         {permissionCandidate && <p><strong>{permissionCandidate.displayName}</strong> ({permissionCandidate.loginId})</p>}
         <div class="kap-permission-table-wrap"><table class="kap-permission-table">
           <thead><tr><th>Menu</th><th>Read</th><th>Write</th></tr></thead>
-          <tbody>{menuPermissionIds.map((menu) => {
+          <tbody>{assignableMenuPermissionIds.map((menu) => {
             const access = permissionDraft[menu] ?? "NONE";
             return <tr key={menu}><th scope="row">{menuLabels[menu]}</th>
               <td><input type="checkbox" aria-label={`${menuLabels[menu]} read`} checked={access === "READ" || access === "WRITE"}

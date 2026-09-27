@@ -18,7 +18,7 @@ assert.deepEqual(topLevelLabels, ["Home", "My Activities", "Account Management",
 assert.deepEqual(navItems[1].children?.map((item) => item.id), ["weekly-activities"]);
 assert.deepEqual(navItems[2].children?.map((item) => item.id), ["account-management-overview", "accounts-workloads"]);
 assert.equal(navItems.some((item) => item.children?.some((child) => child.id === "customers-overview")), false);
-assert.equal(getNavigationRoute("customers-overview").module, "myCustomers360", "legacy portfolio URL remains available");
+assert.equal(getNavigationRoute("customers-overview").module, "home", "legacy portfolio URL is disabled");
 assert.equal(getNavigationRoute("account-management-overview").module, "accountManagementOverview");
 
 const emptyHierarchy = { fiscalYear: null, accounts: [] } as const;

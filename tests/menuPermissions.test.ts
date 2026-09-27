@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parseAuthProfile, type AuthSession, type MenuPermissionMap } from "../src/auth/authSession";
+import { assignableMenuPermissionIds, parseAuthProfile, type AuthSession, type MenuPermissionMap } from "../src/auth/authSession";
 import { canAccessRoute, canWriteRoute, filterNavigationItems, getRoutePermission } from "../src/auth/menuPermissions";
 import { navItems } from "../src/data/kpiMockData";
 import { getNavigationRoute } from "../src/components/navigationRoutes";
@@ -29,6 +29,10 @@ assert.equal(canAccessRoute(user, getNavigationRoute("accounts-workloads")), fal
 assert.equal(canWriteRoute(user, getNavigationRoute("analysis")), true, "WRITE implies READ");
 assert.equal(canAccessRoute(user, getNavigationRoute("users")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("profile")), true);
+assert.equal(getNavigationRoute("customers-overview").id, "home", "disabled legacy route resolves to home");
+assert.equal(canAccessRoute(user, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,
+  "legacy Customer 360 route remains inaccessible even when supplied directly");
+assert.ok(!(assignableMenuPermissionIds as readonly string[]).includes("customers-overview"), "legacy Customer 360 is not assignable in user administration");
 
 const visibleIds = filterNavigationItems(navItems, user).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
 for (const visible of ["home", "kpis-overview", "weekly-activities", "analysis", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
@@ -41,14 +45,19 @@ assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("account-manageme
 assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("accounts-workloads")), false);
 
 const admin: AuthSession = { ...base, access: "Admin", menuPermissions: {}, status: "ACTIVE" };
-for (const routeId of ["activity-a", "weekly-activities", "customers-overview", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
+for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
   assert.equal(canWriteRoute(admin, getNavigationRoute(routeId)), true, `Admin can write ${routeId}`);
 }
+assert.equal(canAccessRoute(admin, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,
+  "disabled legacy route is inaccessible to admins too");
 assert.equal(getRoutePermission(admin, getNavigationRoute("activity-a")), "OWN", "KPI backend remains owner-scoped");
 assert.equal(getRoutePermission(admin, getNavigationRoute("weekly-activities")), "OWN", "Weekly backend remains owner-scoped");
 
 const noGrants: AuthSession = { ...base, menuPermissions: Object.fromEntries(Object.keys(allRead).map((id) => [id, "NONE"])) as MenuPermissionMap, status: "ACTIVE" };
-for (const routeId of Object.keys(allRead)) assert.equal(canAccessRoute(noGrants, getNavigationRoute(routeId)), false);
+for (const routeId of Object.keys(allRead).filter((id) => id !== "customers-overview")) {
+  assert.equal(canAccessRoute(noGrants, getNavigationRoute(routeId)), false);
+}
+assert.equal(getNavigationRoute("customers-overview").module, "home");
 assert.equal(canAccessRoute(noGrants, getNavigationRoute("home")), true);
 
 const appSource = readFileSync("src/components/app.tsx", "utf8");
