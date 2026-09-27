@@ -1155,7 +1155,6 @@ export function AccountsWorkloadsPage({
         const draft = dealDrafts.get(dealEditCell.key);
         if (draft && targetIds.has(draft.workloadId)) setDealEditCell(null);
       }
-      setNotice(`${draftTargets.length} AW deleted.`);
     } catch (requestError) {
       setError(friendlyError(requestError));
     } finally {
