@@ -6,6 +6,7 @@ const messageBanner = readFileSync("src/components/content/AppMessageBanner.tsx"
 const styles = readFileSync("src/styles/app.css", "utf8");
 const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelected"), page.indexOf("const deleteSelected"));
 const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const cancelAllDrafts"));
+const draftDeleteHandler = page.slice(page.indexOf("const deleteSelected"), page.indexOf("const restoreSelected"));
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
 const cancelHandler = page.slice(page.indexOf("const cancelAllDrafts"), page.indexOf("const planWriteFor"));
 const saveAwHandler = page.slice(page.indexOf("const saveAwDrafts"), page.indexOf("const toggleHighlight"));
@@ -72,8 +73,10 @@ assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
 assert.match(cancelHandler, /setPendingDeleteWorkloadIds\(new Set\(\)\)/);
 assert.match(cancelHandler, /setFxRateValue\(savedFxRateValue\)/,
   "AW Cancel clears opportunity drafts, delete drafts and unsaved FX state together");
-assert.match(page, /setNotice\(`\$\{draftTargets\.length\} AW deleted\.`/,
-  "immediate Draft Delete reports completion without asking for Save");
+assert.doesNotMatch(draftDeleteHandler, /setNotice\(/,
+  "immediate Draft Delete uses row disappearance as the only success feedback");
+assert.match(draftDeleteHandler, /catch \(requestError\) \{[\s\S]*setError\(friendlyError\(requestError\)\)/,
+  "immediate Draft Delete keeps failure feedback visible");
 assert.match(page, /<oj-dialog/);
 assert.match(page, /Permanently delete/);
 assert.match(page, /confirmPermanentDelete/,
