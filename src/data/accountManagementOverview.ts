@@ -9,6 +9,7 @@ export type ActualQuarter = 1 | 2 | 3 | 4;
 export type ActualQuarterFilter = ActualQuarter | "ALL";
 export type TargetView = "PRIORITY" | "OVERDUE" | "THIS_QUARTER" | "NEXT_QUARTER" | "CHOOSE_PERIOD";
 export type RevenueKind = "NEW" | "EXPANSION" | "RENEWAL";
+export type OverviewAccountFilter = Readonly<{ accountId?: number; accountName?: string }>;
 
 export type OverviewDeal = Readonly<{
   account: AccountHierarchyAccount;
@@ -94,6 +95,14 @@ const matchesSearch = (item: OverviewDeal, search: string) => {
     .some((value) => value.toLocaleLowerCase().includes(needle));
 };
 
+const normalizedAccountName = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+const matchesAccount = (item: OverviewDeal, filter?: OverviewAccountFilter) => {
+  if (!filter) return true;
+  if (filter.accountId !== undefined) return item.account.id === filter.accountId;
+  return filter.accountName !== undefined &&
+    normalizedAccountName(item.account.name) === normalizedAccountName(filter.accountName);
+};
+
 const amountMetric = (items: readonly OverviewDeal[], kind: RevenueKind): AmountMetric => {
   let amount = 0;
   let missing = 0;
@@ -150,8 +159,8 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
       targetNotSet: targetDeals.filter((item) => !item.deal.targetFiscalYear || item.deal.targetQuarter === null).length,
       closeDateMissing: flattened.filter((item) => item.deal.status === "WON" && !item.deal.actualCloseDate).length,
     },
-    actualFor(fiscalYear: string, quarter: ActualQuarterFilter, search: string) {
-      const yearDeals = actualDeals.filter((item) => item.actualPeriod?.fiscalYear === fiscalYear && matchesSearch(item, search));
+    actualFor(fiscalYear: string, quarter: ActualQuarterFilter, search: string, accountFilter?: OverviewAccountFilter) {
+      const yearDeals = actualDeals.filter((item) => item.actualPeriod?.fiscalYear === fiscalYear && matchesAccount(item, accountFilter) && matchesSearch(item, search));
       const selected = yearDeals.filter((item) => quarter === "ALL" || item.actualPeriod?.quarter === quarter);
       return {
         deals: selected,
@@ -162,8 +171,8 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
         }),
       };
     },
-    targetFor(view: TargetView, search: string, at = today, chosenPeriod = "") {
-      const searched = targetDeals.filter((item) => matchesSearch(item, search));
+    targetFor(view: TargetView, search: string, at = today, chosenPeriod = "", accountFilter?: OverviewAccountFilter) {
+      const searched = targetDeals.filter((item) => matchesAccount(item, accountFilter) && matchesSearch(item, search));
       const current = currentFiscalPeriod(at);
       const next = nextFiscalPeriod(current);
       const deals = searched.filter((item) => {

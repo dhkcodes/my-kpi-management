@@ -488,4 +488,15 @@ assert.match(insightsPage, /disabled=\{loading \|\| !!exporting\}/, "both export
 assert.match(insightsPage, /finally\s*\{[\s\S]*setExporting\(""\)/, "export controls recover after both success and failure");
 assert.match(styles, /\.consumption-insights-linked-trend h3\s*\{[^}]*font-size:\s*1rem[^}]*font-weight:\s*700/, "ACTUAL Trend matches the card-heading hierarchy rather than inheriting an oversized title");
 
+assert.match(
+  insightsPage,
+  /consumptionComboboxRef/,
+  "Consumption Analysis must track the account combobox for outside-click dismissal",
+);
+assert.match(
+  insightsPage,
+  /addEventListener\("pointerdown"/,
+  "Consumption Analysis account results must close on pointer interaction outside the combobox",
+);
+
 console.log("consumptionUiContract tests passed");

@@ -23,6 +23,7 @@ import {
   fetchAccountsWorkloadsHierarchy,
   fetchForecastCandidates,
   forecastCandidateKey,
+  reconcileArchivedWorkloads,
   saveAccountsWorkloadsHierarchy,
   saveAccountsWorkloadsHierarchyWithResults,
 } from "../../data/accountsWorkloadsApi";
@@ -1119,25 +1120,47 @@ export function AccountsWorkloadsPage({
 
     const targetIds = new Set(draftTargets.map((row) => row.workload.id));
     const targetRowKeys = new Set(draftTargets.map((row) => row.key));
-    const hasChangedOpportunity = [...dealDrafts.values()].some(
-      (draft) => targetIds.has(draft.workloadId) && isDealDraftChanged(draft),
-    );
-    setPendingDeleteWorkloadIds(
-      (current) => new Set([...current, ...targetIds]),
-    );
-    setSelectedRows(new Set());
-    if (editCell && targetRowKeys.has(editCell.key)) setEditCell(null);
-    if (dealEditCell) {
-      const draft = dealDrafts.get(dealEditCell.key);
-      if (draft && targetIds.has(draft.workloadId)) setDealEditCell(null);
-    }
-    setNotice(`${draftTargets.length} AW marked as Draft Deleted. Save changes to apply.`);
-    if (hasChangedOpportunity) {
-      setError("Draft Deleted AW 아래 Opportunity 초안은 저장되지 않았습니다. Opportunity 변경을 Undo하거나 삭제한 뒤 다시 저장하세요.");
-    } else {
-      setError("");
-    }
+    setSaving(true);
+    setError("");
     setSaveErrors([]);
+    try {
+      const savedHierarchy = await saveAccountsWorkloadsHierarchy({
+        accounts: [],
+        deals: [],
+        workloadPlans: [],
+        workloads: draftTargets.map((row) => ({
+          id: row.workload.id,
+          clientId: null,
+          accountRef: String(row.account.id),
+          versionNo: row.workload.versionNo,
+          name: row.workload.name,
+          salesRep: row.workload.salesRep,
+          lastUpdated: row.workload.lastUpdated,
+          notes: row.workload.notes,
+          highlighted: row.workload.highlighted,
+          action: "ARCHIVE",
+        })),
+      });
+
+      const reconcileArchive = (source: AccountsWorkloadsHierarchy) =>
+        reconcileArchivedWorkloads(source, savedHierarchy, targetIds, includeDeletedRef.current);
+      setHierarchy((current) => current ? reconcileArchive(current) : current);
+      setBaseline((current) => reconcileArchive(current));
+      setDirtyWorkloads((current) => new Set([...current].filter((id) => !targetIds.has(id))));
+      setDealDrafts((current) => new Map([...current].filter(([, draft]) => !targetIds.has(draft.workloadId))));
+      setSelectedDeals((current) => new Map([...current].filter(([, deal]) => !targetIds.has(deal.workloadId))));
+      setSelectedRows(new Set());
+      if (editCell && targetRowKeys.has(editCell.key)) setEditCell(null);
+      if (dealEditCell) {
+        const draft = dealDrafts.get(dealEditCell.key);
+        if (draft && targetIds.has(draft.workloadId)) setDealEditCell(null);
+      }
+      setNotice(`${draftTargets.length} AW deleted.`);
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const restoreSelected = async () => {
