@@ -83,7 +83,7 @@ assert.doesNotMatch(draftDeleteHandler, /setNotice\(/,
 assert.match(draftDeleteHandler, /catch \(requestError\) \{[\s\S]*setError\(friendlyError\(requestError\)\)/,
   "immediate Draft Delete keeps failure feedback visible");
 assert.match(page, /<oj-dialog/);
-assert.match(page, /Permanently delete/);
+assert.match(page, /Delete Permanently/);
 assert.match(page, /confirmPermanentDelete/,
   "repeat Delete on a Draft Delete workload requires an Oracle JET confirmation dialog");
 assert.match(permanentDeleteHandler, /PERMANENT_DELETE/,
@@ -94,12 +94,15 @@ assert.match(page, /cannot be[\s\S]*undone/i,
   "the permanent-delete confirmation identifies each AW and its child opportunity count");
 assert.match(api, /PERMANENT_DELETE/,
   "PERMANENT_DELETE is mapped by the frontend API contract");
-assert.match(page, /Draft Delete/);
-assert.match(page, /Include Deleted/);
+assert.doesNotMatch(page, /Draft Delete|Draft Deleted|Include Deleted/,
+  "legacy Draft Delete wording is not user-visible");
+assert.match(page, /Include Archived/);
+assert.match(page, /"Discard Draft"/);
+assert.match(page, /"Delete Permanently"/);
 assert.match(page, /action: "RESTORE"/,
-  "included Draft Delete rows can be restored without recreating data");
-assert.doesNotMatch(page, />Archive<\/button>|Include archived/,
-  "legacy Archive wording is not exposed");
+  "included Archived rows can be restored without recreating data");
+assert.match(page, /selectedArchivedCount > 0[\s\S]*"Delete Permanently"[\s\S]*selectedDraftCount === selectedCount[\s\S]*"Discard Draft"[\s\S]*"Archive"/,
+  "saved rows use Archive while unsaved rows use Discard Draft");
 assert.match(page, /<div class="accounts-workloads-header-topline">[\s\S]*<div class="accounts-workloads-header-navigation">[\s\S]*\{breadcrumb\}[\s\S]*<span class="kpi-eyebrow">[\s\S]*My Customers 360[\s\S]*<\/div>[\s\S]*<h1 id="accountsWorkloadsTitle">/,
   "the menu path and recommendation action share the top line above the page title");
 assert.match(page, /highlighted: !workload\.highlighted/);
@@ -261,8 +264,8 @@ assert.match(page, /const generation = \+\+reloadGeneration\.current[\s\S]*searc
   "AW stale callbacks cannot reset active search/filter values and stale hierarchy responses cannot overwrite them");
 assert.match(page, /const nextIncludeDeleted = event\.currentTarget\.checked;[\s\S]*includeDeletedRef\.current = nextIncludeDeleted;[\s\S]*setIncludeDeleted\(nextIncludeDeleted\)/,
   "Include Deleted synchronously updates the reload ref before rendering");
-assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
-  "Include Deleted keeps its checkbox and text in one explicit inline label structure");
+assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Archived<\/span>/,
+  "Include Archived keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
   "opportunity identity and scrolling columns have explicit widths");
 assert.match(styles, /\.accounts-workloads-include-deleted\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*white-space:\s*nowrap/,

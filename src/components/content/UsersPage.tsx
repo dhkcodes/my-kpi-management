@@ -16,7 +16,7 @@ import { menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPe
 type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthSession }> | null;
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
 const menuLabels: Record<MenuPermissionId, string> = {
-  "kpis-overview": "KPI", "weekly-activities": "Weekly", "customers-overview": "Customer 360", "accounts-workloads": "Accounts & Workloads",
+  "kpis-overview": "KPI", "weekly-activities": "Weekly", "customers-overview": "Customer 360", "accounts-workloads": "Account Management — Overview & Account & Workload",
   analysis: "Consumption Analysis", attainment: "Consumption Attainment", records: "Consumption Records"
 };
 

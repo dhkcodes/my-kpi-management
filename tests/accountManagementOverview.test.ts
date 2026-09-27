@@ -53,6 +53,19 @@ assert.strictEqual(overview.exceptions.overdue, 1, "archived OPEN deals must not
 assert.strictEqual(overview.exceptions.targetNotSet, 1);
 assert.strictEqual(overview.targetDeals.length, 2);
 
+const archivedWorkloadOnActiveAccount = buildAccountManagementOverview({
+  fiscalYear: null,
+  accounts: [{
+    ...hierarchy.accounts[1],
+    workloads: [{ ...hierarchy.accounts[1].workloads[0], archived: true }]
+  }]
+}, new Date("2026-09-27T00:00:00Z"));
+assert.strictEqual(archivedWorkloadOnActiveAccount.actualDeals.length, 0,
+  "active Accounts must not expose Opportunities below archived Workloads");
+assert.strictEqual(archivedWorkloadOnActiveAccount.targetDeals.length, 0);
+assert.strictEqual(archivedWorkloadOnActiveAccount.actualFor("FY27", "ALL", "").kpis.newArr.amount, 0);
+assert.strictEqual(archivedWorkloadOnActiveAccount.actualFor("FY27", "ALL", "").quarters[0].newArr, 0);
+
 const actual = overview.actualFor("FY27", "ALL", "");
 assert.strictEqual(actual.kpis.newArr.amount, 120000);
 assert.strictEqual(actual.kpis.newArr.enteredAcr, 30000);

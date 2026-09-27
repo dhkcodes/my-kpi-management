@@ -549,7 +549,7 @@ export function AccountsWorkloadsPage({
     value: string,
   ) => {
     if (isDraftDeletedWorkload(workloadId)) {
-      setError("Draft Deleted AW는 수정할 수 없습니다. 삭제만 가능합니다.");
+      setError("Archived AW는 수정할 수 없습니다. Restore 또는 Delete Permanently만 가능합니다.");
       return;
     }
     setHierarchy((current) => ({
@@ -828,7 +828,7 @@ export function AccountsWorkloadsPage({
   };
 
   const addAw = () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const accountId = nextTempId.current--;
     const workloadId = nextTempId.current--;
     setHierarchy((current) => ({
@@ -884,7 +884,7 @@ export function AccountsWorkloadsPage({
   };
 
   const confirmPermanentDelete = async () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const permanentTargets = rows.filter((row) =>
       permanentDeleteTargets.includes(row.key),
     );
@@ -967,7 +967,7 @@ export function AccountsWorkloadsPage({
   };
 
   const confirmDealDelete = async () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const targets = dealDeleteTargets;
     dealDeleteDialogRef.current?.close();
     setDealDeleteTargets([]);
@@ -1094,7 +1094,7 @@ export function AccountsWorkloadsPage({
   };
 
   const requestDealDelete = () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const targets = [...selectedDeals.values()].filter((deal) => deal.id > 0);
     if (!targets.length) return;
     setDealDeleteTargets(targets);
@@ -1102,7 +1102,7 @@ export function AccountsWorkloadsPage({
   };
 
   const deleteSelected = async () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const selected = new Set(selectedRows);
     const savedRows = rows.filter(
       (row) => selected.has(row.key) && row.workload.id > 0,
@@ -1169,7 +1169,7 @@ export function AccountsWorkloadsPage({
   };
 
   const restoreSelected = async () => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const targets = rows.filter((row) => selectedRows.has(row.key) && row.workload.id > 0 && row.workload.archived);
     if (!targets.length) return;
     setSaving(true);
@@ -1437,7 +1437,7 @@ export function AccountsWorkloadsPage({
       (draft) => isDealDraftChanged(draft) && !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId),
     );
     if (blockedOpportunityDraft) {
-      setError("Draft Deleted AW 아래 Opportunity 변경은 저장할 수 없습니다. Opportunity 초안을 Undo한 뒤 다시 시도하세요.");
+      setError("Archived AW 아래 Opportunity 변경은 저장할 수 없습니다. Opportunity 초안을 Undo한 뒤 다시 시도하세요.");
       return false;
     }
     const awSaved = await saveAwDrafts();
@@ -1496,7 +1496,7 @@ export function AccountsWorkloadsPage({
     workload: AccountWorkload,
   ) => {
     if (isDraftDeletedWorkload(workload.id)) {
-      setError("Draft Deleted AW는 수정할 수 없습니다. 삭제만 가능합니다.");
+      setError("Archived AW는 수정할 수 없습니다. Restore 또는 Delete Permanently만 가능합니다.");
       return;
     }
     if (workload.id < 0) {
@@ -1581,7 +1581,7 @@ export function AccountsWorkloadsPage({
     field: DealField,
   ) => {
     if (isDraftDeletedWorkload(workloadId)) {
-      setError("Draft Deleted AW의 Opportunity는 수정할 수 없습니다. 삭제만 가능합니다.");
+      setError("Archived AW의 Opportunity는 수정할 수 없습니다.");
       return;
     }
     if (!canWrite || dealSaveLock.isLocked()) return;
@@ -1601,10 +1601,10 @@ export function AccountsWorkloadsPage({
     setDealEditCell({ key, field });
   };
   const updateDealDraft = (key: string, field: DealField, value: string) => {
-    if (dealSaveLock.isLocked()) return;
+    if (!canWrite || dealSaveLock.isLocked()) return;
     const existing = dealDrafts.get(key);
     if (existing && isDraftDeletedWorkload(existing.workloadId)) {
-      setError("Draft Deleted AW의 Opportunity는 수정할 수 없습니다. 삭제만 가능합니다.");
+      setError("Archived AW의 Opportunity는 수정할 수 없습니다.");
       return;
     }
     setDealDrafts((current) => {
@@ -1651,6 +1651,7 @@ export function AccountsWorkloadsPage({
     setDealEditCell(null);
   };
   const applyFxRate = () => {
+    if (!canWrite) return;
     const rateValue = Number(fxDraft);
     if (!Number.isFinite(rateValue) || rateValue <= 0) {
       setError("Exchange rate must be a positive number.");
@@ -1662,9 +1663,9 @@ export function AccountsWorkloadsPage({
     setFxPopoverOpen(false);
   };
   const addDeal = (workloadId: number) => {
-    if (dealSaveLock.isLocked() || workloadId < 0 || isDraftDeletedWorkload(workloadId)) {
+    if (!canWrite || dealSaveLock.isLocked() || workloadId < 0 || isDraftDeletedWorkload(workloadId)) {
       if (isDraftDeletedWorkload(workloadId)) {
-        setError("Draft Deleted AW에서는 Opportunity를 추가할 수 없습니다. 삭제만 가능합니다.");
+        setError("Archived AW에서는 Opportunity를 추가할 수 없습니다.");
       }
       return;
     }
@@ -1775,7 +1776,7 @@ export function AccountsWorkloadsPage({
     const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
     if (!changedDrafts.length) return true;
     if (changedDrafts.some((draft) => !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId))) {
-      setError("Draft Deleted AW 아래 Opportunity 변경은 저장할 수 없습니다. 삭제만 가능합니다.");
+      setError("Archived AW 아래 Opportunity 변경은 저장할 수 없습니다.");
       return false;
     }
     if (
@@ -2169,6 +2170,7 @@ export function AccountsWorkloadsPage({
 
   const selectedCount = rows.filter((row) => selectedRows.has(row.key)).length;
   const selectedArchivedCount = rows.filter((row) => selectedRows.has(row.key) && row.workload.archived).length;
+  const selectedDraftCount = rows.filter((row) => selectedRows.has(row.key) && row.workload.id < 0).length;
   const selectedDirtyCount = allRows.filter(
     (row) =>
       selectedRows.has(row.key) &&
@@ -2210,7 +2212,7 @@ export function AccountsWorkloadsPage({
             </oj-button>
           </div>
         </div>
-        <h1 id="accountsWorkloadsTitle">Accounts &amp; Workloads</h1>
+        <h1 id="accountsWorkloadsTitle">Account &amp; Workload</h1>
       </header>
       <form
         class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
@@ -2265,7 +2267,7 @@ export function AccountsWorkloadsPage({
               setIncludeDeleted(nextIncludeDeleted);
             }}
           />
-          <span>Include Deleted</span>
+          <span>Include Archived</span>
         </label>
         <span class="accounts-workloads-toolbar-spacer" />
         {savableAwDraftCount > 0 && (
@@ -2295,7 +2297,11 @@ export function AccountsWorkloadsPage({
         )}
         {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
           <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
-            {selectedArchivedCount > 0 ? "Delete" : "Draft Delete"}
+            {selectedArchivedCount > 0
+              ? "Delete Permanently"
+              : selectedDraftCount === selectedCount
+                ? "Discard Draft"
+                : "Archive"}
           </button>
         )}
         <button
@@ -2820,7 +2826,7 @@ export function AccountsWorkloadsPage({
       )}
       <oj-dialog
         ref={permanentDeleteDialogRef}
-        dialogTitle="Permanently delete Draft Delete rows?"
+        dialogTitle="Delete archived AW permanently?"
         cancelBehavior={saving ? "none" : "icon"}
         onojClose={() => {
           if (!saving) setPermanentDeleteTargets([]);
@@ -2855,7 +2861,7 @@ export function AccountsWorkloadsPage({
             disabled={saving || !permanentDeleteTargets.length}
             onojAction={() => void confirmPermanentDelete()}
           >
-            {saving ? "Deleting…" : "Permanently delete"}
+            {saving ? "Deleting…" : "Delete Permanently"}
           </oj-button>
         </div>
       </oj-dialog>
