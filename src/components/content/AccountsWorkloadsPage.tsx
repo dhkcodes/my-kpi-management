@@ -95,6 +95,10 @@ const rowKey = (accountId: number, workloadId: number) =>
 const refFor = (id: number, entity: "account" | "workload") =>
   id > 0 ? String(id) : `${entity}-${Math.abs(id)}`;
 const nullable = (value: string) => value.trim() || null;
+// Controlled multiline editors must keep the user's in-progress whitespace.
+// Trimming here makes a trailing space or newline disappear on the same input
+// event, so normalize only the truly empty value to null.
+const nullableMultiline = (value: string) => value === "" ? null : value;
 const numberValue = (value: string) =>
   value.trim() === "" ? null : Number(value);
 const normalizedAccount = (value: string) =>
@@ -259,9 +263,11 @@ export function AccountsWorkloadsPage({
   const nextTempId = useRef(-1);
   const reloadGeneration = useRef(0);
   const preserveDraftsForNextReload = useRef(false);
-  const appliedSearchRef = useRef(initialSearch);
+  const appliedSearchRef = useRef(initialSearch.trim());
+  const includeDeletedRef = useRef(false);
   const searchComposingRef = useRef(false);
   const editSnapshot = useRef("");
+  const dealEditSnapshot = useRef("");
   const highlightRequests = useRef(new Set<number>());
   const permanentDeleteDialogRef = useRef<any>(null);
   const dealDeleteDialogRef = useRef<any>(null);
@@ -432,9 +438,9 @@ export function AccountsWorkloadsPage({
     setError("");
     try {
       const result = await fetchAccountsWorkloadsHierarchy({
-        search,
-        includeArchived: includeDeleted,
-        includeDeletedDeals: includeDeleted,
+        search: appliedSearchRef.current,
+        includeArchived: includeDeletedRef.current,
+        includeDeletedDeals: includeDeletedRef.current,
       });
       if (generation !== reloadGeneration.current) return;
       setHierarchy((current) => preserveDrafts
@@ -555,9 +561,9 @@ export function AccountsWorkloadsPage({
                     : field === "salesRep"
                       ? { ...workload, salesRep: value }
                     : field === "lastUpdated"
-                      ? { ...workload, lastUpdated: nullable(value) }
+                      ? { ...workload, lastUpdated: nullableMultiline(value) }
                       : field === "notes"
-                        ? { ...workload, notes: nullable(value) }
+                        ? { ...workload, notes: nullableMultiline(value) }
                         : field === "plan"
                           ? {
                               ...workload,
@@ -651,16 +657,26 @@ export function AccountsWorkloadsPage({
   const multilineEditorKey = (
     event: KeyboardEvent,
     commit: () => void,
+    update: (value: string) => void,
     cancel?: () => void,
   ) => {
     event.stopPropagation();
-    if (event.key === "Escape") {
+    if (event.key === "Enter" && event.altKey) {
+      event.preventDefault();
+      const editor = event.currentTarget as HTMLTextAreaElement;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      update(`${editor.value.slice(0, start)}\n${editor.value.slice(end)}`);
+      requestAnimationFrame(() => {
+        editor.selectionStart = start + 1;
+        editor.selectionEnd = start + 1;
+      });
+    } else if (event.key === "Escape") {
       if (!cancel) return;
       event.preventDefault();
       cancel();
     } else if (
       event.key === "Enter" &&
-      !event.altKey &&
       !event.shiftKey
     ) {
       event.preventDefault();
@@ -675,6 +691,7 @@ export function AccountsWorkloadsPage({
   ) => multilineEditorKey(
     event,
     () => setEditCell(null),
+    (value) => updateAw(accountId, workloadId, field, value),
     () => cancelAwCell(accountId, workloadId, field),
   );
   const showImmediateTooltip = (
@@ -1541,6 +1558,7 @@ export function AccountsWorkloadsPage({
     }
     if (!canWrite || dealSaveLock.isLocked()) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
+    dealEditSnapshot.current = field === "latestUpdate" ? (deal.latestUpdate ?? "") : "";
     setDealDrafts((current) => {
       if (current.has(key)) return current;
       const next = new Map(current);
@@ -1581,13 +1599,14 @@ export function AccountsWorkloadsPage({
         );
       } else if (field === "winProbability")
         (deal as any)[field] = numberValue(value);
+      else if (field === "latestUpdate")
+        deal.latestUpdate = nullableMultiline(value);
       else if (
         [
           "opportunityNo",
           "actualCloseDate",
           "contractStartDate",
           "contractEndDate",
-          "latestUpdate",
         ].includes(field)
       )
         (deal as any)[field] = nullable(value);
@@ -1598,6 +1617,10 @@ export function AccountsWorkloadsPage({
       next.set(key, { ...draft, deal });
       return next;
     });
+  };
+  const cancelDealCell = (key: string, field: DealField) => {
+    updateDealDraft(key, field, dealEditSnapshot.current);
+    setDealEditCell(null);
   };
   const applyFxRate = () => {
     const rateValue = Number(fxDraft);
@@ -1949,7 +1972,12 @@ export function AccountsWorkloadsPage({
               updateDealDraft(key, field, event.currentTarget.value)
             }
             onKeyDown={(event) =>
-              multilineEditorKey(event, () => setDealEditCell(null))
+              multilineEditorKey(
+                event,
+                () => setDealEditCell(null),
+                (nextValue) => updateDealDraft(key, field, nextValue),
+                () => cancelDealCell(key, field),
+              )
             }
             onBlur={() => setDealEditCell(null)}
           />
@@ -2203,7 +2231,11 @@ export function AccountsWorkloadsPage({
             type="checkbox"
             checked={includeDeleted}
             disabled={dirty || loading || saving}
-            onChange={(event) => setIncludeDeleted(event.currentTarget.checked)}
+            onChange={(event) => {
+              const nextIncludeDeleted = event.currentTarget.checked;
+              includeDeletedRef.current = nextIncludeDeleted;
+              setIncludeDeleted(nextIncludeDeleted);
+            }}
           />
           <span>Include Deleted</span>
         </label>

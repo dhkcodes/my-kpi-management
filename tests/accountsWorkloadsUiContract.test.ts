@@ -18,10 +18,18 @@ assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
   "saved AW cells remain display-first and enter edit mode only on double-click");
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
   "Latest Update and Notes retain multiline editors");
-assert.match(page, /const multilineEditorKey[\s\S]*event\.stopPropagation\(\)[\s\S]*event\.key === "Enter"[\s\S]*!event\.altKey[\s\S]*!event\.shiftKey/,
-  "multiline editors isolate typing from row shortcuts and reserve Option+Enter or Shift+Enter for native newlines");
-assert.match(page, /<textarea[\s\S]*onKeyDown=\{\(event\) =>[\s\S]*multilineEditorKey\(event/,
-  "AW and Opportunity multiline editors share the collision-safe key handler");
+assert.match(page, /const multilineEditorKey[\s\S]*event\.stopPropagation\(\)[\s\S]*event\.key === "Enter" && event\.altKey[\s\S]*selectionStart[\s\S]*update\(`[\s\S]*\\n[\s\S]*event\.key === "Enter"[\s\S]*!event\.shiftKey/,
+  "multiline editors isolate row shortcuts, explicitly insert Option+Enter newlines, and keep Shift+Enter native");
+assert.match(page, /const nullableMultiline = \(value: string\) => value === "" \? null : value;/,
+  "multiline draft normalization preserves spaces and newlines instead of trimming every input event");
+assert.match(page, /lastUpdated: nullableMultiline\(value\)[\s\S]*notes: nullableMultiline\(value\)/,
+  "AW Latest Update and Notes preserve in-progress whitespace");
+assert.match(page, /field === "latestUpdate"[\s\S]*deal\.latestUpdate = nullableMultiline\(value\)/,
+  "Opportunity Latest Update preserves in-progress whitespace");
+assert.match(page, /<textarea[\s\S]*awEditorKey\(event[\s\S]*field === "latestUpdate"[\s\S]*<textarea[\s\S]*multilineEditorKey\(/,
+  "AW and Opportunity multiline editors both use the collision-safe key path");
+assert.match(page, /dealEditSnapshot\.current = field === "latestUpdate"[\s\S]*const cancelDealCell[\s\S]*updateDealDraft\(key, field, dealEditSnapshot\.current\)[\s\S]*cancelDealCell\(key, field\)/,
+  "Opportunity Latest Update restores its pre-edit value when Escape cancels editing");
 assert.match(page, /accounts-workloads-ellipsis/);
 assert.match(page, /showImmediateTooltip[\s\S]*createPortal\([\s\S]*accounts-workloads-latest-tooltip/,
   "truncated AW and Opportunity text uses the same immediate portaled tooltip");
@@ -241,8 +249,10 @@ assert.match(page, /preserveDraftsForNextReload\.current = nextSearch === ""/,
   "AW limits draft-preserving refresh behavior to search clear");
 assert.match(page, /mergeSearchResultWithAwDrafts[\s\S]*dirtyWorkloadIds\.has\(workload\.id\)[\s\S]*workload\.id < 0[\s\S]*dirtyAccountIds\.has\(account\.id\)/,
   "AW clear reconciliation preserves edited fields and newly added draft rows");
-assert.match(page, /const generation = \+\+reloadGeneration\.current[\s\S]*if \(generation !== reloadGeneration\.current\) return;[\s\S]*if \(generation === reloadGeneration\.current\) setLoading\(false\)/,
-  "AW stale hierarchy responses cannot overwrite the latest search or filter results");
+assert.match(page, /const generation = \+\+reloadGeneration\.current[\s\S]*search: appliedSearchRef\.current[\s\S]*includeArchived: includeDeletedRef\.current[\s\S]*if \(generation !== reloadGeneration\.current\) return;[\s\S]*if \(generation === reloadGeneration\.current\) setLoading\(false\)/,
+  "AW stale callbacks cannot reset active search/filter values and stale hierarchy responses cannot overwrite them");
+assert.match(page, /const nextIncludeDeleted = event\.currentTarget\.checked;[\s\S]*includeDeletedRef\.current = nextIncludeDeleted;[\s\S]*setIncludeDeleted\(nextIncludeDeleted\)/,
+  "Include Deleted synchronously updates the reload ref before rendering");
 assert.match(page, /class="accounts-workloads-include-deleted"[\s\S]*type="checkbox"[\s\S]*<span>Include Deleted<\/span>/,
   "Include Deleted keeps its checkbox and text in one explicit inline label structure");
 assert.match(page, /<colgroup class="accounts-workloads-oppty-columns">[\s\S]*accounts-workloads-oppty-column--name[\s\S]*accounts-workloads-oppty-column--id[\s\S]*accounts-workloads-oppty-column--revenue/,
