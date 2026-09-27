@@ -4550,7 +4550,7 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* Design-reference alignment overrides; still strictly scoped to this page. */
-.account-management-overview { gap: 1rem; padding: 1rem 1.25rem 2rem; background: #f7f8fa; font-size: 13px; }
+.account-management-overview { gap: 1rem; padding: 1rem 1.25rem 2rem; background: var(--oj-core-bg-color-content, #fff); font-size: 13px; }
 .account-overview__header h1 { font-size: 1.8rem; }
 .account-overview__top-row { display: grid; grid-template-columns: minmax(300px,1fr) minmax(600px,1.25fr); gap: .7rem; align-items: stretch; }
 .account-overview__search { gap: .3rem; padding: .7rem .8rem; border-radius: 5px; }
@@ -4750,7 +4750,6 @@ h4.weekly-activity-section-label--next-week,
 
 @media (max-width: 520px) {
   .account-overview__kpis { grid-template-columns: 1fr; }
-  .account-overview__metric-lines { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-overview__metric-lines strong { font-size: 1.15rem; }
   .account-overview__hierarchy-scroll { height: 24rem; max-height: 24rem; }
   .account-overview__target-scroll { height: 28rem; max-height: 28rem; }
