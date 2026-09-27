@@ -58,4 +58,6 @@ assert.match(appSource, /const route = getNavigationRouteFromPath\(window\.locat
   "browser history navigation must replace unauthorized routes");
 assert.match(appSource, /requestedInitialRoute[\s\S]*?canAccessRoute\(profile, requestedInitialRoute\)[\s\S]*?getNavigationRoute\("home"\)/,
   "direct URL initialization must fall back from unauthorized routes");
+assert.match(appSource, /onFxRateChange=\{async \(rateValue\) => \{[\s\S]*?if \(!canWriteRoute\(profile, getNavigationRoute\("accounts-workloads"\)\)\)[\s\S]*?updateFxRate/,
+  "exchange-rate mutation callback must reject users without Account & Workload WRITE permission");
 console.log("menu permission tests passed");

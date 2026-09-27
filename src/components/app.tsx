@@ -60,7 +60,7 @@ import {
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import type { AuthSession } from "../auth/authSession";
-import { canAccessRoute, filterNavigationItems } from "../auth/menuPermissions";
+import { canAccessRoute, canWriteRoute, filterNavigationItems } from "../auth/menuPermissions";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
 import { subscribeAuthRequired } from "../auth/apiFetch";
 import "ojs/ojbutton";
@@ -715,6 +715,9 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             fxError={fxError}
             onSaveGuide={saveKpiGuide}
             onFxRateChange={async (rateValue) => {
+              if (!canWriteRoute(profile, getNavigationRoute("accounts-workloads"))) {
+                throw new Error("Write permission is required to update the exchange rate.");
+              }
               if (!fxRate) throw new Error("The exchange rate is unavailable for this fiscal year.");
               const saved = await updateFxRate({ ...fxRate, rateValue });
               setFxRate(saved);
