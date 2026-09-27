@@ -17,6 +17,7 @@ export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermission
 }
 
 export function getRoutePermission(profile: AuthSession, route: NavigationRouteDefinition): RoutePermission {
+  if (route.module === "myCustomers360") return "NONE";
   if (route.module === "users") return profile.access === "Admin" ? "WRITE" : "NONE";
   if (route.module === "profile" || route.module === "home") return "OWN";
   const menuId = getRouteMenuId(route);

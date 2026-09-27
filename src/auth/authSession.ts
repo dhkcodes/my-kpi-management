@@ -12,6 +12,14 @@ export const menuPermissionIds = [
 ] as const;
 export type MenuPermissionId = typeof menuPermissionIds[number];
 export type MenuPermissionMap = Readonly<Record<MenuPermissionId, MenuPermission>>;
+export const assignableMenuPermissionIds = [
+  "kpis-overview",
+  "weekly-activities",
+  "accounts-workloads",
+  "analysis",
+  "attainment",
+  "records"
+] as const satisfies readonly MenuPermissionId[];
 
 export type AuthSession = Readonly<{
   userKey: string;
