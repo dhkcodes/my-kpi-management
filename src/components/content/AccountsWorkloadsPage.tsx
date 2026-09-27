@@ -648,23 +648,35 @@ export function AccountsWorkloadsPage({
     updateAw(accountId, workloadId, field, String(editSnapshot.current ?? ""));
     setEditCell(null);
   };
+  const multilineEditorKey = (
+    event: KeyboardEvent,
+    commit: () => void,
+    cancel?: () => void,
+  ) => {
+    event.stopPropagation();
+    if (event.key === "Escape") {
+      if (!cancel) return;
+      event.preventDefault();
+      cancel();
+    } else if (
+      event.key === "Enter" &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      commit();
+    }
+  };
   const awEditorKey = (
     event: KeyboardEvent,
     accountId: number,
     workloadId: number,
     field: AwField,
-  ) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelAwCell(accountId, workloadId, field);
-    } else if (
-      event.key === "Enter" &&
-      !((field === "lastUpdated" || field === "notes") && event.shiftKey)
-    ) {
-      event.preventDefault();
-      setEditCell(null);
-    }
-  };
+  ) => multilineEditorKey(
+    event,
+    () => setEditCell(null),
+    () => cancelAwCell(accountId, workloadId, field),
+  );
   const showImmediateTooltip = (
     element: HTMLElement,
     value: string,
@@ -1385,7 +1397,10 @@ export function AccountsWorkloadsPage({
     }
     const awSaved = await saveAwDrafts();
     if (!awSaved) return false;
-    return await saveDealDrafts();
+    const dealsSaved = await saveDealDrafts();
+    if (!dealsSaved) return false;
+    await reload();
+    return true;
   };
 
   const confirmPrimaryAction = async () => {
@@ -1932,6 +1947,9 @@ export function AccountsWorkloadsPage({
             value={value}
             onInput={(event) =>
               updateDealDraft(key, field, event.currentTarget.value)
+            }
+            onKeyDown={(event) =>
+              multilineEditorKey(event, () => setDealEditCell(null))
             }
             onBlur={() => setDealEditCell(null)}
           />

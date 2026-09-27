@@ -9,6 +9,7 @@ const deleteHandler = page.slice(page.indexOf("const deleteSelected"), page.inde
 const permanentDeleteHandler = page.slice(page.indexOf("const confirmPermanentDelete"), page.indexOf("const deleteSelected"));
 const cancelHandler = page.slice(page.indexOf("const cancelAllDrafts"), page.indexOf("const planWriteFor"));
 const saveAwHandler = page.slice(page.indexOf("const saveAwDrafts"), page.indexOf("const toggleHighlight"));
+const saveAllHandler = page.slice(page.indexOf("const saveAllDrafts"), page.indexOf("const deleteDialogTitle"));
 const saveDealHandler = page.slice(page.indexOf("const saveDealDrafts"), page.indexOf("const dealDisplay"));
 const confirmDealDeleteHandler = page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete"));
 
@@ -17,6 +18,10 @@ assert.match(page, /onDblClick={[\s\S]*beginAwEdit/,
   "saved AW cells remain display-first and enter edit mode only on double-click");
 assert.match(page, /field === "lastUpdated" \|\| field === "notes"/,
   "Latest Update and Notes retain multiline editors");
+assert.match(page, /const multilineEditorKey[\s\S]*event\.stopPropagation\(\)[\s\S]*event\.key === "Enter"[\s\S]*!event\.altKey[\s\S]*!event\.shiftKey/,
+  "multiline editors isolate typing from row shortcuts and reserve Option+Enter or Shift+Enter for native newlines");
+assert.match(page, /<textarea[\s\S]*onKeyDown=\{\(event\) =>[\s\S]*multilineEditorKey\(event/,
+  "AW and Opportunity multiline editors share the collision-safe key handler");
 assert.match(page, /accounts-workloads-ellipsis/);
 assert.match(page, /showImmediateTooltip[\s\S]*createPortal\([\s\S]*accounts-workloads-latest-tooltip/,
   "truncated AW and Opportunity text uses the same immediate portaled tooltip");
@@ -275,6 +280,8 @@ assert.match(messageBanner, /window\.setTimeout[\s\S]*onClose\?\.\(message\.id\)
   "the shared banner auto-dismisses non-sticky informational notices");
 assert.match(saveAwHandler, /const saved = await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*setBaseline\(withoutArchived\)[\s\S]*setNotice\(/,
   "AW save success appears only after the authoritative save response is adopted");
+assert.match(saveAllHandler, /const dealsSaved = await saveDealDrafts\(\)[\s\S]*if \(!dealsSaved\) return false;[\s\S]*await reload\(\)[\s\S]*return true/,
+  "a successful save reapplies the active Account search and existing archive/deleted filters");
 assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
   "sticky Opportunity identity headers share the other header background");
 assert.match(page, /type="button"[\s\S]*class="accounts-workloads-add-aw"[\s\S]*onClick=\{addAw\}/,
