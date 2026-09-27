@@ -104,10 +104,16 @@ const numberValue = (value: string) =>
   value.trim() === "" ? null : Number(value);
 const normalizedAccount = (value: string) =>
   value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
-const friendlyError = (error: unknown) =>
-  error instanceof Error
+const friendlyError = (error: unknown) => {
+  if (
+    error instanceof AccountsWorkloadsApiError &&
+    error.errors.some((item) => item.code === "ACCOUNT_NAME_CONFLICT")
+  )
+    return "이미 같은 이름의 활성 Account가 있습니다. 다른 이름을 입력해 주세요. 입력 내용과 기존 연결은 유지됩니다.";
+  return error instanceof Error
     ? error.message
     : "The request could not be completed.";
+};
 const isDefiniteWriteRejection = (error: unknown) =>
   error instanceof AccountsWorkloadsApiError &&
   [400, 401, 403, 404, 409, 422].includes(error.status);

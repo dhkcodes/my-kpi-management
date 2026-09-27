@@ -70,6 +70,8 @@ const sumPrimary = (items: readonly OverviewDeal[], kind: "NEW" | "EXPANSION" | 
   return sum + (kind === "RENEWAL" ? item.deal.acrUsd ?? 0 : item.deal.arrUsd ?? 0);
 }, 0);
 
+const sumAcr = (items: readonly OverviewDeal[]) => items.reduce((sum, item) => sum + (item.deal.acrUsd ?? 0), 0);
+
 type RevenueMeasure = "ALL" | "ARR" | "ACR";
 type RevenueKind = "NEW" | "EXPANSION" | "RENEWAL";
 const revenueKinds: readonly RevenueKind[] = ["NEW", "EXPANSION", "RENEWAL"];
@@ -141,8 +143,8 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const filteredAccountNames = accountNames.filter((account) => account.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const accountDetails = (accountName: string) => hierarchy?.accounts.find((account) => account.name === accountName)?.workloads
     .filter((workload) => !workload.archived)
-    .map((workload) => `Workload: ${workload.name} · Plan: ${workload.plans.map((plan) => plan.sourcePlanNumber).filter(Boolean).join(", ") || "—"}`)
-    .join(" | ") || "Workload: — · Plan: —";
+    .map((workload) => `${workload.name} · ${workload.plans.map((plan) => plan.sourcePlanNumber).filter(Boolean).join(", ") || "—"}`)
+    .join(" | ") || "— · —";
   const targetPrimaryTotal = (target?.deals ?? []).reduce((sum, item) => sum + (primaryAmount(item) ?? 0), 0);
   const targetPeriods = [...new Set((overview?.targetDeals ?? [])
     .filter((item) => item.deal.targetFiscalYear && item.deal.targetQuarter)
@@ -213,13 +215,13 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
             <article class="account-overview__panel account-overview__hierarchy">
               <div class="account-overview__panel-heading"><div><h3>Account → Workload → Deal</h3><p>Trace selected actuals without mixing target-period attribution.</p></div></div>
-              <div class="account-overview__hierarchy-head"><span>Name</span><span>New ARR</span><span>Expansion ARR</span><span>Renewal ACR</span><span>WON</span></div>
+              <div class="account-overview__hierarchy-head"><span>Name</span><span>New ARR</span><span>Expansion ARR</span><span>ACR</span><span>WON</span></div>
               <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">No WON deals in this scope.</p> : grouped.map(({ account, workloads }) => {
                 const accountDeals = [...workloads.values()].flatMap((item) => item.deals);
                 const accountKey = `account-${account.id}`;
-                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={expanded.has(accountKey)}><span><i>{expanded.has(accountKey) ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(accountDeals, "NEW"))}</b><b>{fmtUsd(sumPrimary(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumPrimary(accountDeals, "RENEWAL"))}</b><b>{accountDeals.length}</b></button>
-                  {expanded.has(accountKey) && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={expanded.has(workloadKey)}><span><i>{expanded.has(workloadKey) ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(deals, "NEW"))}</b><b>{fmtUsd(sumPrimary(deals, "EXPANSION"))}</b><b>{fmtUsd(sumPrimary(deals, "RENEWAL"))}</b><b>{deals.length}</b></button>
-                    {expanded.has(workloadKey) && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · Close {item.deal.actualCloseDate} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd) : item.deal.acrUsd === null ? "—" : `ACR ${fmtUsd(item.deal.acrUsd)}`}</b><b>1</b></div>)}</div>; })}
+                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={expanded.has(accountKey)}><span><i>{expanded.has(accountKey) ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(accountDeals, "NEW"))}</b><b>{fmtUsd(sumPrimary(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b><b>{accountDeals.length}</b></button>
+                  {expanded.has(accountKey) && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={expanded.has(workloadKey)}><span><i>{expanded.has(workloadKey) ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(deals, "NEW"))}</b><b>{fmtUsd(sumPrimary(deals, "EXPANSION"))}</b><b>{fmtUsd(sumAcr(deals))}</b><b>{deals.length}</b></button>
+                    {expanded.has(workloadKey) && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · Close {item.deal.actualCloseDate} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b><b>1</b></div>)}</div>; })}
                 </div>;
               })}</div>
             </article>
