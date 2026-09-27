@@ -548,6 +548,7 @@ export function AccountsWorkloadsPage({
     field: AwField,
     value: string,
   ) => {
+    if (!canWrite) return;
     if (isDraftDeletedWorkload(workloadId)) {
       setError("Archived AW는 수정할 수 없습니다. Restore 또는 Delete Permanently만 가능합니다.");
       return;
@@ -1259,6 +1260,7 @@ export function AccountsWorkloadsPage({
   };
 
   const saveAwDrafts = async (): Promise<boolean> => {
+    if (!canWrite) return false;
     if (dealSaveLock.isLocked()) return false;
     if (
       hierarchy.accounts.some(
@@ -1433,6 +1435,7 @@ export function AccountsWorkloadsPage({
   }, [dirty, onNavigationGuardChange, saving]);
 
   const saveAllDrafts = async (): Promise<boolean> => {
+    if (!canWrite) return false;
     const blockedOpportunityDraft = [...dealDrafts.values()].some(
       (draft) => isDealDraftChanged(draft) && !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId),
     );
@@ -1495,6 +1498,7 @@ export function AccountsWorkloadsPage({
     account: AccountHierarchyAccount,
     workload: AccountWorkload,
   ) => {
+    if (!canWrite) return;
     if (isDraftDeletedWorkload(workload.id)) {
       setError("Archived AW는 수정할 수 없습니다. Restore 또는 Delete Permanently만 가능합니다.");
       return;
@@ -1772,6 +1776,7 @@ export function AccountsWorkloadsPage({
     }
   };
   const saveDealDrafts = async () => {
+    if (!canWrite) return false;
     if (dealSaveLock.isLocked()) return false;
     const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
     if (!changedDrafts.length) return true;

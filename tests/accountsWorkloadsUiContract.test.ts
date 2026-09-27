@@ -344,7 +344,12 @@ assert.match(styles, /\.accounts-workloads-fx-popover\s*\{[^}]*z-index:\s*50/,
 assert.match(page, /const dealSaveLock = useRef\(createOpportunitySaveLock\(\)\)\.current;/,
   "Opportunity save owns a synchronous mutation lock");
 assert.match(page, /const beginDealEdit[\s\S]*?if \(!canWrite \|\| dealSaveLock\.isLocked\(\)\) return;/);
-assert.match(page, /const updateDealDraft[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
+assert.match(page, /const updateAw[\s\S]*?if \(!canWrite\) return;/);
+assert.match(page, /const saveAwDrafts[\s\S]*?if \(!canWrite\) return false;/);
+assert.match(page, /const saveAllDrafts[\s\S]*?if \(!canWrite\) return false;/);
+assert.match(page, /const updateDealDraft[\s\S]*?if \(!canWrite \|\| dealSaveLock\.isLocked\(\)\) return;/);
+assert.match(page, /const toggleHighlight[\s\S]*?if \(!canWrite\) return;/);
+assert.match(page, /const saveDealDrafts[\s\S]*?if \(!canWrite\) return false;/);
 assert.match(page, /const addDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
 assert.match(page, /const cancelDeal[\s\S]*?if \(dealSaveLock\.isLocked\(\)\) return;/);
 assert.match(saveDealHandler, /if \(dealSaveLock\.isLocked\(\)\) return false;[\s\S]*dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*finally \{\s*dealSaveLock\.release\(\);\s*setSaving\(false\);/,
