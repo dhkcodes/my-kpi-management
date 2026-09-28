@@ -20,6 +20,7 @@ import {
   getLatestActualMonth,
   getNextQuarterMonths,
   initialConsumptionRecordsBatchSize,
+  isConsumptionMtdDisplayPeriod,
   isConsumptionPeriodInQuarterRange,
   shouldRestartConsumptionRecordsPage,
   getQuarterMonths,
@@ -1367,7 +1368,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
-          const mtd = showMtd && month === currentMtdPeriod;
+          const mtd = isConsumptionMtdDisplayPeriod(showMtd, currentMtdPeriod, currentMtdExact, month);
           const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month) && !mtd;
           const value = editable
             ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
