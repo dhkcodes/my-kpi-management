@@ -20,7 +20,7 @@ const workspace = {
   editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"], displayQuarterOrder: ["FY27-Q2", "FY27-Q1"],
   plans: [{ planId: 1, stableKey: "A::P1", account: "A", endUser: "EU", planCode: "P1", dataCenter: "3", dpDataCenterCount: 3, ociDataCenterCount: 2,
     dataCenterBreakdown: { dpCount: 3, ociCount: 2, duplicatePossible: true },
-    facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "DP" }] }],
+    facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" }] }],
   controlTotals: [], signals: []
 };
 
@@ -221,7 +221,7 @@ void (async () => {
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/imports/apply?pillar=ALL");
     assert.ok(init?.body instanceof FormData);
-    return new Response(JSON.stringify({ workspace: { ...workspace, selectedPillar: "ALL", plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts.map((fact) => ({ ...fact, pillar: "ALL" })) }] },
+    return new Response(JSON.stringify({ workspace: { ...workspace, selectedPillar: "ALL", plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts }] },
       batchIds: [1, 2], duplicate: false, physicalFactCount: 1, deduplicatedFactCount: 1,
       insertedFactCount: 0, unchangedFactCount: 0, overwrittenFactCount: 1, skippedFactCount: 0, deletedFactCount: 0 }),
       { status: 200, headers: { "Content-Type": "application/json" } });
@@ -231,7 +231,7 @@ void (async () => {
   assert.deepEqual([applied.insertedFactCount, applied.unchangedFactCount, applied.overwrittenFactCount, applied.skippedFactCount, applied.deletedFactCount], [0, 0, 1, 0, 0]);
 
   const unifiedApplyWorkspace = { ...workspace, selectedPillar: "ALL",
-    plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts.map((fact) => ({ ...fact, pillar: "ALL" })) }] };
+    plans: [{ ...workspace.plans[0], dataCenter: "5", facts: workspace.plans[0].facts }] };
   runtime.fetch = async () => new Response(JSON.stringify({
     workspace: unifiedApplyWorkspace, batchIds: [79, 80], duplicate: false,
     physicalFactCount: 1350, deduplicatedFactCount: 0, insertedFactCount: 1350,

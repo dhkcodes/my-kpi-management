@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fetchConsumptionAnalysis } from "../src/data/consumptionApi";
-import { ConsumptionAnalysisAccount, ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRefreshConsumptionAnalysisContext, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
+import { ConsumptionPlan, filterForecastCompositionAccounts, getAlertActualTrend, isUnmappedConsumptionLabel, nextConsumptionBatchSize, resolveConsumptionControlTotal, shouldRefreshConsumptionAnalysisContext, shouldRestartConsumptionRecordsPage, sortAndFilterConsumptionAccounts } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -96,18 +96,29 @@ void (async () => {
   assert.equal(decoded.quarters[3].coveragePercent, 0);
   assert.deepEqual(decoded.quarters.map((quarter) => quarter.quarter), ["Q1", "Q2", "Q3", "Q4"]);
   assert.deepEqual(decoded.movementBridge, analysis.movementBridge.map((point) => ({
-    ...point, includedForecastPeriods: [], accounts: []
-  })), "legacy movement responses gain empty drill fields without turning unavailable coverage into zero");
+    quarter: point.quarter,
+    totalForecastAmountExact: String(point.totalForecastAmount),
+    newAmountExact: point.newAmount === null ? null : String(point.newAmount),
+    expansionAmountExact: point.expansionAmount === null ? null : String(point.expansionAmount),
+    reductionAmountExact: point.reductionAmount === null ? null : String(point.reductionAmount),
+    netMovementAmountExact: point.netMovementAmount === null ? null : String(point.netMovementAmount),
+    compositionStatus: point.compositionStatus,
+    unavailableReason: point.unavailableReason,
+    classifiedAccountCount: point.classifiedAccountCount,
+    unclassifiedAccountCount: point.unclassifiedAccountCount,
+    includedForecastPeriods: [],
+    accounts: []
+  })), "legacy movement responses gain exact drill fields without turning unavailable coverage into zero");
   assert.deepEqual(decoded.accountCandidates, analysis.accountCandidates);
-  assert.equal(decoded.salesRepOverview[0].fyExpectedAmount, 1000);
+  assert.equal(decoded.salesRepOverview[0].fyExpectedAmountExact, "1000");
   assert.deepEqual(decoded.periodCoverage, analysis.periodCoverage);
   assert.equal(decoded.salesRepOverview[0].yoyComparisonStatus, "AVAILABLE");
   assert.equal(decoded.accounts[0].forecastEntryStatus, "ENTERED");
-  assert.equal(decoded.accounts[0].totalAmount, 600,
+  assert.equal(decoded.accounts[0].totalAmountExact, "600",
     "Actual-only Account contribution accepts the deployed wire total");
-  assert.equal(decoded.accounts[0].workloads[0].totalAmount, 600,
+  assert.equal(decoded.accounts[0].workloads[0].totalAmountExact, "600",
     "Actual-only Workload contribution accepts the deployed wire total");
-  assert.equal(decoded.accounts[0].workloads[0].plans[0].totalAmount, 600,
+  assert.equal(decoded.accounts[0].workloads[0].plans[0].totalAmountExact, "600",
     "Actual-only Plan contribution accepts the deployed wire total");
   assert.equal(decoded.contextActualTrend.length, 6, "top-level current-context ACTUAL trend is decoded");
   assert.equal(Object.prototype.hasOwnProperty.call(decoded, "otherContribution"), false,
@@ -117,6 +128,40 @@ void (async () => {
     ["FY26-MAR", "FY26-APR", "FY26-MAY", "FY27-JUN", "FY27-JUL", "FY27-AUG"],
     "the selected alert base month anchors the preceding five ACTUAL months");
   assert.equal(decoded.mtdSummary, null, "an OFF response has no provisional MTD summary");
+
+  const exactAmount = (value: number) => String(value);
+  const exactWireAnalysis = {
+    ...analysis,
+    portfolio: { ...analysis.portfolio,
+      actualAmount: exactAmount(analysis.portfolio.actualAmount), forecastAmount: exactAmount(analysis.portfolio.forecastAmount),
+      totalAmount: exactAmount(analysis.portfolio.totalAmount) },
+    quarters: analysis.quarters.map((quarter) => ({ ...quarter,
+      actualAmount: exactAmount(quarter.actualAmount), forecastAmount: exactAmount(quarter.forecastAmount),
+      totalAmount: exactAmount(quarter.totalAmount),
+      qoqChangeAmount: quarter.qoqChangeAmount === null ? null : exactAmount(quarter.qoqChangeAmount),
+      qoqChangePercent: quarter.qoqChangePercent === null ? null : exactAmount(quarter.qoqChangePercent) })),
+    contextActualTrend: analysis.contextActualTrend.map((point) => ({ ...point,
+      actualAmount: point.actualAmount === null ? null : exactAmount(point.actualAmount) })),
+    accounts: analysis.accounts.map((account) => ({ ...account,
+      actualAmount: exactAmount(account.actualAmount), forecastAmount: exactAmount(account.forecastAmount), totalAmount: exactAmount(account.totalAmount),
+      workloads: account.workloads.map((workload) => ({ ...workload,
+        actualAmount: exactAmount(workload.actualAmount), forecastAmount: exactAmount(workload.forecastAmount), totalAmount: exactAmount(workload.totalAmount),
+        plans: workload.plans.map((plan) => ({ ...plan,
+          actualAmount: exactAmount(plan.actualAmount), forecastAmount: exactAmount(plan.forecastAmount), totalAmount: exactAmount(plan.totalAmount),
+          actualTrend: plan.actualTrend.map((point) => ({ ...point,
+            actualAmount: point.actualAmount === null ? null : exactAmount(point.actualAmount) })) })) })) }))
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(exactWireAnalysis), {
+    status: 200, headers: { "Content-Type": "application/json" }
+  });
+  const exactDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.equal(exactDecoded.portfolio.actualAmountExact, "600");
+  assert.equal(exactDecoded.portfolio.forecastAmountExact, "400");
+  assert.equal(exactDecoded.portfolio.totalAmountExact, "1000");
+  assert.equal(exactDecoded.quarters[1].qoqChangePercentExact, "33.3333");
+  assert.equal(exactDecoded.accounts[0].workloads[0].plans[0].actualTrend[5].actualAmountExact, "60");
+  assert.equal(exactDecoded.portfolio.actualAmountChartCoordinate, 600,
+    "the only approximate projection is explicitly named for chart coordinates");
 
   const mtdAnalysis = { ...analysis,
     selectedPillar: "OCI",
@@ -135,10 +180,10 @@ void (async () => {
   });
   assert.equal(withMtd.selectedPillar, "OCI", "MTD responses preserve the selected OCI pillar");
   assert.deepEqual(withMtd.mtdSummary,
-    { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" },
+    { periodKey: "FY27-SEP", amountExact: "1700", asOf: "2026-09-22T09:00:00+09:00" },
     "MTD responses accept display Forecast while Total excludes the overlapping current-period Forecast");
-  assert.equal(withMtd.portfolio.totalAmount, 2510);
-  assert.equal(withMtd.quarters[1].totalAmount, 2360);
+  assert.equal(withMtd.portfolio.totalAmountExact, "2510");
+  assert.equal(withMtd.quarters[1].totalAmountExact, "2360");
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...mtdAnalysis,
     quarters: mtdAnalysis.quarters.map((quarter) => quarter.quarter === "Q1"
@@ -161,9 +206,9 @@ void (async () => {
   const nonComparable = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
   assert.deepEqual(nonComparable.quarters.slice(2).map((quarter) => quarter.status), ["NOT_OPEN", "NOT_OPEN"],
     "deployed NOT_OPEN quarter semantics survive decoding");
-  assert.equal(nonComparable.salesRepOverview[0].actualGrowthAmount, null,
+  assert.equal(nonComparable.salesRepOverview[0].actualGrowthAmountExact, null,
     "unavailable Sales Rep YoY amount remains null");
-  assert.equal(nonComparable.accounts[0].actualGrowthAmount, null,
+  assert.equal(nonComparable.accounts[0].actualGrowthAmountExact, null,
     "unavailable Account YoY amount remains null");
 
   runtime.fetch = async (input) => {
@@ -197,10 +242,10 @@ void (async () => {
   };
   runtime.fetch = async () => new Response(JSON.stringify(signedAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
   const signedDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
-  assert.equal(signedDecoded.portfolio.totalAmount, -50, "valid credits and negative adjustments remain analyzable");
-  assert.equal(signedDecoded.accounts[0].totalAmount, -100,
+  assert.equal(signedDecoded.portfolio.totalAmountExact, "-50", "valid credits and negative adjustments remain analyzable");
+  assert.equal(signedDecoded.accounts[0].totalAmountExact, "-100",
     "a legacy additive wire total is normalized to signed Actual during a rolling cache/API transition");
-  assert.equal(signedDecoded.accounts[0].percentage, 125, "signed portfolios may produce contribution percentages outside 0–100");
+  assert.equal(signedDecoded.accounts[0].percentageExact, "125", "signed portfolios may produce contribution percentages outside 0–100");
 
   const zeroDenominatorAnalysis = {
     ...analysis,
@@ -210,9 +255,9 @@ void (async () => {
   };
   runtime.fetch = async () => new Response(JSON.stringify(zeroDenominatorAnalysis), { status: 200, headers: { "Content-Type": "application/json" } });
   const zeroDenominatorDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
-  assert.equal(zeroDenominatorDecoded.accounts[0].percentage, null,
+  assert.equal(zeroDenominatorDecoded.accounts[0].percentageExact, null,
     "a zero Actual denominator remains a valid null contribution percentage");
-  assert.equal(zeroDenominatorDecoded.accounts[0].workloads[0].plans[0].percentage, null);
+  assert.equal(zeroDenominatorDecoded.accounts[0].workloads[0].plans[0].percentageExact, null);
 
   for (const malformed of [
     { ...analysis, fiscalYear: "2027" },
@@ -220,7 +265,8 @@ void (async () => {
     { ...analysis, portfolio: { ...analysis.portfolio, coveragePercent: 101 } },
     { ...analysis, quarters: analysis.quarters.slice(0, 3) },
     { ...analysis, quarters: analysis.quarters.map((quarter, index) => index === 0 ? { ...quarter, status: "UNKNOWN" } : quarter) },
-    { ...analysis, accounts: [{ ...analysis.accounts[0], percentage: "101" }] },
+    { ...analysis, quarters: analysis.quarters.map((quarter, index) => index === 1 ? { ...quarter, qoqChangePercent: "not-a-decimal" } : quarter) },
+    { ...analysis, accounts: [{ ...analysis.accounts[0], percentage: "not-a-decimal" }] },
     { ...analysis, accounts: [analysis.accounts[0], { ...analysis.accounts[0], workloads: [] }] },
     { ...analysis, accounts: [{ ...analysis.accounts[0], workloads: [analysis.accounts[0].workloads[0], { ...analysis.accounts[0].workloads[0], plans: [] }] }] },
     { ...analysis, alerts: [analysis.alerts[0], { ...analysis.alerts[0] }] },
@@ -235,10 +281,10 @@ void (async () => {
   }
 
   const accountRows = [
-    { ...analysis.accounts[0], account: "Zulu", totalAmount: 100 },
-    { ...analysis.accounts[0], account: "Alpha", totalAmount: 300 },
-    { ...analysis.accounts[0], account: "Bravo", totalAmount: 200 }
-  ] as unknown as ConsumptionAnalysisAccount[];
+    { ...zeroDenominatorDecoded.accounts[0], account: "Zulu", totalAmountExact: "100" },
+    { ...zeroDenominatorDecoded.accounts[0], account: "Alpha", totalAmountExact: "300" },
+    { ...zeroDenominatorDecoded.accounts[0], account: "Bravo", totalAmountExact: "200" }
+  ];
   assert.deepEqual(sortAndFilterConsumptionAccounts(accountRows, "a", "amount", "desc").map((row) => row.account), ["Alpha", "Bravo"]);
   assert.equal(nextConsumptionBatchSize(25, 10), 20);
   assert.equal(nextConsumptionBatchSize(25, 20), 25);
@@ -258,26 +304,28 @@ void (async () => {
   });
 
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, {}), plan("b", {}, {})], "FY27-SEP", undefined),
-    { amount: null, detailState: "MISSING", editable: true, source: "MANUAL" });
+    { amount: null, amountExact: null, detailState: "MISSING", editable: true, source: "MANUAL" });
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 0 }), plan("b", {}, {})], "FY27-SEP", 0),
-    { amount: 0, detailState: "ZERO", editable: true, source: "MANUAL" }, "explicit zero remains distinct from missing");
+    { amount: 0, amountExact: "0", detailState: "ZERO", editable: true, source: "MANUAL" }, "explicit zero remains distinct from missing");
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", { "FY27-AUG": 0 }, {}), plan("b", {}, {})], "FY27-AUG", undefined),
-    { amount: 0, detailState: "ZERO", editable: true, source: "DETAIL" }, "an explicit zero Actual remains visible without a manual Forecast");
+    { amount: 0, amountExact: "0", detailState: "ZERO", editable: true, source: "DETAIL" }, "an explicit zero Actual remains visible without a manual Forecast");
   assert.deepEqual(resolveConsumptionControlTotal([plan("a", {}, { "FY27-SEP": 25 }), plan("b", {}, { "FY27-SEP": 0 })], "FY27-SEP", 999),
-    { amount: 25, detailState: "VALUE", editable: false, source: "DETAIL" }, "a non-zero child value immediately owns the Control Total");
+    { amount: 25, amountExact: "25", detailState: "VALUE", editable: false, source: "DETAIL" }, "a non-zero child value immediately owns the Control Total");
 
   const compositionAccounts = [
-    { account: "Natural", totalForecastAmount: 400, newAmount: 0, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 0 },
-    { account: "New", totalForecastAmount: 200, newAmount: 200, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 200 },
-    { account: "Expansion", totalForecastAmount: 250, newAmount: 0, expansionAmount: 50, reductionAmount: 0, netMovementAmount: 50 },
-    { account: "Reduction", totalForecastAmount: 180, newAmount: 0, expansionAmount: 0, reductionAmount: 20, netMovementAmount: -20 },
-    { account: "Rounded zero", totalForecastAmount: 5, newAmount: 4.9, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 4.9 },
-    { account: "Visible precision", totalForecastAmount: 5, newAmount: 5, expansionAmount: 0, reductionAmount: 0, netMovementAmount: 5 }
+    { account: "Natural", totalForecastAmountExact: "400", newAmountExact: "0", expansionAmountExact: "0", reductionAmountExact: "0", netMovementAmountExact: "0" },
+    { account: "New", totalForecastAmountExact: "200", newAmountExact: "200", expansionAmountExact: "0", reductionAmountExact: "0", netMovementAmountExact: "200" },
+    { account: "Expansion", totalForecastAmountExact: "250", newAmountExact: "0", expansionAmountExact: "50", reductionAmountExact: "0", netMovementAmountExact: "50" },
+    { account: "Reduction", totalForecastAmountExact: "180", newAmountExact: "0", expansionAmountExact: "0", reductionAmountExact: "20", netMovementAmountExact: "-20" },
+    { account: "Rounded zero", totalForecastAmountExact: "5", newAmountExact: "4.9", expansionAmountExact: "0", reductionAmountExact: "0", netMovementAmountExact: "4.9" },
+    { account: "Visible precision", totalForecastAmountExact: "5", newAmountExact: "5", expansionAmountExact: "0", reductionAmountExact: "0", netMovementAmountExact: "5" }
   ];
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "All").map((row) => row.account),
     ["Natural", "New", "Expansion", "Reduction", "Rounded zero", "Visible precision"],
     "All preserves the API's full Forecast Total account set, including Base/Natural-only and small positive values");
-  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account), ["New", "Visible precision"]);
+  assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "New").map((row) => row.account),
+    ["New", "Rounded zero", "Visible precision"],
+    "exact positive values remain visible even when a coarser display would round them to zero");
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Expansion").map((row) => row.account), ["Expansion"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Reduction").map((row) => row.account), ["Reduction"]);
   console.log("consumptionAnalysis tests passed");

@@ -12,7 +12,7 @@ import {
   saveConsumptionForecasts
 } from "../src/data/consumptionApi";
 import { buildDisplayQuarterSummaries } from "../src/data/consumptionData";
-import { parseForecastCompositionK } from "../src/data/forecastComposition";
+import { forecastAmountExactToKInput, parseForecastCompositionK } from "../src/data/forecastComposition";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
@@ -24,14 +24,17 @@ const payload = {
   editablePeriodIds: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
   displayQuarterOrder: ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"],
   plans: [{ planId: 11, stableKey: "A::EU::P1::DC", account: "A", endUser: "EU", planCode: "P1", dataCenter: "DC", dpDataCenterCount: null, ociDataCenterCount: null, workload: "Autonomous Database",
-    facts: [{ periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "ALL" },
-      { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 999, versionNo: 3, pillar: null }] }],
+    facts: [{ periodKey: "FY27-AUG", actualAmount: 60, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" },
+      { periodKey: "FY27-AUG", actualAmount: 40, forecastAmount: null, versionNo: 2, pillar: "OCI", actualState: "FINAL" },
+      { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 333, versionNo: 3, pillar: "DP", actualState: null },
+      { periodKey: "FY27-OCT", actualAmount: null, forecastAmount: 666, versionNo: 4, pillar: "OCI", actualState: null }] }],
   controlTotals: [
-    { account: "A", periodKey: "FY27-AUG", controlAmount: 100, detailAmount: 100, matchStatus: "MATCH", pillar: "ALL" },
-    { account: "A", periodKey: "FY27-SEP", controlAmount: 999, detailAmount: null, matchStatus: "NO_DETAIL", pillar: "ALL" },
-    { account: "A", periodKey: "FY27-OCT", controlAmount: 777, detailAmount: null, matchStatus: "MANUAL_FORECAST", pillar: "ALL" },
-    { account: "B", periodKey: "FY27-AUG", controlAmount: 50, detailAmount: 50, matchStatus: "MATCH", pillar: "ALL" },
-    { account: "B", periodKey: "FY27-SEP", controlAmount: 0, detailAmount: 0, matchStatus: "MATCH", pillar: "ALL" }
+    { account: "A", periodKey: "FY27-AUG", controlAmount: 100, detailAmount: 100, matchStatus: "MATCH", pillar: "DP", actualState: "FINAL" },
+    { account: "A", periodKey: "FY27-AUG", controlAmount: 40, detailAmount: 40, matchStatus: "MATCH", pillar: "OCI", actualState: "FINAL" },
+    { account: "A", periodKey: "FY27-SEP", controlAmount: 999, detailAmount: null, matchStatus: "NO_DETAIL", pillar: "DP", actualState: "FINAL" },
+    { account: "A", periodKey: "FY27-OCT", controlAmount: 777, detailAmount: null, matchStatus: "MANUAL_FORECAST", pillar: "DP", actualState: "FINAL" },
+    { account: "B", periodKey: "FY27-AUG", controlAmount: 50, detailAmount: 50, matchStatus: "MATCH", pillar: "OCI", actualState: "FINAL" },
+    { account: "B", periodKey: "FY27-SEP", controlAmount: 0, detailAmount: 0, matchStatus: "MATCH", pillar: "OCI", actualState: "FINAL" }
   ], signals: []
 };
 const changeSignal = {
@@ -50,11 +53,43 @@ runtime.fetch = async (input) => {
 
 void (async () => {
   assert.deepEqual(parseForecastCompositionK("100.25", "20", "30.25"), {
-    totalAmount: 100250, newAmount: 20000, expansionAmount: 30250
+    totalAmountExact: "100250", newAmountExact: "20000", expansionAmountExact: "30250"
   });
   assert.equal(typeof parseForecastCompositionK("100", "60", "50"), "string");
   assert.equal(typeof parseForecastCompositionK("", "0", "0"), "string");
-  assert.equal(typeof parseForecastCompositionK("1.001", "0", "0"), "string");
+  assert.deepEqual(parseForecastCompositionK("0.1234567", "0.0234567", "0.1"), {
+    totalAmountExact: "123.4567", newAmountExact: "23.4567", expansionAmountExact: "100"
+  });
+  assert.equal(typeof parseForecastCompositionK("0.12345678", "0", "0"), "string");
+  assert.deepEqual(
+    parseForecastCompositionK("9999999999999.9999999", "5000000000000", "4999999999999.9999999"),
+    {
+      totalAmountExact: "9999999999999999.9999", newAmountExact: "5000000000000000",
+      expansionAmountExact: "4999999999999999.9999"
+    },
+    "the full NUMBER(20,4) boundary remains exact without creating a lossy numeric alias"
+  );
+  assert.equal(parseForecastCompositionK("10000000000000", "0", "0"), "Forecast value must fit NUMBER(20,4).");
+  assert.equal(forecastAmountExactToKInput("900719925474.0003"), "900719925.4740003",
+    "reopening an unsafe-integer forecast must not round its editor input");
+  assert.equal(forecastAmountExactToKInput("0.0001"), "0.0000001",
+    "the minimum NUMBER(20,4) unit must remain a valid seven-decimal K input");
+  assert.equal(forecastAmountExactToKInput("1000.0000"), "1");
+  assert.equal(forecastAmountExactToKInput(null), "");
+  const reopenedHighPrecision = parseForecastCompositionK(
+    forecastAmountExactToKInput("900719925474.0003"),
+    forecastAmountExactToKInput("900719925474.0003"),
+    "0"
+  );
+  assert.equal(typeof reopenedHighPrecision, "object");
+  if (typeof reopenedHighPrecision === "object") assert.equal(reopenedHighPrecision.totalAmountExact, "900719925474.0003");
+  const reopenedMinimum = parseForecastCompositionK(
+    forecastAmountExactToKInput("0.0001"),
+    forecastAmountExactToKInput("0.0001"),
+    "0"
+  );
+  assert.equal(typeof reopenedMinimum, "object");
+  if (typeof reopenedMinimum === "object") assert.equal(reopenedMinimum.totalAmountExact, "0.0001");
 
   const workspace = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1" });
   assert.equal(workspace.etag, '"header-etag"');
@@ -63,13 +98,16 @@ void (async () => {
   assert.equal(workspace.toQuarter, "FY27-Q1");
   assert.deepEqual(workspace.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
   assert.deepEqual(workspace.displayQuarterOrder, ["FY27-Q2", "FY27-Q1", "FY26-Q4", "FY26-Q3", "FY26-Q2", "FY26-Q1"]);
-  assert.equal(workspace.controlTotalCount, 2, "monthly control entries must be reported as two source Multiple controls");
+  assert.equal(workspace.controlTotalCount, 2, "source Multiple control count remains independent from pillar-aware control rows");
+  assert.deepEqual(workspace.controlTotals.filter((control) => control.account === "A" && control.periodKey === "FY27-AUG")
+    .map((control) => control.pillar).sort(), ["DP", "OCI"],
+  "ALL mode accepts and preserves DP and OCI controls for the same account and period without collision");
   assert.equal(workspace.controlTotals.find((control) => control.periodKey === "FY27-OCT")?.matchStatus, "MANUAL_FORECAST");
   assert.equal(workspace.plans[0].workload, "Autonomous Database", "Plan Number mapping exposes its Workload without a client-side lookup");
   assert.equal(workspace.plans[0].forecasts["FY27-OCT"], 999, "persisted server forecast must remain authoritative");
   assert.equal(workspace.plans[0].forecasts["FY27-NOV"], undefined, "a missing editable forecast month remains absent");
   assert.equal("FY27-SEP" in workspace.plans[0].forecasts, false);
-  assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 3);
+  assert.equal(workspace.plans[0].versions?.["FY27-OCT"], 4);
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=FY26-Q1&toQuarter=FY27-Q1&search=database&sort=AMOUNT&direction=DESC&offset=10&limit=10");
@@ -94,10 +132,10 @@ void (async () => {
   assert.deepEqual(records.accountGroups.map((group) => group.account), ["A"]);
   assert.equal(records.accountGroups[0].plans[0].workload, "Autonomous Database");
   assert.deepEqual([records.totalAccounts, records.nextOffset, records.hasMore], [11, 11, false]);
-  assert.equal(records.totals.actualByPeriod["FY27-AUG"], 300, "server total covers the full filtered result, not only the loaded page");
-  assert.equal(records.accountGroups[0].totals.outlookByPeriod["FY27-OCT"], 20);
+  assert.equal(records.totals.actualByPeriod["FY27-AUG"], "300", "server total covers the full filtered result, not only the loaded page");
+  assert.equal(records.accountGroups[0].totals.outlookByPeriod["FY27-OCT"], "20");
   assert.deepEqual(records.totals.incompletePeriods, ["FY27-SEP"]);
-  assert.deepEqual(records.totals.mtdByPeriod, { "FY27-SEP": 175 });
+  assert.deepEqual(records.totals.mtdByPeriod, { "FY27-SEP": "175" });
   assert.deepEqual(records.totals.mtdStatusByPeriod,
     { "FY27-SEP": "PROVISIONAL", "FY27-AUG": "FINAL_UPLOAD_REQUIRED" });
 
@@ -125,8 +163,15 @@ void (async () => {
   assert.deepEqual([forecastOnlyPage.nextOffset, forecastOnlyPage.hasMore], [12, false]);
   assert.deepEqual(forecastOnlyPage.accountForecasts[0], {
     account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "DP",
-    amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
-    previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
+    amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7,
+    amountExact: "25", totalAmountExact: "25", newAmountExact: "5", expansionAmountExact: "7",
+    amountChartCoordinate: 25, totalAmountChartCoordinate: 25,
+    newAmountChartCoordinate: 5, expansionAmountChartCoordinate: 7,
+    baseAmount: 13, reductionAmount: 2,
+    baseAmountExact: "13", reductionAmountExact: "2",
+    baseAmountChartCoordinate: 13, reductionAmountChartCoordinate: 2,
+    previousAmount: 15, previousAmountExact: "15", previousAmountChartCoordinate: 15,
+    previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
     compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE"
   }, "Consumption Records preserves every forecast-composition field supplied by the backend");
 
@@ -198,10 +243,10 @@ void (async () => {
     ...payload,
     fromQuarter: "FY26-Q4", toQuarter: "FY26-Q4", displayQuarterOrder: ["FY27-Q2", "FY26-Q4"],
     plans: [{ ...payload.plans[0], facts: [
-      { periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1 },
-      { periodKey: "FY26-MAR", actualAmount: 70, forecastAmount: null, versionNo: 1 },
-      { periodKey: "FY26-APR", actualAmount: 80, forecastAmount: null, versionNo: 1 },
-      { periodKey: "FY26-MAY", actualAmount: 90, forecastAmount: null, versionNo: 1 }
+      { periodKey: "FY27-AUG", actualAmount: 100, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" },
+      { periodKey: "FY26-MAR", actualAmount: 70, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" },
+      { periodKey: "FY26-APR", actualAmount: 80, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" },
+      { periodKey: "FY26-MAY", actualAmount: 90, forecastAmount: null, versionNo: 1, pillar: "DP", actualState: "FINAL" }
     ] }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"past-range"' } });
   const pastRange = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q4", toQuarter: "FY26-Q4" });
@@ -215,10 +260,8 @@ void (async () => {
     selectedPillar: "ALL", etag: '"legacy-etag"', lastBatchId: null, plans: payload.plans,
     controlTotals: payload.controlTotals, signals: []
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"legacy-etag"' } });
-  const compatible = await fetchConsumptionWorkspace();
-  assert.equal(compatible.currentFiscalMonth, "FY27-AUG", "legacy workspaces derive the latest Actual fiscal month");
-  assert.deepEqual(compatible.editablePeriodIds, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
-  assert.deepEqual(compatible.displayQuarterOrder.slice(0, 2), ["FY27-Q2", "FY27-Q1"]);
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption workspace pillar metadata/,
+    "a legacy workspace without the pillar contract must be rejected instead of silently decoded");
 
   let putInit: RequestInit | undefined;
   runtime.fetch = async (_input, init) => {
@@ -226,16 +269,22 @@ void (async () => {
     return new Response(JSON.stringify({ ...payload, selectedPillar: "DP", plans: [], controlTotals: [], etag: '"next-etag"' }), { status: 200, headers: { ETag: '"next-etag"' } });
   };
   const saved = await saveConsumptionForecasts('"header-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
-    amount: 100000, totalAmount: 100000, newAmount: 20000, expansionAmount: 30000 }], "DP");
+    amount: "100000", totalAmount: "100000", newAmount: "20000", expansionAmount: "30000" }], "DP");
   assert.equal(putInit?.method, "PUT");
   assert.equal((putInit?.headers as Record<string, string>)["If-Match"], '"header-etag"');
   assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
-    amount: 100000, totalAmount: 100000, newAmount: 20000, expansionAmount: 30000 }] });
+    amount: "100000", totalAmount: "100000", newAmount: "20000", expansionAmount: "30000" }] });
   assert.equal(saved.etag, '"next-etag"');
-  await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }], "DP");
+  await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
+    amount: "900719925474.0003", totalAmount: "900719925474.0003", newAmount: "0.0001",
+    expansionAmount: "900719925474.0002" }], "DP");
+  assert.deepEqual(JSON.parse(String(putInit?.body)), { updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP",
+    amount: "900719925474.0003", totalAmount: "900719925474.0003", newAmount: "0.0001",
+    expansionAmount: "900719925474.0002" }] }, "unsafe-integer decimal strings remain exact through the UI request wire format");
+  await saveConsumptionForecasts('"next-etag"', [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: "0" }], "DP");
   assert.deepEqual(JSON.parse(String(putInit?.body)), {
-    updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: 0 }]
-  }, "a numeric zero Control Total remains distinct from a missing/null control");
+    updates: [], controlUpdates: [{ account: "A", periodKey: "FY27-OCT", pillar: "DP", amount: "0" }]
+  }, "an exact decimal zero Control Total remains distinct from a missing/null control");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     workspace: payload, planCount: 1, controlTotalCount: 0, insertedCount: 0, updatedCount: 1, appliedCount: 1
@@ -250,7 +299,7 @@ void (async () => {
       current: { ...payload, selectedPillar, etag: '"current-etag"', plans: [], controlTotals: [], accountForecasts: [] }
     }), { status: 409, headers: { "Content-Type": "application/json" } });
     await assert.rejects(
-      () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: selectedPillar, amount: 1002 }], selectedPillar),
+      () => saveConsumptionForecasts('"stale"', [{ account: "A", periodKey: "FY27-OCT", pillar: selectedPillar, amount: "1002" }], selectedPillar),
       (error: unknown) => error instanceof ConsumptionConflictError
         && error.current.etag === '"current-etag"'
         && error.current.selectedPillar === selectedPillar,
@@ -263,6 +312,42 @@ void (async () => {
     plans: [{ ...payload.plans[0], facts: [{ ...payload.plans[0].facts[0], versionNo: "1" }] }]
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"malformed-fact"' } });
   await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption fact response/);
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
+    plans: [{ ...payload.plans[0], facts: [{ ...payload.plans[0].facts[0], actualState: undefined }] }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"missing-actual-state"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(), /Malformed Consumption fact response/,
+    "an Actual fact without explicit actualState must not be silently treated as FINAL");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, selectedPillar: "DP", plans: [], controlTotals: [],
+    accountForecasts: [{ account: "A", normalizedAccount: "A", periodKey: "FY27-OCT", pillar: "OCI",
+      amount: "900719925474.0003", totalAmount: "900719925474.0003", newAmount: "0.0001",
+      expansionAmount: "0", baseAmount: "900719925474.0002", reductionAmount: null, previousAmount: null,
+      previousSource: "Unavailable", reductionStatus: "UNAVAILABLE", compositionStatus: "CLASSIFIED",
+      version: 1, status: "DRAFT", completeness: "COMPLETE" }], forecastVariances: []
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"cross-pillar-forecast"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(undefined, "DP"), /Malformed Consumption account forecast/,
+    "a DP response must reject an OCI account forecast instead of filtering it later");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload, selectedPillar: "DP", plans: [], controlTotals: [], accountForecasts: [],
+    forecastVariances: [{ account: "A", normalizedAccount: "A", periodKey: "FY27-OCT", pillar: "OCI",
+      actualAmount: null, forecastAmount: "900719925474.0003", varianceAmount: null,
+      variancePercent: null, completeness: "INCOMPLETE" }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"cross-pillar-variance"' } });
+  await assert.rejects(() => fetchConsumptionWorkspace(undefined, "DP"), /Malformed Consumption forecast variance/,
+    "a DP response must reject an OCI variance instead of filtering it later");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...payload,
+    controlTotals: [{ ...payload.controlTotals[0], matchStatus: "STALE_CONTROL", controlAmount: 128, detailAmount: 346 }]
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"stale-control"' } });
+  const staleWorkspace = await fetchConsumptionWorkspace();
+  assert.equal(staleWorkspace.controlTotals[0].matchStatus, "STALE_CONTROL");
+  assert.equal(staleWorkspace.controlTotals[0].controlAmount, 128);
+  assert.equal(staleWorkspace.controlTotals[0].detailAmount, 346);
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...payload, signals: [{ ...changeSignal, grade: "UNTRUSTED" }]
@@ -317,8 +402,8 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-reference", sources: [{ fileName: "forecast.csv", sha256: "a".repeat(64) }],
-    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", totalAmount: 7,
-      newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3, reductionBasis: "PRIOR_QUARTER_ACTUAL",
+    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", totalAmount: "900719925474.0003",
+      newAmount: "0.0001", expansionAmount: "2", baseAmount: "900719925472.0002", reductionAmount: "3", reductionBasis: "PRIOR_QUARTER_ACTUAL",
       compositionStatus: "CLASSIFIED", sourceFile: "forecast.csv", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],
     salesRepChanges: [{ normalizedAccount: "A", account: "Account A", beforeSalesRep: "Old Rep", afterSalesRep: "New Rep", changed: true }],
@@ -330,8 +415,9 @@ void (async () => {
   assert.match(referencePreview.referenceNotice ?? "", /read-only.*never imported/i);
   assert.deepEqual(referencePreview.changes[0], {
     rowNumber: 2, account: "A", resolvedAccount: "A", endUser: null, planCode: null, periodKey: "FY27-SEP",
-    forecastAmount: 7, totalAmount: 7, newAmount: 1, expansionAmount: 2, baseAmount: 4, reductionAmount: 3,
-    previousSource: "PRIOR_QUARTER_ACTUAL", compositionStatus: "CLASSIFIED", rawValue: "7|1|2",
+    forecastAmount: "900719925474.0003", totalAmount: "900719925474.0003", newAmount: "0.0001", expansionAmount: "2",
+    baseAmount: "900719925472.0002", reductionAmount: "3",
+    previousSource: "PRIOR_QUARTER_ACTUAL", compositionStatus: "CLASSIFIED", rawValue: "900719925474.0003|0.0001|2",
     existingForecastAmount: null, resolution: "PLAN_UNASSIGNED"
   }, "Forecast Preview decodes raw-to-canonical movement composition and its prior basis");
   assert.deepEqual(referencePreview.canonicalPeriods, ["FY27-SEP"], "allowed periods come from the backend preview contract");

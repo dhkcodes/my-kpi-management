@@ -15,13 +15,13 @@ const styles = readFileSync("src/styles/app.css", "utf8");
 
 assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
-assert.match(insightsPage, /<strong>Actual \{amountK\(account\.actualAmount\)\}<\/strong>/,
+assert.match(insightsPage, /<strong>Actual \{formatExactK\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
-assert.match(insightsPage, /Forecast \{amountK\(account\.forecastAmount\)\} · Covered-period expected \{amountK\(account\.actualAmount \+ account\.forecastAmount\)\}/,
+assert.match(insightsPage, /Forecast \{formatExactK\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactK\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
   "entered Forecast and covered-period expected use separate fields without changing contribution totals");
 assert.match(insightsPage, /Forecast missing · Covered-period expected unavailable/,
   "missing Forecast remains distinct and does not fabricate an expected amount");
-assert.match(insightsPage, /Forecast \{amountK\(account\.forecastAmount\)\} \(entered as 0\) · Covered-period expected \{amountK\(account\.actualAmount \+ account\.forecastAmount\)\}/,
+assert.match(insightsPage, /Forecast \{formatExactK\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactK\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
   "an explicit zero Forecast remains distinct while showing the covered-period sum");
 assert.doesNotMatch(insightsPage, /FY Expected/, "partial-year coverage is never presented as a full-year expectation");
 assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.consumption-sales-attention-list button\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*\}/,
@@ -49,7 +49,7 @@ assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
 assert.match(homeConsumption, /확정 업로드 필요/, "Home guides users when a previous MTD remains unresolved");
 assert.match(homeConsumption, />MTD \(잠정\)</, "Home labels current-month MTD as provisional rather than Actual");
-assert.match(homeConsumption, /const showActual = quarter\.actualAmount !== 0;[\s\S]*const showMtd = !showActual && mtd\?\.amount !== null && mtd\?\.amount !== undefined;/,
+assert.match(homeConsumption, /const showActual = compareExactDecimals\(quarter\.actualAmountExact, "0"\) !== 0;[\s\S]*const showMtd = !showActual && mtd\?\.amountExact !== null && mtd\?\.amountExact !== undefined;/,
   "Quarterly display treats zero Actual as absent, shows available MTD only then, and hides MTD for non-zero Actual");
 assert.doesNotMatch(homeConsumption, /Separate values|Actual periods are closed results|Partial or incomplete source coverage|MTD \(잠정\) is provisional|Current-month MTD is provisional|Actual and Forecast remain separate/,
   "Home removes the requested explanatory copy and orphaned footnotes");
@@ -188,8 +188,8 @@ assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoin
 assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
 assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
-assert.match(insightsPage, /ACTUAL ONLY[\s\S]*account\.actualAmount[\s\S]*plan\.actualAmount/, "both Contribution cards render Actual-only amounts");
-assert.match(insightsPage, /contributionPercentText\(account\.percentage\)[\s\S]*contributionPercentText\(plan\.percentage\)/, "both Contribution cards render nullable Actual-only percentages");
+assert.match(insightsPage, /ACTUAL ONLY[\s\S]*account\.actualAmountExact[\s\S]*plan\.actualAmountExact/, "both Contribution cards render exact Actual-only amounts");
+assert.match(insightsPage, /contributionPercentText\(account\.percentageExact\)[\s\S]*contributionPercentText\(plan\.percentageExact\)/, "both Contribution cards render nullable exact Actual-only percentages");
 assert.match(insightsPage, /Finalized Actual periods:[^`]+actualPeriods\.join/, "Contribution discloses the exact finalized Actual periods");
 assert.match(insightsPage, /Actual not entered[\s\S]*Actual 0 entered/, "Contribution distinguishes missing Actual from an entered zero");
 assert.doesNotMatch(insightsPage.slice(insightsPage.indexOf('aria-label="Account to Plan contribution"')), /splitLabel\(account\)|planSplitLabel\(plan\)|is-forecast/, "Contribution amount, label, and bars do not use Forecast");
@@ -197,15 +197,15 @@ assert.match(insightsPage, /const selectedAccount = analysis\?\.accounts\.find[^
 assert.match(insightsPage, /const rows = \[[\s\S]*analysis\.fiscalYear[\s\S]*analysis\.priorFiscalYear/, "fiscal chart places the current FY first and prior FY below");
 assert.match(insightsPage, /id="fyQuarterTotalsTitle">FY &amp; Quarter totals[\s\S]*<h3>\{analysis\.fiscalYear\} Mixed quarter consumption<\/h3>/, "the card keeps its FY and Quarter title while the Quarter region names its Actual-first Forecast-fallback meaning");
 assert.doesNotMatch(insightsPage, /otherContribution|otherSelected|Other Accounts|consumption-insights-account-other/, "Consumption Analysis removes the aggregate Other Accounts contract and UI");
-assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*contributionPercentText\(plan\.percentage\)\} of \{percentageContext\}/, "normal Account plans retain the selected Account percentage label");
+assert.match(insightsPage, /percentageContext: "selected Account"[\s\S]*contributionPercentText\(plan\.percentageExact\)\} of \{percentageContext\}/, "normal Account plans retain the selected Account exact-percentage label");
 assert.match(insightsPage, /\{!isUnmappedConsumptionLabel\(workload\) && <>\s*<b>\{workload\}<\/b> · <\/?>\}Plan \{plan\.planId\}/, "Plan Contribution keeps actual workload names while omitting unmapped labels regardless of case or surrounding whitespace");
 assert.doesNotMatch(insightsPage, /<b>\{workload\}<\/b> · Plan \{plan\.planId\}/, "Plan Contribution does not render the workload label unconditionally");
 assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/, "the Consumption API excludes the removed Other Accounts response fields");
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
-assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendDataLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
-assert.match(insightsPage, /const trendDataLabel[\s\S]*compactCurrency\.format\(value\)/, "Chart value labels use the approved compact USD format");
-assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendDataLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendDataLabel\}/, "FY and Quarter totals expose each value through the official JET chart dataLabel callback");
+assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendChartCoordinateLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
+assert.match(insightsPage, /const trendChartCoordinateLabel[\s\S]*chartCurrency\.format\(value\)/, "Chart-coordinate value labels use the approved compact USD format");
+assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendChartCoordinateLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendChartCoordinateLabel\}/, "FY and Quarter totals expose each chart coordinate through the official JET chart dataLabel callback");
 assert.doesNotMatch(insightsPage, /Organic Consumption Growth Proxy|organicGrowthChart/, "the UI does not relabel Forecast movement composition as an organic-growth proxy");
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
 assert.match(insightsPage, /trendPoints\.length === 6[\s\S]*consumption-insights-actual-chart[\s\S]*Why flagged:/, "the six-month chart and selected-alert Why flagged explanation remain without the duplicate list");
@@ -225,10 +225,10 @@ assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)
 assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
 assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
-assert.match(recordsPage, /actuals: showMtd && currentMtdPeriod[\s\S]*hasCurrentMtd \? \{ \[currentMtdPeriod\]: serverMtdTotals\[currentMtdPeriod\] \}[\s\S]*forecasts: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
+assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPeriod[\s\S]*serverMtdTotals\[currentMtdPeriod\][\s\S]*actualsExact: \{ \.\.\.displayedActualsExact \}[\s\S]*forecastsExact: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
   "portfolio MTD is represented separately from Forecast and never falls back to the current-period Forecast");
-assert.match(recordsPage, /const currentMtd = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtds[\s\S]*actuals: \{[\s\S]*baseDisplaySeries\.actuals[\s\S]*hasCurrentMtd \? \{ \[currentMtdPeriod\]: currentMtd\[currentMtdPeriod\] \}[\s\S]*forecasts: Object\.fromEntries\(Object\.entries\(baseDisplaySeries\.forecasts\)\.filter\(\(\[period\]\) => period !== currentMtdPeriod\)\)/,
-  "account and plan MTD participate in current mode without being stored or classified as Forecast");
+assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtdsExact[\s\S]*applyConsumptionMtdDisplayOverride\(\s*baseDisplaySeries,\s*currentMtdPeriod,\s*currentMtdExact,\s*showMtd\s*\)/,
+  "account and plan MTD use the tested exact-decimal override without being stored or classified as Forecast");
 assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
 assert.match(recordsPage, /Account \/ Plan Consumption[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"/, "Records places Show MTD at the right side of the table heading");
 assert.doesNotMatch(recordsPage, /oj-ux-ico-information-s/, "Forecast composition no longer depends on an information icon");
@@ -300,11 +300,11 @@ assert.match(styles, /\.consumption-sales-rep-overview \.consumption-sales-rep-t
 assert.match(insightsPage, /consumption-insights-movement-list[\s\S]*<thead>[\s\S]*<th>Account<\/th>/, "the account table is isolated in its own scroll region with a retained header");
 assert.doesNotMatch(insightsPage, />Close<\/button>/, "composition detail no longer has a Close button");
 assert.match(styles, /\.consumption-insights-movement-detail \{[^}]*height: 100%;[^}]*overflow: hidden;[\s\S]*\.consumption-insights-movement-list \{[^}]*overflow: auto;[\s\S]*\.consumption-insights-movement-detail thead th \{[^}]*position: sticky;/, "detail matches the chart height and scrolls only the list while keeping the header");
-assert.match(insightsPage, /seriesId: "All"[\s\S]*value: toK\(point\.totalForecastAmount\)/, "All displays total Forecast in explicit K units rather than Renewal or net movement");
+assert.match(insightsPage, /point\.totalForecastAmountExact !== null[\s\S]*chartPoint\("All", point\.totalForecastAmountExact/, "All displays total Forecast in explicit K units rather than Renewal or net movement");
 assert.doesNotMatch(insightsPage, /compositionStatus !== "CLASSIFIED"/, "partially classified quarters do not suppress every stored Forecast component");
-assert.match(insightsPage, /point\.newAmount !== null[\s\S]*seriesId: "New"[\s\S]*point\.expansionAmount !== null[\s\S]*seriesId: "Expansion"[\s\S]*point\.reductionAmount !== null[\s\S]*seriesId: "Reduction"/, "each stored Forecast component is charted independently when available");
-assert.doesNotMatch(insightsPage, /if \(point\.totalForecastAmount === null\) return \[\]/, "a missing total Forecast never suppresses stored component series");
-assert.match(insightsPage, /const all = point\.totalForecastAmount === null \? null[\s\S]*return all === null \? components : \[all, \.\.\.components\]/, "All is omitted independently when unavailable while New, Expansion, and Reduction remain chartable");
+assert.match(insightsPage, /point\.newAmountExact !== null[\s\S]*chartPoint\("New", point\.newAmountExact[\s\S]*point\.expansionAmountExact !== null[\s\S]*chartPoint\("Expansion", point\.expansionAmountExact[\s\S]*point\.reductionAmountExact !== null[\s\S]*chartPoint\("Reduction", point\.reductionAmountExact/, "each stored Forecast component is charted independently when available");
+assert.doesNotMatch(insightsPage, /if \(point\.totalForecastAmountExact === null\) return \[\]/, "a missing total Forecast never suppresses stored component series");
+assert.match(insightsPage, /const points: InsightChartPoint\[\] = \[\][\s\S]*if \(point\.totalForecastAmountExact !== null\) points\.push[\s\S]*if \(point\.newAmountExact !== null\) points\.push[\s\S]*return points;/, "All is omitted independently when unavailable while New, Expansion, and Reduction remain chartable");
 assert.match(insightsPage, /filterForecastCompositionAccounts\(\s*selectedMovementPoint\.accounts, selectedMovement\.category\)/, "composition detail applies Forecast Total for All and component criteria for category tabs");
 assert.match(insightsPage, /consumption-insights-composition-grid[\s\S]*consumption-insights-composition-chart__plot[\s\S]*consumption-insights-movement-detail/, "Forecast composition chart and detail share an independent responsive section");
 assert.match(styles, /\.consumption-insights-composition-grid \{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[\s\S]*@media \(max-width: 1100px\)[\s\S]*\.consumption-insights-composition-grid[^}]*grid-template-columns: minmax\(0, 1fr\)/, "composition uses balanced columns on desktop and one column on narrower screens");
@@ -333,7 +333,7 @@ assert.match(recordsPage, /onDblClick[\s\S]*beginControlEdit/, "double click ent
 assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
 assert.match(recordsPage, /ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "each editable Forecast input binds whole-value selection to its stable Account-period key");
 assert.match(recordsPage, /<label><span>Total<\/span><input type="text" inputMode="decimal" value=\{forecastEditor\.total\}[\s\S]*ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "Forecast composition editor exposes a measurable whole-text selection range on its Total input");
-assert.match(recordsPage, /const validForecastKInput[\s\S]*\\d\{1,2\}[\s\S]*value\.trim/, "Forecast composition inputs accept non-negative K values with at most two decimals");
+assert.match(recordsPage, /const validForecastKInput[\s\S]*\\d\{1,7\}[\s\S]*value\.trim/, "Forecast composition inputs preserve NUMBER(20,4) through K values with at most seven decimals");
 assert.match(recordsPage, /applyForecastComposition[\s\S]*parseForecastCompositionK[\s\S]*updateControlForecast/, "Forecast composition apply validates the full composition before updating the Account control total");
 assert.match(recordsPage, /<form onSubmit=\{\(event\) => \{ event\.preventDefault\(\); applyForecastComposition\(\); \}\}[\s\S]*event\.key === "Escape"[\s\S]*cancelForecastComposition/, "submit applies and Escape cancels the Forecast composition popover");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
@@ -449,10 +449,10 @@ assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-a
 assert.match(insightsPage, /consumption-insights-fy-total[\s\S]*data=\{fiscalTotalsChart\}[\s\S]*consumption-insights-totals-divider[\s\S]*consumption-insights-quarter-totals[\s\S]*data=\{quarterTotalsChart\}/, "FY and Quarter totals use distinct stacked visual regions separated by a divider");
 assert.match(insightsPage, /analysis\.quarters\.flatMap/, "mixed quarter consumption remains sourced from effective fact-cell quarter totals");
 assert.match(insightsPage, /analysis\.movementBridge\.flatMap/, "Forecast movement composition remains a separate data source");
-assert.match(insightsPage, /seriesId: "New"/);
-assert.match(insightsPage, /seriesId: "Expansion"/);
-assert.match(insightsPage, /seriesId: "Reduction"/);
-assert.match(insightsPage, /value: -toK\(point\.reductionAmount\)/, "Reduction is converted to K and rendered below zero exactly once at the visual boundary");
+assert.match(insightsPage, /chartPoint\("New", point\.newAmountExact/);
+assert.match(insightsPage, /chartPoint\("Expansion", point\.expansionAmountExact/);
+assert.match(insightsPage, /chartPoint\("Reduction", point\.reductionAmountExact/);
+assert.match(insightsPage, /const signedAmountExact = category === "Reduction" \? negateExactDecimal\(amountExact\) : amountExact[\s\S]*value: amountExactToKChartCoordinate\(signedAmountExact\)/, "Reduction is converted to K and rendered below zero exactly once at the visual boundary");
 assert.doesNotMatch(insightsPage, /compositionStatus !== "CLASSIFIED"/, "quarter-level classification status does not suppress independently stored Forecast components");
 assert.match(insightsPage, /point\.includedForecastPeriods\.join/, "movement labels expose only included Forecast periods");
 assert.doesNotMatch(insightsPage, /run[- ]?rate/i, "movement labels do not invent run-rate periods");
@@ -463,7 +463,7 @@ assert.match(styles, /\.consumption-insights-alert-trend-grid[^}]*align-items:\s
 assert.match(styles, /\.consumption-insights-alert-trend \.consumption-signal-metrics > strong[^}]*font-size:\s*1\.2rem[\s\S]*\.consumption-insights-alert-trend \.consumption-signal-metrics > small[^}]*font-size:\s*\.82rem/, "alert amount, delta, and ratio are visually prominent");
 assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\{`Severity[^`]+`\}/, "Alert type and severity badges expose explicit accessible labels");
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
-assert.match(insightsPage, /contributionPercentText\(plan\.percentage\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidth\(plan\.percentage\)\}%/, "Plan Contribution uses each Plan percentage on a common group-wide 0–100 track");
+assert.match(insightsPage, /contributionPercentText\(plan\.percentageExact\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidthChartCoordinate\(plan\.percentageExact\)\}%/, "Plan Contribution uses each exact Plan percentage and projects only the visual track width");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
 assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
@@ -498,5 +498,9 @@ assert.match(
   /addEventListener\("pointerdown"/,
   "Consumption Analysis account results must close on pointer interaction outside the combobox",
 );
+
+assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
+assert.match(recordsPage, /actualControlTotals[\s\S]*matchStatus !== "MATCH"/, "stale or mismatched controls must remain visible rather than being silently omitted");
+assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale control must show both amounts and the confirmation-required state");
 
 console.log("consumptionUiContract tests passed");

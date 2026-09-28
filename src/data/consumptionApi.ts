@@ -12,6 +12,7 @@ import {
   getNextQuarterMonths
 } from "./consumptionData";
 import { apiFetch } from "../auth/apiFetch";
+import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, subtractExactDecimals } from "./exactDecimal";
 
 const apiBase = () => {
   const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: unknown; location?: { hostname?: string; port?: string } };
@@ -20,7 +21,7 @@ const apiBase = () => {
   return "/api/v1";
 };
 
-type RawFact = Readonly<{ periodKey: string; actualAmount: number | null; forecastAmount: number | null; versionNo: number; actualState?: unknown; pillar?: unknown }>;
+type RawFact = Readonly<{ periodKey: string; actualAmount: unknown; forecastAmount: unknown; versionNo: number; actualState?: unknown; pillar?: unknown }>;
 type RawPlan = Readonly<{ planId: number; stableKey: string; account: string; endUser: string; planCode: string; dataCenter: string; dataCenterBreakdown?: unknown; dpDataCenterCount?: unknown; ociDataCenterCount?: unknown; workload?: string | null; facts: RawFact[] }>;
 type RawSignalPoint = Readonly<{ periodKey: string; actualAmount: number }>;
 type RawSignal = Readonly<{
@@ -30,10 +31,10 @@ type RawSignal = Readonly<{
   previousDirection: ConsumptionSignal["previousDirection"]; sparkline: RawSignalPoint[]; reason: string
 }>;
 type RawControlTotal = Readonly<{
-  account: string; periodKey: string; controlAmount: number; detailAmount: number | null; matchStatus: string; pillar?: unknown;
+  account: string; periodKey: string; controlAmount: number; detailAmount: number | null; matchStatus: string; pillar?: unknown; actualState?: unknown;
 }>;
-type RawAccountForecast = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: unknown; amount: number; version: number; status: string; completeness: string }>;
-type RawForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: unknown; actualAmount: number | null; forecastAmount: number | null; varianceAmount: number | null; variancePercent: number | null; completeness: string }>;
+type RawAccountForecast = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: unknown; amount: unknown; version: number; status: string; completeness: string }>;
+type RawForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: unknown; actualAmount: unknown; forecastAmount: unknown; varianceAmount: unknown; variancePercent: unknown; completeness: string }>;
 type RawWorkspace = Readonly<{
   selectedPillar: unknown;
   etag: string;
@@ -71,15 +72,20 @@ export type ConsumptionApiWorkspace = Readonly<{
 export type ConsumptionForecastCompositionStatus = "CLASSIFIED" | "UNCLASSIFIED" | "UNAVAILABLE";
 export type ConsumptionAccountForecast = Readonly<{
   account: string; normalizedAccount: string; periodKey: string; pillar: Exclude<ConsumptionPillar, "ALL">;
-  amount: number; totalAmount: number; newAmount: number | null; expansionAmount: number | null;
-  baseAmount: number | null; reductionAmount: number | null; previousAmount: number | null;
+  amountChartCoordinate: number; totalAmountChartCoordinate: number; newAmountChartCoordinate: number | null; expansionAmountChartCoordinate: number | null;
+  amountExact: string; totalAmountExact: string; newAmountExact: string | null; expansionAmountExact: string | null;
+  baseAmountChartCoordinate: number | null; reductionAmountChartCoordinate: number | null; previousAmountChartCoordinate: number | null;
+  baseAmountExact: string | null; reductionAmountExact: string | null; previousAmountExact: string | null;
   previousSource: string; reductionStatus: string; compositionStatus: ConsumptionForecastCompositionStatus;
   version: number; status: "DRAFT" | "FINAL"; completeness: string;
 }>;
-export type ConsumptionForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: ConsumptionPillar; actualAmount: number | null; forecastAmount: number | null; varianceAmount: number | null; variancePercent: number | null; completeness: string }>;
+export type ConsumptionForecastVariance = Readonly<{ account: string; normalizedAccount: string; periodKey: string; pillar: ConsumptionPillar; actualAmountChartCoordinate: number | null; forecastAmountChartCoordinate: number | null; varianceAmountChartCoordinate: number | null; variancePercentChartCoordinate: number | null; actualAmountExact: string | null; forecastAmountExact: string | null; varianceAmountExact: string | null; variancePercentExact: string | null; completeness: string }>;
 export type ConsumptionApiControlTotal = Readonly<{
   account: string; periodKey: string; controlAmount: number; detailAmount: number | null;
-  matchStatus: "MATCH" | "MISMATCH" | "NO_DETAIL" | "MANUAL_FORECAST";
+  controlAmountExact?: string; detailAmountExact?: string | null;
+  matchStatus: "MATCH" | "MISMATCH" | "STALE_CONTROL" | "NO_DETAIL" | "MANUAL_FORECAST";
+  pillar: ConsumptionPillar;
+  actualState: "FINAL" | "MTD";
 }>;
 export type ConsumptionWorkspaceRange = Readonly<{ fromQuarter: string; toQuarter: string }>;
 export type ConsumptionRecordsQuery = Readonly<{
@@ -87,11 +93,11 @@ export type ConsumptionRecordsQuery = Readonly<{
   direction: "ASC" | "DESC"; offset: number; limit: number; pillar?: ConsumptionPillar;
 }>;
 export type ConsumptionRecordsTotals = Readonly<{
-  actualByPeriod: Readonly<Record<string, number>>;
-  appliedForecastByPeriod: Readonly<Record<string, number>>;
-  outlookByPeriod: Readonly<Record<string, number>>;
+  actualByPeriod: Readonly<Record<string, string>>;
+  appliedForecastByPeriod: Readonly<Record<string, string>>;
+  outlookByPeriod: Readonly<Record<string, string>>;
   incompletePeriods: readonly string[];
-  mtdByPeriod?: Readonly<Record<string, number>>;
+  mtdByPeriod?: Readonly<Record<string, string>>;
   mtdStatusByPeriod?: Readonly<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>;
 }>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
@@ -102,42 +108,43 @@ export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "
 export type ConsumptionAnalysisQuarter = Omit<ConsumptionAmountSplit, "status"> & Readonly<{
   status: ConsumptionAmountSplit["status"] | "NOT_OPEN";
   quarter: "Q1" | "Q2" | "Q3" | "Q4"; coveragePercent: number;
-  qoqChangeAmount: number | null; qoqChangePercent: number | null;
+  qoqChangeAmountExact: string | null; qoqChangePercentExact: string | null;
 }>;
 export type ConsumptionAnalysisAlert = Readonly<{
   alertId: string; serverPlanId: number; account: string; workload: string; workloadMapped: boolean; planId: string; periodKey: string;
   type: ConsumptionSignal["type"]; grade: ConsumptionSignal["grade"];
-  actualAmount: number; baselineMedian: number; changeAmount: number; changePercent: number | null; reason: string;
+  actualAmountExact: string; baselineMedianExact: string; changeAmountExact: string; changePercentExact: string | null; reason: string;
 }>;
 export type ConsumptionOrganicGrowthCategory = "NEW" | "EXPANSION" | "RETURNING_REACTIVATED" | "CONTRACTION" | "STABLE" | "UNCLASSIFIED_INCOMPLETE";
 export type ConsumptionOrganicGrowthPoint = Readonly<{
   category: ConsumptionOrganicGrowthCategory;
-  amount: number;
+  amountExact: string;
+  amountChartCoordinate: number;
   accountCount: number | null;
 }>;
 export type ConsumptionOrganicGrowthProxy = Readonly<{
   quarter: "Q1" | "Q2" | "Q3" | "Q4";
   comparisonQuarter: string;
   expected: boolean;
-  openingAmount: number;
-  closingAmount: number;
-  netGrowthAmount: number;
-  classifiedGrowthAmount: number;
-  reconciliationAmount: number;
+  openingAmountExact: string;
+  closingAmountExact: string;
+  netGrowthAmountExact: string;
+  classifiedGrowthAmountExact: string;
+  reconciliationAmountExact: string;
   explanation: string;
   categories: readonly ConsumptionOrganicGrowthPoint[];
 }>;
 export type ConsumptionMovementBridgePoint = Readonly<{
   quarter: "Q1" | "Q2" | "Q3" | "Q4";
-  totalForecastAmount: number | null;
-  newAmount: number | null; expansionAmount: number | null; reductionAmount: number | null;
-  netMovementAmount: number | null; compositionStatus: ConsumptionForecastCompositionStatus;
+  totalForecastAmountExact: string | null;
+  newAmountExact: string | null; expansionAmountExact: string | null; reductionAmountExact: string | null;
+  netMovementAmountExact: string | null; compositionStatus: ConsumptionForecastCompositionStatus;
   classifiedAccountCount: number; unclassifiedAccountCount: number; unavailableReason: string | null;
   includedForecastPeriods: readonly string[];
   accounts: readonly ConsumptionMovementAccountDetail[];
 }>;
 export type ConsumptionMovementAccountDetail = Readonly<{
-  account: string; totalForecastAmount: number; newAmount: number; expansionAmount: number; reductionAmount: number; netMovementAmount: number;
+  account: string; totalForecastAmountExact: string; newAmountExact: string; expansionAmountExact: string; reductionAmountExact: string; netMovementAmountExact: string;
 }>;
 export type ConsumptionAnalysis = Readonly<{
   selectedPillar: ConsumptionPillar;
@@ -147,10 +154,10 @@ export type ConsumptionAnalysis = Readonly<{
   periodCoverage: ConsumptionAnalysisPeriodCoverage;
   salesRepOverview: readonly ConsumptionSalesRepOverview[];
   portfolio: ConsumptionAmountSplit & Readonly<{
-    coveragePercent: number; priorActualAmount: number; priorForecastAmount: number; priorTotalAmount: number;
+    coveragePercent: number; priorActualAmountExact: string; priorForecastAmountExact: string; priorTotalAmountExact: string;
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
   }>;
-  mtdSummary: Readonly<{ periodKey: string; amount: number; asOf: string | null }> | null;
+  mtdSummary: Readonly<{ periodKey: string; amountExact: string; asOf: string | null }> | null;
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
@@ -164,21 +171,21 @@ export type ConsumptionAnalysisPeriodCoverage = Readonly<{
   priorComparisonPeriods: readonly string[]; comparisonStatus: string; comparisonUnavailableReason: string | null;
 }>;
 export type ConsumptionSalesRepOverview = Readonly<{
-  salesRep: string; actualAmount: number; priorActualAmount: number;
-  actualGrowthAmount: number | null; actualGrowthPercent: number | null;
+  salesRep: string; actualAmountExact: string; priorActualAmountExact: string;
+  actualGrowthAmountExact: string | null; actualGrowthPercentExact: string | null;
   yoyComparisonStatus: string; yoyUnavailableReason: string | null;
-  forecastAmount: number; fyExpectedAmount: number; accountCount: number;
-  topThreeConcentrationPercent: number; attentionAccountCount: number;
+  forecastAmountExact: string; fyExpectedAmountExact: string; accountCount: number;
+  topThreeConcentrationPercentExact: string; attentionAccountCount: number;
 }>;
 export type ConsumptionAnalysisQuery = Readonly<{ fiscalYear: string; search: string; account: string; salesRep?: string; pillar?: ConsumptionPillar; includeMtd?: boolean }>;
 export type ConsumptionControlForecastUpdate = Readonly<{
   account: string;
   periodKey: string;
   pillar: Exclude<ConsumptionPillar, "ALL">;
-  amount: number;
-  totalAmount?: number;
-  newAmount?: number;
-  expansionAmount?: number;
+  amount: string;
+  totalAmount?: string;
+  newAmount?: string;
+  expansionAmount?: string;
 }>;
 export type ConsumptionImportFilePreview = Readonly<{
   fileName: string; owner: string; fromPeriod: string; toPeriod: string; detectedPillar: Exclude<ConsumptionPillar, "ALL">;
@@ -241,11 +248,11 @@ export type ConsumptionForecastWideChange = Readonly<{
   endUser: string | null;
   planCode: string | null;
   periodKey: string;
-  forecastAmount: number;
-  totalAmount: number; newAmount: number | null; expansionAmount: number | null; baseAmount: number | null;
-  reductionAmount: number | null; previousSource: string; compositionStatus: ConsumptionForecastCompositionStatus;
+  forecastAmount: string;
+  totalAmount: string; newAmount: string | null; expansionAmount: string | null; baseAmount: string | null;
+  reductionAmount: string | null; previousSource: string; compositionStatus: ConsumptionForecastCompositionStatus;
   rawValue: string;
-  existingForecastAmount: number | null;
+  existingForecastAmount: string | null;
   resolution: ConsumptionForecastWideResolution;
 }>;
 export type ConsumptionForecastWideBlockedError = Readonly<{
@@ -310,6 +317,24 @@ const isNonNegativeFiniteNumber = (value: unknown): value is number => isFiniteN
 const isNullableFiniteNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
 const isDecimalString = (value: unknown): value is string => typeof value === "string" && /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value);
 const isNullableDecimalString = (value: unknown): value is string | null => value === null || isDecimalString(value);
+type ExactDecimal = Readonly<{ chartCoordinate: number; exact: string }>;
+const decodeExactDecimal = (value: unknown, nonNegative = false): ExactDecimal | null => {
+  if (typeof value === "string" && /^-?\d+(?:\.\d{1,4})?$/.test(value)) {
+    if (nonNegative && value.startsWith("-")) return null;
+    const [wholeWithSign, fraction = ""] = value.split(".");
+    const unsignedWhole = wholeWithSign.replace(/^-/, "").replace(/^0+(?=\d)/, "");
+    if (unsignedWhole.length > 16 || (unsignedWhole.length === 16 && unsignedWhole > "9999999999999999")) return null;
+    const normalized = `${wholeWithSign.startsWith("-") ? "-" : ""}${unsignedWhole}${fraction ? `.${fraction}` : ""}`;
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) ? { chartCoordinate: numeric, exact: normalized } : null;
+  }
+  if (isFiniteNumber(value) && (!nonNegative || value >= 0) && Number.isSafeInteger(value * 10_000)) {
+    return { chartCoordinate: value, exact: String(value) };
+  }
+  return null;
+};
+const decodeNullableExactDecimal = (value: unknown, nonNegative = false): ExactDecimal | null | undefined =>
+  value === null || value === undefined ? null : decodeExactDecimal(value, nonNegative) ?? undefined;
 const isCoveragePercent = (value: unknown): value is number => isFiniteNumber(value) && value >= 0 && value <= 100;
 const isNonNegativeInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 const isPositiveInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
@@ -368,7 +393,7 @@ const expectedSignalGrade = (amount: number, percent: number | null): Consumptio
 
 const amountStatuses = new Set<ConsumptionAmountSplit["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE"]);
 const quarterAmountStatuses = new Set<ConsumptionAnalysisQuarter["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE", "NOT_OPEN"]);
-const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "NO_DETAIL", "MANUAL_FORECAST"]);
+const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "STALE_CONTROL", "NO_DETAIL", "MANUAL_FORECAST"]);
 const malformedAnalysis = (): never => { throw new Error("Malformed Consumption analysis response"); };
 const hasValidYoyResult = (amount: unknown, percent: unknown, status: unknown, reason: unknown): boolean => {
   if (!isNonEmptyString(status) || !isNullableFiniteNumber(amount) || !isNullableFiniteNumber(percent)
@@ -379,28 +404,41 @@ const parseAmountSplit = (value: unknown, allowedStatuses: ReadonlySet<string> =
   requireAdditiveTotal = true): ConsumptionAmountSplit => {
   if (typeof value !== "object" || value === null) return malformedAnalysis();
   const raw = value as Record<string, unknown>;
-  if (!isFiniteNumber(raw.actualAmount) || !isFiniteNumber(raw.forecastAmount)
-    || !isFiniteNumber(raw.totalAmount) || typeof raw.status !== "string" || !allowedStatuses.has(raw.status)
-    || (requireAdditiveTotal && !nearlyEqual(raw.totalAmount, raw.actualAmount + raw.forecastAmount))) return malformedAnalysis();
-  return { actualAmount: raw.actualAmount, forecastAmount: raw.forecastAmount, totalAmount: raw.totalAmount,
-    status: raw.status as ConsumptionAmountSplit["status"] };
+  const actual = decodeExactDecimal(raw.actualAmount);
+  const forecast = decodeExactDecimal(raw.forecastAmount);
+  const total = decodeExactDecimal(raw.totalAmount);
+  if (!actual || !forecast || !total || typeof raw.status !== "string" || !allowedStatuses.has(raw.status)
+    || (requireAdditiveTotal && compareExactDecimals(total.exact, addExactDecimals(actual.exact, forecast.exact)) !== 0)) return malformedAnalysis();
+  return {
+    actualAmountExact: actual.exact,
+    forecastAmountExact: forecast.exact,
+    totalAmountExact: total.exact,
+    actualAmountChartCoordinate: exactDecimalToChartCoordinate(actual.exact),
+    forecastAmountChartCoordinate: exactDecimalToChartCoordinate(forecast.exact),
+    totalAmountChartCoordinate: exactDecimalToChartCoordinate(total.exact),
+    status: raw.status as ConsumptionAmountSplit["status"]
+  };
 };
 const parseContributionAmountSplit = (value: unknown): ConsumptionAmountSplit => {
   const split = parseAmountSplit(value, amountStatuses, false);
   // Contribution is Actual-only. Accept the former additive wire total during a rolling
   // API/browser-cache transition, but never expose Forecast through totalAmount.
-  if (!nearlyEqual(split.totalAmount, split.actualAmount)
-    && !nearlyEqual(split.totalAmount, split.actualAmount + split.forecastAmount)) return malformedAnalysis();
-  return { ...split, totalAmount: split.actualAmount };
+  if (compareExactDecimals(split.totalAmountExact!, split.actualAmountExact!) !== 0
+    && compareExactDecimals(split.totalAmountExact!, addExactDecimals(split.actualAmountExact!, split.forecastAmountExact!)) !== 0) return malformedAnalysis();
+  return { ...split, totalAmountChartCoordinate: split.actualAmountChartCoordinate,
+    totalAmountExact: split.actualAmountExact };
 };
 const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>): ConsumptionActualTrendPoint[] => {
   if (!Array.isArray(value)) return malformedAnalysis();
   const actualTrend = value.map((point) => {
     if (typeof point !== "object" || point === null) return malformedAnalysis();
     const rawPoint = point as Record<string, unknown>;
-    if (!isPeriodKey(rawPoint.periodKey) || !isNullableFiniteNumber(rawPoint.actualAmount)
+    const actualAmount = decodeNullableExactDecimal(rawPoint.actualAmount);
+    if (!isPeriodKey(rawPoint.periodKey) || actualAmount === undefined
       || typeof rawPoint.alertCalculationMonth !== "boolean") return malformedAnalysis();
-    return { periodKey: rawPoint.periodKey, actualAmount: rawPoint.actualAmount,
+    return { periodKey: rawPoint.periodKey,
+      actualAmountChartCoordinate: actualAmount ? exactDecimalToChartCoordinate(actualAmount.exact) : null,
+      actualAmountExact: actualAmount?.exact ?? null,
       alertCalculationMonth: rawPoint.alertCalculationMonth };
   });
   let priorTrendOrder = Number.NEGATIVE_INFINITY;
@@ -419,12 +457,13 @@ const parseAnalysisPlan = (value: unknown, allowedTrendYears: ReadonlySet<string
   const raw = value as Record<string, unknown>;
   const forecastEntryStatus = (raw.forecastEntryStatus ?? "PROVIDED") as "PROVIDED" | "UNAVAILABLE";
   const actualEntryStatus = raw.actualEntryStatus as "PROVIDED" | "MISSING";
+  const percentage = decodeNullableExactDecimal(raw.percentage);
   if (!isPositiveInteger(raw.serverPlanId) || !isNonEmptyString(raw.planId) || !isNonEmptyString(raw.endUser) || !isNonEmptyString(raw.dataCenter)
-    || !isNullableFiniteNumber(raw.percentage) || !["PROVIDED", "MISSING"].includes(String(actualEntryStatus))
+    || percentage === undefined || !["PROVIDED", "MISSING"].includes(String(actualEntryStatus))
     || !["PROVIDED", "UNAVAILABLE"].includes(String(forecastEntryStatus))) return malformedAnalysis();
   return { ...split, serverPlanId: raw.serverPlanId, planId: raw.planId, endUser: raw.endUser, dataCenter: raw.dataCenter,
     dataCenterBreakdown: parseDataCenterBreakdown(raw.dataCenterBreakdown, raw.dpDataCenterCount, raw.ociDataCenterCount),
-    percentage: raw.percentage, actualEntryStatus, forecastEntryStatus,
+    percentageExact: percentage?.exact ?? null, actualEntryStatus, forecastEntryStatus,
     actualTrend: parseActualTrend(raw.actualTrend, allowedTrendYears) };
 };
 const organicGrowthCategories: readonly ConsumptionOrganicGrowthCategory[] = [
@@ -435,28 +474,33 @@ const parseOrganicGrowthProxy = (value: unknown): ConsumptionOrganicGrowthProxy 
   if (value === undefined || value === null) return null;
   if (typeof value !== "object") return malformedAnalysis();
   const raw = value as Record<string, unknown>;
+  const opening = decodeExactDecimal(raw.openingAmount);
+  const closing = decodeExactDecimal(raw.closingAmount);
+  const netGrowth = decodeExactDecimal(raw.netGrowthAmount);
+  const classifiedGrowth = decodeExactDecimal(raw.classifiedGrowthAmount);
+  const reconciliation = decodeExactDecimal(raw.reconciliationAmount);
   if (!["Q1", "Q2", "Q3", "Q4"].includes(String(raw.quarter)) || !isQuarterKey(raw.comparisonQuarter)
-    || typeof raw.expected !== "boolean" || !isFiniteNumber(raw.openingAmount) || !isFiniteNumber(raw.closingAmount)
-    || !isFiniteNumber(raw.netGrowthAmount) || !isFiniteNumber(raw.classifiedGrowthAmount)
-    || !isFiniteNumber(raw.reconciliationAmount) || !isNonEmptyString(raw.explanation) || !Array.isArray(raw.categories)) {
-    return malformedAnalysis();
-  }
+    || typeof raw.expected !== "boolean" || !opening || !closing || !netGrowth || !classifiedGrowth || !reconciliation
+    || !isNonEmptyString(raw.explanation) || !Array.isArray(raw.categories)) return malformedAnalysis();
   const categories = raw.categories.map((entry) => {
     if (typeof entry !== "object" || entry === null) return malformedAnalysis();
     const point = entry as Record<string, unknown>;
+    const amount = decodeExactDecimal(point.amount);
     if (!organicGrowthCategories.includes(point.category as ConsumptionOrganicGrowthCategory)
-      || !isFiniteNumber(point.amount) || !(point.accountCount === null || isNonNegativeInteger(point.accountCount))) return malformedAnalysis();
-    return { category: point.category as ConsumptionOrganicGrowthCategory, amount: point.amount, accountCount: point.accountCount as number | null };
+      || !amount || !(point.accountCount === null || isNonNegativeInteger(point.accountCount))) return malformedAnalysis();
+    return { category: point.category as ConsumptionOrganicGrowthCategory, amountExact: amount.exact,
+      amountChartCoordinate: exactDecimalToChartCoordinate(amount.exact), accountCount: point.accountCount as number | null };
   });
+  const categoryTotal = categories.reduce((sum, point) => addExactDecimals(sum, point.amountExact), "0");
   if (categories.length !== organicGrowthCategories.length
     || categories.some((point, index) => point.category !== organicGrowthCategories[index])
-    || !nearlyEqual(raw.netGrowthAmount, raw.closingAmount - raw.openingAmount)
-    || !nearlyEqual(raw.classifiedGrowthAmount, categories.reduce((sum, point) => sum + point.amount, 0))
-    || !nearlyEqual(raw.reconciliationAmount, raw.netGrowthAmount - raw.classifiedGrowthAmount)) return malformedAnalysis();
+    || compareExactDecimals(netGrowth.exact, subtractExactDecimals(closing.exact, opening.exact)) !== 0
+    || compareExactDecimals(classifiedGrowth.exact, categoryTotal) !== 0
+    || compareExactDecimals(reconciliation.exact, subtractExactDecimals(netGrowth.exact, classifiedGrowth.exact)) !== 0) return malformedAnalysis();
   return { quarter: raw.quarter as ConsumptionOrganicGrowthProxy["quarter"], comparisonQuarter: raw.comparisonQuarter as string,
-    expected: raw.expected, openingAmount: raw.openingAmount, closingAmount: raw.closingAmount,
-    netGrowthAmount: raw.netGrowthAmount, classifiedGrowthAmount: raw.classifiedGrowthAmount,
-    reconciliationAmount: raw.reconciliationAmount, explanation: raw.explanation, categories };
+    expected: raw.expected, openingAmountExact: opening.exact, closingAmountExact: closing.exact,
+    netGrowthAmountExact: netGrowth.exact, classifiedGrowthAmountExact: classifiedGrowth.exact,
+    reconciliationAmountExact: reconciliation.exact, explanation: raw.explanation, categories };
 };
 const compositionStatuses = new Set<ConsumptionForecastCompositionStatus>(["CLASSIFIED", "UNCLASSIFIED", "UNAVAILABLE"]);
 const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] => {
@@ -467,23 +511,43 @@ const parseMovementBridge = (value: unknown): ConsumptionMovementBridgePoint[] =
     if (typeof entry !== "object" || entry === null) return malformedAnalysis();
     const point = entry as Record<string, unknown>;
     const includedForecastPeriods = point.includedForecastPeriods === undefined ? [] : point.includedForecastPeriods;
-    const accounts = point.accounts === undefined ? [] : point.accounts;
+    const rawAccounts = point.accounts === undefined ? [] : point.accounts;
+    const totalForecast = decodeNullableExactDecimal(point.totalForecastAmount);
+    const newAmount = decodeNullableExactDecimal(point.newAmount);
+    const expansion = decodeNullableExactDecimal(point.expansionAmount);
+    const reduction = decodeNullableExactDecimal(point.reductionAmount);
+    const netMovement = decodeNullableExactDecimal(point.netMovementAmount);
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(point.quarter))
-      || !isNullableFiniteNumber(point.totalForecastAmount)
-      || !isNullableFiniteNumber(point.newAmount) || !isNullableFiniteNumber(point.expansionAmount)
-      || !isNullableFiniteNumber(point.reductionAmount) || !isNullableFiniteNumber(point.netMovementAmount)
+      || [totalForecast, newAmount, expansion, reduction, netMovement].some((amount) => amount === undefined)
       || !compositionStatuses.has(point.compositionStatus as ConsumptionForecastCompositionStatus)
       || !isNonNegativeInteger(point.classifiedAccountCount) || !isNonNegativeInteger(point.unclassifiedAccountCount)
       || !(point.unavailableReason === null || isNonEmptyString(point.unavailableReason))
       || !Array.isArray(includedForecastPeriods) || !includedForecastPeriods.every(isPeriodKey)
-      || !Array.isArray(accounts) || !accounts.every((detail) => {
-        if (typeof detail !== "object" || detail === null) return false;
-        const row = detail as Record<string, unknown>;
-        return isNonEmptyString(row.account) && isFiniteNumber(row.totalForecastAmount)
-          && isFiniteNumber(row.newAmount) && isFiniteNumber(row.expansionAmount)
-          && isFiniteNumber(row.reductionAmount) && isFiniteNumber(row.netMovementAmount);
-      })) return malformedAnalysis();
-    return { ...point, includedForecastPeriods, accounts } as unknown as ConsumptionMovementBridgePoint;
+      || !Array.isArray(rawAccounts)) return malformedAnalysis();
+    const accounts = rawAccounts.map((detail) => {
+      if (typeof detail !== "object" || detail === null) return malformedAnalysis();
+      const row = detail as Record<string, unknown>;
+      const amounts = [row.totalForecastAmount, row.newAmount, row.expansionAmount, row.reductionAmount, row.netMovementAmount]
+        .map((amount) => decodeExactDecimal(amount));
+      if (!isNonEmptyString(row.account) || amounts.some((amount) => !amount)) return malformedAnalysis();
+      return { account: row.account, totalForecastAmountExact: amounts[0]!.exact, newAmountExact: amounts[1]!.exact,
+        expansionAmountExact: amounts[2]!.exact, reductionAmountExact: amounts[3]!.exact,
+        netMovementAmountExact: amounts[4]!.exact };
+    });
+    return {
+      quarter: point.quarter as ConsumptionMovementBridgePoint["quarter"],
+      totalForecastAmountExact: totalForecast?.exact ?? null,
+      newAmountExact: newAmount?.exact ?? null,
+      expansionAmountExact: expansion?.exact ?? null,
+      reductionAmountExact: reduction?.exact ?? null,
+      netMovementAmountExact: netMovement?.exact ?? null,
+      compositionStatus: point.compositionStatus as ConsumptionForecastCompositionStatus,
+      classifiedAccountCount: point.classifiedAccountCount as number,
+      unclassifiedAccountCount: point.unclassifiedAccountCount as number,
+      unavailableReason: point.unavailableReason as string | null,
+      includedForecastPeriods: includedForecastPeriods as string[],
+      accounts
+    };
   });
 };
 const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
@@ -509,9 +573,10 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   if (raw.mtdSummary !== null && raw.mtdSummary !== undefined) {
     if (typeof raw.mtdSummary !== "object") return malformedAnalysis();
     const mtd = raw.mtdSummary as Record<string, unknown>;
-    if (!isPeriodKey(mtd.periodKey) || !isFiniteNumber(mtd.amount)
+    const amount = decodeExactDecimal(mtd.amount);
+    if (!isPeriodKey(mtd.periodKey) || !amount
       || !(mtd.asOf === null || typeof mtd.asOf === "string")) return malformedAnalysis();
-    mtdSummary = { periodKey: mtd.periodKey, amount: mtd.amount, asOf: mtd.asOf as string | null };
+    mtdSummary = { periodKey: mtd.periodKey, amountExact: amount.exact, asOf: mtd.asOf as string | null };
   }
   // With MTD enabled, the API keeps the saved current-period Forecast visible while Total excludes
   // the overlapping Forecast. Portfolio and that fiscal quarter are therefore intentionally non-additive.
@@ -526,46 +591,54 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   }
   const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, mtdSummary === null);
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
-  if (!isFiniteNumber(portfolioRaw.priorActualAmount)
-    || !isFiniteNumber(portfolioRaw.priorForecastAmount)
-    || !isFiniteNumber(portfolioRaw.priorTotalAmount)
-    || !nearlyEqual(portfolioRaw.priorTotalAmount, portfolioRaw.priorActualAmount + portfolioRaw.priorForecastAmount)
+  const priorActual = decodeExactDecimal(portfolioRaw.priorActualAmount);
+  const priorForecast = decodeExactDecimal(portfolioRaw.priorForecastAmount);
+  const priorTotal = decodeExactDecimal(portfolioRaw.priorTotalAmount);
+  if (!priorActual || !priorForecast || !priorTotal
+    || compareExactDecimals(priorTotal.exact, addExactDecimals(priorActual.exact, priorForecast.exact)) !== 0
     || !amountStatuses.has(portfolioRaw.priorStatus as ConsumptionAmountSplit["status"])
     || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   const quarters = raw.quarters.map((value) => {
     const quarter = value as Record<string, unknown>;
     const split = parseAmountSplit(value, quarterAmountStatuses,
       mtdQuarter === null || `${raw.fiscalYear}-${String(quarter.quarter)}` !== mtdQuarter);
+    const qoqChangeAmount = decodeNullableExactDecimal(quarter.qoqChangeAmount);
+    const qoqChangePercent = decodeNullableExactDecimal(quarter.qoqChangePercent);
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)
-      || !isNullableFiniteNumber(quarter.qoqChangeAmount)
-      || !isNullableFiniteNumber(quarter.qoqChangePercent)
-      || (quarter.status === "NOT_OPEN" && (split.actualAmount !== 0 || split.forecastAmount !== 0
-        || split.totalAmount !== 0 || quarter.coveragePercent !== 0
+      || qoqChangeAmount === undefined || qoqChangePercent === undefined
+      || (quarter.status === "NOT_OPEN" && (compareExactDecimals(split.actualAmountExact, "0") !== 0
+        || compareExactDecimals(split.forecastAmountExact, "0") !== 0
+        || compareExactDecimals(split.totalAmountExact, "0") !== 0 || quarter.coveragePercent !== 0
         || quarter.qoqChangeAmount !== null || quarter.qoqChangePercent !== null))) return malformedAnalysis();
     return { ...split, status: quarter.status as ConsumptionAnalysisQuarter["status"], quarter: quarter.quarter as ConsumptionAnalysisQuarter["quarter"],
-      coveragePercent: quarter.coveragePercent, qoqChangeAmount: quarter.qoqChangeAmount, qoqChangePercent: quarter.qoqChangePercent };
+      coveragePercent: quarter.coveragePercent, qoqChangeAmountExact: qoqChangeAmount?.exact ?? null,
+      qoqChangePercentExact: qoqChangePercent?.exact ?? null };
   });
   if (quarters.length !== 4 || quarters.some((quarter, index) => quarter.quarter !== `Q${index + 1}`)) return malformedAnalysis();
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
     const split = parseContributionAmountSplit(value); const account = value as Record<string, unknown>;
+    const percentage = decodeNullableExactDecimal(account.percentage);
+    const priorActualAmount = decodeExactDecimal(account.priorActualAmount);
+    const actualGrowthAmount = decodeNullableExactDecimal(account.actualGrowthAmount);
+    const actualGrowthPercent = decodeNullableExactDecimal(account.actualGrowthPercent);
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
-      || !isNullableFiniteNumber(account.percentage) || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
-      || !isFiniteNumber(account.priorActualAmount)
-      || !isNullableFiniteNumber(account.actualGrowthAmount) || !isNullableFiniteNumber(account.actualGrowthPercent)
+      || percentage === undefined || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
+      || !priorActualAmount || actualGrowthAmount === undefined || actualGrowthPercent === undefined
       || !["MISSING", "ZERO", "ENTERED"].includes(String(account.forecastEntryStatus))
       || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
       || !Array.isArray(account.workloads)) return malformedAnalysis();
     const workloads = account.workloads.map((value) => {
       const workloadSplit = parseContributionAmountSplit(value); const workload = value as Record<string, unknown>;
-      if (!isNonEmptyString(workload.workload) || !isNullableFiniteNumber(workload.percentage) || !Array.isArray(workload.plans)) return malformedAnalysis();
-      return { ...workloadSplit, workload: workload.workload, percentage: workload.percentage,
+      const workloadPercentage = decodeNullableExactDecimal(workload.percentage);
+      if (!isNonEmptyString(workload.workload) || workloadPercentage === undefined || !Array.isArray(workload.plans)) return malformedAnalysis();
+      return { ...workloadSplit, workload: workload.workload, percentageExact: workloadPercentage?.exact ?? null,
         plans: workload.plans.map((plan) => parseAnalysisPlan(plan, allowedTrendYears)) };
     });
     if (new Set(workloads.map((workload) => workload.workload)).size !== workloads.length) return malformedAnalysis();
-    return { ...split, account: account.account, salesRep: account.salesRep, percentage: account.percentage,
+    return { ...split, account: account.account, salesRep: account.salesRep, percentageExact: percentage?.exact ?? null,
       actualEntryStatus: account.actualEntryStatus,
-      priorActualAmount: account.priorActualAmount, actualGrowthAmount: account.actualGrowthAmount,
-      actualGrowthPercent: account.actualGrowthPercent, forecastEntryStatus: account.forecastEntryStatus,
+      priorActualAmountExact: priorActualAmount.exact, actualGrowthAmountExact: actualGrowthAmount?.exact ?? null,
+      actualGrowthPercentExact: actualGrowthPercent?.exact ?? null, forecastEntryStatus: account.forecastEntryStatus,
       attentionReasons: account.attentionReasons, workloads } as ConsumptionAnalysisAccount;
   });
   if (new Set(accounts.map((account) => account.account)).size !== accounts.length) return malformedAnalysis();
@@ -597,13 +670,20 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const alerts: ConsumptionAnalysisAlert[] = raw.alerts.map((value) => {
     if (typeof value !== "object" || value === null) return malformedAnalysis();
     const alert = value as Record<string, unknown>;
+    const actualAmount = decodeExactDecimal(alert.actualAmount);
+    const baselineMedian = decodeExactDecimal(alert.baselineMedian);
+    const changeAmount = decodeExactDecimal(alert.changeAmount);
+    const changePercent = decodeNullableExactDecimal(alert.changePercent);
     if (!isNonEmptyString(alert.alertId) || !isPositiveInteger(alert.serverPlanId) || !isNonEmptyString(alert.account) || !isNonEmptyString(alert.workload)
       || typeof alert.workloadMapped !== "boolean"
       || !isNonEmptyString(alert.planId) || !isPeriodKey(alert.periodKey) || !signalTypes.has(alert.type as ConsumptionSignal["type"])
-      || !signalGrades.has(alert.grade as ConsumptionSignal["grade"]) || !isFiniteNumber(alert.actualAmount)
-      || !isFiniteNumber(alert.baselineMedian) || !isFiniteNumber(alert.changeAmount)
-      || !isNullableFiniteNumber(alert.changePercent) || !isNonEmptyString(alert.reason)) return malformedAnalysis();
-    return alert as unknown as ConsumptionAnalysisAlert;
+      || !signalGrades.has(alert.grade as ConsumptionSignal["grade"]) || !actualAmount || !baselineMedian || !changeAmount
+      || changePercent === undefined || !isNonEmptyString(alert.reason)) return malformedAnalysis();
+    return { alertId: alert.alertId, serverPlanId: alert.serverPlanId, account: alert.account, workload: alert.workload,
+      workloadMapped: alert.workloadMapped, planId: alert.planId, periodKey: alert.periodKey,
+      type: alert.type, grade: alert.grade, actualAmountExact: actualAmount.exact,
+      baselineMedianExact: baselineMedian.exact, changeAmountExact: changeAmount.exact,
+      changePercentExact: changePercent?.exact ?? null, reason: alert.reason } as ConsumptionAnalysisAlert;
   });
   if (new Set(alerts.map((alert) => alert.alertId)).size !== alerts.length) return malformedAnalysis();
   alerts.forEach((alert) => {
@@ -613,19 +693,32 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const salesRepOverview: ConsumptionSalesRepOverview[] = raw.salesRepOverview.map((value) => {
     if (typeof value !== "object" || value === null) return malformedAnalysis();
     const row = value as Record<string, unknown>;
-    if (!isNonEmptyString(row.salesRep) || !isFiniteNumber(row.actualAmount) || !isFiniteNumber(row.priorActualAmount)
-      || !hasValidYoyResult(row.actualGrowthAmount, row.actualGrowthPercent,
-        row.yoyComparisonStatus, row.yoyUnavailableReason)
-      || !isFiniteNumber(row.forecastAmount) || !isFiniteNumber(row.fyExpectedAmount)
-      || !isNonNegativeInteger(row.accountCount) || !isFiniteNumber(row.topThreeConcentrationPercent)
+    const actualAmount = decodeExactDecimal(row.actualAmount);
+    const priorActualAmount = decodeExactDecimal(row.priorActualAmount);
+    const actualGrowthAmount = decodeNullableExactDecimal(row.actualGrowthAmount);
+    const actualGrowthPercent = decodeNullableExactDecimal(row.actualGrowthPercent);
+    const forecastAmount = decodeExactDecimal(row.forecastAmount);
+    const fyExpectedAmount = decodeExactDecimal(row.fyExpectedAmount);
+    const concentration = decodeExactDecimal(row.topThreeConcentrationPercent);
+    if (!isNonEmptyString(row.salesRep) || !actualAmount || !priorActualAmount
+      || actualGrowthAmount === undefined || actualGrowthPercent === undefined
+      || !isNonEmptyString(row.yoyComparisonStatus)
+      || !(row.yoyUnavailableReason === null || isNonEmptyString(row.yoyUnavailableReason))
+      || !forecastAmount || !fyExpectedAmount
+      || !isNonNegativeInteger(row.accountCount) || !concentration
       || !isNonNegativeInteger(row.attentionAccountCount)) return malformedAnalysis();
-    return row as unknown as ConsumptionSalesRepOverview;
+    return { salesRep: row.salesRep, actualAmountExact: actualAmount.exact, priorActualAmountExact: priorActualAmount.exact,
+      actualGrowthAmountExact: actualGrowthAmount?.exact ?? null, actualGrowthPercentExact: actualGrowthPercent?.exact ?? null,
+      yoyComparisonStatus: row.yoyComparisonStatus, yoyUnavailableReason: row.yoyUnavailableReason,
+      forecastAmountExact: forecastAmount.exact, fyExpectedAmountExact: fyExpectedAmount.exact,
+      accountCount: row.accountCount, topThreeConcentrationPercentExact: concentration.exact,
+      attentionAccountCount: row.attentionAccountCount } as ConsumptionSalesRepOverview;
   });
   return { selectedPillar,
     fiscalYear: raw.fiscalYear as string, priorFiscalYear: raw.priorFiscalYear as string, selectedAccount: raw.selectedAccount as string | null,
     selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], periodCoverage, salesRepOverview,
-    portfolio: { ...portfolioSplit, priorActualAmount: portfolioRaw.priorActualAmount,
-      priorForecastAmount: portfolioRaw.priorForecastAmount, priorTotalAmount: portfolioRaw.priorTotalAmount,
+    portfolio: { ...portfolioSplit, priorActualAmountExact: priorActual.exact,
+      priorForecastAmountExact: priorForecast.exact, priorTotalAmountExact: priorTotal.exact,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
       priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, quarters, accountCandidates, contextActualTrend, alerts, accounts,
     organicConsumptionGrowthProxy, movementBridge };
@@ -645,21 +738,31 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
   if (!Array.isArray(raw.plans) || !Array.isArray(raw.signals) || !Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption workspace response");
   const etag = headerEtag ?? raw.etag;
   if (!isNonEmptyString(etag) || !(raw.lastBatchId === null || isPositiveInteger(raw.lastBatchId))) throw new Error("Malformed Consumption workspace metadata");
-  if (raw.controlTotals.some((control) => !isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey)
-    || !isFiniteNumber(control?.controlAmount) || !isNullableFiniteNumber(control?.detailAmount)
-    || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"])
-    ||(expectedPillar!==undefined&&normalizeConsumptionPillar(control?.pillar)!==selectedPillar))) throw new Error("Malformed Consumption control total response");
+  const decodedControlTotals = raw.controlTotals.map((control) => {
+    const pillar = normalizeConsumptionPillar(control?.pillar);
+    const actualState = control?.actualState;
+    const pillarMatches = selectedPillar === "ALL" ? pillar === "DP" || pillar === "OCI" : pillar === selectedPillar;
+    if (!isNonEmptyString(control?.account) || !isPeriodKey(control?.periodKey)
+      || !isFiniteNumber(control?.controlAmount) || !isNullableFiniteNumber(control?.detailAmount)
+      || !controlMatchStatuses.has(control?.matchStatus as ConsumptionApiControlTotal["matchStatus"])
+      || !pillarMatches || !(actualState === "FINAL" || actualState === "MTD")) {
+      throw new Error("Malformed Consumption control total response");
+    }
+    return { ...control, pillar, actualState,
+      matchStatus: control.matchStatus as ConsumptionApiControlTotal["matchStatus"] } as ConsumptionApiControlTotal;
+  });
   const seenControlKeys = new Set<string>();
-  const controlTotals: ConsumptionApiControlTotal[] = raw.controlTotals.map((control) => {
-    const key = `${control.account}::${control.periodKey}`;
+  const controlTotals: ConsumptionApiControlTotal[] = decodedControlTotals.map((control) => {
+    const key = `${control.account}::${control.periodKey}::${control.pillar}::${control.actualState}`;
     if (seenControlKeys.has(key)) throw new Error("Malformed Consumption control total response");
     seenControlKeys.add(key);
-    return { ...control, matchStatus: control.matchStatus as ConsumptionApiControlTotal["matchStatus"] };
+    return control;
   });
   const accountForecasts=(raw.accountForecasts ?? []).map((forecast):ConsumptionAccountForecast=>{
     const pillar = normalizeConsumptionPillar(forecast?.pillar);
+    const amount = decodeExactDecimal(forecast?.amount, true);
     if(!forecast||!isNonEmptyString(forecast.account)||!isNonEmptyString(forecast.normalizedAccount)||!isPeriodKey(forecast.periodKey)
-      ||!(pillar==="DP"||pillar==="OCI")||!isFiniteNumber(forecast.amount)||forecast.amount<0
+      ||!(pillar==="DP"||pillar==="OCI")||(selectedPillar!=="ALL"&&pillar!==selectedPillar)||!amount
       ||!isPositiveInteger(forecast.version)||!(forecast.status==="DRAFT"||forecast.status==="FINAL")||!isNonEmptyString(forecast.completeness))
       throw new Error("Malformed Consumption account forecast");
     const record = forecast as unknown as Record<string, unknown>;
@@ -667,26 +770,45 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     const nullableAmount = (field: string) => {
       const value = record[field];
       if (value === undefined || value === null) return null;
-      if (!isNonNegativeFiniteNumber(value)) throw new Error("Malformed Consumption account forecast");
-      return value;
+      const decoded = decodeExactDecimal(value, true);
+      if (!decoded) throw new Error("Malformed Consumption account forecast");
+      return decoded;
     };
-    if (!isNonNegativeFiniteNumber(totalAmount)) throw new Error("Malformed Consumption account forecast");
+    const decodedTotal = decodeExactDecimal(totalAmount, true);
+    if (!decodedTotal) throw new Error("Malformed Consumption account forecast");
+    const newAmount = nullableAmount("newAmount");
+    const expansionAmount = nullableAmount("expansionAmount");
+    const baseAmount = nullableAmount("baseAmount");
+    const reductionAmount = nullableAmount("reductionAmount");
+    const previousAmount = nullableAmount("previousAmount");
     const compositionStatus = compositionStatuses.has(record.compositionStatus as ConsumptionForecastCompositionStatus)
       ? record.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
     return { ...forecast, pillar,
-      status: forecast.status as ConsumptionAccountForecast["status"], amount: totalAmount, totalAmount,
-      newAmount: nullableAmount("newAmount"), expansionAmount: nullableAmount("expansionAmount"),
-      baseAmount: nullableAmount("baseAmount"), reductionAmount: nullableAmount("reductionAmount"),
-      previousAmount: nullableAmount("previousAmount"), previousSource: typeof record.previousSource === "string" ? record.previousSource : "Unavailable",
+      status: forecast.status as ConsumptionAccountForecast["status"], amountChartCoordinate: decodedTotal.chartCoordinate, totalAmountChartCoordinate: decodedTotal.chartCoordinate,
+      amountExact: decodedTotal.exact, totalAmountExact: decodedTotal.exact,
+      newAmountChartCoordinate: newAmount?.chartCoordinate ?? null, expansionAmountChartCoordinate: expansionAmount?.chartCoordinate ?? null,
+      newAmountExact: newAmount?.exact ?? null, expansionAmountExact: expansionAmount?.exact ?? null,
+      baseAmountChartCoordinate: baseAmount?.chartCoordinate ?? null, reductionAmountChartCoordinate: reductionAmount?.chartCoordinate ?? null,
+      previousAmountChartCoordinate: previousAmount?.chartCoordinate ?? null,
+      baseAmountExact: baseAmount?.exact ?? null, reductionAmountExact: reductionAmount?.exact ?? null,
+      previousAmountExact: previousAmount?.exact ?? null, previousSource: typeof record.previousSource === "string" ? record.previousSource : "Unavailable",
       reductionStatus: typeof record.reductionStatus === "string" ? record.reductionStatus : "UNAVAILABLE", compositionStatus };
   });
   const forecastVariances=(raw.forecastVariances ?? []).map((variance):ConsumptionForecastVariance=>{
     const pillar = normalizeConsumptionPillar(variance?.pillar);
+    const actualAmount = decodeNullableExactDecimal(variance?.actualAmount);
+    const forecastAmount = decodeNullableExactDecimal(variance?.forecastAmount);
+    const varianceAmount = decodeNullableExactDecimal(variance?.varianceAmount);
+    const variancePercent = decodeNullableExactDecimal(variance?.variancePercent);
     if(!variance||!isNonEmptyString(variance.account)||!isNonEmptyString(variance.normalizedAccount)||!isPeriodKey(variance.periodKey)
-      ||!pillar||!isNullableFiniteNumber(variance.actualAmount)||!isNullableFiniteNumber(variance.forecastAmount)
-      ||!isNullableFiniteNumber(variance.varianceAmount)||!isNullableFiniteNumber(variance.variancePercent)||!isNonEmptyString(variance.completeness))
+      ||!pillar||(selectedPillar!=="ALL"&&pillar!==selectedPillar)||actualAmount===undefined||forecastAmount===undefined
+      ||varianceAmount===undefined||variancePercent===undefined||!isNonEmptyString(variance.completeness))
       throw new Error("Malformed Consumption forecast variance");
-    return { ...variance, pillar } as ConsumptionForecastVariance;
+    return { ...variance, pillar,
+      actualAmountChartCoordinate: actualAmount?.chartCoordinate ?? null, forecastAmountChartCoordinate: forecastAmount?.chartCoordinate ?? null,
+      varianceAmountChartCoordinate: varianceAmount?.chartCoordinate ?? null, variancePercentChartCoordinate: variancePercent?.chartCoordinate ?? null,
+      actualAmountExact: actualAmount?.exact ?? null, forecastAmountExact: forecastAmount?.exact ?? null,
+      varianceAmountExact: varianceAmount?.exact ?? null, variancePercentExact: variancePercent?.exact ?? null } as ConsumptionForecastVariance;
   });
   const seenPlanIds = new Set<number>();
   const seenStableKeys = new Set<string>();
@@ -704,23 +826,47 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
     const actuals: Record<string, number> = {};
     const mtds: Record<string, number> = {};
     const forecasts: Record<string, number> = {};
+    const actualsExact: Record<string, string> = {};
+    const mtdsExact: Record<string, string> = {};
+    const forecastsExact: Record<string, string> = {};
     const versions: Record<string, number> = {};
+    const seenFacts = new Set<string>();
     plan.facts.forEach((fact) => {
-      const actualState = fact?.actualState ?? "FINAL";
-      if (!isPeriodKey(fact?.periodKey) || !isNullableFiniteNumber(fact?.actualAmount)
-        || !isNullableFiniteNumber(fact?.forecastAmount) || !isNonNegativeInteger(fact?.versionNo)
-        || (fact.actualAmount !== null && actualState !== "FINAL" && actualState !== "MTD")
-        ||(expectedPillar!==undefined&&(fact.actualAmount!==null?normalizeConsumptionPillar(fact.pillar)!==selectedPillar:fact.pillar!=null))) throw new Error("Malformed Consumption fact response");
-      if (Object.prototype.hasOwnProperty.call(versions, fact.periodKey)) throw new Error("Malformed Consumption fact response");
-      versions[fact.periodKey] = fact.versionNo;
+      const actualState = fact?.actualState;
+      const factPillar = normalizeConsumptionPillar(fact?.pillar);
+      const actualAmount = decodeNullableExactDecimal(fact?.actualAmount);
+      const forecastAmount = decodeNullableExactDecimal(fact?.forecastAmount);
+      if (!isPeriodKey(fact?.periodKey) || actualAmount === undefined
+        || forecastAmount === undefined || !isNonNegativeInteger(fact?.versionNo)
+        || (actualAmount !== null && actualState !== "FINAL" && actualState !== "MTD")
+        || (actualAmount === null && actualState !== null)
+        || (expectedPillar !== undefined && (!factPillar || factPillar === "ALL"
+          || (selectedPillar !== "ALL" && factPillar !== selectedPillar)))) throw new Error("Malformed Consumption fact response");
+      const factKey = `${fact.periodKey}::${factPillar ?? "LEGACY"}::${actualAmount !== null ? actualState : "FORECAST"}`;
+      if (seenFacts.has(factKey)) throw new Error("Malformed Consumption fact response");
+      seenFacts.add(factKey);
+      versions[fact.periodKey] = Math.max(versions[fact.periodKey] ?? 0, fact.versionNo);
       // Keep provisional MTD separate from finalized Actual all the way to the view model.
-      if (fact.actualAmount !== null && actualState === "FINAL") actuals[fact.periodKey] = fact.actualAmount;
-      if (fact.actualAmount !== null && actualState === "MTD") mtds[fact.periodKey] = fact.actualAmount;
-      if (fact.forecastAmount !== null) forecasts[fact.periodKey] = fact.forecastAmount;
+      if (actualAmount !== null && actualState === "FINAL") {
+        const exact = actualAmount.exact;
+        actualsExact[fact.periodKey] = addExactDecimals(actualsExact[fact.periodKey] ?? "0", exact);
+        actuals[fact.periodKey] = exactDecimalToChartCoordinate(actualsExact[fact.periodKey]);
+      }
+      if (actualAmount !== null && actualState === "MTD") {
+        const exact = actualAmount.exact;
+        mtdsExact[fact.periodKey] = addExactDecimals(mtdsExact[fact.periodKey] ?? "0", exact);
+        mtds[fact.periodKey] = exactDecimalToChartCoordinate(mtdsExact[fact.periodKey]);
+      }
+      if (forecastAmount !== null) {
+        const exact = forecastAmount.exact;
+        forecastsExact[fact.periodKey] = addExactDecimals(forecastsExact[fact.periodKey] ?? "0", exact);
+        forecasts[fact.periodKey] = exactDecimalToChartCoordinate(forecastsExact[fact.periodKey]);
+      }
     });
     const dataCenterBreakdown = parseDataCenterBreakdown(plan.dataCenterBreakdown, plan.dpDataCenterCount, plan.ociDataCenterCount);
     return { id: plan.stableKey, customer: plan.account, endUser: plan.endUser, planId: plan.planCode,
-      dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI", actuals, mtds, forecasts, serverPlanId: plan.planId, versions };
+      dataCenter: plan.dataCenter, dataCenterBreakdown, workload: plan.workload ?? undefined, planType: "OCI",
+      actuals, mtds, forecasts, actualsExact, mtdsExact, forecastsExact, serverPlanId: plan.planId, versions };
   });
   const metadataMissing = !raw.currentFiscalMonth && !raw.fromQuarter && !raw.toQuarter
     && (!raw.editablePeriodIds || raw.editablePeriodIds.length === 0)
@@ -841,7 +987,7 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
   if (pillar !== undefined) parameters.set("pillar", pillar);
   const query = parameters.size > 0 ? `?${parameters}` : "";
   const { response, payload } = await request(`/consumption/workspace${query}`);
-  return parseWorkspace(payload, response.headers.get("ETag"), pillar === undefined ? undefined : selectedPillar);
+  return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
 };
 const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   if (value === undefined || value === null) {
@@ -849,12 +995,13 @@ const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   }
   if (typeof value !== "object") throw new Error("Malformed Consumption records totals");
   const raw = value as Record<string, unknown>;
-  const decodeMap = (candidate: unknown): Readonly<Record<string, number>> => {
+  const decodeMap = (candidate: unknown): Readonly<Record<string, string>> => {
     if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) throw new Error("Malformed Consumption records totals");
     const entries = Object.entries(candidate as Record<string, unknown>);
-    if (entries.some(([period, amount]) => !/^FY\d{2}-[A-Z]{3}$/.test(period) || typeof amount !== "number" || !Number.isFinite(amount)))
+    const decoded = entries.map(([period, amount]) => [period, decodeExactDecimal(amount)] as const);
+    if (decoded.some(([period, amount]) => !/^FY\d{2}-[A-Z]{3}$/.test(period) || amount === null))
       throw new Error("Malformed Consumption records totals");
-    return Object.fromEntries(entries) as Record<string, number>;
+    return Object.fromEntries(decoded.map(([period, amount]) => [period, amount!.exact])) as Record<string, string>;
   };
   if (!Array.isArray(raw.incompletePeriods) || raw.incompletePeriods.some((period) => typeof period !== "string"))
     throw new Error("Malformed Consumption records totals");
@@ -1179,31 +1326,32 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
     if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast Wide preview");
     const line = value as Record<string, unknown>;
     if (!isPositiveInteger(line.sourceRow) || !isNonEmptyString(line.accountName) || !isNonEmptyString(line.normalizedAccount)
-      || !isForecastPeriodKey(line.periodKey)
-      || !(line.amount === undefined || isFiniteNumber(line.amount))) throw new Error("Malformed Forecast Wide preview");
+      || !isForecastPeriodKey(line.periodKey)) throw new Error("Malformed Forecast Wide preview");
     const totalAmount = line.totalAmount === undefined ? line.amount : line.totalAmount;
     const nullableAmount = (field: string) => {
       const value = line[field];
       if (value === undefined || value === null) return null;
-      if (!isNonNegativeFiniteNumber(value)) throw new Error("Malformed Forecast Wide preview");
-      return value;
+      const decoded = decodeExactDecimal(value, true);
+      if (!decoded) throw new Error("Malformed Forecast Wide preview");
+      return decoded.exact;
     };
-    if (!isNonNegativeFiniteNumber(totalAmount)) throw new Error("Malformed Forecast Wide preview");
+    const totalAmountExact = decodeExactDecimal(totalAmount, true)?.exact;
+    if (totalAmountExact === undefined) throw new Error("Malformed Forecast Wide preview");
     const compositionStatus = compositionStatuses.has(line.compositionStatus as ConsumptionForecastCompositionStatus)
       ? line.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
     const newAmount = nullableAmount("newAmount");
     const expansionAmount = nullableAmount("expansionAmount");
     return { rowNumber: line.sourceRow, account: line.accountName, resolvedAccount: line.accountName,
-      endUser: null, planCode: null, periodKey: line.periodKey, forecastAmount: totalAmount,
-      totalAmount, newAmount, expansionAmount, baseAmount: nullableAmount("baseAmount"),
+      endUser: null, planCode: null, periodKey: line.periodKey, forecastAmount: totalAmountExact,
+      totalAmount: totalAmountExact, newAmount, expansionAmount, baseAmount: nullableAmount("baseAmount"),
       reductionAmount: nullableAmount("reductionAmount"),
       previousSource: typeof line.previousSource === "string" ? line.previousSource
         : typeof line.reductionBasis === "string" ? line.reductionBasis : "Unavailable",
       compositionStatus, rawValue: typeof line.rawValue === "string" ? line.rawValue
-        : [totalAmount, newAmount, expansionAmount].map((amount) => amount ?? "").join("|"),
+        : [totalAmountExact, newAmount, expansionAmount].map((amount) => amount ?? "").join("|"),
       existingForecastAmount: null, resolution: "PLAN_UNASSIGNED" };
   });
-  const explicitZeroCount = changes.filter((change) => change.forecastAmount === 0).length;
+  const explicitZeroCount = changes.filter((change) => compareExactDecimals(change.forecastAmount, "0") === 0).length;
   const sourceRowCount = new Set(changes.map((change) => change.rowNumber)).size;
   const salesRepChanges = decodeSalesRepChanges(raw.salesRepChanges, "Malformed Forecast Wide preview");
   const rawBlockedErrors = raw.blockedErrors ?? raw.errors ?? [];

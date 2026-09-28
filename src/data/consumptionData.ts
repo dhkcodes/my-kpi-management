@@ -1,3 +1,5 @@
+import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, subtractExactDecimals } from "./exactDecimal";
+
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
 export type ConsumptionPillar = "ALL" | "DP" | "OCI";
 export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; value: ConsumptionPillar }>> = [
@@ -7,52 +9,63 @@ export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; v
 ];
 export const isUnmappedConsumptionLabel = (value: string): boolean => value.trim().toUpperCase() === "UNMAPPED";
 export type ForecastCompositionCategory = "All" | "New" | "Expansion" | "Reduction";
+
 export type ForecastCompositionAccount = Readonly<{
   account: string;
-  totalForecastAmount: number;
-  newAmount: number;
-  expansionAmount: number;
-  reductionAmount: number;
-  netMovementAmount: number;
+  totalForecastAmountExact: string;
+  newAmountExact: string;
+  expansionAmountExact: string;
+  reductionAmountExact: string;
+  netMovementAmountExact: string;
 }>;
-export const hasVisibleCompositionAmount = (amount: number): boolean =>
-  Math.round(Math.abs(amount) / 10) > 0;
+export const hasVisibleCompositionAmount = (amountExact: string): boolean =>
+  compareExactDecimals(amountExact, "0") !== 0;
 export const filterForecastCompositionAccounts = <T extends ForecastCompositionAccount>(
   accounts: readonly T[], category: ForecastCompositionCategory
 ): readonly T[] => accounts.filter((account) => category === "All"
-  ? Number.isFinite(account.totalForecastAmount) && (account.totalForecastAmount !== 0
-    || [account.newAmount, account.expansionAmount, account.reductionAmount]
-      .some((amount) => Number.isFinite(amount) && amount !== 0))
-  : category === "New" ? hasVisibleCompositionAmount(account.newAmount)
-  : category === "Expansion" ? hasVisibleCompositionAmount(account.expansionAmount)
-  : hasVisibleCompositionAmount(account.reductionAmount));
+  ? compareExactDecimals(account.totalForecastAmountExact, "0") !== 0
+    || [account.newAmountExact, account.expansionAmountExact, account.reductionAmountExact]
+      .some((amount) => compareExactDecimals(amount, "0") !== 0)
+  : category === "New" ? hasVisibleCompositionAmount(account.newAmountExact)
+  : category === "Expansion" ? hasVisibleCompositionAmount(account.expansionAmountExact)
+  : hasVisibleCompositionAmount(account.reductionAmountExact));
 export type ConsumptionDataCenterBreakdown = Readonly<{
   dpCount: number | null;
   ociCount: number | null;
   duplicatePossible: boolean;
 }>;
 export type ConsumptionAmountSplit = Readonly<{
-  actualAmount: number;
-  forecastAmount: number;
-  totalAmount: number;
+  actualAmountExact: string;
+  forecastAmountExact: string;
+  totalAmountExact: string;
+  /** Lossy values reserved exclusively for chart coordinates. */
+  actualAmountChartCoordinate: number;
+  forecastAmountChartCoordinate: number;
+  totalAmountChartCoordinate: number;
   status: ConsumptionMonthStatus;
 }>;
-export type ConsumptionActualTrendPoint = Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>;
+export type ConsumptionActualTrendPoint = Readonly<{
+  periodKey: string;
+  actualAmountExact: string | null;
+  /** Lossy value reserved exclusively for a chart coordinate. */
+  actualAmountChartCoordinate: number | null;
+  alertCalculationMonth: boolean;
+}>;
 export type ConsumptionAnalysisPlan = ConsumptionAmountSplit & Readonly<{
   serverPlanId: number; planId: string; endUser: string; dataCenter: string;
   dataCenterBreakdown?: ConsumptionDataCenterBreakdown;
-  percentage: number | null;
+  percentageExact: string | null;
   actualEntryStatus: "PROVIDED" | "MISSING";
   forecastEntryStatus: "PROVIDED" | "UNAVAILABLE";
   actualTrend: readonly ConsumptionActualTrendPoint[];
 }>;
 export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
-  workload: string; percentage: number | null; plans: readonly ConsumptionAnalysisPlan[];
+  workload: string; percentageExact: string | null; plans: readonly ConsumptionAnalysisPlan[];
 }>;
 export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
-  account: string; salesRep: string; percentage: number | null;
+  account: string; salesRep: string; percentageExact: string | null;
   actualEntryStatus: "PROVIDED" | "MISSING";
-  priorActualAmount: number; actualGrowthAmount: number | null; actualGrowthPercent: number | null;
+  priorActualAmountExact: string; actualGrowthAmountExact: string | null; actualGrowthPercentExact: string | null;
   forecastEntryStatus: "MISSING" | "ZERO" | "ENTERED";
   attentionReasons: readonly string[];
   workloads: readonly ConsumptionAnalysisWorkload[];
@@ -81,6 +94,10 @@ export type ConsumptionPlan = Readonly<{
   actuals: Record<string, number>;
   mtds?: Record<string, number>;
   forecasts: Record<string, number>;
+  /** Authoritative decimal values. Numeric maps above are chart-only compatibility projections. */
+  actualsExact?: Record<string, string>;
+  mtdsExact?: Record<string, string>;
+  forecastsExact?: Record<string, string>;
   serverPlanId?: number;
   versions?: Record<string, number>;
 }>;
@@ -111,10 +128,40 @@ export type ConsumptionAccount = Readonly<{
   planType: "Aggregate";
   actuals: Record<string, number>;
   forecasts: Record<string, number>;
+  /** Authoritative decimal values. Numeric maps above are chart-only compatibility projections. */
+  actualsExact?: Record<string, string>;
+  forecastsExact?: Record<string, string>;
   plans: ConsumptionPlan[];
 }>;
 
 export type ConsumptionSeries = ConsumptionPlan | ConsumptionAccount;
+
+export const applyConsumptionMtdDisplayOverride = <T extends ConsumptionSeries>(
+  series: T,
+  currentMtdPeriod: string,
+  currentMtdExact: Readonly<Record<string, string>>,
+  showMtd: boolean
+): T => {
+  if (!showMtd || currentMtdPeriod === "") return series;
+  const hasCurrentMtd = Object.prototype.hasOwnProperty.call(currentMtdExact, currentMtdPeriod);
+  return {
+    ...series,
+    actuals: {
+      ...series.actuals,
+      ...(hasCurrentMtd
+        ? { [currentMtdPeriod]: exactDecimalToChartCoordinate(currentMtdExact[currentMtdPeriod]) }
+        : {})
+    },
+    actualsExact: {
+      ...series.actualsExact,
+      ...(hasCurrentMtd ? { [currentMtdPeriod]: currentMtdExact[currentMtdPeriod] } : {})
+    },
+    forecasts: Object.fromEntries(Object.entries(series.forecasts)
+      .filter(([period]) => period !== currentMtdPeriod)),
+    forecastsExact: Object.fromEntries(Object.entries(series.forecastsExact ?? {})
+      .filter(([period]) => period !== currentMtdPeriod))
+  } as T;
+};
 
 export type ConsumptionControlTotal = Readonly<{
   customer: string;
@@ -131,8 +178,10 @@ export type ConsumptionQuarterSummary = Readonly<{
   quarter: string;
   months: string[];
   total: number | null;
+  totalExact: string | null;
   status: ConsumptionMonthStatus;
   preQGap: number | null;
+  preQGapExact: string | null;
 }>;
 
 export type ConsumptionSignalPoint = Readonly<{
@@ -224,14 +273,15 @@ const parseCsvRows = (csv: string): string[][] => {
   return rows;
 };
 
-const parseAmount = (value: string, rowNumber: number, month: string): number | null => {
+const parseAmount = (value: string, rowNumber: number, month: string): Readonly<{ exact: string; chartCoordinate: number }> | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const decimalCurrency = /^\$?[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)$/;
   if (!decimalCurrency.test(trimmed)) throw new Error(`Consumption CSV row ${rowNumber} has invalid ${month} amount.`);
-  const amount = Number(trimmed.replace(/^\$/, "").replace(/,/g, ""));
-  if (!Number.isFinite(amount)) throw new Error(`Consumption CSV row ${rowNumber} has invalid ${month} amount.`);
-  return amount;
+  const exact = trimmed.replace(/^\$/, "").replace(/,/g, "");
+  const chartCoordinate = exactDecimalToChartCoordinate(exact);
+  if (!Number.isFinite(chartCoordinate)) throw new Error(`Consumption CSV row ${rowNumber} has invalid ${month} amount.`);
+  return { exact, chartCoordinate };
 };
 
 const normalizeHeader = (value: string) => value.trim();
@@ -258,11 +308,16 @@ export const parseConsumptionCsv = (csv: string): ParsedConsumptionCsv => {
     const planType = values[indexOf("Plan Type")]?.trim() ?? "";
     if (!customer) return;
     const actualEntries: Array<[string, number]> = [];
+    const actualExactEntries: Array<[string, string]> = [];
     monthIndexes.forEach(([month, index]) => {
       const amount = parseAmount(values[index] ?? "", rowIndex + 2, month);
-      if (amount !== null) actualEntries.push([month, amount]);
+      if (amount !== null) {
+        actualEntries.push([month, amount.chartCoordinate]);
+        actualExactEntries.push([month, amount.exact]);
+      }
     });
     const actuals = Object.fromEntries(actualEntries) as Record<string, number>;
+    const actualsExact = Object.fromEntries(actualExactEntries) as Record<string, string>;
     if (planType.toLowerCase() === "multiple") {
       controlTotals.push({ customer, values: actuals });
       return;
@@ -276,6 +331,7 @@ export const parseConsumptionCsv = (csv: string): ParsedConsumptionCsv => {
       dataCenter,
       planType: planType || "OCI",
       actuals,
+      actualsExact,
       forecasts: {}
     });
   });
@@ -288,15 +344,24 @@ export const aggregateConsumptionAccounts = (plans: readonly ConsumptionPlan[]):
   return [...grouped.entries()].map(([customer, accountPlans]) => {
     const actuals: Record<string, number> = {};
     const forecasts: Record<string, number> = {};
-    const aggregateCompleteMonths = (field: "actuals" | "forecasts", target: Record<string, number>) => {
+    const actualsExact: Record<string, string> = {};
+    const forecastsExact: Record<string, string> = {};
+    const aggregateCompleteMonths = (
+      field: "actuals" | "forecasts",
+      exactField: "actualsExact" | "forecastsExact",
+      target: Record<string, number>,
+      exactTarget: Record<string, string>
+    ) => {
       const months = new Set(accountPlans.flatMap((plan) => Object.keys(plan[field])));
       months.forEach((month) => {
         if (!accountPlans.every((plan) => Object.prototype.hasOwnProperty.call(plan[field], month))) return;
-        target[month] = accountPlans.reduce((sum, plan) => sum + plan[field][month], 0);
+        exactTarget[month] = accountPlans.reduce((sum, plan) =>
+          addExactDecimals(sum, plan[exactField]?.[month] ?? String(plan[field][month])), "0");
+        target[month] = exactDecimalToChartCoordinate(exactTarget[month]);
       });
     };
-    aggregateCompleteMonths("actuals", actuals);
-    aggregateCompleteMonths("forecasts", forecasts);
+    aggregateCompleteMonths("actuals", "actualsExact", actuals, actualsExact);
+    aggregateCompleteMonths("forecasts", "forecastsExact", forecasts, forecastsExact);
     return {
       id: `account::${customer}`,
       customer,
@@ -306,6 +371,8 @@ export const aggregateConsumptionAccounts = (plans: readonly ConsumptionPlan[]):
       planType: "Aggregate",
       actuals,
       forecasts,
+      actualsExact,
+      forecastsExact,
       plans: accountPlans
     };
   });
@@ -313,11 +380,13 @@ export const aggregateConsumptionAccounts = (plans: readonly ConsumptionPlan[]):
 
 export const aggregateConsumptionActualTotals = (plans: readonly ConsumptionPlan[]): ConsumptionAccount => {
   const actuals: Record<string, number> = {};
+  const actualsExact: Record<string, string> = {};
   plans.forEach((plan) => Object.entries(plan.actuals).forEach(([month, amount]) => {
-    actuals[month] = (actuals[month] ?? 0) + amount;
+    actualsExact[month] = addExactDecimals(actualsExact[month] ?? "0", plan.actualsExact?.[month] ?? String(amount));
+    actuals[month] = exactDecimalToChartCoordinate(actualsExact[month]);
   }));
   return { id: "account::all", customer: "All accounts", endUser: "", planId: "", dataCenter: "",
-    planType: "Aggregate", actuals, forecasts: {}, plans: [...plans] };
+    planType: "Aggregate", actuals, forecasts: {}, actualsExact, forecastsExact: {}, plans: [...plans] };
 };
 
 const fiscalMonthOrder = (key: string): number => {
@@ -360,10 +429,10 @@ const previousFiscalMonth = (month: string): string | null => {
 };
 
 /** Return the alert month and its previous five contiguous ACTUAL-only monthly slots. */
-export const getAlertActualTrend = (
-  points: readonly Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>[],
+export const getAlertActualTrend = <T extends Readonly<{ periodKey: string }>>(
+  points: readonly T[],
   alertPeriodKey: string
-): ReadonlyArray<Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>> => {
+): readonly T[] => {
   const byPeriod = new Map(points.map((point) => [point.periodKey, point]));
   const periods = [alertPeriodKey];
   for (let index = 1; index < 6; index += 1) {
@@ -372,12 +441,13 @@ export const getAlertActualTrend = (
     periods.unshift(previous);
   }
   return periods.every((period) => byPeriod.has(period))
-    ? periods.map((period) => byPeriod.get(period) as Readonly<{ periodKey: string; actualAmount: number | null; alertCalculationMonth: boolean }>)
+    ? periods.map((period) => byPeriod.get(period) as T)
     : [];
 };
 
 export type ConsumptionControlResolution = Readonly<{
   amount: number | null;
+  amountExact: string | null;
   detailState: "MISSING" | "ZERO" | "VALUE";
   editable: boolean;
   source: "MANUAL" | "DETAIL";
@@ -387,22 +457,29 @@ export type ConsumptionControlResolution = Readonly<{
 export const resolveConsumptionControlTotal = (
   plans: readonly ConsumptionPlan[],
   month: string,
-  manualAmount: number | undefined
+  manualAmount: number | undefined,
+  manualAmountExact?: string
 ): ConsumptionControlResolution => {
   const childValues = plans.flatMap((plan) => {
-    if (Object.prototype.hasOwnProperty.call(plan.actuals, month)) return [plan.actuals[month]];
-    if (Object.prototype.hasOwnProperty.call(plan.forecasts, month)) return [plan.forecasts[month]];
+    if (Object.prototype.hasOwnProperty.call(plan.actuals, month)) return [{
+      amount: plan.actuals[month], exact: plan.actualsExact?.[month] ?? String(plan.actuals[month])
+    }];
+    if (Object.prototype.hasOwnProperty.call(plan.forecasts, month)) return [{
+      amount: plan.forecasts[month], exact: plan.forecastsExact?.[month] ?? String(plan.forecasts[month])
+    }];
     return [];
   });
-  const hasNonZeroDetail = childValues.some((value) => value !== 0);
+  const hasNonZeroDetail = childValues.some((value) => compareExactDecimals(value.exact, "0") !== 0);
   if (hasNonZeroDetail) {
-    return { amount: childValues.reduce((sum, value) => sum + value, 0), detailState: "VALUE", editable: false, source: "DETAIL" };
+    const amountExact = childValues.reduce((sum, value) => addExactDecimals(sum, value.exact), "0");
+    return { amount: exactDecimalToChartCoordinate(amountExact), amountExact, detailState: "VALUE", editable: false, source: "DETAIL" };
   }
   if (childValues.length > 0 && manualAmount === undefined) {
-    return { amount: 0, detailState: "ZERO", editable: true, source: "DETAIL" };
+    return { amount: 0, amountExact: "0", detailState: "ZERO", editable: true, source: "DETAIL" };
   }
   return {
     amount: manualAmount ?? null,
+    amountExact: manualAmountExact ?? (manualAmount === undefined ? null : String(manualAmount)),
     detailState: childValues.length === 0 ? "MISSING" : "ZERO",
     editable: true,
     source: "MANUAL"
@@ -488,6 +565,12 @@ const effectiveValue = (series: ConsumptionSeries, month: string): { value: numb
   return { value: null, status: "MISSING" };
 };
 
+const effectiveExactValue = (series: ConsumptionSeries, month: string): string | null => {
+  if (Object.prototype.hasOwnProperty.call(series.actuals, month)) return series.actualsExact?.[month] ?? String(series.actuals[month]);
+  if (Object.prototype.hasOwnProperty.call(series.forecasts, month)) return series.forecastsExact?.[month] ?? String(series.forecasts[month]);
+  return null;
+};
+
 export const buildQuarterSummary = (
   series: ConsumptionSeries,
   quarter: string,
@@ -504,8 +587,11 @@ export const buildQuarterSummary = (
         ? "FORECAST"
         : "MIXED";
   const total = values.reduce((sum, item) => sum + (item.value ?? 0), 0);
+  const totalExact = months.reduce((sum, month) => addExactDecimals(sum, effectiveExactValue(series, month) ?? "0"), "0");
   const preQGap = previous?.total !== null && previous?.total !== undefined ? total - previous.total : null;
-  return { quarter, months, total, status, preQGap };
+  const preQGapExact = previous?.totalExact !== null && previous?.totalExact !== undefined
+    ? subtractExactDecimals(totalExact, previous.totalExact) : null;
+  return { quarter, months, total, totalExact, status, preQGap, preQGapExact };
 };
 
 export const buildDisplayQuarterSummaries = (
@@ -529,16 +615,23 @@ export const buildDisplayQuarterSummaries = (
 export const seedForecastMonths = (plans: readonly ConsumptionPlan[], forecastMonths: readonly string[]): ConsumptionPlan[] =>
   plans.map((plan) => {
     const actualMonths = sortConsumptionMonths(Object.keys(plan.actuals));
-    const latestActual = actualMonths.length > 0 ? plan.actuals[actualMonths[actualMonths.length - 1]] : 0;
+    const latestActualMonth = actualMonths[actualMonths.length - 1];
+    const latestActualExact = latestActualMonth
+      ? plan.actualsExact?.[latestActualMonth] ?? String(plan.actuals[latestActualMonth])
+      : "0";
+    const latestActualChartCoordinate = exactDecimalToChartCoordinate(latestActualExact);
+    const seededMonths = forecastMonths.filter((month) => !Object.prototype.hasOwnProperty.call(plan.forecasts, month)
+      && !Object.prototype.hasOwnProperty.call(plan.actuals, month));
     return {
       ...plan,
       actuals: { ...plan.actuals },
       forecasts: {
         ...plan.forecasts,
-        ...Object.fromEntries(forecastMonths
-          .filter((month) => !Object.prototype.hasOwnProperty.call(plan.forecasts, month)
-            && !Object.prototype.hasOwnProperty.call(plan.actuals, month))
-          .map((month) => [month, latestActual]))
+        ...Object.fromEntries(seededMonths.map((month) => [month, latestActualChartCoordinate]))
+      },
+      forecastsExact: {
+        ...plan.forecastsExact,
+        ...Object.fromEntries(seededMonths.map((month) => [month, latestActualExact]))
       }
     };
   });
@@ -631,8 +724,9 @@ export const sortAndFilterConsumptionAccounts = (
   const query = search.trim().toLocaleLowerCase();
   const filtered = query ? accounts.filter((account) => account.account.toLocaleLowerCase().includes(query)) : [...accounts];
   const factor = direction === "asc" ? 1 : -1;
+  const exactTotal = (account: ConsumptionAnalysisAccount) => account.totalAmountExact;
   return filtered.sort((left, right) => factor * (sort === "amount"
-    ? left.totalAmount - right.totalAmount || left.account.localeCompare(right.account)
+    ? compareExactDecimals(exactTotal(left), exactTotal(right)) || left.account.localeCompare(right.account)
     : left.account.localeCompare(right.account)));
 };
 
