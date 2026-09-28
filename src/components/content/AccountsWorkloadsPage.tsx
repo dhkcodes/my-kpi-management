@@ -42,6 +42,11 @@ import {
   OpportunityCurrencyField,
   updateOpportunityCurrencyPair,
 } from "./opportunityCurrency";
+import {
+  accountsWorkloadsBatchErrorSummary,
+  formatOpportunityFieldError,
+  sortOpportunitiesByTarget,
+} from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
 
 type NavigationGuard = (label: string, action: () => void) => void;
@@ -110,6 +115,8 @@ const friendlyError = (error: unknown) => {
     error.errors.some((item) => item.code === "ACCOUNT_NAME_CONFLICT")
   )
     return "이미 같은 이름의 활성 Account가 있습니다. 다른 이름을 입력해 주세요. 입력 내용과 기존 연결은 유지됩니다.";
+  if (error instanceof AccountsWorkloadsApiError && error.errors.length > 0)
+    return accountsWorkloadsBatchErrorSummary;
   return error instanceof Error
     ? error.message
     : "The request could not be completed.";
@@ -1611,6 +1618,8 @@ export function AccountsWorkloadsPage({
       setError("Archived AW의 Opportunity는 수정할 수 없습니다.");
       return;
     }
+    setError("");
+    setSaveErrors([]);
     setDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
@@ -1796,6 +1805,7 @@ export function AccountsWorkloadsPage({
     if (!drafts) return false;
     setSaving(true);
     setError("");
+    setSaveErrors([]);
     const pageScrollY = window.scrollY;
     const opportunityScrolls = new Map(
       Array.from(document.querySelectorAll<HTMLElement>("[data-opportunity-scroll]"))
@@ -2398,9 +2408,16 @@ export function AccountsWorkloadsPage({
       {saveErrors.length > 0 && (
         <div class="accounts-workloads-inline-validation" role="status">
           <ul>
-            {saveErrors.map((item) => (
-              <li>{item.entity} · {item.field}: {item.message}</li>
-            ))}
+            {saveErrors.map((item) => {
+              const opportunity = item.clientId
+                ? dealDrafts.get(item.clientId)?.deal
+                : undefined;
+              return (
+                <li key={`${item.entity}:${item.operationIndex}:${item.field}:${item.code}`}>
+                  {formatOpportunityFieldError(item, opportunity)}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -2477,6 +2494,7 @@ export function AccountsWorkloadsPage({
                 childDrafts
                   .filter((draft) => draft.original === null)
                   .forEach((draft) => shownDeals.unshift(draft.deal));
+                const sortedDeals = sortOpportunitiesByTarget(shownDeals);
                 return (
                   <Fragment key={key}>
                     <tr
@@ -2694,7 +2712,7 @@ export function AccountsWorkloadsPage({
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {shownDeals.map((deal) => {
+                                    {sortedDeals.map((deal) => {
                                       const draftKey =
                                         deal.id > 0
                                           ? `deal:${deal.id}`
