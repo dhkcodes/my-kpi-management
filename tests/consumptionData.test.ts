@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   ConsumptionPlan,
+  applyConsumptionMtdDisplayOverride,
   aggregateConsumptionAccounts,
   countUniqueConsumptionPlans,
   aggregateConsumptionActualTotals,
@@ -50,6 +51,37 @@ assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY2
 assert.equal(initialConsumptionRecordsBatchSize(768), 10, "the initial Consumption Records request fills a compact viewport");
 assert.equal(initialConsumptionRecordsBatchSize(1240), 20, "the initial Consumption Records request expands for a taller viewport");
 assert.equal(initialConsumptionRecordsBatchSize(10000), 100, "the initial server page remains bounded");
+const mtdSource: ConsumptionPlan = {
+  id: "mtd-exact",
+  customer: "Exact Account",
+  endUser: "Exact End User",
+  planId: "PLAN-MTD",
+  dataCenter: "OCI",
+  planType: "Monthly",
+  actuals: { "FY27-AUG": 1 },
+  actualsExact: { "FY27-AUG": "1" },
+  forecasts: { "FY27-SEP": 123, "FY27-OCT": 456 },
+  forecastsExact: { "FY27-SEP": "900719925474.0002", "FY27-OCT": "456" }
+};
+const mtdDisplay = applyConsumptionMtdDisplayOverride(
+  mtdSource, "FY27-SEP", { "FY27-SEP": "900719925474.0003" }, true);
+assert.equal(mtdDisplay.actualsExact?.["FY27-SEP"], "900719925474.0003",
+  "MTD display keeps the authoritative exact decimal instead of the prior Forecast");
+assert.equal(mtdDisplay.actuals["FY27-SEP"], 900719925474.0003,
+  "MTD display creates a lossy number only for the chart/display compatibility map");
+assert.equal(Object.prototype.hasOwnProperty.call(mtdDisplay.forecasts, "FY27-SEP"), false,
+  "MTD replaces the current-period Forecast coordinate");
+assert.equal(Object.prototype.hasOwnProperty.call(mtdDisplay.forecastsExact, "FY27-SEP"), false,
+  "MTD replaces the current-period authoritative Forecast value");
+assert.equal(mtdDisplay.forecastsExact?.["FY27-OCT"], "456", "non-MTD Forecasts remain unchanged");
+const forecastDisplay = applyConsumptionMtdDisplayOverride(
+  mtdSource, "FY27-SEP", { "FY27-SEP": "900719925474.0003" }, false);
+assert.equal(forecastDisplay.actualsExact?.["FY27-SEP"], undefined,
+  "disabling MTD does not inject the current-period actual");
+assert.equal(forecastDisplay.forecasts["FY27-SEP"], 123,
+  "disabling MTD preserves the current-period chart Forecast");
+assert.equal(forecastDisplay.forecastsExact?.["FY27-SEP"], "900719925474.0002",
+  "disabling MTD preserves the authoritative exact Forecast");
 const visibilityPlans: ConsumptionPlan[] = [
   { ...parsed.plans[0], id: "zero", planId: "ZERO", actuals: { "FY27-JUL": 0 }, forecasts: {} },
   { ...parsed.plans[0], id: "active", planId: "ACTIVE", actuals: { "FY27-JUL": -1 }, forecasts: {} },
@@ -63,18 +95,18 @@ assert.equal(countUniqueConsumptionPlans([
   { id: "oci-row", planId: visibilityPlans[1].planId }
 ]), 1, "All counts the same Plan ID once when DP and OCI membership coexist");
 const compositionAccounts = [
-  { account: "Positive Total", totalForecastAmount: 100, newAmount: 0, expansionAmount: 0,
-    reductionAmount: 14085, netMovementAmount: -14085 },
-  { account: "Zero Total Reduction", totalForecastAmount: 0, newAmount: 0, expansionAmount: 0,
-    reductionAmount: 1404, netMovementAmount: -1404 },
-  { account: "Tiny Confirmed Reduction", totalForecastAmount: 0, newAmount: 0, expansionAmount: 0,
-    reductionAmount: 2, netMovementAmount: -2 }
+  { account: "Positive Total", totalForecastAmountExact: "100", newAmountExact: "0", expansionAmountExact: "0",
+    reductionAmountExact: "14085", netMovementAmountExact: "-14085" },
+  { account: "Zero Total Reduction", totalForecastAmountExact: "0", newAmountExact: "0", expansionAmountExact: "0",
+    reductionAmountExact: "1404", netMovementAmountExact: "-1404" },
+  { account: "Tiny Confirmed Reduction", totalForecastAmountExact: "0", newAmountExact: "0", expansionAmountExact: "0",
+    reductionAmountExact: "2", netMovementAmountExact: "-2" }
 ];
 const allCompositionAccounts = filterForecastCompositionAccounts(compositionAccounts, "All");
 assert.deepEqual(allCompositionAccounts.map((account) => account.account),
   ["Positive Total", "Zero Total Reduction", "Tiny Confirmed Reduction"],
   "All composition keeps zero-Total Accounts when they contain a confirmed component");
-assert.equal(allCompositionAccounts.reduce((sum, account) => sum + account.reductionAmount, 0), 15491,
+assert.deepEqual(allCompositionAccounts.map((account) => account.reductionAmountExact), ["14085", "1404", "2"],
   "All detail and the Reduction chart use the same confirmed Account rows");
 assert.deepEqual(
   sortConsumptionMonthsNewestFirst(["FY27-SEP", "FY27-NOV", "FY27-OCT"]),
@@ -122,13 +154,13 @@ for (const malformed of ["1 2", "1e3", "0x10", "1,2"]) {
 }
 
 const account = aggregateConsumptionAccounts(parsed.plans)[0];
-assert.equal(account.actuals["FY27-AUG"], 800, "account totals must sum detailed plans only once");
+assert.equal(account.actualsExact?.["FY27-AUG"], "800", "account totals must sum detailed plans only once");
 assert.equal(
   aggregateConsumptionActualTotals([
     { ...parsed.plans[0], actuals: { "FY27-AUG": 350 } },
     { ...parsed.plans[1], actuals: { "FY27-JUL": 400, "FY27-AUG": 450 } }
-  ]).actuals["FY27-JUL"],
-  400,
+  ]).actualsExact?.["FY27-JUL"],
+  "400",
   "All accounts Trend sums every available ACTUAL without requiring every Plan to contain the month"
 );
 
@@ -137,12 +169,14 @@ assert.deepEqual(fy26q4, {
   quarter: "FY26-Q4",
   months: ["FY26-MAR", "FY26-APR", "FY26-MAY"],
   total: 1200,
+  totalExact: "1200",
   status: "ACTUAL",
-  preQGap: null
+  preQGap: null,
+  preQGapExact: null
 });
 const fy27q1 = buildQuarterSummary(account, "FY27-Q1", fy26q4);
-assert.equal(fy27q1.total, 2100);
-assert.equal(fy27q1.preQGap, 900, "PreQ Gap must compare adjacent effective quarter totals");
+assert.equal(fy27q1.totalExact, "2100");
+assert.equal(fy27q1.preQGapExact, "900", "PreQ Gap must compare adjacent effective quarter totals");
 assert.equal(fy27q1.status, "ACTUAL");
 
 const forecasted = seedForecastMonths(parsed.plans, ["FY27-SEP", "FY27-OCT", "FY27-NOV"]);
@@ -163,9 +197,9 @@ const restoredForecast = restoreForecastEntry({ ...savedForecastPlan, forecasts:
 assert.equal(restoredForecast.forecasts["FY27-SEP"], 999, "Escape restores the original persisted Forecast value");
 const forecastAccount = aggregateConsumptionAccounts(forecasted)[0];
 const fy27q2 = buildQuarterSummary(forecastAccount, "FY27-Q2", fy27q1);
-assert.equal(fy27q2.total, 2400);
+assert.equal(fy27q2.totalExact, "2400");
 assert.equal(fy27q2.status, "FORECAST");
-assert.equal(fy27q2.preQGap, 300);
+assert.equal(fy27q2.preQGapExact, "300");
 
 assert.equal(isConsumptionQuarterRangeValid("FY26-Q4", "FY27-Q1"), true);
 assert.equal(isConsumptionQuarterRangeValid("FY27-Q2", "FY27-Q1"), false, "a reversed From/To range is invalid");
@@ -179,25 +213,25 @@ const displaySeries: ConsumptionPlan = {
 };
 const displaySummaries = buildDisplayQuarterSummaries(displaySeries, ["FY27-Q1", "FY27-Q2", "FY26-Q4", "FY27-Q1"]);
 assert.deepEqual(displaySummaries.map((summary) => summary.quarter), ["FY27-Q1", "FY27-Q2", "FY26-Q4"], "backend display order is preserved without duplicate quarters");
-assert.equal(displaySummaries[0].preQGap, 15, "a displayed history quarter compares with its chronological predecessor");
-assert.equal(displaySummaries[1].preQGap, 30, "a displayed forecast quarter compares with its chronological predecessor");
-assert.equal(displaySummaries[2].preQGap, null, "the first chronological quarter has no predecessor in the returned range");
+assert.equal(displaySummaries[0].preQGapExact, "15", "a displayed history quarter compares with its chronological predecessor");
+assert.equal(displaySummaries[1].preQGapExact, "30", "a displayed forecast quarter compares with its chronological predecessor");
+assert.equal(displaySummaries[2].preQGapExact, null, "the first chronological quarter has no predecessor in the returned range");
 
 const offscreenPriorSummaries = buildDisplayQuarterSummaries(displaySeries, ["FY27-Q1", "FY27-Q2"]);
-assert.equal(offscreenPriorSummaries[0].preQGap, 15, "the first displayed quarter uses a supplied offscreen prior quarter for PreQ Gap");
+assert.equal(offscreenPriorSummaries[0].preQGapExact, "15", "the first displayed quarter uses a supplied offscreen prior quarter for PreQ Gap");
 
 const incompleteQuarter = buildQuarterSummary({ ...displaySeries,
   actuals: { "FY27-JUN": 10, "FY27-JUL": 20 }, forecasts: {} }, "FY27-Q1", null);
-assert.equal(incompleteQuarter.total, 30, "a missing month contributes zero to the quarter total");
-assert.equal(incompleteQuarter.preQGap, null);
+assert.equal(incompleteQuarter.totalExact, "30", "a missing month contributes zero to the quarter total");
+assert.equal(incompleteQuarter.preQGapExact, null);
 assert.equal(incompleteQuarter.status, "INCOMPLETE");
 const partialForecastQuarter = buildQuarterSummary({ ...displaySeries,
   actuals: {}, forecasts: { "FY27-SEP": 20, "FY27-NOV": 30 } }, "FY27-Q2", fy27q1);
-assert.equal(partialForecastQuarter.total, 50, "Forecast Quarter Total sums entered months and treats missing months as zero");
-assert.equal(partialForecastQuarter.preQGap, -2050, "Forecast PreQ Gap uses the same zero-for-missing quarter total");
+assert.equal(partialForecastQuarter.totalExact, "50", "Forecast Quarter Total sums entered months and treats missing months as zero");
+assert.equal(partialForecastQuarter.preQGapExact, "-2050", "Forecast PreQ Gap uses the same zero-for-missing quarter total");
 const explicitZeroQuarter = buildQuarterSummary({ ...displaySeries,
   actuals: { "FY27-JUN": 0, "FY27-JUL": 0, "FY27-AUG": 0 }, forecasts: {} }, "FY27-Q1", null);
-assert.equal(explicitZeroQuarter.total, 0, "three explicit zeros are a complete quarter");
+assert.equal(explicitZeroQuarter.totalExact, "0", "three explicit zeros are a complete quarter");
 assert.equal(explicitZeroQuarter.status, "ACTUAL");
 
 const signalPlan = (
@@ -238,9 +272,9 @@ assert.equal(monthBoundarySignals[0]?.month, "FY27-JUL", "completed months advan
 assert.equal(signals.every((signal) => Boolean(signal.customer && signal.endUser && signal.planId && signal.month && signal.reason)), true);
 
 const forecastCompositionAccounts = [
-  { account: "SuperConnect", newAmount: 0, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 4326.268673, netMovementAmount: 0 },
-  { account: "New Account", newAmount: 1000, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 1000, netMovementAmount: 1000 },
-  { account: "No forecast", newAmount: 0, expansionAmount: 0, reductionAmount: 0, totalForecastAmount: 0, netMovementAmount: 0 }
+  { account: "SuperConnect", newAmountExact: "0", expansionAmountExact: "0", reductionAmountExact: "0", totalForecastAmountExact: "4326.268673", netMovementAmountExact: "0" },
+  { account: "New Account", newAmountExact: "1000", expansionAmountExact: "0", reductionAmountExact: "0", totalForecastAmountExact: "1000", netMovementAmountExact: "1000" },
+  { account: "No forecast", newAmountExact: "0", expansionAmountExact: "0", reductionAmountExact: "0", totalForecastAmountExact: "0", netMovementAmountExact: "0" }
 ];
 assert.deepEqual(
   filterForecastCompositionAccounts(forecastCompositionAccounts, "All").map((account) => account.account),

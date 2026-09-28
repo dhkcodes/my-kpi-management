@@ -1,25 +1,35 @@
 import type { ConsumptionAnalysis, ConsumptionRecordsTotals } from "./consumptionApi";
 import { sortConsumptionMonths } from "./consumptionData";
+import {
+  exactDecimalToChartCoordinate,
+  multiplyExactDecimalByInteger,
+  subtractExactDecimals,
+  divideExactDecimal,
+  compareExactDecimals
+} from "./exactDecimal";
 
 export type HomeConsumptionMonth = Readonly<{
   periodKey: string;
   kind: "ACTUAL" | "MTD" | "FORECAST";
-  amount: number | null;
-  forecastAmount: number | null;
+  amountExact: string | null;
+  amountChartCoordinate: number | null;
+  forecastAmountExact: string | null;
+  forecastAmountChartCoordinate: number | null;
   incomplete: boolean;
 }>;
 
+/** These numbers are chart coordinates only; exact strings remain the monetary authority. */
 export type HomeConsumptionLineEdge = Readonly<{
   kind: HomeConsumptionMonth["kind"];
   fromIndex: number;
   toIndex: number;
-  fromAmount: number;
-  toAmount: number;
+  fromAmountChartCoordinate: number;
+  toAmountChartCoordinate: number;
 }>;
 
 const graphForecastAmount = (month: HomeConsumptionMonth): number | null => month.kind === "FORECAST"
-  ? month.amount
-  : month.forecastAmount;
+  ? month.amountChartCoordinate
+  : month.forecastAmountChartCoordinate;
 
 const homeConsumptionFiscalMonths = ["JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY"] as const;
 
@@ -39,25 +49,28 @@ export const buildHomeConsumptionLineEdges = (
   const currentOrder = homeConsumptionPeriodOrder(month.periodKey);
   const consecutive = previousOrder !== null && currentOrder !== null && currentOrder - previousOrder === 1;
   if (!consecutive) return [];
-  if (previous.kind === "ACTUAL" && month.kind === "ACTUAL" && previous.amount !== null && month.amount !== null) {
-    return [{ kind: "ACTUAL" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: month.amount }];
+  if (previous.kind === "ACTUAL" && month.kind === "ACTUAL" && previous.amountChartCoordinate !== null && month.amountChartCoordinate !== null) {
+    return [{ kind: "ACTUAL" as const, fromIndex: offset, toIndex,
+      fromAmountChartCoordinate: previous.amountChartCoordinate, toAmountChartCoordinate: month.amountChartCoordinate }];
   }
-  if (previous.kind === "ACTUAL" && previous.amount !== null) {
+  if (previous.kind === "ACTUAL" && previous.amountChartCoordinate !== null) {
     const currentForecast = graphForecastAmount(month);
     if (currentForecast !== null) {
-      return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex, fromAmount: previous.amount, toAmount: currentForecast }];
+      return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex,
+        fromAmountChartCoordinate: previous.amountChartCoordinate, toAmountChartCoordinate: currentForecast }];
     }
   }
   const previousForecast = graphForecastAmount(previous);
   const currentForecast = graphForecastAmount(month);
   if (previousForecast === null || currentForecast === null) return [];
-  return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex, fromAmount: previousForecast, toAmount: currentForecast }];
+  return [{ kind: "FORECAST" as const, fromIndex: offset, toIndex,
+    fromAmountChartCoordinate: previousForecast, toAmountChartCoordinate: currentForecast }];
 });
 
 export type HomeConsumptionOverviewData = Readonly<{
-  actualAmount: number | null;
-  expectedAmount: number | null;
-  actualYoYPercent: number | null;
+  actualAmountExact: string | null;
+  expectedAmountExact: string | null;
+  actualYoYPercentExact: string | null;
   actualYoYUnavailableReason: string | null;
   attentionSignalCount: number;
   attentionAccountCount: number;
@@ -103,16 +116,19 @@ export const buildHomeConsumptionOverview = (
   const hasActual = analysis.periodCoverage.actualPeriods.length > 0;
   const hasExpected = includedPeriods.length > 0;
   const comparisonAvailable = analysis.periodCoverage.comparisonStatus === "COMPARABLE"
-    && analysis.portfolio.priorActualAmount !== 0;
-  const actualYoYPercent = comparisonAvailable
-    ? ((analysis.portfolio.actualAmount - analysis.portfolio.priorActualAmount) / Math.abs(analysis.portfolio.priorActualAmount)) * 100
+    && compareExactDecimals(analysis.portfolio.priorActualAmountExact, "0") !== 0;
+  const actualYoYPercentExact = comparisonAvailable
+    ? divideExactDecimal(
+      multiplyExactDecimalByInteger(subtractExactDecimals(analysis.portfolio.actualAmountExact, analysis.portfolio.priorActualAmountExact), 100),
+      analysis.portfolio.priorActualAmountExact.startsWith("-") ? analysis.portfolio.priorActualAmountExact.slice(1) : analysis.portfolio.priorActualAmountExact,
+      2)
     : null;
 
   return {
-    actualAmount: hasActual ? analysis.portfolio.actualAmount : null,
-    expectedAmount: hasExpected ? analysis.portfolio.totalAmount : null,
-    actualYoYPercent,
-    actualYoYUnavailableReason: actualYoYPercent === null
+    actualAmountExact: hasActual ? analysis.portfolio.actualAmountExact : null,
+    expectedAmountExact: hasExpected ? analysis.portfolio.totalAmountExact : null,
+    actualYoYPercentExact,
+    actualYoYUnavailableReason: actualYoYPercentExact === null
       ? analysis.periodCoverage.comparisonUnavailableReason ?? "Prior-period Actual is unavailable."
       : null,
     attentionSignalCount: analysis.alerts.length,
@@ -130,13 +146,17 @@ export const buildHomeConsumptionOverview = (
       const source = kind === "ACTUAL" ? totals.actualByPeriod
         : kind === "MTD" ? totals.mtdByPeriod ?? {}
           : totals.appliedForecastByPeriod;
+      const amountExact = Object.prototype.hasOwnProperty.call(source, periodKey) ? source[periodKey] : null;
+      const forecastAmountExact = kind === "MTD" && Object.prototype.hasOwnProperty.call(totals.appliedForecastByPeriod, periodKey)
+        ? totals.appliedForecastByPeriod[periodKey]
+        : null;
       return {
         periodKey,
         kind,
-        amount: Object.prototype.hasOwnProperty.call(source, periodKey) ? source[periodKey] : null,
-        forecastAmount: kind === "MTD" && Object.prototype.hasOwnProperty.call(totals.appliedForecastByPeriod, periodKey)
-          ? totals.appliedForecastByPeriod[periodKey]
-          : null,
+        amountExact,
+        amountChartCoordinate: amountExact === null ? null : exactDecimalToChartCoordinate(amountExact),
+        forecastAmountExact,
+        forecastAmountChartCoordinate: forecastAmountExact === null ? null : exactDecimalToChartCoordinate(forecastAmountExact),
         incomplete: kind === "MTD" || incompletePeriods.has(periodKey)
       };
     }),

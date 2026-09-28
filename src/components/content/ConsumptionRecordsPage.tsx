@@ -6,6 +6,7 @@ import {
   ConsumptionPlan,
   ConsumptionPillar,
   ConsumptionSignal,
+  applyConsumptionMtdDisplayOverride,
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
@@ -29,7 +30,8 @@ import {
   sortConsumptionMonthsNewestFirst
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
-import { ForecastCompositionDraft, parseForecastCompositionK } from "../../data/forecastComposition";
+import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCompositionK } from "../../data/forecastComposition";
+import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import {
   ConsumptionAccountForecast,
   ConsumptionApiControlTotal,
@@ -79,23 +81,37 @@ const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
     ...plan,
     actuals: { ...plan.actuals },
+    mtds: plan.mtds ? { ...plan.mtds } : undefined,
     forecasts: { ...plan.forecasts },
+    actualsExact: plan.actualsExact ? { ...plan.actualsExact } : undefined,
+    mtdsExact: plan.mtdsExact ? { ...plan.mtdsExact } : undefined,
+    forecastsExact: plan.forecastsExact ? { ...plan.forecastsExact } : undefined,
     versions: plan.versions ? { ...plan.versions } : undefined
   }));
 
 const cloneControlTotals = (controls: readonly ConsumptionApiControlTotal[]): ConsumptionApiControlTotal[] => controls.map((control) => ({ ...control }));
+const controlAmountExact = (control: Pick<ConsumptionApiControlTotal, "controlAmount" | "controlAmountExact">) =>
+  control.controlAmountExact ?? String(control.controlAmount);
 const accountForecastControls = (workspace: Pick<ConsumptionApiWorkspace, "selectedPillar" | "accountForecasts" | "forecastVariances">): ConsumptionApiControlTotal[] =>
   workspace.selectedPillar === "ALL"
-    ? workspace.forecastVariances.filter((item) => item.pillar === "ALL" && item.forecastAmount !== null).map((item) => ({ account: item.account, periodKey: item.periodKey,
-      controlAmount: item.forecastAmount as number, detailAmount: item.actualAmount, matchStatus: "MANUAL_FORECAST" as const }))
+    ? workspace.forecastVariances.filter((item) => item.pillar === "ALL" && item.forecastAmountExact !== null).map((item) => ({ account: item.account, periodKey: item.periodKey,
+      controlAmount: exactDecimalToChartCoordinate(item.forecastAmountExact as string), controlAmountExact: item.forecastAmountExact as string,
+      detailAmount: item.actualAmountExact === null ? null : exactDecimalToChartCoordinate(item.actualAmountExact), detailAmountExact: item.actualAmountExact,
+      matchStatus: "MANUAL_FORECAST" as const, pillar: "ALL" as const, actualState: "FINAL" as const }))
     : workspace.accountForecasts.filter((item) => item.pillar === workspace.selectedPillar).map((item) => ({ account: item.account, periodKey: item.periodKey,
-      controlAmount: item.amount, detailAmount: workspace.forecastVariances.find((variance) => variance.account === item.account && variance.periodKey === item.periodKey && variance.pillar === item.pillar)?.actualAmount ?? null,
-      matchStatus: "MANUAL_FORECAST" as const }));
-const controlKey = (control: Pick<ConsumptionApiControlTotal, "account" | "periodKey">) => `${control.account}::${control.periodKey}`;
+      controlAmount: item.amountChartCoordinate, controlAmountExact: item.amountExact,
+      detailAmount: workspace.forecastVariances.find((variance) => variance.account === item.account && variance.periodKey === item.periodKey && variance.pillar === item.pillar)?.actualAmountChartCoordinate ?? null,
+      detailAmountExact: workspace.forecastVariances.find((variance) => variance.account === item.account && variance.periodKey === item.periodKey && variance.pillar === item.pillar)?.actualAmountExact ?? null,
+      matchStatus: "MANUAL_FORECAST" as const, pillar: item.pillar, actualState: "FINAL" as const }));
+const controlKey = (control: Pick<ConsumptionApiControlTotal, "account" | "periodKey" | "pillar" | "actualState">) =>
+  `${control.account}::${control.periodKey}::${control.pillar}::${control.actualState}`;
 const controlValuesEqual = (left: readonly ConsumptionApiControlTotal[], right: readonly ConsumptionApiControlTotal[]) => {
   if (left.length !== right.length) return false;
-  const rightByKey = new Map(right.map((control) => [controlKey(control), control.controlAmount]));
-  return left.every((control) => rightByKey.get(controlKey(control)) === control.controlAmount);
+  const rightByKey = new Map(right.map((control) => [controlKey(control), controlAmountExact(control)]));
+  return left.every((control) => {
+    const rightExact = rightByKey.get(controlKey(control));
+    return rightExact !== undefined && compareExactDecimals(controlAmountExact(control), rightExact) === 0;
+  });
 };
 const mergeRefreshedControlsWithDrafts = (
   refreshed: readonly ConsumptionApiControlTotal[],
@@ -105,7 +121,8 @@ const mergeRefreshedControlsWithDrafts = (
   const savedByKey = new Map(saved.map((control) => [controlKey(control), control]));
   const draftByKey = new Map(draft.map((control) => [controlKey(control), control]));
   const dirtyKeys = new Set([...savedByKey.keys(), ...draftByKey.keys()].filter((key) =>
-    savedByKey.get(key)?.controlAmount !== draftByKey.get(key)?.controlAmount));
+    savedByKey.get(key) === undefined || draftByKey.get(key) === undefined
+      || compareExactDecimals(controlAmountExact(savedByKey.get(key)!), controlAmountExact(draftByKey.get(key)!)) !== 0));
   const merged = new Map(refreshed.map((control) => [controlKey(control), { ...control }]));
   dirtyKeys.forEach((key) => {
     const draftControl = draftByKey.get(key);
@@ -127,28 +144,29 @@ const ForecastCompositionTooltip = ({ composition, children }: Readonly<{
   if (composition.compositionStatus === "UNCLASSIFIED") return <>{children}</>;
   const unavailable = forecastCompositionUnavailable(composition);
   const accessibleText = unavailable ?? [
-    `Total ${currency.format(composition.totalAmount)}`,
-    `New ${composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}`,
-    `Expansion ${composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}`,
-    `Reduction ${composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)} (previous Total minus current Total, floored at zero)`,
-    `Previous source ${composition.previousSource}${composition.previousAmount === null ? "" : ` ${currency.format(composition.previousAmount)}`}`
+    `Total ${exactCurrency(composition.totalAmountExact)}`,
+    `New ${composition.newAmountExact === null ? "N/A" : exactCurrency(composition.newAmountExact)}`,
+    `Expansion ${composition.expansionAmountExact === null ? "N/A" : exactCurrency(composition.expansionAmountExact)}`,
+    `Reduction ${composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmountExact === null ? "N/A" : exactCurrency(composition.reductionAmountExact)} (previous Total minus current Total, floored at zero)`,
+    `Previous source ${composition.previousSource}${composition.previousAmountExact === null ? "" : ` ${exactCurrency(composition.previousAmountExact)}`}`
   ].join("; ");
   return <span class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}>
     {children}
     <span class="consumption-forecast-tooltip__content" role="tooltip">
       {unavailable ? <>{unavailable}</> : <dl>
-        <div><dt>Total</dt><dd>{currency.format(composition.totalAmount)}</dd></div>
-        <div><dt>New</dt><dd>{composition.newAmount === null ? "N/A" : currency.format(composition.newAmount)}</dd></div>
-        <div><dt>Expansion</dt><dd>{composition.expansionAmount === null ? "N/A" : currency.format(composition.expansionAmount)}</dd></div>
-        <div><dt>Reduction</dt><dd>{composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmount === null ? "N/A" : currency.format(composition.reductionAmount)}<small>Previous Total − current Total, minimum 0</small></dd></div>
-        <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmount === null ? "" : ` · ${currency.format(composition.previousAmount)}`}</dd></div>
+        <div><dt>Total</dt><dd>{exactCurrency(composition.totalAmountExact)}</dd></div>
+        <div><dt>New</dt><dd>{composition.newAmountExact === null ? "N/A" : exactCurrency(composition.newAmountExact)}</dd></div>
+        <div><dt>Expansion</dt><dd>{composition.expansionAmountExact === null ? "N/A" : exactCurrency(composition.expansionAmountExact)}</dd></div>
+        <div><dt>Reduction</dt><dd>{composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmountExact === null ? "N/A" : exactCurrency(composition.reductionAmountExact)}<small>Previous Total − current Total, minimum 0</small></dd></div>
+        <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmountExact === null ? "" : ` · ${exactCurrency(composition.previousAmountExact)}`}</dd></div>
       </dl>}
     </span>
   </span>;
 };
 const toApiControlTotals = (controls: readonly { customer: string; values: Readonly<Record<string, number>> }[]): ConsumptionApiControlTotal[] =>
   controls.flatMap((control) => Object.entries(control.values).map(([periodKey, controlAmount]) => ({
-    account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const
+    account: control.customer, periodKey, controlAmount, detailAmount: null, matchStatus: "NO_DETAIL" as const,
+    pillar: "ALL" as const, actualState: "FINAL" as const
   })));
 const planMatchesRecordSearch = (plan: ConsumptionPlan, query: string) =>
   [plan.customer, plan.workload, plan.endUser, plan.planId]
@@ -188,7 +206,8 @@ const fallbackEditablePeriods = getNextQuarterMonths(initialSeed.latestActualMon
 const fallbackForecastQuarters = [...new Set(fallbackEditablePeriods.map(getFiscalQuarter))];
 const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackActualQuarters.filter((quarter) => !fallbackForecastQuarters.includes(quarter))];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const formatForecastK = (amount: number | null) => amount === null ? "" : (amount / 1000).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+const exactCurrency = (value: string | number): string => formatExactCurrency(String(value));
+const formatForecastK = (amount: string | null) => amount === null ? "" : exactDecimalToK(amount);
 const renderSalesRepPreview = (changes: readonly ConsumptionSalesRepChange[]) => (
   <section class="consumption-sales-rep-preview" aria-label="Sales Rep preview">
     <div class="consumption-sales-rep-heading">
@@ -216,11 +235,8 @@ const formatConflictCurrency = (value: string) => {
 };
 const signedCurrency = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${currency.format(value)}`;
 const formatPercent = (value: number | null) => value === null ? "N/A" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
-const parseForecastDecimal = (raw: string): number | null => {
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+const signedExactCurrency = (value: string | null) => value === null ? "N/A" : `${compareExactDecimals(value, "0") > 0 ? "+" : ""}${exactCurrency(value)}`;
+const signedExactPercent = (value: string | null) => value === null ? "N/A" : `${compareExactDecimals(value, "0") > 0 ? "+" : ""}${value}%`;
 const shortMonth = (month: string) => month.split("-")[1];
 const consumptionSignalPresentation = (signal: ConsumptionSignal) => signal.type === "ABOVE_USUAL"
   ? { label: "ABOVE USUAL", tone: "is-above-usual" }
@@ -326,8 +342,7 @@ type ForecastCompositionEditor = Readonly<{
   error: string;
 }>;
 const forecastDraftKey = (account: string, month: string) => `${account}::${month}`;
-const toKInput = (amount: number | null | undefined) => amount === null || amount === undefined ? "" : `${amount / 1000}`;
-const validForecastKInput = (value: string) => /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value.trim());
+const validForecastKInput = (value: string) => /^(?:0|[1-9]\d*)(?:\.\d{1,7})?$/.test(value.trim());
 
 const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPoint }>) => (
   <oj-chart-item
@@ -358,6 +373,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
   const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
+  const [actualControlTotals, setActualControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [forecastVariances, setForecastVariances] = useState<ConsumptionForecastVariance[]>([]);
   const [accountForecasts, setAccountForecasts] = useState<ConsumptionAccountForecast[]>([]);
   const [draftForecastCompositions, setDraftForecastCompositions] = useState<Map<string, ForecastCompositionDraft>>(() => new Map());
@@ -395,11 +411,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   const [appliedSearch, setAppliedSearch] = useState("");
   const [searchComposing, setSearchComposing] = useState(false);
   const [recordsTotalAccounts, setRecordsTotalAccounts] = useState(0);
-  const [serverActualTotals, setServerActualTotals] = useState<Record<string, number> | null>(null);
-  const [serverAccountActualTotals, setServerAccountActualTotals] = useState<Record<string, Record<string, number>>>({});
-  const [serverMtdTotals, setServerMtdTotals] = useState<Record<string, number>>({});
+  const [serverActualTotals, setServerActualTotals] = useState<Record<string, string> | null>(null);
+  const [serverAccountActualTotals, setServerAccountActualTotals] = useState<Record<string, Record<string, string>>>({});
+  const [serverMtdTotals, setServerMtdTotals] = useState<Record<string, string>>({});
   const [serverMtdStatuses, setServerMtdStatuses] = useState<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>({});
-  const [serverAccountMtdTotals, setServerAccountMtdTotals] = useState<Record<string, Record<string, number>>>({});
+  const [serverAccountMtdTotals, setServerAccountMtdTotals] = useState<Record<string, Record<string, string>>>({});
   const [showMtd, setShowMtd] = useState(false);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
@@ -472,6 +488,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     setRecordAccountNames(adoptedAccountNames);
     setSavedControlTotals(cloneControlTotals(forecastControls));
     setDraftControlTotals(cloneControlTotals(forecastControls));
+    setActualControlTotals(cloneControlTotals(workspace.controlTotals.filter((control) => control.matchStatus !== "MANUAL_FORECAST")));
     setForecastVariances([...workspace.forecastVariances]);
     setAccountForecasts([...workspace.accountForecasts]);
     setDraftForecastCompositions(new Map());
@@ -554,6 +571,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
       setDraftControlTotals(preserveDrafts
         ? mergeRefreshedControlsWithDrafts(refreshedControls, savedControlTotalsRef.current, draftControlTotalsRef.current)
         : cloneControlTotals(refreshedControls));
+      setActualControlTotals((current) => {
+        const keyed = new Map((append ? current : []).map((control) => [controlKey(control), control]));
+        page.controlTotals.filter((control) => control.matchStatus !== "MANUAL_FORECAST")
+          .forEach((control) => keyed.set(controlKey(control), { ...control }));
+        return [...keyed.values()];
+      });
       setForecastVariances((current) => append ? [...current, ...page.forecastVariances] : [...page.forecastVariances]);
       setAccountForecasts((current) => {
         const keyed = new Map((append ? current : []).map((forecast) => [`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast]));
@@ -668,12 +691,18 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
 
   const visiblePlans = draftPlans;
   const accounts = useMemo(() => {
-    const grouped = new Map(aggregateConsumptionAccounts(visiblePlans).map((account) => [account.customer, {
-      ...account, actuals: serverAccountActualTotals[account.customer] ?? account.actuals
-    }]));
+    const grouped = new Map(aggregateConsumptionAccounts(visiblePlans).map((account) => {
+      const serverActualsExact = serverAccountActualTotals[account.customer];
+      return [account.customer, serverActualsExact ? {
+        ...account,
+        actuals: Object.fromEntries(Object.entries(serverActualsExact).map(([period, amount]) =>
+          [period, exactDecimalToChartCoordinate(amount)])),
+        actualsExact: { ...serverActualsExact }
+      } : account];
+    }));
     return recordAccountNames.map((customer) => grouped.get(customer) ?? ({
       id: `account::${customer}`, customer, endUser: "", planId: "", dataCenter: "", planType: "Aggregate" as const,
-      actuals: {}, forecasts: Object.fromEntries(draftControlTotals.filter((control) =>
+      actuals: {}, actualsExact: {}, forecasts: Object.fromEntries(draftControlTotals.filter((control) =>
         control.account === customer && control.matchStatus === "MANUAL_FORECAST")
         .map((control) => [control.periodKey, control.controlAmount])), plans: []
     }));
@@ -691,14 +720,20 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     if (serverActualTotals === null) return null;
     const total = aggregateConsumptionActualTotals(draftPlans);
     const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(serverMtdTotals, currentMtdPeriod);
+    const displayedActualsExact = showMtd && currentMtdPeriod
+      ? { ...serverActualTotals, ...(hasCurrentMtd ? { [currentMtdPeriod]: serverMtdTotals[currentMtdPeriod] } : {}) }
+      : serverActualTotals;
     return {
       ...total,
-      actuals: showMtd && currentMtdPeriod
-        ? { ...serverActualTotals, ...(hasCurrentMtd ? { [currentMtdPeriod]: serverMtdTotals[currentMtdPeriod] } : {}) }
-        : serverActualTotals,
+      actuals: Object.fromEntries(Object.entries(displayedActualsExact).map(([period, amount]) =>
+        [period, exactDecimalToChartCoordinate(amount)])),
+      actualsExact: { ...displayedActualsExact },
       forecasts: showMtd && currentMtdPeriod
         ? Object.fromEntries(Object.entries(total.forecasts).filter(([period]) => period !== currentMtdPeriod))
-        : total.forecasts
+        : total.forecasts,
+      forecastsExact: showMtd && currentMtdPeriod
+        ? Object.fromEntries(Object.entries(total.forecastsExact ?? {}).filter(([period]) => period !== currentMtdPeriod))
+        : total.forecastsExact
     };
   }, [currentMtdPeriod, draftPlans, serverActualTotals, serverMtdTotals, showMtd]);
   const selectedPlan = selectedSeriesId === "__all__"
@@ -789,22 +824,23 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   const rangeValid = isConsumptionQuarterRangeValid(fromQuarter, toQuarter);
   const trendPoints = useMemo<ConsumptionChartPoint[]>(() => selectedPlan
     ? allMonths.flatMap((month) => {
-      const value = selectedPlan.actuals[month];
-      return value === undefined ? [] : [{
+      const exactValue = selectedPlan.actualsExact?.[month]
+        ?? (selectedPlan.actuals[month] === undefined ? undefined : String(selectedPlan.actuals[month]));
+      return exactValue === undefined ? [] : [{
         id: `${selectedPlan.id}-${month}`,
         seriesId: selectedPlanLabel,
         groupId: month,
-        value,
-        shortDesc: `${month}: ${currency.format(value)}`
+        value: exactDecimalToChartCoordinate(exactValue),
+        shortDesc: `${month}: ${exactCurrency(exactValue)}`
       }];
     })
     : [], [allMonths, selectedPlan, selectedPlanLabel]);
   const trendDataProvider = useMemo(() => new ArrayDataProvider(trendPoints, { keyAttributes: "id" }), [trendPoints]);
   const rangeSummaries = useMemo(() => selectedPlan ? buildDisplayQuarterSummaries(selectedPlan, displayQuarterOrder) : [], [displayQuarterOrder, selectedPlan]);
-  const rangeTotal = rangeSummaries.reduce((sum, summary) => sum + (summary.total ?? 0), 0);
+  const rangeTotalExact = rangeSummaries.reduce((sum, summary) => addExactDecimals(sum, summary.totalExact ?? "0"), "0");
   const latestSummary = rangeSummaries[0] ?? null;
-  const forecastTotal = rangeSummaries.filter((summary) => summary.status === "FORECAST" || summary.status === "MIXED")
-    .reduce((sum, summary) => sum + (summary.total ?? 0), 0);
+  const forecastTotalExact = rangeSummaries.filter((summary) => summary.status === "FORECAST" || summary.status === "MIXED")
+    .reduce((sum, summary) => addExactDecimals(sum, summary.totalExact ?? "0"), "0");
 
   useEffect(() => {
     updateTableScrollState();
@@ -906,14 +942,22 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     controls.find((control) => control.account === account && control.periodKey === month);
   const controlValue = (controls: readonly ConsumptionApiControlTotal[], account: string, month: string) =>
     controlRecord(controls, account, month)?.controlAmount;
+  const controlValueExact = (controls: readonly ConsumptionApiControlTotal[], account: string, month: string) => {
+    const control = controlRecord(controls, account, month);
+    return control ? control.controlAmountExact ?? String(control.controlAmount) : undefined;
+  };
+  const actualControlsRequiringConfirmation = (account: string, month: string) => actualControlTotals.filter((control) =>
+    control.account === account && control.periodKey === month && control.matchStatus !== "MATCH");
 
-  const updateControlForecast = (account: string, month: string, value: number | null) => {
+  const updateControlForecast = (account: string, month: string, valueExact: string | null) => {
     recordsRequestGeneration.current++;
     recordsLoadingRef.current = false;
     setRecordsLoadingPhase("idle");
     setDraftControlTotals((current) => {
       const next = current.filter((control) => !(control.account === account && control.periodKey === month));
-      if (value !== null) next.push({ account, periodKey: month, controlAmount: value, detailAmount: null, matchStatus: "MANUAL_FORECAST" });
+      if (valueExact !== null) next.push({ account, periodKey: month,
+        controlAmount: exactDecimalToChartCoordinate(valueExact), controlAmountExact: valueExact, detailAmount: null,
+        matchStatus: "MANUAL_FORECAST", pillar: selectedPillar, actualState: "FINAL" });
       return next.sort((left, right) => controlKey(left).localeCompare(controlKey(right)));
     });
   };
@@ -970,7 +1014,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     };
   }, [forecastEditor?.account, forecastEditor?.month, forecastEditor?.pillar, forecastEditor?.anchor, forecastEditor?.error]);
 
-  const beginControlEdit = (anchor: HTMLElement, account: string, month: string, value: number | null) => {
+  const beginControlEdit = (anchor: HTMLElement, account: string, month: string, valueExact: string | null) => {
     if (!canWrite) { setImportError("Write permission is required."); return; }
     if (selectedPillar === "ALL" || isSaving || recordsLoading || dataMode !== "backend") return;
     const key = forecastDraftKey(account, month);
@@ -981,9 +1025,17 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
       month,
       pillar: selectedPillar,
       anchor,
-      total: toKInput(draft?.totalAmount ?? saved?.amount ?? value),
-      newValue: toKInput(draft?.newAmount ?? saved?.newAmount),
-      expansion: toKInput(draft?.expansionAmount ?? saved?.expansionAmount),
+      total: draft?.totalAmountExact !== undefined
+        ? forecastAmountExactToKInput(draft.totalAmountExact)
+        : saved?.amountExact !== undefined
+          ? forecastAmountExactToKInput(saved.amountExact)
+          : forecastAmountExactToKInput(valueExact),
+      newValue: draft?.newAmountExact !== undefined
+        ? forecastAmountExactToKInput(draft.newAmountExact)
+        : forecastAmountExactToKInput(saved?.newAmountExact),
+      expansion: draft?.expansionAmountExact !== undefined
+        ? forecastAmountExactToKInput(draft.expansionAmountExact)
+        : forecastAmountExactToKInput(saved?.expansionAmountExact),
       error: ""
     });
   };
@@ -1004,15 +1056,15 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
     const saved = accountForecasts.find((forecast) => forecast.account === forecastEditor.account
       && forecast.periodKey === forecastEditor.month && forecast.pillar === forecastEditor.pillar);
     const unchanged = saved?.compositionStatus === "CLASSIFIED"
-      && saved.amount === parsed.totalAmount
-      && saved.newAmount === parsed.newAmount
-      && saved.expansionAmount === parsed.expansionAmount;
+      && compareExactDecimals(saved.amountExact, parsed.totalAmountExact) === 0
+      && saved.newAmountExact !== null && compareExactDecimals(saved.newAmountExact, parsed.newAmountExact) === 0
+      && saved.expansionAmountExact !== null && compareExactDecimals(saved.expansionAmountExact, parsed.expansionAmountExact) === 0;
     setDraftForecastCompositions((current) => {
       const next = new Map(current);
       if (unchanged) next.delete(key); else next.set(key, parsed);
       return next;
     });
-    updateControlForecast(forecastEditor.account, forecastEditor.month, parsed.totalAmount);
+    updateControlForecast(forecastEditor.account, forecastEditor.month, parsed.totalAmountExact);
     setForecastEditor(null);
   };
 
@@ -1031,7 +1083,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         const composition = draftForecastCompositions.get(forecastDraftKey(account.customer, month));
         if (!composition) return [];
         return [{ account: account.customer, periodKey: month, pillar: selectedPillar,
-          amount: composition.totalAmount, ...composition }];
+          amount: composition.totalAmountExact, totalAmount: composition.totalAmountExact,
+          newAmount: composition.newAmountExact, expansionAmount: composition.expansionAmountExact }];
       }));
     try {
       if (dataMode === "fallback") {
@@ -1271,8 +1324,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
 
   const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], accountLevel: boolean) => {
     const accountResolutions = accountLevel && "plans" in series ? Object.fromEntries(allMonths.map((month) => {
-      const manual = controlValue(draftControlTotals, series.customer, month);
-      return [month, resolveConsumptionControlTotal(series.plans, month, manual)];
+      const manualExact = controlValueExact(draftControlTotals, series.customer, month);
+      const manualChartCoordinate = manualExact === undefined ? undefined : exactDecimalToChartCoordinate(manualExact);
+      return [month, resolveConsumptionControlTotal(series.plans, month, manualChartCoordinate)];
     })) : {};
     const baseDisplaySeries: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number] = accountLevel && "plans" in series ? {
       ...series,
@@ -1280,23 +1334,28 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         const resolution = accountResolutions[month];
         return !editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
       })),
+      actualsExact: Object.fromEntries(allMonths.flatMap((month) => {
+        const resolution = accountResolutions[month];
+        return !editablePeriodIds.has(month) && resolution?.amountExact !== null ? [[month, resolution.amountExact]] : [];
+      })),
       forecasts: Object.fromEntries(allMonths.flatMap((month) => {
         const resolution = accountResolutions[month];
         return editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
+      })),
+      forecastsExact: Object.fromEntries(allMonths.flatMap((month) => {
+        const resolution = accountResolutions[month];
+        const manualExact = controlValueExact(draftControlTotals, series.customer, month);
+        const amountExact = manualExact ?? resolution?.amountExact;
+        return editablePeriodIds.has(month) && amountExact !== null && amountExact !== undefined ? [[month, amountExact]] : [];
       }))
     } : { ...series };
-    const currentMtd = accountLevel && "plans" in series
+    const currentMtdExact = accountLevel && "plans" in series
       ? serverAccountMtdTotals[series.customer] ?? {}
-      : "mtds" in series ? series.mtds ?? {} : {};
-    const hasCurrentMtd = currentMtdPeriod !== "" && Object.prototype.hasOwnProperty.call(currentMtd, currentMtdPeriod);
-    const displaySeries = showMtd && currentMtdPeriod ? {
-      ...baseDisplaySeries,
-      actuals: {
-        ...baseDisplaySeries.actuals,
-        ...(hasCurrentMtd ? { [currentMtdPeriod]: currentMtd[currentMtdPeriod] } : {})
-      },
-      forecasts: Object.fromEntries(Object.entries(baseDisplaySeries.forecasts).filter(([period]) => period !== currentMtdPeriod))
-    } : baseDisplaySeries;
+      : "mtdsExact" in series ? series.mtdsExact ?? {} : {};
+    const hasCurrentMtd = currentMtdPeriod !== ""
+      && Object.prototype.hasOwnProperty.call(currentMtdExact, currentMtdPeriod);
+    const displaySeries = applyConsumptionMtdDisplayOverride(
+      baseDisplaySeries, currentMtdPeriod, currentMtdExact, showMtd);
     return buildDisplayQuarterSummaries({
       ...displaySeries,
       actuals: Object.fromEntries(Object.entries(displaySeries.actuals).filter(([month]) =>
@@ -1313,6 +1372,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
           const value = editable
             ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
             : actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
+          const valueExact = editable
+            ? displaySeries.forecastsExact?.[month] ?? displaySeries.actualsExact?.[month] ?? null
+            : actual ? displaySeries.actualsExact?.[month] ?? null : forecast ? displaySeries.forecastsExact?.[month] ?? null : null;
           const key = `${series.id}-${month}`;
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
@@ -1323,40 +1385,53 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
             const compositionDraft = draftForecastCompositions.get(forecastDraftKey(series.customer, month));
             const displayedComposition = compositionDraft && composition ? {
               ...composition,
-              amount: compositionDraft.totalAmount,
-              totalAmount: compositionDraft.totalAmount,
-              newAmount: compositionDraft.newAmount,
-              expansionAmount: compositionDraft.expansionAmount,
-              baseAmount: compositionDraft.totalAmount - compositionDraft.newAmount - compositionDraft.expansionAmount,
+              amountChartCoordinate: exactDecimalToChartCoordinate(compositionDraft.totalAmountExact),
+              amountExact: compositionDraft.totalAmountExact,
+              totalAmountChartCoordinate: exactDecimalToChartCoordinate(compositionDraft.totalAmountExact),
+              totalAmountExact: compositionDraft.totalAmountExact,
+              newAmountChartCoordinate: exactDecimalToChartCoordinate(compositionDraft.newAmountExact),
+              newAmountExact: compositionDraft.newAmountExact,
+              expansionAmountChartCoordinate: exactDecimalToChartCoordinate(compositionDraft.expansionAmountExact),
+              expansionAmountExact: compositionDraft.expansionAmountExact,
+              baseAmountExact: subtractExactDecimals(subtractExactDecimals(
+                compositionDraft.totalAmountExact, compositionDraft.newAmountExact), compositionDraft.expansionAmountExact),
+              baseAmountChartCoordinate: exactDecimalToChartCoordinate(subtractExactDecimals(subtractExactDecimals(
+                compositionDraft.totalAmountExact, compositionDraft.newAmountExact), compositionDraft.expansionAmountExact)),
               compositionStatus: "CLASSIFIED" as const
             } : composition;
             const dirty = draftForecastCompositions.has(forecastDraftKey(series.customer, month));
             if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
               class="consumption-value-cell consumption-mtd-cell">
-              <span>{hasCurrentMtd ? currency.format(currentMtd[month]) : "—"}</span>
+              <span>{hasCurrentMtd ? formatExactCurrency(currentMtdExact[month]) : "—"}</span>
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
-              onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, value)}>
+              onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, valueExact)}>
               {displayedComposition ? <ForecastCompositionTooltip composition={displayedComposition}>
-                <span>{value === null ? currency.format(0) : currency.format(value)}{dirty && <small>draft</small>}
-                  {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
-                    Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
+                <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}
+                  {variance && variance.actualAmountExact !== null && variance.forecastAmountExact !== null && <small title="Account Actual minus preserved Final Forecast">
+                    Actual {exactCurrency(variance.actualAmountExact)} · Final {exactCurrency(variance.forecastAmountExact)} · Variance {signedExactCurrency(variance.varianceAmountExact)} ({signedExactPercent(variance.variancePercentExact)})
                   </small>}</span>
-              </ForecastCompositionTooltip> : <span>{value === null ? currency.format(0) : currency.format(value)}{dirty && <small>draft</small>}
-                {variance && variance.actualAmount !== null && variance.forecastAmount !== null && <small title="Account Actual minus preserved Final Forecast">
-                  Actual {currency.format(variance.actualAmount)} · Final {currency.format(variance.forecastAmount)} · Variance {signedCurrency(variance.varianceAmount)}
+              </ForecastCompositionTooltip> : <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}
+                {variance && variance.actualAmountExact !== null && variance.forecastAmountExact !== null && <small title="Account Actual minus preserved Final Forecast">
+                  Actual {exactCurrency(variance.actualAmountExact)} · Final {exactCurrency(variance.forecastAmountExact)} · Variance {signedExactCurrency(variance.varianceAmountExact)} ({signedExactPercent(variance.variancePercentExact)})
                 </small>}</span>}
             </td>;
           }
-          return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>{value === null ? "—" : currency.format(value)}</td>;
+          const controlWarnings = accountLevel ? actualControlsRequiringConfirmation(series.customer, month) : [];
+          return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>
+            {value === null ? "—" : currency.format(value)}
+            {controlWarnings.map((control) => <small key={controlKey(control)} class="consumption-control-warning">
+              {control.pillar} Control {currency.format(control.controlAmount)} · Detail {control.detailAmount === null ? "—" : currency.format(control.detailAmount)} · 확인 필요
+            </small>)}
+          </td>;
         }),
         <td key={`${series.id}-${quarter}-total`} class={`consumption-value-cell consumption-quarter-total${forecastQuarter ? " is-forecast" : ""}`}>
-          {currency.format(summary.total ?? 0)}
+          {forecastQuarter ? exactCurrency(summary.totalExact ?? "0") : currency.format(summary.total ?? 0)}
         </td>,
         <td key={`${series.id}-${quarter}-gap`} class={`consumption-value-cell consumption-preq-gap${forecastQuarter ? " is-forecast" : ""}`}>
-          {summary.preQGap === null ? "—" : signedCurrency(summary.preQGap)}
+          {forecastQuarter ? (summary.preQGapExact === null ? "—" : signedExactCurrency(summary.preQGapExact)) : (summary.preQGap === null ? "—" : signedCurrency(summary.preQGap))}
         </td>
       ];
     });
@@ -1369,6 +1444,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
+  const controlsRequiringConfirmation = actualControlTotals.filter((control) => control.matchStatus !== "MATCH");
+  if (controlsRequiringConfirmation.length > 0) pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${controlsRequiringConfirmation.length}건의 과거 또는 불일치 Control이 있습니다. Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
 
   if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
