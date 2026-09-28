@@ -16,6 +16,7 @@ import {
   getConsumptionPlanLabel,
   getNextQuarterMonths,
   initialConsumptionRecordsBatchSize,
+  isConsumptionMtdDisplayPeriod,
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
@@ -82,6 +83,18 @@ assert.equal(forecastDisplay.forecasts["FY27-SEP"], 123,
   "disabling MTD preserves the current-period chart Forecast");
 assert.equal(forecastDisplay.forecastsExact?.["FY27-SEP"], "900719925474.0002",
   "disabling MTD preserves the authoritative exact Forecast");
+const missingMtdDisplay = applyConsumptionMtdDisplayOverride(
+  mtdSource, "FY27-SEP", {}, true);
+assert.equal(missingMtdDisplay.actualsExact?.["FY27-SEP"], undefined,
+  "enabling MTD without a current-period value does not inject an Actual");
+assert.equal(missingMtdDisplay.forecasts["FY27-SEP"], 123,
+  "enabling MTD without a current-period value preserves the editable Forecast coordinate");
+assert.equal(missingMtdDisplay.forecastsExact?.["FY27-SEP"], "900719925474.0002",
+  "enabling MTD without a current-period value preserves the authoritative Forecast");
+assert.equal(isConsumptionMtdDisplayPeriod(true, "FY27-SEP", {}, "FY27-SEP"), false,
+  "a missing current-period MTD remains an editable Forecast cell");
+assert.equal(isConsumptionMtdDisplayPeriod(true, "FY27-SEP", { "FY27-SEP": "1" }, "FY27-SEP"), true,
+  "an existing current-period MTD is rendered as a read-only MTD cell");
 const visibilityPlans: ConsumptionPlan[] = [
   { ...parsed.plans[0], id: "zero", planId: "ZERO", actuals: { "FY27-JUL": 0 }, forecasts: {} },
   { ...parsed.plans[0], id: "active", planId: "ACTIVE", actuals: { "FY27-JUL": -1 }, forecasts: {} },

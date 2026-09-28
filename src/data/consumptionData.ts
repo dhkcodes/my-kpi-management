@@ -136,25 +136,32 @@ export type ConsumptionAccount = Readonly<{
 
 export type ConsumptionSeries = ConsumptionPlan | ConsumptionAccount;
 
+export const isConsumptionMtdDisplayPeriod = (
+  showMtd: boolean,
+  currentMtdPeriod: string,
+  currentMtdExact: Readonly<Record<string, string>>,
+  period: string
+): boolean => showMtd
+  && currentMtdPeriod !== ""
+  && period === currentMtdPeriod
+  && Object.prototype.hasOwnProperty.call(currentMtdExact, currentMtdPeriod);
+
 export const applyConsumptionMtdDisplayOverride = <T extends ConsumptionSeries>(
   series: T,
   currentMtdPeriod: string,
   currentMtdExact: Readonly<Record<string, string>>,
   showMtd: boolean
 ): T => {
-  if (!showMtd || currentMtdPeriod === "") return series;
-  const hasCurrentMtd = Object.prototype.hasOwnProperty.call(currentMtdExact, currentMtdPeriod);
+  if (!isConsumptionMtdDisplayPeriod(showMtd, currentMtdPeriod, currentMtdExact, currentMtdPeriod)) return series;
   return {
     ...series,
     actuals: {
       ...series.actuals,
-      ...(hasCurrentMtd
-        ? { [currentMtdPeriod]: exactDecimalToChartCoordinate(currentMtdExact[currentMtdPeriod]) }
-        : {})
+      [currentMtdPeriod]: exactDecimalToChartCoordinate(currentMtdExact[currentMtdPeriod])
     },
     actualsExact: {
       ...series.actualsExact,
-      ...(hasCurrentMtd ? { [currentMtdPeriod]: currentMtdExact[currentMtdPeriod] } : {})
+      [currentMtdPeriod]: currentMtdExact[currentMtdPeriod]
     },
     forecasts: Object.fromEntries(Object.entries(series.forecasts)
       .filter(([period]) => period !== currentMtdPeriod)),
