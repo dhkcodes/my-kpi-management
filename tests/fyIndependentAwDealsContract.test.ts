@@ -80,7 +80,7 @@ async function run() {
       { candidateKey: "ACCOUNT:DRAFT ONLY", accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY PLUS", accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false }
     ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
-    [["Malformed suffix", "42450000"], ["No cross-domain match", "OTHER-9"], ["Draft only plus", null]],
+    [["Legacy suffix match", "42459532"], ["Malformed suffix", "42450000"], ["No cross-domain match", "OTHER-9"], ["Draft only plus", null]],
     "Plan Code, internal Plan ID, and exact normalized account names are independent exclusions; archived plans count and numeric-looking codes never cross-match internal IDs"
   );
   let candidateUrl = "";
