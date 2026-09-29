@@ -163,8 +163,10 @@ assert.doesNotMatch(page, /notes: draft\.deal\.notes/,
   "opportunity Notes is excluded from the editor and save payload");
 assert.match(page, /Account Recommendations/);
 assert.match(page, /filterForecastCandidates\(forecastCandidates, hierarchy\.accounts\)/);
-assert.match(api, /if \(candidate\.planId !== null\) return \[`plan-id:\$\{candidate\.planId\}`\][\s\S]*normalizedAccountIdentity/,
-  "Add from Records uses Plan ID first and normalized Account exact-match only as fallback");
+assert.match(api, /const planId = normalizedPlanIdValue\(candidate\.planId\)[\s\S]*if \(planId !== null\) return \[`plan-id:\$\{planId\}`\][\s\S]*normalizedAccountIdentity/,
+  "Add from Records uses normalized Plan ID first and normalized Account exact-match only as fallback");
+assert.match(api, /normalizedPlanIdValue\(plan\.sourcePlanNumber\)[\s\S]*occupied\.add\(`plan-id:\$\{sourcePlanNumberAsId\}`\)/,
+  "registered numeric Plan Number representations are excluded by Plan ID independently of Account/Plan Code fallback");
 assert.match(page, /CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요"/);
 assert.match(page, /requestError instanceof AccountsWorkloadsApiError/);
 assert.match(page, /setSaveErrors\(/,

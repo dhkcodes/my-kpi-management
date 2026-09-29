@@ -132,6 +132,16 @@ export type ForecastCandidate = Readonly<{
 const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
 const normalizedPlanIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
 
+const normalizedPlanIdValue = (value: number | string | null): string | null => {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
+  }
+  const trimmed = value?.trim() ?? "";
+  if (!/^\d+(?:\.0+)?$/.test(trimmed)) return null;
+  const integerPart = trimmed.split(".", 1)[0].replace(/^0+/, "");
+  return integerPart || "0";
+};
+
 const planAccountKey = (planNumber: string | null, accountName: string): string | null => {
   if (!planNumber?.trim()) return null;
   const account = normalizedAccountIdentity(accountName);
@@ -139,7 +149,8 @@ const planAccountKey = (planNumber: string | null, accountName: string): string 
 };
 
 export const forecastCandidateKeys = (candidate: ForecastCandidate): string[] => {
-  if (candidate.planId !== null) return [`plan-id:${candidate.planId}`];
+  const planId = normalizedPlanIdValue(candidate.planId);
+  if (planId !== null) return [`plan-id:${planId}`];
   const account = normalizedAccountIdentity(candidate.normalizedAccount || candidate.accountName);
   return account ? [`account:${account}`] : [];
 };
@@ -165,7 +176,10 @@ export const filterForecastCandidates = (
     const accountKey = normalizedAccountIdentity(account.name);
     if (accountKey) occupied.add(`account:${accountKey}`);
     account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
-      if (plan.sourcePlanId !== null) occupied.add(`plan-id:${plan.sourcePlanId}`);
+      const sourcePlanId = normalizedPlanIdValue(plan.sourcePlanId);
+      if (sourcePlanId !== null) occupied.add(`plan-id:${sourcePlanId}`);
+      const sourcePlanNumberAsId = normalizedPlanIdValue(plan.sourcePlanNumber);
+      if (sourcePlanNumberAsId !== null) occupied.add(`plan-id:${sourcePlanNumberAsId}`);
       const planCodeKey = planAccountKey(plan.sourcePlanNumber, account.name);
       if (planCodeKey) occupied.add(planCodeKey);
     }));
