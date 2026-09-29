@@ -129,6 +129,20 @@ void (async () => {
     "the selected alert base month anchors the preceding five ACTUAL months");
   assert.equal(decoded.mtdSummary, null, "an OFF response has no provisional MTD summary");
 
+  const ordinaryDecimalAnalysis = {
+    ...analysis,
+    accounts: analysis.accounts.map((account) => ({ ...account,
+      percentage: 33.45,
+      workloads: account.workloads.map((workload) => ({ ...workload, percentage: 2.47,
+        plans: workload.plans.map((plan) => ({ ...plan, percentage: 2.47 })) })) }))
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(ordinaryDecimalAnalysis), {
+    status: 200, headers: { "Content-Type": "application/json" }
+  });
+  const ordinaryDecimalDecoded = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.equal(ordinaryDecimalDecoded.accounts[0].workloads[0].percentageExact, "2.47",
+    "ordinary server decimals must not fail validation because of binary floating-point multiplication artifacts");
+
   const exactAmount = (value: number) => String(value);
   const exactWireAnalysis = {
     ...analysis,

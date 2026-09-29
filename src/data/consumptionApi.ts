@@ -328,8 +328,11 @@ const decodeExactDecimal = (value: unknown, nonNegative = false): ExactDecimal |
     const numeric = Number(normalized);
     return Number.isFinite(numeric) ? { chartCoordinate: numeric, exact: normalized } : null;
   }
-  if (isFiniteNumber(value) && (!nonNegative || value >= 0) && Number.isSafeInteger(value * 10_000)) {
-    return { chartCoordinate: value, exact: String(value) };
+  if (isFiniteNumber(value) && (!nonNegative || value >= 0)) {
+    // JSON numbers such as 2.47 are valid four-decimal values, but their binary
+    // product can be 24700.000000000004. Validate the shortest decimal wire
+    // representation instead of requiring exact floating-point multiplication.
+    return decodeExactDecimal(String(value), nonNegative);
   }
   return null;
 };
