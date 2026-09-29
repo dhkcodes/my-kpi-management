@@ -58,11 +58,12 @@ async function run() {
   assert.deepEqual(
     filterForecastCandidates([
       ...candidates,
+      { candidateKey: "PLAN_ID:81", accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 81, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY", accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY PLUS", accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false }
     ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
     [["Acme", "PLAN-9"], ["Renamed account", "PLAN-8"], ["Draft only plus", null]],
-    "saved Plan IDs and unsaved exact-account drafts are excluded without fuzzy-merging distinct Plan IDs or account names"
+    "saved Plan IDs, stale IDs with the same account/plan code, and exact-account drafts are excluded without merging the same plan code on another account"
   );
   let candidateUrl = "";
   await fetchForecastCandidates(false, async (input) => {

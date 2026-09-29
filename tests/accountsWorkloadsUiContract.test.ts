@@ -438,7 +438,31 @@ assert.match(page, /candidate\.candidateKey/,
   "recommendation row identity uses the backend candidate key");
 assert.match(page, /fetchForecastCandidates\(true\)/,
   "resync fetches excluded candidates so the switch can filter client-side without another mutation");
+assert.match(page, /forecastRequestPendingRef\.current/,
+  "recommendation requests use an immediate lock to reject duplicate Resync clicks");
+assert.match(page, /forecastRequestIdRef\.current/,
+  "recommendation requests ignore responses that are no longer current");
+assert.match(page, /const closeForecast[\s\S]*forecastRequestIdRef\.current \+= 1[\s\S]*forecastRequestPendingRef\.current = false/,
+  "closing an in-flight recommendation request invalidates it before a later reopen can fetch a newer result");
+assert.doesNotMatch(page, /forecastLoading\s*\?\s*\(\s*<p>Loading/,
+  "loading keeps the recommendation table mounted instead of collapsing the dialog");
+assert.match(page, /class="accounts-forecast-loading"[\s\S]*role="status"[\s\S]*Loading recommendations/,
+  "loading is rendered as an accessible overlay in the table body region");
+assert.match(page, /disabled=\{!canWrite \|\| forecastLoading \|\| candidate\.excluded\}/,
+  "row selection is disabled while recommendations are refreshing");
+assert.match(page, /disabled=\{forecastLoading \|\| forecastMutationKey !== null\}/,
+  "Resync and exclusion controls do not overlap loading or mutation requests");
+assert.match(page, /disabled=\{forecastLoading \|\| !selectedCandidateKeys\.size\}/,
+  "stale selected candidates cannot be applied while recommendations are refreshing");
+assert.match(page, /class="accounts-forecast-table-scroll"[\s\S]*aria-busy=\{forecastLoading\}[\s\S]*accounts-forecast-candidates-table/,
+  "recommendation rows scroll inside a stable table viewport");
 assert.match(styles, /\.accounts-forecast-toolbar\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/,
   "recommendation search and resync controls wrap responsively");
+assert.match(styles, /\.accounts-forecast-dialog\s*\{[^}]*overflow:\s*hidden[^}]*height:/,
+  "recommendation dialog reserves a stable height and keeps outer chrome fixed");
+assert.match(styles, /\.accounts-forecast-table-scroll\s*\{[^}]*overflow:\s*auto[^}]*min-height:\s*0/,
+  "only the recommendation table viewport owns horizontal and vertical scrolling");
+assert.match(styles, /\.accounts-forecast-candidates-table thead th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/,
+  "recommendation table headers remain fixed while rows scroll");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");
