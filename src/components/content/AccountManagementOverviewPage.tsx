@@ -65,9 +65,9 @@ const groupActual = (items: readonly OverviewDeal[]) => {
   return [...accounts.values()];
 };
 
-const sumPrimary = (items: readonly OverviewDeal[], kind: "NEW" | "EXPANSION" | "RENEWAL") => items.reduce((sum, item) => {
+const sumArrByKind = (items: readonly OverviewDeal[], kind: "NEW" | "EXPANSION" | "RENEWAL") => items.reduce((sum, item) => {
   if (item.deal.revenueType.toUpperCase() !== kind) return sum;
-  return sum + (kind === "RENEWAL" ? item.deal.acrUsd ?? 0 : item.deal.arrUsd ?? 0);
+  return sum + (item.deal.arrUsd ?? 0);
 }, 0);
 
 const sumAcr = (items: readonly OverviewDeal[]) => items.reduce((sum, item) => sum + (item.deal.acrUsd ?? 0), 0);
@@ -215,13 +215,13 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
             <article class="account-overview__panel account-overview__hierarchy">
               <div class="account-overview__panel-heading"><div><h3>Account → Workload → Opportunity</h3></div></div>
-              <div class="account-overview__hierarchy-head"><span>Name</span><span>New ARR</span><span>Expansion ARR</span><span>ACR</span><span>WON</span></div>
+              <div class="account-overview__hierarchy-head"><span>Name</span><span>NEW<small>ARR</small></span><span>EXPANSION<small>ARR</small></span><span>RENEWAL<small>ARR</small></span><span>ACR</span></div>
               <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">No WON Opportunities in this scope.</p> : grouped.map(({ account, workloads }) => {
                 const accountDeals = [...workloads.values()].flatMap((item) => item.deals);
                 const accountKey = `account-${account.id}`;
-                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={expanded.has(accountKey)}><span><i>{expanded.has(accountKey) ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(accountDeals, "NEW"))}</b><b>{fmtUsd(sumPrimary(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b><b>{accountDeals.length}</b></button>
-                  {expanded.has(accountKey) && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={expanded.has(workloadKey)}><span><i>{expanded.has(workloadKey) ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumPrimary(deals, "NEW"))}</b><b>{fmtUsd(sumPrimary(deals, "EXPANSION"))}</b><b>{fmtUsd(sumAcr(deals))}</b><b>{deals.length}</b></button>
-                    {expanded.has(workloadKey) && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · Close {item.deal.actualCloseDate} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b><b>1</b></div>)}</div>; })}
+                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={expanded.has(accountKey)}><span><i>{expanded.has(accountKey) ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(accountDeals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b></button>
+                  {expanded.has(accountKey) && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={expanded.has(workloadKey)}><span><i>{expanded.has(workloadKey) ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(deals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(deals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(deals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(deals))}</b></button>
+                    {expanded.has(workloadKey) && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · Close {item.deal.actualCloseDate} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b></div>)}</div>; })}
                 </div>;
               })}</div>
             </article>

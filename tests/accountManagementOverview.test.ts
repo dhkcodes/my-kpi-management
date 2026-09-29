@@ -165,7 +165,14 @@ assert.match(pageSource, /accountId: selectedAccountId \?\? undefined/,
   "selected account must prefer its stable ID when one is available");
 assert.doesNotMatch(pageSource, /`Workload:|· Plan:/, "overview account results must omit Workload and Plan prefixes");
 assert.match(pageSource, /workload\.name} · \$\{workload\.plans/, "overview account results must retain workload names, plan numbers and separators");
-assert.match(pageSource, />ACR<\/span>/, "hierarchy third amount column must be labelled ACR");
+assert.match(pageSource, /<span>NEW<small>ARR<\/small><\/span><span>EXPANSION<small>ARR<\/small><\/span><span>RENEWAL<small>ARR<\/small><\/span><span>ACR<\/span>/,
+  "hierarchy columns must be NEW, EXPANSION, RENEWAL, and ACR with ARR subtitles");
+assert.doesNotMatch(pageSource, /<span>WON<\/span>/, "ACR must be the final hierarchy column");
+assert.match(pageSource, /const sumArrByKind =/, "hierarchy revenue-type columns must aggregate ARR for every type");
+assert.match(pageSource, /sumArrByKind\(accountDeals, "RENEWAL"\)/,
+  "account rows must expose Renewal ARR separately from ACR");
+assert.match(pageSource, /revenueType\.toUpperCase\(\) === "RENEWAL"[\s\S]*arrUsd/,
+  "Opportunity rows must render ARR in the Renewal column");
 assert.match(pageSource, /const sumAcr =/, "hierarchy ACR must aggregate every revenue type");
 assert.doesNotMatch(pageSource, /`ACR \$\{fmtUsd/, "deal rows must keep the ACR label in the header rather than the amount cell");
 assert.match(appCss, /\.account-overview__bar-columns \.is-new,[\s\S]*background:\s*#7fb4df/, "New bars must use a pastel blue");

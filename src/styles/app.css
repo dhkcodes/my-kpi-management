@@ -4507,6 +4507,7 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__deal-row { align-items: center; display: grid; gap: .6rem; grid-template-columns: minmax(18rem, 2fr) repeat(4, minmax(5.5rem, .7fr)); }
 .account-overview__hierarchy-head { border-bottom: 1px solid var(--amo-line); color: var(--kpi-muted); font-size: .7rem; font-weight: 800; padding: .55rem .65rem; text-transform: uppercase; }
 .account-overview__hierarchy-head span:not(:first-child) { text-align: right; }
+.account-overview__hierarchy-head small { display: block; font-size: .62rem; font-weight: 700; letter-spacing: .04em; margin-top: .12rem; }
 .account-overview__tree-row { background: transparent; border: 0; border-bottom: 1px solid #ebe8e4; color: inherit; cursor: pointer; font: inherit; min-height: 2.85rem; padding: .5rem .65rem; text-align: left; width: 100%; }
 .account-overview__tree-row:hover { background: #f7f9fb; }
 .account-overview__tree-row > span { align-items: center; display: flex; gap: .5rem; }
@@ -4649,7 +4650,7 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__bar-columns i { width: 16%; min-width: 9px; max-width: 18px; min-height: 2px; border-radius: 2px 2px 0 0; background: #2b63c4; }
 .account-overview__bar-columns .is-expansion { background: #5d8be0; }
 .account-overview__bar-columns .is-renewal { background: #a8c4ef; }
-.account-overview__hierarchy-head, .account-overview__tree-row, .account-overview__deal-row { grid-template-columns: minmax(180px,2fr) repeat(3,minmax(75px,.8fr)) minmax(40px,.4fr); gap: .4rem; }
+.account-overview__hierarchy-head, .account-overview__tree-row, .account-overview__deal-row { grid-template-columns: minmax(180px,2fr) repeat(4,minmax(75px,.8fr)); gap: .4rem; }
 .account-overview__hierarchy-head { padding: .45rem .65rem; background: #f4f6f8; font-size: .58rem; }
 .account-overview__tree-row { min-height: 34px; padding: .38rem .65rem; border-radius: 0; border-bottom: 1px solid #eceff3; }
 .account-overview__tree-row.is-workload { padding-left: .65rem; }
