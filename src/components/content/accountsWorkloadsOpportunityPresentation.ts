@@ -50,6 +50,11 @@ export const sumWonOpportunityAmount = (
   0
 );
 
+const awParentK = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+export const formatAwParentAmountK = (value: number): string =>
+  `${awParentK.format(value / 1000)}K`;
+
 export const isContractDateRangeValid = (
   startDate: string | null,
   endDate: string | null

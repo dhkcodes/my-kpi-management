@@ -95,6 +95,8 @@ assert.strictEqual(target.deals.length, 2);
 assert.strictEqual(target.pipeline.expansionArr.amount, 70000);
 assert.strictEqual(target.pipeline.newArr.missing, 1);
 assert.strictEqual(target.pipeline.newArr.enteredAcr, 8000);
+assert.strictEqual(target.pipeline.acr.amount, 18000,
+  "Target Actions ACR must include OPEN New, Expansion, and Renewal opportunities");
 
 const searched = overview.targetFor("PRIORITY", "beta", new Date("2026-09-27T00:00:00Z"));
 assert.strictEqual(searched.deals.length, 2);
@@ -142,6 +144,8 @@ assert.match(pageSource, /item\.account\.name} \({item\.workload\.name}\)/, "ope
 assert.match(pageSource, /item\.deal\.name} \({item\.deal\.opportunityNo/, "open deals must show Opportunity (Opportunity ID) second");
 assert.match(pageSource, /account-overview__bar-item/, "quarter bars must render numeric labels");
 assert.match(pageSource, /account-overview__target-footer/, "open deal list must keep a footer outside the scrolling rows");
+assert.match(pageSource, /<span>ACR<\/span>/, "Target Actions must label the all-type ACR card as ACR");
+assert.doesNotMatch(pageSource, /RENEWAL ACR PIPELINE/, "the obsolete renewal-only ACR card label must be removed");
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*overflow:\s*auto/s, "open deal rows must scroll internally");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*auto/s, "account hierarchy must scroll internally");
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*height:\s*24rem/s, "open deal list must have a fixed desktop height");

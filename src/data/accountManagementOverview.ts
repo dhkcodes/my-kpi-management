@@ -117,6 +117,16 @@ const amountMetric = (items: readonly OverviewDeal[], kind: RevenueKind): Amount
   return { amount, missing, enteredAcr };
 };
 
+const acrMetric = (items: readonly OverviewDeal[]): AmountMetric => {
+  let amount = 0;
+  let missing = 0;
+  items.forEach(({ deal }) => {
+    if (deal.acrUsd === null) missing += 1;
+    else amount += deal.acrUsd;
+  });
+  return { amount, missing, enteredAcr: 0 };
+};
+
 const metricsFor = (items: readonly OverviewDeal[]): OverviewKpis => ({
   newArr: amountMetric(items, "NEW"),
   expansionArr: amountMetric(items, "EXPANSION"),
@@ -188,7 +198,7 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
         pipeline: {
           newArr: amountMetric(deals, "NEW"),
           expansionArr: amountMetric(deals, "EXPANSION"),
-          renewalAcr: amountMetric(deals, "RENEWAL"),
+          acr: acrMetric(deals),
         },
       };
     },

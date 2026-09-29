@@ -45,6 +45,7 @@ import {
 } from "./opportunityCurrency";
 import {
   accountsWorkloadsBatchErrorSummary,
+  formatAwParentAmountK,
   formatOpportunityFieldError,
   sumWonOpportunityAmount,
   sortOpportunitiesByTarget,
@@ -2618,10 +2619,10 @@ export function AccountsWorkloadsPage({
                       {renderAwCell(account, workload, "salesRep")}
                       {renderAwCell(account, workload, "plan")}
                       <td class="accounts-workloads-number-cell">
-                        {fmtMoney(arr)}
+                        {formatAwParentAmountK(arr)}
                       </td>
                       <td class="accounts-workloads-number-cell">
-                        {fmtMoney(acr)}
+                        {formatAwParentAmountK(acr)}
                       </td>
                       <td class="accounts-workloads-number-cell">
                         {deals.length}

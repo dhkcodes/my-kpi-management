@@ -239,7 +239,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           <div class="account-overview__pipeline">
             <article><span>NEW ARR PIPELINE</span><strong>{fmtUsd(target!.pipeline.newArr.amount)}</strong><small>{metricSecondary(target!.pipeline.newArr.missing, target!.pipeline.newArr.enteredAcr)}</small></article>
             <article><span>EXPANSION ARR PIPELINE</span><strong>{fmtUsd(target!.pipeline.expansionArr.amount)}</strong><small>{metricSecondary(target!.pipeline.expansionArr.missing, target!.pipeline.expansionArr.enteredAcr)}</small></article>
-            <article><span>RENEWAL ACR PIPELINE</span><strong>{fmtUsd(target!.pipeline.renewalAcr.amount)}</strong><small>{metricSecondary(target!.pipeline.renewalAcr.missing, 0, false)}</small></article>
+            <article><span>ACR</span><strong>{fmtUsd(target!.pipeline.acr.amount)}</strong><small>{metricSecondary(target!.pipeline.acr.missing, 0, false)}</small></article>
           </div>
 
           <article class="account-overview__panel account-overview__target-list"><div class="account-overview__panel-heading"><div><h3>Open Deal action list</h3><p>{target!.deals.length} deals in the selected target scope</p></div></div>
