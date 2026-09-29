@@ -1,24 +1,16 @@
 /** @license UPL-1.0 */
 import { h } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojtoolbar";
 import "ojs/ojmenu";
 import "ojs/ojavatar";
 import { getProfileInitials, type AuthSession } from "../auth/authSession";
-
-const KAP_HEADER_LOGOS = [
-  { variant: "gold", src: "styles/images/kap-header-gold.png", iconSrc: "styles/images/kap-header-gold-icon.png" },
-  { variant: "purple", src: "styles/images/kap-header-purple.png", iconSrc: "styles/images/kap-header-purple-icon.png" },
-  { variant: "blue", src: "styles/images/kap-header-blue.png", iconSrc: "styles/images/kap-header-blue-icon.png" },
-  { variant: "coral", src: "styles/images/kap-header-coral.png", iconSrc: "styles/images/kap-header-coral-icon.png" }
-] as const;
-
-export const selectKapHeaderLogo = (randomValue = Math.random()) =>
-  KAP_HEADER_LOGOS[Math.min(KAP_HEADER_LOGOS.length - 1, Math.floor(Math.max(0, randomValue) * KAP_HEADER_LOGOS.length))];
-
-// Module scope keeps one variant stable throughout SPA navigation; a full reload evaluates it again.
-const selectedKapHeaderLogo = selectKapHeaderLogo();
-
+import {
+  getOrCreateKapHeaderLogo,
+  KAP_HEADER_VARIANT_STORAGE_KEY,
+  readKapHeaderLogo
+} from "./kapHeaderBrand";
 
 type Props = Readonly<{
   appName: string;
@@ -30,6 +22,18 @@ type Props = Readonly<{
 }>;
 
 export function Header({ profile, navigationOpen, onToggleNavigation, onNavigate, onLogout }: Props) {
+  const [selectedKapHeaderLogo, setSelectedKapHeaderLogo] = useState(getOrCreateKapHeaderLogo);
+
+  useEffect(() => {
+    const syncBrandAcrossTabs = (event: StorageEvent) => {
+      if (event.key !== KAP_HEADER_VARIANT_STORAGE_KEY || event.newValue === null) return;
+      const sharedLogo = readKapHeaderLogo();
+      if (sharedLogo) setSelectedKapHeaderLogo(sharedLogo);
+    };
+    window.addEventListener("storage", syncBrandAcrossTabs);
+    return () => window.removeEventListener("storage", syncBrandAcrossTabs);
+  }, []);
+
   return (
     <header role="banner" class="oj-web-applayout-header kpi-header">
       <div class="oj-flex-bar oj-sm-align-items-center kpi-header__bar">

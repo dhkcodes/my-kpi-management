@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
+import { clearKapHeaderLoginSession, startNewKapHeaderLoginSession } from "./kapHeaderBrand";
 import { LoginPage } from "./LoginPage";
 import { Content } from "./content/index";
 import type { KpiNavigationGuard } from "./content/KpiSpreadsheetPage";
@@ -792,10 +793,15 @@ export const App = registerCustomElement(
       let active = true;
       void getAuthenticatedSession()
         .then((verifiedSession) => {
-          if (active) setSession(verifiedSession);
+          if (!active) return;
+          if (!verifiedSession) clearKapHeaderLoginSession();
+          setSession(verifiedSession);
         })
         .catch(() => {
-          if (active) setSession(null);
+          if (active) {
+            clearKapHeaderLoginSession();
+            setSession(null);
+          }
         })
         .finally(() => {
           if (active) setAuthChecking(false);
@@ -823,12 +829,14 @@ export const App = registerCustomElement(
     useEffect(() => subscribeAuthRequired(() => {
       window.history.replaceState(null, "", "/");
       window.scrollTo({ top: 0, left: 0 });
+      clearKapHeaderLoginSession();
       setSession(null);
       setAuthChecking(false);
     }), []);
 
     const handleAuthenticated = useCallback((authenticatedSession: AuthSession) => {
       window.history.replaceState(null, "", "/");
+      startNewKapHeaderLoginSession();
       setSession(authenticatedSession);
     }, []);
 
@@ -837,6 +845,7 @@ export const App = registerCustomElement(
         .then(() => {
           window.history.replaceState(null, "", "/");
           window.scrollTo({ top: 0, left: 0 });
+          clearKapHeaderLoginSession();
           setSession(null);
         })
         .catch(() => undefined);
