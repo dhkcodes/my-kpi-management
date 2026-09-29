@@ -2560,7 +2560,13 @@ export function AccountsWorkloadsPage({
                 childDrafts
                   .filter((draft) => draft.original === null)
                   .forEach((draft) => shownDeals.unshift(draft.deal));
-                const sortedDeals = sortOpportunitiesByTarget(shownDeals);
+                const dealSortNames = new Map(
+                  childDrafts.map((draft) => [draft.deal.id, draft.original?.name ?? ""])
+                );
+                const sortedDeals = sortOpportunitiesByTarget(
+                  shownDeals,
+                  (deal) => dealSortNames.get(deal.id) ?? deal.name
+                );
                 return (
                   <Fragment key={key}>
                     <tr
@@ -2995,9 +3001,10 @@ export function AccountsWorkloadsPage({
                 <h2>Account Recommendations</h2>
                 <p>
                   Select one or more recommendations, then confirm to add them as
-                  unsaved Account &amp; Workload drafts. Plan ID is matched first;
-                  normalized Account exact match is used only when Plan ID is
-                  unavailable. They will be added as unsaved AW drafts.
+                  unsaved Account &amp; Workload drafts. Recommendations already
+                  registered under your accessible AW scope are removed independently
+                  by internal Plan ID, exact displayed Plan Number, or normalized
+                  Account name. They will be added as unsaved AW drafts.
                 </p>
               </div>
               <button type="button" onClick={closeForecast}>

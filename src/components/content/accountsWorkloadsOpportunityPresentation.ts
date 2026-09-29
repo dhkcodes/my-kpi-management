@@ -14,7 +14,8 @@ const targetRank = (deal: AccountWorkloadDeal) => {
 };
 
 export const sortOpportunitiesByTarget = (
-  deals: readonly AccountWorkloadDeal[]
+  deals: readonly AccountWorkloadDeal[],
+  sortName: (deal: AccountWorkloadDeal) => string = (deal) => deal.name
 ): AccountWorkloadDeal[] =>
   deals
     .map((deal, originalIndex) => ({ deal, originalIndex }))
@@ -26,8 +27,8 @@ export const sortOpportunitiesByTarget = (
       if (leftTarget !== null && rightTarget !== null && leftTarget !== rightTarget)
         return rightTarget - leftTarget;
 
-      const nameOrder = left.deal.name.localeCompare(
-        right.deal.name,
+      const nameOrder = sortName(left.deal).localeCompare(
+        sortName(right.deal),
         ["ko-KR", "en-US"],
         { numeric: true, sensitivity: "base" }
       );
