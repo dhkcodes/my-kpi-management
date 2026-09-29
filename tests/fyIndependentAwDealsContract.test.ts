@@ -54,6 +54,17 @@ async function run() {
   }, {
     id: -1, versionNo: 0, name: "  Draft only  ", archived: false,
     workloads: [{ id: -2, versionNo: 0, name: "미정의 — 수정 필요", salesRep: null, lastUpdated: null, notes: null, highlighted: false, archived: false, deals: [], plans: [] }]
+  }, {
+    id: 20, versionNo: 1, name: "Unrelated registered account", archived: true,
+    workloads: [{
+      id: 21, versionNo: 1, name: "Archived workload", salesRep: null, lastUpdated: null, notes: null, highlighted: false, archived: true, deals: [],
+      plans: [
+        { id: 22, workloadId: 21, sourcePlanId: null, sourcePlanNumber: " 0009.0 ", versionNo: 1 },
+        { id: 23, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "10", versionNo: 1 },
+        { id: 24, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "   ", versionNo: 1 },
+        { id: 25, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "9A", versionNo: 1 }
+      ]
+    }]
   }];
   assert.deepEqual(
     filterForecastCandidates([
@@ -62,8 +73,8 @@ async function run() {
       { candidateKey: "ACCOUNT:DRAFT ONLY", accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY PLUS", accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false }
     ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
-    [["Acme", "PLAN-9"], ["Renamed account", "PLAN-8"], ["Draft only plus", null]],
-    "saved Plan IDs, stale IDs with the same account/plan code, and exact-account drafts are excluded without merging the same plan code on another account"
+    [["Renamed account", "PLAN-8"], ["Draft only plus", null]],
+    "saved Plan IDs, strict numeric Plan Number representations, stale IDs with the same account/plan code, and exact-account drafts are excluded without merging different identifiers"
   );
   let candidateUrl = "";
   await fetchForecastCandidates(false, async (input) => {
