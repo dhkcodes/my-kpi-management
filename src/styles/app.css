@@ -3697,7 +3697,7 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-name .is-danger { min-width: 2rem; padding-inline: .35rem; }
 .accounts-workloads-empty { color: var(--kpi-muted); padding: 1rem !important; text-align: center; }
 .accounts-workloads-dialog-backdrop { align-items: center; background: rgb(22 21 19 / 45%); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 1000; }
-.accounts-forecast-dialog { background: #fff; border-radius: .4rem; box-shadow: 0 1rem 3rem rgb(0 0 0 / 28%); display: grid; gap: .8rem; max-height: 85vh; max-width: 58rem; overflow: auto; padding: 1rem; width: 100%; }
+.accounts-forecast-dialog { background: #fff; border-radius: .4rem; box-shadow: 0 1rem 3rem rgb(0 0 0 / 28%); display: grid; gap: .8rem; grid-template-rows: auto auto minmax(0, 1fr) auto; max-width: 58rem; overflow: hidden; height: min(44rem, calc(100dvh - 2rem)); padding: 1rem; width: 100%; }
 .accounts-forecast-dialog header, .accounts-forecast-dialog footer { align-items: center; display: flex; gap: .75rem; justify-content: space-between; }
 .accounts-forecast-dialog footer > div { display: flex; gap: .5rem; }
 .accounts-forecast-dialog h2 { margin: 0; }
@@ -3711,15 +3711,20 @@ h4.weekly-activity-section-label--next-week,
 .accounts-forecast-exclusion-action { border-color: #c8c2bb !important; color: #6f4b12 !important; }
 .accounts-forecast-empty { color: var(--kpi-muted); padding: 1.25rem !important; text-align: center !important; }
 .accounts-forecast-list { display: grid; gap: .5rem; overflow-x: auto; }
-.accounts-forecast-candidates-table { border-collapse: collapse; min-width: 32rem; width: 100%; }
+.accounts-forecast-table-scroll { border: 1px solid var(--kpi-border); overflow: auto; min-height: 0; position: relative; }
+.accounts-forecast-candidates-table { border-collapse: collapse; min-width: 44rem; width: 100%; }
+.accounts-forecast-candidates-table thead th { background: #fff; position: sticky; top: 0; z-index: 2; }
 .accounts-forecast-candidates-table th, .accounts-forecast-candidates-table td { border-bottom: 1px solid var(--kpi-border); padding: .65rem; text-align: left; }
 .accounts-forecast-candidates-table th:first-child, .accounts-forecast-candidates-table td:first-child { text-align: center; width: 4rem; }
 .accounts-forecast-candidate input[type="checkbox"] { height: 1rem; width: 1rem; }
 .accounts-forecast-candidate:hover { background: #faf9f7; }
+.accounts-forecast-loading { align-items: center; background: rgb(255 255 255 / 88%); display: flex; gap: .65rem; inset: 2.75rem 0 0; justify-content: center; position: absolute; z-index: 3; }
+.accounts-forecast-loading-spinner { animation: accounts-forecast-spin .75s linear infinite; border: 2px solid var(--kpi-border); border-radius: 50%; border-top-color: var(--oj-core-text-color-primary, #312d2a); height: 1.25rem; width: 1.25rem; }
+@keyframes accounts-forecast-spin { to { transform: rotate(360deg); } }
 @media (max-width: 640px) {
   .accounts-workloads-child-row > td { padding-left: .5rem; }
   .accounts-workloads-opportunities { max-width: calc(100vw - 2rem); }
-  .accounts-forecast-dialog { max-height: 92dvh; padding: .75rem; }
+  .accounts-forecast-dialog { height: calc(100dvh - 1rem); padding: .75rem; }
   .accounts-forecast-toolbar { align-items: stretch; }
   .accounts-forecast-search { flex-basis: 100%; min-width: 100%; }
   .accounts-forecast-resync, .accounts-forecast-excluded-switch { flex: 1 1 auto; justify-content: center; }

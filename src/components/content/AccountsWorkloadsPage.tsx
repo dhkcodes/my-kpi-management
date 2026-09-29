@@ -355,6 +355,8 @@ export function AccountsWorkloadsPage({
   const [selectedCandidateKeys, setSelectedCandidateKeys] = useState<
     Set<string>
   >(new Set());
+  const forecastRequestPendingRef = useRef(false);
+  const forecastRequestIdRef = useRef(0);
 
   const changedAccountIds = new Set(
     [...dirtyAccounts].filter((id) => {
@@ -2115,19 +2117,34 @@ export function AccountsWorkloadsPage({
   const fetchForecast = async ({ force = false }: { force?: boolean } = {}) => {
     setForecastOpen(true);
     if (!force && forecastCandidates.length > 0) return;
+    if (forecastRequestPendingRef.current) return;
+    forecastRequestPendingRef.current = true;
+    const requestId = ++forecastRequestIdRef.current;
     setForecastLoading(true);
-    setSelectedCandidateKeys(new Set());
     setError("");
     try {
-      setForecastCandidates(await fetchForecastCandidates(true));
+      const candidates = await fetchForecastCandidates(true);
+      if (requestId !== forecastRequestIdRef.current) return;
+      setForecastCandidates(candidates);
+      setSelectedCandidateKeys(new Set());
     } catch (requestError) {
+      if (requestId !== forecastRequestIdRef.current) return;
       setError(friendlyError(requestError));
     } finally {
-      setForecastLoading(false);
+      if (requestId === forecastRequestIdRef.current) {
+        forecastRequestPendingRef.current = false;
+        setForecastLoading(false);
+      }
     }
   };
+  const closeForecast = () => {
+    forecastRequestIdRef.current += 1;
+    forecastRequestPendingRef.current = false;
+    setForecastLoading(false);
+    setForecastOpen(false);
+  };
   const toggleCandidateExcluded = async (candidate: ForecastCandidate) => {
-    if (!canWrite || forecastMutationKey) return;
+    if (!canWrite || forecastLoading || forecastMutationKey) return;
     const excluded = !candidate.excluded;
     setForecastMutationKey(candidate.candidateKey);
     setError("");
@@ -2983,7 +3000,7 @@ export function AccountsWorkloadsPage({
                   unavailable. They will be added as unsaved AW drafts.
                 </p>
               </div>
-              <button type="button" onClick={() => setForecastOpen(false)}>
+              <button type="button" onClick={closeForecast}>
                 ×
               </button>
             </header>
@@ -3006,7 +3023,7 @@ export function AccountsWorkloadsPage({
               </label>
               <oj-button
                 class="accounts-workloads-button accounts-forecast-resync"
-                disabled={forecastLoading}
+                disabled={forecastLoading || forecastMutationKey !== null}
                 onojAction={() => void fetchForecast({ force: true })}
               >
                 <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true" />
@@ -3022,9 +3039,7 @@ export function AccountsWorkloadsPage({
                 <span>Show excluded</span>
               </label>
             </div>
-            {forecastLoading ? (
-              <p>Loading…</p>
-            ) : (
+            <div class="accounts-forecast-table-scroll" aria-busy={forecastLoading}>
               <table class="accounts-forecast-candidates-table">
                 <thead>
                   <tr>
@@ -3045,7 +3060,7 @@ export function AccountsWorkloadsPage({
                             type="checkbox"
                             aria-label={`Select ${candidate.accountName}`}
                             checked={selectedCandidateKeys.has(key)}
-                            disabled={!canWrite || candidate.excluded}
+                            disabled={!canWrite || forecastLoading || candidate.excluded}
                             onChange={() =>
                               setSelectedCandidateKeys((current) => {
                                 const next = new Set(current);
@@ -3064,7 +3079,7 @@ export function AccountsWorkloadsPage({
                             <button
                               type="button"
                               class="accounts-forecast-exclusion-action"
-                              disabled={forecastMutationKey !== null}
+                              disabled={forecastLoading || forecastMutationKey !== null}
                               onClick={() => void toggleCandidateExcluded(candidate)}
                             >
                               {candidate.excluded ? "Unexclude" : "Exclude"}
@@ -3079,17 +3094,23 @@ export function AccountsWorkloadsPage({
                   )}
                 </tbody>
               </table>
-            )}
+              {forecastLoading && (
+                <div class="accounts-forecast-loading" role="status" aria-live="polite">
+                  <span class="accounts-forecast-loading-spinner" aria-hidden="true" />
+                  <span>Loading recommendations…</span>
+                </div>
+              )}
+            </div>
             <footer>
               <span>{canWrite ? `${selectedCandidateKeys.size} selected` : "Read-only"}</span>
               <div>
-                <button type="button" onClick={() => setForecastOpen(false)}>
+                <button type="button" onClick={closeForecast}>
                   Close
                 </button>
                 {canWrite && (
                   <button
                     type="button"
-                    disabled={!selectedCandidateKeys.size}
+                    disabled={forecastLoading || !selectedCandidateKeys.size}
                     onClick={addCandidates}
                   >
                     Apply selected

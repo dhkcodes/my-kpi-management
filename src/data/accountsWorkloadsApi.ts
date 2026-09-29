@@ -130,6 +130,13 @@ export type ForecastCandidate = Readonly<{
 }>;
 
 const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+const normalizedPlanIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+
+const planAccountKey = (planNumber: string | null, accountName: string): string | null => {
+  if (!planNumber?.trim()) return null;
+  const account = normalizedAccountIdentity(accountName);
+  return account ? `plan-code:${normalizedPlanIdentity(planNumber)}|account:${account}` : null;
+};
 
 export const forecastCandidateKeys = (candidate: ForecastCandidate): string[] => {
   if (candidate.planId !== null) return [`plan-id:${candidate.planId}`];
@@ -159,14 +166,17 @@ export const filterForecastCandidates = (
     if (accountKey) occupied.add(`account:${accountKey}`);
     account.workloads.forEach((workload) => workload.plans.forEach((plan) => {
       if (plan.sourcePlanId !== null) occupied.add(`plan-id:${plan.sourcePlanId}`);
-      else if (plan.sourcePlanNumber?.trim()) occupied.add(`plan-id:${plan.sourcePlanNumber.trim()}`);
+      const planCodeKey = planAccountKey(plan.sourcePlanNumber, account.name);
+      if (planCodeKey) occupied.add(planCodeKey);
     }));
   });
 
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
     const keys = forecastCandidateKeys(candidate);
-    if (candidate.linked || keys.length === 0 || keys.some((key) => occupied.has(key) || seen.has(key))) return false;
+    const planCodeKey = planAccountKey(candidate.planNumber, candidate.normalizedAccount || candidate.accountName);
+    if (candidate.linked || keys.length === 0 || keys.some((key) => occupied.has(key) || seen.has(key))
+        || (planCodeKey !== null && occupied.has(planCodeKey))) return false;
     keys.forEach((key) => seen.add(key));
     return true;
   });
