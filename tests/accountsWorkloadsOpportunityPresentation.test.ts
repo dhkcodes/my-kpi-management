@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   accountsWorkloadsBatchErrorSummary,
+  formatAwParentAmountK,
   formatOpportunityFieldError,
   isContractDateRangeValid,
   sumWonOpportunityAmount,
@@ -63,23 +64,26 @@ const amountDeal = (id: number, status: AccountWorkloadDeal["status"], arrKrw: n
   deletedAt: deleted ? "2026-09-29T00:00:00Z" : null
 });
 const mixedAmounts = [
-  amountDeal(20, "WON", 100, 40),
-  amountDeal(21, "OPEN", 900, 600),
-  amountDeal(22, "LOST", 800, 500),
-  amountDeal(23, "WON", 700, 300, true)
+  { ...amountDeal(20, "WON", null, null), arrUsd: 100, acrUsd: 40 },
+  { ...amountDeal(21, "OPEN", null, null), name: "아이디어정보기술 OPEN", opportunityNo: "A9KFF9", arrUsd: 30276.87, acrUsd: 600 },
+  { ...amountDeal(22, "LOST", null, null), arrUsd: 800, acrUsd: 500 },
+  { ...amountDeal(23, "WON", null, null, true), arrUsd: 700, acrUsd: 300 }
 ];
-assert.equal(sumWonOpportunityAmount(mixedAmounts, "arrKrw"), 100,
-  "ARR includes only active Closed Won opportunities; OPEN, LOST, and archived rows are excluded");
-assert.equal(sumWonOpportunityAmount(mixedAmounts, "acrKrw"), 40,
+assert.equal(sumWonOpportunityAmount(mixedAmounts, "arrUsd"), 100,
+  "ARR includes only active Closed Won opportunities; OPEN A9KFF9 (30,276.87), LOST, and archived rows are excluded");
+assert.equal(sumWonOpportunityAmount(mixedAmounts, "acrUsd"), 40,
   "ACR uses the same Closed Won scope");
 assert.equal(sumWonOpportunityAmount([amountDeal(24, "OPEN", 50, 20)], "arrKrw"), 0,
   "no closed opportunity yields zero");
-assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[1], status: "WON" }], "arrKrw"), 900,
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[1], status: "WON" }], "arrUsd"), 30276.87,
   "a persisted OPEN to WON transition immediately adds the amount to aggregates");
-assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "OPEN" }], "arrKrw"), 0,
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "OPEN" }], "arrUsd"), 0,
   "a persisted WON to OPEN transition immediately removes the amount from aggregates");
-assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "LOST" }], "arrKrw"), 0,
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "LOST" }], "arrUsd"), 0,
   "a persisted WON to LOST transition immediately removes the amount from aggregates");
+assert.equal(formatAwParentAmountK(30276.87), "30.28K",
+  "AW parent totals are divided by 1,000 and marked with K without changing the raw amount");
+assert.equal(formatAwParentAmountK(0), "0K", "an empty WON total remains an explicit zero in K units");
 
 const renamedWhileEditing = input.map((item) => item.id === 2 ? { ...item, name: "Aardvark" } : item);
 assert.deepEqual(
