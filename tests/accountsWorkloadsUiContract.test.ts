@@ -70,8 +70,8 @@ assert.match(deleteHandler, /setDealDrafts\([\s\S]*!targetIds\.has\(draft\.workl
   "Draft Delete removes only child Opportunity drafts belonging to the deleted AW");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!removedWorkloadIds\.has\(workload\.id\)/,
   "unsaved workload deletion is local removal");
-assert.match(page, /const rows = allRows/,
-  "visible hierarchy rows are derived from the server response");
+assert.match(page, /const sortedRows = allRows[\s\S]*const rows = titleEditOrder[\s\S]*orderRowsByKeys\(sortedRows, titleEditOrder\)[\s\S]*sortedRows/,
+  "visible hierarchy rows derive from the server response while title editing can hold a stable order");
 assert.match(cancelHandler, /setHierarchy\(baseline\)/,
   "AW Cancel restores the complete last-saved hierarchy without depending on row selection");
 assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
@@ -325,8 +325,8 @@ assert.match(styles, /\.accounts-workloads-header-actions\s*\{[^}]*flex:\s*0 0 a
   "the recommendation action remains visible and does not shrink or clip");
 assert.match(page, /<header class="accounts-workloads-header consumption-page__header">[\s\S]*?<div class="accounts-workloads-header-topline">[\s\S]*?<div class="accounts-workloads-header-navigation">[\s\S]*?\{breadcrumb\}[\s\S]*?<div class="consumption-import-actions accounts-workloads-header-actions">[\s\S]*?<\/div>\s*<\/div>\s*<h1 id="accountsWorkloadsTitle">/,
   "breadcrumb and recommendation action precede the page title in a dedicated first row");
-assert.match(page, /<oj-button[\s\S]*?aria-label="Account Recommendations"[\s\S]*?disabled=\{!canWrite \|\| saving\}[\s\S]*?onojAction=\{\(\) => void openForecast\(\)\}[\s\S]*?Account Recommendations/,
-  "Account Recommendations exposes its full accessible name and preserves its permission gate and action handler");
+assert.match(page, /<oj-button[\s\S]*?aria-label="Account Recommendations"[\s\S]*?disabled=\{saving\}[\s\S]*?onojAction=\{\(\) => void fetchForecast\(\)\}[\s\S]*?Account Recommendations/,
+  "Account Recommendations remains available for read-only viewing and opens the recommendation dialog");
 assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Account Recomm\.<\/span>/,
   "the recommendation action provides the full desktop label and Account Recomm. on mobile");
 assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*none/,
@@ -413,5 +413,32 @@ assert.doesNotMatch(
   /marked as Draft Deleted\. Save changes to apply/,
   "Draft Delete must not wait for the separate Save/Cancel lifecycle",
 );
+
+assert.match(page, /const \[titleEditOrder, setTitleEditOrder\] = useState<string\[\] \| null>\(null\)/,
+  "title editing owns an explicit row-order snapshot");
+assert.match(page, /beginAwEdit[\s\S]*\(field === "account" \|\| field === "workload"\)[\s\S]*setTitleEditOrder/,
+  "opening a title input freezes the currently visible row order");
+assert.match(page, /const rows = titleEditOrder[\s\S]*orderRowsByKeys\(sortedRows, titleEditOrder\)[\s\S]*: sortedRows/,
+  "active and failed title edits keep the frozen row order");
+assert.match(saveAwHandler, /setTitleEditOrder\(null\)/,
+  "only successful Account & Workload save releases the title sort snapshot");
+assert.doesNotMatch(page.slice(page.indexOf("const updateAw"), page.indexOf("const saveAwDrafts")), /setTitleEditOrder\(null\)/,
+  "blur and draft updates cannot release title sort stability before save succeeds");
+assert.match(page, /placeholder="Search account name, plan number, or sales rep"/,
+  "recommendations provide searchable Account Name, Plan Number, and Sales Rep fields");
+assert.match(page, /onojAction=\{\(\) => void fetchForecast\(\{ force: true \}\)\}[\s\S]*Resync/,
+  "recommendations expose an explicit backend resync action");
+assert.match(page, /setShowExcluded[\s\S]*Show excluded/,
+  "recommendations hide excluded candidates by default and provide a visibility switch");
+assert.match(page, /candidate\.excluded \? "Unexclude" : "Exclude"/,
+  "writable recommendations expose reversible per-row exclusion controls");
+assert.match(page, /\{canWrite && \([\s\S]*candidate\.excluded \? "Unexclude" : "Exclude"/,
+  "read-only users can inspect and resync recommendations without mutation controls");
+assert.match(page, /candidate\.candidateKey/,
+  "recommendation row identity uses the backend candidate key");
+assert.match(page, /fetchForecastCandidates\(true\)/,
+  "resync fetches excluded candidates so the switch can filter client-side without another mutation");
+assert.match(styles, /\.accounts-forecast-toolbar\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/,
+  "recommendation search and resync controls wrap responsively");
 
 console.log("Accounts & Workloads hierarchy editable UI contracts passed");

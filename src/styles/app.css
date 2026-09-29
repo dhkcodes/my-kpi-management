@@ -3702,6 +3702,14 @@ h4.weekly-activity-section-label--next-week,
 .accounts-forecast-dialog footer > div { display: flex; gap: .5rem; }
 .accounts-forecast-dialog h2 { margin: 0; }
 .accounts-forecast-dialog p { color: var(--kpi-muted); margin: .2rem 0 0; }
+.accounts-forecast-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: .65rem; }
+.accounts-forecast-search { flex: 1 1 22rem; margin: 0; min-width: min(22rem, 100%); }
+.accounts-forecast-resync { align-items: center; display: inline-flex; gap: .35rem; }
+.accounts-forecast-excluded-switch { align-items: center; color: var(--kpi-ink); cursor: pointer; display: inline-flex; font-size: .875rem; font-weight: 600; gap: .45rem; white-space: nowrap; }
+.accounts-forecast-excluded-switch input { accent-color: var(--oj-core-text-color-primary, #312d2a); height: 1.05rem; width: 1.8rem; }
+.accounts-forecast-row--excluded { background: #f5f4f2; color: var(--kpi-muted); }
+.accounts-forecast-exclusion-action { border-color: #c8c2bb !important; color: #6f4b12 !important; }
+.accounts-forecast-empty { color: var(--kpi-muted); padding: 1.25rem !important; text-align: center !important; }
 .accounts-forecast-list { display: grid; gap: .5rem; overflow-x: auto; }
 .accounts-forecast-candidates-table { border-collapse: collapse; min-width: 32rem; width: 100%; }
 .accounts-forecast-candidates-table th, .accounts-forecast-candidates-table td { border-bottom: 1px solid var(--kpi-border); padding: .65rem; text-align: left; }
@@ -3711,6 +3719,11 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 640px) {
   .accounts-workloads-child-row > td { padding-left: .5rem; }
   .accounts-workloads-opportunities { max-width: calc(100vw - 2rem); }
+  .accounts-forecast-dialog { max-height: 92dvh; padding: .75rem; }
+  .accounts-forecast-toolbar { align-items: stretch; }
+  .accounts-forecast-search { flex-basis: 100%; min-width: 100%; }
+  .accounts-forecast-resync, .accounts-forecast-excluded-switch { flex: 1 1 auto; justify-content: center; }
+  .accounts-forecast-candidates-table { min-width: 38rem; }
 }
 
 /* Pure Accounts & Workloads table: restore the pre-opportunity inline-edit layout. */
