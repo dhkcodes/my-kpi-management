@@ -57,6 +57,21 @@ assert.deepEqual(
 );
 assert.deepEqual(input.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8, 9], "sorting must not mutate saved/draft order");
 
+const renamedWhileEditing = input.map((item) => item.id === 2 ? { ...item, name: "Aardvark" } : item);
+assert.deepEqual(
+  sortOpportunitiesByTarget(
+    renamedWhileEditing,
+    (item) => item.id === 2 ? "Beta" : item.name
+  ).map((item) => item.id),
+  [4, 3, 2, 5, 1, 8, 9, 7, 6],
+  "an unsaved Opportunity name uses its original sort key so typing does not move the row"
+);
+assert.deepEqual(
+  sortOpportunitiesByTarget(renamedWhileEditing).map((item) => item.id),
+  [2, 4, 3, 5, 1, 8, 9, 7, 6],
+  "after save clears the frozen key, the updated name participates in sorting"
+);
+
 assert.equal(isContractDateRangeValid("2026-08-02", "2026-08-01"), false, "reversed dates are invalid");
 assert.equal(isContractDateRangeValid("2026-08-01", "2026-08-01"), true, "the same date is valid");
 assert.equal(

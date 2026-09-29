@@ -163,10 +163,14 @@ assert.doesNotMatch(page, /notes: draft\.deal\.notes/,
   "opportunity Notes is excluded from the editor and save payload");
 assert.match(page, /Account Recommendations/);
 assert.match(page, /filterForecastCandidates\(forecastCandidates, hierarchy\.accounts\)/);
-assert.match(api, /const planId = normalizedPlanIdValue\(candidate\.planId\)[\s\S]*if \(planId !== null\) return \[`plan-id:\$\{planId\}`\][\s\S]*normalizedAccountIdentity/,
-  "Add from Records uses normalized Plan ID first and normalized Account exact-match only as fallback");
-assert.match(api, /normalizedPlanIdValue\(plan\.sourcePlanNumber\)[\s\S]*occupied\.add\(`plan-id:\$\{sourcePlanNumberAsId\}`\)/,
-  "registered numeric Plan Number representations are excluded by Plan ID independently of Account/Plan Code fallback");
+assert.match(api, /const occupiedPlanIds = new Set<string>\(\)[\s\S]*const occupiedPlanNumbers = new Set<string>\(\)[\s\S]*const occupiedAccounts = new Set<string>\(\)/,
+  "Add from Records tracks internal Plan ID, displayed Plan Number, and normalized Account identities independently");
+assert.match(api, /occupiedPlanIds\.has\(`plan-id:\$\{planId\}`\)[\s\S]*occupiedPlanNumbers\.has\(`plan-number:\$\{planNumber\}`\)[\s\S]*occupiedAccounts\.has\(`account:\$\{account\}`\)/,
+  "client fallback applies independent Plan ID, Plan Number, then exact normalized Account exclusions");
+assert.doesNotMatch(api, /normalizedPlanIdValue\(plan\.sourcePlanNumber\)/,
+  "numeric-looking Plan Codes are never converted into internal Plan IDs");
+assert.match(page, /const dealSortNames = new Map\([\s\S]*draft\.original\?\.name \?\? ""[\s\S]*sortOpportunitiesByTarget\([\s\S]*\(deal\) => dealSortNames\.get\(deal\.id\) \?\? deal\.name/,
+  "Opportunity name edits keep the original name as the sort key until a successful save clears the draft");
 assert.match(page, /CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요"/);
 assert.match(page, /requestError instanceof AccountsWorkloadsApiError/);
 assert.match(page, /setSaveErrors\(/,
