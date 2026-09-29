@@ -118,6 +118,7 @@ export type AccountsWorkloadsHierarchy = Readonly<{
 }>;
 
 export type ForecastCandidate = Readonly<{
+  candidateKey: string;
   accountName: string;
   normalizedAccount: string;
   salesRep: string | null;
@@ -125,6 +126,7 @@ export type ForecastCandidate = Readonly<{
   planNumber: string | null;
   linked: boolean;
   linkedWorkloadIds: number[];
+  excluded: boolean;
 }>;
 
 const normalizedAccountIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
@@ -584,24 +586,38 @@ export const saveAccountsWorkloadsHierarchy = async (
 };
 
 export const fetchForecastCandidates = async (
+  includeExcluded = false,
   fetchImpl: FetchLike = fetch
 ): Promise<ForecastCandidate[]> => {
   const payload = await requestJson<unknown>(fetchImpl,
-    `${accountsWorkloadsApiBase()}/accounts-workloads/forecast-candidates`);
+    `${accountsWorkloadsApiBase()}/accounts-workloads/forecast-candidates?includeExcluded=${includeExcluded}`);
   if (!Array.isArray(payload)) throw new Error("Malformed Forecast candidates response");
   return dedupeForecastCandidates(payload.map((entry, index): ForecastCandidate => {
     const value = requiredObject(entry, `Malformed Forecast candidate ${index + 1}`);
     const linkedWorkloadIds = value.linkedWorkloadIds;
-    if (typeof value.accountName !== "string" || typeof value.normalizedAccount !== "string" ||
+    if (typeof value.candidateKey !== "string" || typeof value.accountName !== "string" || typeof value.normalizedAccount !== "string" ||
         !(value.salesRep === null || typeof value.salesRep === "string") ||
         !(value.planId === null || isPositiveInteger(value.planId)) ||
         !(value.planNumber === null || typeof value.planNumber === "string") ||
-        typeof value.linked !== "boolean" || !Array.isArray(linkedWorkloadIds) ||
+        typeof value.linked !== "boolean" || typeof value.excluded !== "boolean" || !Array.isArray(linkedWorkloadIds) ||
         linkedWorkloadIds.some((id) => !isPositiveInteger(id))) {
       throw new Error(`Malformed Forecast candidate ${index + 1}`);
     }
     return value as ForecastCandidate;
   }));
+};
+
+export const setForecastCandidateExcluded = async (
+  candidateKey: string,
+  excluded: boolean,
+  fetchImpl: FetchLike = fetch
+): Promise<void> => {
+  await requestJson<unknown>(fetchImpl,
+    `${accountsWorkloadsApiBase()}/accounts-workloads/forecast-candidates/exclusion`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ candidateKey, excluded }),
+    });
 };
 
 export const fetchAccountsWorkloads = async (

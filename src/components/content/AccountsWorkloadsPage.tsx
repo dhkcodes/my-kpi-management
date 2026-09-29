@@ -23,6 +23,7 @@ import {
   fetchAccountsWorkloadsHierarchy,
   fetchForecastCandidates,
   forecastCandidateKey,
+  setForecastCandidateExcluded,
   reconcileArchivedWorkloads,
   saveAccountsWorkloadsHierarchy,
   saveAccountsWorkloadsHierarchyWithResults,
@@ -98,6 +99,12 @@ const EMPTY: AccountsWorkloadsHierarchy = { fiscalYear: null, accounts: [] };
 const CANDIDATE_WORKLOAD_NAME = "미정의 — 수정 필요";
 const rowKey = (accountId: number, workloadId: number) =>
   `${accountId}:${workloadId}`;
+const orderRowsByKeys = <T extends { key: string }>(rows: T[], keys: string[]): T[] => {
+  const rank = new Map(keys.map((key, index) => [key, index]));
+  return [...rows].sort((left, right) =>
+    (rank.get(left.key) ?? Number.MAX_SAFE_INTEGER) -
+    (rank.get(right.key) ?? Number.MAX_SAFE_INTEGER));
+};
 const refFor = (id: number, entity: "account" | "workload") =>
   id > 0 ? String(id) : `${entity}-${Math.abs(id)}`;
 const nullable = (value: string) => value.trim() || null;
@@ -323,6 +330,7 @@ export function AccountsWorkloadsPage({
   const [selectedDeals, setSelectedDeals] = useState<Map<number, AccountWorkloadDeal>>(new Map());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editCell, setEditCell] = useState<EditCell | null>(null);
+  const [titleEditOrder, setTitleEditOrder] = useState<string[] | null>(null);
   const [sortField, setSortField] = useState<SortField>("account");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [dealDrafts, setDealDrafts] = useState<Map<string, DealDraft>>(
@@ -341,6 +349,9 @@ export function AccountsWorkloadsPage({
   const [forecastCandidates, setForecastCandidates] = useState<
     ForecastCandidate[]
   >([]);
+  const [forecastSearch, setForecastSearch] = useState("");
+  const [showExcluded, setShowExcluded] = useState(false);
+  const [forecastMutationKey, setForecastMutationKey] = useState<string | null>(null);
   const [selectedCandidateKeys, setSelectedCandidateKeys] = useState<
     Set<string>
   >(new Set());
@@ -467,6 +478,7 @@ export function AccountsWorkloadsPage({
         setPendingDeleteWorkloadIds(new Set());
         setSelectedRows(new Set());
         setEditCell(null);
+        setTitleEditOrder(null);
       }
     } catch (requestError) {
       if (generation !== reloadGeneration.current) return;
@@ -531,13 +543,25 @@ export function AccountsWorkloadsPage({
   }, [hierarchy, sortField, sortDirection]);
   // A pending delete is only a local draft. Keep the saved workload and its
   // opportunities visible (and therefore counted) until Save succeeds.
-  const rows = allRows;
+  const sortedRows = allRows;
+  const rows = titleEditOrder
+    ? orderRowsByKeys(sortedRows, titleEditOrder)
+    : sortedRows;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedRows.has(row.key));
 
   const missingCandidates = useMemo(
     () => filterForecastCandidates(forecastCandidates, hierarchy.accounts),
     [forecastCandidates, hierarchy.accounts],
   );
+  const visibleCandidates = useMemo(() => {
+    const needle = forecastSearch.trim().toLocaleLowerCase();
+    return missingCandidates.filter((candidate) => {
+      if (!showExcluded && candidate.excluded) return false;
+      if (!needle) return true;
+      return [candidate.accountName, candidate.planNumber ?? "", candidate.salesRep ?? ""]
+        .some((value) => value.toLocaleLowerCase().includes(needle));
+    });
+  }, [missingCandidates, forecastSearch, showExcluded]);
   const toggleSort = (field: SortField) => {
     if (sortField === field)
       setSortDirection((value) => (value === "asc" ? "desc" : "asc"));
@@ -658,6 +682,8 @@ export function AccountsWorkloadsPage({
   const beginAwEdit = (key: string, field: AwField, value: string) => {
     if (!canWrite) return;
     editSnapshot.current = value;
+    if ((field === "account" || field === "workload") && titleEditOrder === null)
+      setTitleEditOrder(allRows.map((row) => row.key));
     setSelectedRows(new Set([key]));
     setEditCell({ key, field });
   };
@@ -1380,6 +1406,7 @@ export function AccountsWorkloadsPage({
         );
         setPendingDeleteWorkloadIds(new Set());
         setSelectedRows(new Set());
+        setTitleEditOrder(null);
       }
       if (fxDirty) {
         setFxSaving(true);
@@ -2085,16 +2112,38 @@ export function AccountsWorkloadsPage({
     );
   };
 
-  const openForecast = async () => {
+  const fetchForecast = async ({ force = false }: { force?: boolean } = {}) => {
     setForecastOpen(true);
+    if (!force && forecastCandidates.length > 0) return;
     setForecastLoading(true);
     setSelectedCandidateKeys(new Set());
+    setError("");
     try {
-      setForecastCandidates(await fetchForecastCandidates());
+      setForecastCandidates(await fetchForecastCandidates(true));
     } catch (requestError) {
       setError(friendlyError(requestError));
     } finally {
       setForecastLoading(false);
+    }
+  };
+  const toggleCandidateExcluded = async (candidate: ForecastCandidate) => {
+    if (!canWrite || forecastMutationKey) return;
+    const excluded = !candidate.excluded;
+    setForecastMutationKey(candidate.candidateKey);
+    setError("");
+    try {
+      await setForecastCandidateExcluded(candidate.candidateKey, excluded);
+      setForecastCandidates((current) => current.map((item) =>
+        item.candidateKey === candidate.candidateKey ? { ...item, excluded } : item));
+      setSelectedCandidateKeys((current) => {
+        const next = new Set(current);
+        next.delete(candidate.candidateKey);
+        return next;
+      });
+    } catch (requestError) {
+      setError(friendlyError(requestError));
+    } finally {
+      setForecastMutationKey(null);
     }
   };
   const addCandidates = () => {
@@ -2218,8 +2267,8 @@ export function AccountsWorkloadsPage({
             <oj-button
               chroming="outlined"
               aria-label="Account Recommendations"
-              disabled={!canWrite || saving}
-              onojAction={() => void openForecast()}
+              disabled={saving}
+              onojAction={() => void fetchForecast()}
             >
               <span slot="startIcon" class="oj-ux-ico-plus" />
               <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
@@ -2938,6 +2987,41 @@ export function AccountsWorkloadsPage({
                 ×
               </button>
             </header>
+            <div class="accounts-forecast-toolbar">
+              <label
+                class="consumption-record-search accounts-workloads-search accounts-forecast-search"
+                for="accountRecommendationsSearch"
+              >
+                <span class="oj-helper-hidden-accessible">Search recommendations</span>
+                <input
+                  id="accountRecommendationsSearch"
+                  type="search"
+                  value={forecastSearch}
+                  placeholder="Search account name, plan number, or sales rep"
+                  onInput={(event) => setForecastSearch(event.currentTarget.value)}
+                />
+                <button type="button" class="consumption-record-search__submit" aria-label="Search recommendations">
+                  <span class="oj-ux-ico-search" aria-hidden="true" />
+                </button>
+              </label>
+              <oj-button
+                class="accounts-workloads-button accounts-forecast-resync"
+                disabled={forecastLoading}
+                onojAction={() => void fetchForecast({ force: true })}
+              >
+                <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true" />
+                Resync
+              </oj-button>
+              <label class="accounts-forecast-excluded-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={showExcluded}
+                  onChange={(event) => setShowExcluded(event.currentTarget.checked)}
+                />
+                <span>Show excluded</span>
+              </label>
+            </div>
             {forecastLoading ? (
               <p>Loading…</p>
             ) : (
@@ -2948,17 +3032,20 @@ export function AccountsWorkloadsPage({
                     <th>Account</th>
                     <th>Sales Rep</th>
                     <th>Plan ID(Number)</th>
+                    <th>Recommendation</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {missingCandidates.map((candidate) => {
+                  {visibleCandidates.map((candidate) => {
                     const key = forecastCandidateKey(candidate);
                     return (
-                      <tr key={key}>
+                      <tr key={key} class={candidate.excluded ? "accounts-forecast-row--excluded" : undefined}>
                         <td>
                           <input
                             type="checkbox"
+                            aria-label={`Select ${candidate.accountName}`}
                             checked={selectedCandidateKeys.has(key)}
+                            disabled={!canWrite || candidate.excluded}
                             onChange={() =>
                               setSelectedCandidateKeys((current) => {
                                 const next = new Set(current);
@@ -2972,25 +3059,42 @@ export function AccountsWorkloadsPage({
                         <td>{candidate.accountName}</td>
                         <td>{candidate.salesRep ?? "—"}</td>
                         <td>{candidate.planNumber ?? "No Plan Number"}</td>
+                        <td>
+                          {canWrite && (
+                            <button
+                              type="button"
+                              class="accounts-forecast-exclusion-action"
+                              disabled={forecastMutationKey !== null}
+                              onClick={() => void toggleCandidateExcluded(candidate)}
+                            >
+                              {candidate.excluded ? "Unexclude" : "Exclude"}
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
+                  {!visibleCandidates.length && (
+                    <tr><td colSpan={5} class="accounts-forecast-empty">No matching recommendations.</td></tr>
+                  )}
                 </tbody>
               </table>
             )}
             <footer>
-              <span>{selectedCandidateKeys.size} selected</span>
+              <span>{canWrite ? `${selectedCandidateKeys.size} selected` : "Read-only"}</span>
               <div>
                 <button type="button" onClick={() => setForecastOpen(false)}>
-                  Cancel
+                  Close
                 </button>
-                <button
-                  type="button"
-                  disabled={!selectedCandidateKeys.size}
-                  onClick={addCandidates}
-                >
-                  Apply selected
-                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    disabled={!selectedCandidateKeys.size}
+                    onClick={addCandidates}
+                  >
+                    Apply selected
+                  </button>
+                )}
               </div>
             </footer>
           </section>

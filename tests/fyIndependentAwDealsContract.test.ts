@@ -35,12 +35,12 @@ async function run() {
   assert.doesNotMatch(hierarchyUrl, /fiscalYear/i, "hierarchy request is FY-independent");
 
   const candidates: ForecastCandidate[] = [
-    { accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
-    { accountName: " Acme ", normalizedAccount: "ACME", salesRep: "Alice", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
-    { accountName: "Beta", normalizedAccount: "BETA", salesRep: "Bob", planId: 7, planNumber: "PLAN-7", linked: true, linkedWorkloadIds: [3] },
-    { accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 8, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [] },
-    { accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 9, planNumber: "PLAN-9", linked: false, linkedWorkloadIds: [] },
-    { accountName: "Renamed account", normalizedAccount: "RENAMED ACCOUNT", salesRep: null, planId: 80, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [] }
+    { candidateKey: "ACCOUNT:ACME", accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
+    { candidateKey: "ACCOUNT:ACME", accountName: " Acme ", normalizedAccount: "ACME", salesRep: "Alice", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
+    { candidateKey: "PLAN_ID:7", accountName: "Beta", normalizedAccount: "BETA", salesRep: "Bob", planId: 7, planNumber: "PLAN-7", linked: true, linkedWorkloadIds: [3], excluded: false },
+    { candidateKey: "PLAN_ID:8", accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 8, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [], excluded: false },
+    { candidateKey: "PLAN_ID:9", accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 9, planNumber: "PLAN-9", linked: false, linkedWorkloadIds: [], excluded: false },
+    { candidateKey: "PLAN_ID:80", accountName: "Renamed account", normalizedAccount: "RENAMED ACCOUNT", salesRep: null, planId: 80, planNumber: "PLAN-8", linked: false, linkedWorkloadIds: [], excluded: false }
   ];
   assert.deepEqual(dedupeForecastCandidates(candidates).map((item) => item.planNumber),
     [null, "PLAN-7", "PLAN-8", "PLAN-9", "PLAN-8"],
@@ -58,18 +58,18 @@ async function run() {
   assert.deepEqual(
     filterForecastCandidates([
       ...candidates,
-      { accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] },
-      { accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [] }
+      { candidateKey: "ACCOUNT:DRAFT ONLY", accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
+      { candidateKey: "ACCOUNT:DRAFT ONLY PLUS", accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false }
     ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
     [["Acme", "PLAN-9"], ["Renamed account", "PLAN-8"], ["Draft only plus", null]],
     "saved Plan IDs and unsaved exact-account drafts are excluded without fuzzy-merging distinct Plan IDs or account names"
   );
   let candidateUrl = "";
-  await fetchForecastCandidates(async (input) => {
+  await fetchForecastCandidates(false, async (input) => {
     candidateUrl = String(input);
     return new Response(JSON.stringify(candidates), { status: 200 });
   });
-  assert.match(candidateUrl, /accounts-workloads\/forecast-candidates$/);
+  assert.match(candidateUrl, /accounts-workloads\/forecast-candidates\?includeExcluded=false$/);
   assert.doesNotMatch(candidateUrl, /scope=|search=/, "complete candidate endpoint is not accidentally filtered");
 
   const saveRequest: AccountsWorkloadsHierarchySaveRequest = {

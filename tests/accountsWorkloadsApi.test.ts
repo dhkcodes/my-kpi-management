@@ -19,7 +19,9 @@ import {
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloadsClonePreview,
   cloneAccountsWorkloadsPreviousFiscalYear,
-  fetchAccountsWorkloadsHierarchy
+  fetchAccountsWorkloadsHierarchy,
+  fetchForecastCandidates,
+  setForecastCandidateExcluded
 } from "../src/data/accountsWorkloadsApi";
 import { AccountWorkloadRow } from "../src/data/accountsWorkloadsMockData";
 
@@ -592,6 +594,49 @@ async function run() {
     ["NEW", "Strategic Alliance"],
     "known wire display variants canonicalize while unknown values retain their text",
   );
+
+  let forecastRequestUrl = "";
+  const forecastCandidates = await fetchForecastCandidates(true, async (input) => {
+    forecastRequestUrl = String(input);
+    return response([{
+      candidateKey: "PLAN_ID:101",
+      accountName: "Acme",
+      normalizedAccount: "ACME",
+      salesRep: "Alex",
+      planId: 101,
+      planNumber: "101",
+      linked: false,
+      linkedWorkloadIds: [],
+      excluded: true,
+    }]);
+  });
+  assert.match(forecastRequestUrl, /\/forecast-candidates\?includeExcluded=true$/,
+    "candidate resync may request excluded rows for local show/hide filtering");
+  assert.deepEqual(forecastCandidates[0], {
+    candidateKey: "PLAN_ID:101",
+    accountName: "Acme",
+    normalizedAccount: "ACME",
+    salesRep: "Alex",
+    planId: 101,
+    planNumber: "101",
+    linked: false,
+    linkedWorkloadIds: [],
+    excluded: true,
+  }, "forecast candidates retain the backend exclusion identity and state");
+
+  let exclusionRequest: { url?: string; method?: string; body?: unknown } = {};
+  await setForecastCandidateExcluded("PLAN_ID:101", true, async (input, init) => {
+    exclusionRequest = {
+      url: String(input),
+      method: init?.method,
+      body: JSON.parse(String(init?.body)),
+    };
+    return response({});
+  });
+  assert.match(exclusionRequest.url ?? "", /\/forecast-candidates\/exclusion$/,
+    "candidate exclusion uses the mutation endpoint");
+  assert.equal(exclusionRequest.method, "PUT");
+  assert.deepEqual(exclusionRequest.body, { candidateKey: "PLAN_ID:101", excluded: true });
 
   delete (globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string }).__KPI_API_BASE_URL__;
   console.log("accountsWorkloadsApi tests passed");
