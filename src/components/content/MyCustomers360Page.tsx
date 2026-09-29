@@ -3,6 +3,7 @@ import { useMemo } from "preact/hooks";
 import { AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { FiscalYear } from "../../data/kpiMockData";
 import { summarizeAccountsWorkloadsByAccount } from "../../data/accountsWorkloadsPulseV2";
+import type { AccountsWorkloadsHierarchy } from "../../data/accountsWorkloadsApi";
 
 const compactCurrency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -15,13 +16,14 @@ const compactCurrency = new Intl.NumberFormat("en-US", {
 type Props = Readonly<{
   fiscalYear: FiscalYear;
   rows: AccountWorkloadRow[];
+  hierarchy?: AccountsWorkloadsHierarchy;
   dataAvailable: boolean;
   onOpenAccount: (account: string) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function MyCustomers360Page({ fiscalYear, rows, dataAvailable, onOpenAccount, breadcrumb }: Props) {
-  const accounts = useMemo(() => summarizeAccountsWorkloadsByAccount(rows), [rows]);
+export function MyCustomers360Page({ fiscalYear, rows, hierarchy, dataAvailable, onOpenAccount, breadcrumb }: Props) {
+  const accounts = useMemo(() => summarizeAccountsWorkloadsByAccount(rows, fiscalYear, hierarchy), [rows, fiscalYear, hierarchy]);
 
   return (
     <section class="my-customers-360-page" aria-labelledby="myCustomers360Title">

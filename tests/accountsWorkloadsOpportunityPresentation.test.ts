@@ -3,6 +3,7 @@ import {
   accountsWorkloadsBatchErrorSummary,
   formatOpportunityFieldError,
   isContractDateRangeValid,
+  sumWonOpportunityAmount,
   sortOpportunitiesByTarget
 } from "../src/components/content/accountsWorkloadsOpportunityPresentation";
 import { AccountWorkloadDeal, AccountsWorkloadsFieldError } from "../src/data/accountsWorkloadsApi";
@@ -56,6 +57,29 @@ assert.deepEqual(
   "FY/quarter desc, name asc, OPEN first, missing target last, and stable exact ties"
 );
 assert.deepEqual(input.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8, 9], "sorting must not mutate saved/draft order");
+
+const amountDeal = (id: number, status: AccountWorkloadDeal["status"], arrKrw: number | null, acrKrw: number | null, deleted = false): AccountWorkloadDeal => ({
+  ...deal(id, `Amount ${id}`, "FY27", 1, status), arrKrw, acrKrw, deleted,
+  deletedAt: deleted ? "2026-09-29T00:00:00Z" : null
+});
+const mixedAmounts = [
+  amountDeal(20, "WON", 100, 40),
+  amountDeal(21, "OPEN", 900, 600),
+  amountDeal(22, "LOST", 800, 500),
+  amountDeal(23, "WON", 700, 300, true)
+];
+assert.equal(sumWonOpportunityAmount(mixedAmounts, "arrKrw"), 100,
+  "ARR includes only active Closed Won opportunities; OPEN, LOST, and archived rows are excluded");
+assert.equal(sumWonOpportunityAmount(mixedAmounts, "acrKrw"), 40,
+  "ACR uses the same Closed Won scope");
+assert.equal(sumWonOpportunityAmount([amountDeal(24, "OPEN", 50, 20)], "arrKrw"), 0,
+  "no closed opportunity yields zero");
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[1], status: "WON" }], "arrKrw"), 900,
+  "a persisted OPEN to WON transition immediately adds the amount to aggregates");
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "OPEN" }], "arrKrw"), 0,
+  "a persisted WON to OPEN transition immediately removes the amount from aggregates");
+assert.equal(sumWonOpportunityAmount([{ ...mixedAmounts[0], status: "LOST" }], "arrKrw"), 0,
+  "a persisted WON to LOST transition immediately removes the amount from aggregates");
 
 const renamedWhileEditing = input.map((item) => item.id === 2 ? { ...item, name: "Aardvark" } : item);
 assert.deepEqual(

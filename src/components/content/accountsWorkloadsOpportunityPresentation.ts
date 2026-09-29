@@ -40,6 +40,16 @@ export const sortOpportunitiesByTarget = (
     })
     .map(({ deal }) => deal);
 
+export const sumWonOpportunityAmount = (
+  deals: readonly AccountWorkloadDeal[],
+  field: "arrUsd" | "arrKrw" | "acrUsd" | "acrKrw"
+) => deals.reduce(
+  (sum, deal) => sum + (
+    deal.status === "WON" && !deal.deleted ? (deal[field] ?? 0) : 0
+  ),
+  0
+);
+
 export const isContractDateRangeValid = (
   startDate: string | null,
   endDate: string | null

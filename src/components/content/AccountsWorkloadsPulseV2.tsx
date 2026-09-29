@@ -3,6 +3,7 @@ import { useMemo, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
+import type { AccountsWorkloadsHierarchy } from "../../data/accountsWorkloadsApi";
 import {
   calculateAccountsWorkloadsPulseV2,
   PulseUrgencyLevel
@@ -34,6 +35,7 @@ const workloadCount = (value: number) => `${value} ${value === 1 ? "workload" : 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
   rows: AccountWorkloadRow[];
+  hierarchy?: AccountsWorkloadsHierarchy;
   asOf: string;
   dataAvailable: boolean;
   loading: boolean;
@@ -42,10 +44,10 @@ type Props = Readonly<{
   breadcrumb?: ComponentChildren;
 }>;
 
-export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable, loading, dataSource, onOpenAccount, breadcrumb }: Props) {
+export function AccountsWorkloadsPulseV2({ fiscalYear, rows, hierarchy, asOf, dataAvailable, loading, dataSource, onOpenAccount, breadcrumb }: Props) {
   const pulse = useMemo(
-    () => calculateAccountsWorkloadsPulseV2(rows, fiscalYear, asOf),
-    [rows, fiscalYear, asOf]
+    () => calculateAccountsWorkloadsPulseV2(rows, fiscalYear, asOf, hierarchy),
+    [rows, fiscalYear, asOf, hierarchy]
   );
   const [expandedUrgency, setExpandedUrgency] = useState("");
   const maxAccountWorkloads = Math.max(1, ...pulse.workloadsByAccount.map((item) => item.workloads));
@@ -54,8 +56,8 @@ export function AccountsWorkloadsPulseV2({ fiscalYear, rows, asOf, dataAvailable
   const metricCards = [
     { label: "Active Accounts", value: `${pulse.metrics.activeAccounts}`, detail: "distinct customers" },
     { label: "Active Commitments", value: `${pulse.metrics.activeWorkloads}`, detail: `${deletedRows} deleted excluded` },
-    { label: "ARR", value: compactCurrency.format(pulse.metrics.arrUsd), detail: "active commitments" },
-    { label: "ACR", value: compactCurrency.format(pulse.metrics.acrUsd), detail: "annual contract value" },
+    { label: "ARR", value: compactCurrency.format(pulse.metrics.arrUsd), detail: "WON opportunities" },
+    { label: "ACR", value: compactCurrency.format(pulse.metrics.acrUsd), detail: "WON opportunities" },
     { label: "Important", value: `${pulse.metrics.importantWorkloads}`, detail: "flagged workloads" },
     {
       label: "Target input completeness",

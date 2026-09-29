@@ -46,6 +46,7 @@ import {
 import {
   accountsWorkloadsBatchErrorSummary,
   formatOpportunityFieldError,
+  sumWonOpportunityAmount,
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
@@ -520,9 +521,9 @@ export function AccountsWorkloadsPage({
       if (sortField === "lastUpdated") return item.workload.lastUpdated ?? "";
       if (sortField === "notes") return item.workload.notes ?? "";
       if (sortField === "arrUsd")
-        return deals.reduce((sum, deal) => sum + (deal.arrUsd ?? 0), 0);
+        return sumWonOpportunityAmount(deals, "arrUsd");
       if (sortField === "acrUsd")
-        return deals.reduce((sum, deal) => sum + (deal.acrUsd ?? 0), 0);
+        return sumWonOpportunityAmount(deals, "acrUsd");
       return deals.length;
     };
     return [...flattened].sort((left, right) => {
@@ -2114,9 +2115,8 @@ export function AccountsWorkloadsPage({
     );
   };
 
-  const fetchForecast = async ({ force = false }: { force?: boolean } = {}) => {
+  const fetchForecast = async () => {
     setForecastOpen(true);
-    if (!force && forecastCandidates.length > 0) return;
     if (forecastRequestPendingRef.current) return;
     forecastRequestPendingRef.current = true;
     const requestId = ++forecastRequestIdRef.current;
@@ -2537,14 +2537,8 @@ export function AccountsWorkloadsPage({
                 const pendingDelete =
                   workload.archived || pendingDeleteWorkloadIds.has(workload.id);
                 const deals = workload.deals.filter((deal) => !deal.deleted);
-                const arr = deals.reduce(
-                  (sum, deal) => sum + (deal.arrUsd ?? 0),
-                  0,
-                );
-                const acr = deals.reduce(
-                  (sum, deal) => sum + (deal.acrUsd ?? 0),
-                  0,
-                );
+                const arr = sumWonOpportunityAmount(deals, "arrUsd");
+                const acr = sumWonOpportunityAmount(deals, "acrUsd");
                 const childDrafts = [...dealDrafts.values()].filter(
                   (draft) => draft.workloadId === workload.id,
                 );
@@ -3031,7 +3025,7 @@ export function AccountsWorkloadsPage({
               <oj-button
                 class="accounts-workloads-button accounts-forecast-resync"
                 disabled={forecastLoading || forecastMutationKey !== null}
-                onojAction={() => void fetchForecast({ force: true })}
+                onojAction={() => void fetchForecast()}
               >
                 <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true" />
                 Resync

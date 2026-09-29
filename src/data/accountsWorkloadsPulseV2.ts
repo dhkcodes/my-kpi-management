@@ -1,4 +1,5 @@
 import { AccountWorkloadRow } from "./accountsWorkloadsMockData";
+import type { AccountsWorkloadsHierarchy } from "./accountsWorkloadsApi";
 import { FiscalYear } from "./kpiMockData";
 
 export type PulseUrgencyLevel = "critical" | "attention" | "upcoming";
@@ -48,8 +49,12 @@ export type AccountPortfolioSummary = Readonly<{
 }>;
 
 export const summarizeAccountsWorkloadsByAccount = (
-  rows: AccountWorkloadRow[]
-): AccountPortfolioSummary[] => Array.from(
+  rows: AccountWorkloadRow[],
+  fiscalYear?: FiscalYear,
+  hierarchy?: AccountsWorkloadsHierarchy
+): AccountPortfolioSummary[] => {
+  const wonAmounts = fiscalYear && hierarchy ? wonAmountsByAccount(hierarchy, fiscalYear) : null;
+  return Array.from(
   rows.filter((row) => !row.isDeleted).reduce((summaries, row) => {
     const current = summaries.get(row.account) ?? {
       account: row.account,
@@ -62,16 +67,44 @@ export const summarizeAccountsWorkloadsByAccount = (
     summaries.set(row.account, {
       ...current,
       workloads: current.workloads + 1,
-      arrUsd: current.arrUsd + (row.arrUsd ?? 0),
-      acrUsd: current.acrUsd + (row.acrUsd ?? 0),
+      arrUsd: wonAmounts ? (wonAmounts.get(row.account)?.arrUsd ?? 0) : current.arrUsd + (row.arrUsd ?? 0),
+      acrUsd: wonAmounts ? (wonAmounts.get(row.account)?.acrUsd ?? 0) : current.acrUsd + (row.acrUsd ?? 0),
       importantWorkloads: current.importantWorkloads + (row.isImportant ? 1 : 0),
       targetCoverageWorkloads: current.targetCoverageWorkloads + (row.target.trim() === "" ? 0 : 1)
     });
     return summaries;
   }, new Map<string, AccountPortfolioSummary>()).values()
-).sort((left, right) =>
+  ).sort((left, right) =>
   right.workloads - left.workloads || left.account.localeCompare(right.account)
-);
+  );
+};
+
+const fiscalYearForDate = (isoDate: string): FiscalYear | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isInteger(year) || month < 1 || month > 12) return null;
+  return `FY${String((month >= 6 ? year + 1 : year) % 100).padStart(2, "0")}` as FiscalYear;
+};
+
+const wonAmountsByAccount = (hierarchy: AccountsWorkloadsHierarchy, fiscalYear: FiscalYear) => {
+  const result = new Map<string, { arrUsd: number; acrUsd: number }>();
+  hierarchy.accounts.filter((account) => !account.archived).forEach((account) => {
+    account.workloads.filter((workload) => !workload.archived).forEach((workload) => {
+      workload.deals
+        .filter((deal) => deal.status === "WON" && !deal.deleted && deal.actualCloseDate !== null && fiscalYearForDate(deal.actualCloseDate) === fiscalYear)
+        .forEach((deal) => {
+          const current = result.get(account.name) ?? { arrUsd: 0, acrUsd: 0 };
+          result.set(account.name, {
+            arrUsd: current.arrUsd + (deal.arrUsd ?? 0),
+            acrUsd: current.acrUsd + (deal.acrUsd ?? 0)
+          });
+        });
+    });
+  });
+  return result;
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BUSINESS_TIME_ZONE = "Asia/Seoul";
@@ -150,13 +183,15 @@ const targetQuarterEnd = (fiscalYear: FiscalYear, target: string) => {
 export const calculateAccountsWorkloadsPulseV2 = (
   rows: AccountWorkloadRow[],
   fiscalYear: FiscalYear,
-  asOf: string
+  asOf: string,
+  hierarchy?: AccountsWorkloadsHierarchy
 ): AccountsWorkloadsPulseV2 => {
   const activeRows = rows.filter((row) => !row.isDeleted);
   const activeAccounts = new Set(activeRows.map((row) => row.account)).size;
   const targetCoverageWorkloads = activeRows.filter((row) => row.target.trim() !== "").length;
 
-  const accountSummaries = summarizeAccountsWorkloadsByAccount(activeRows);
+  const accountSummaries = summarizeAccountsWorkloadsByAccount(activeRows, fiscalYear, hierarchy);
+  const wonAmounts = hierarchy ? wonAmountsByAccount(hierarchy, fiscalYear) : null;
   const accountCounts = accountSummaries.map(({ account, workloads }) => ({ account, workloads }));
   const topAccounts = accountCounts.slice(0, 3);
   const remainingAccounts = accountCounts.slice(3);
@@ -189,8 +224,8 @@ export const calculateAccountsWorkloadsPulseV2 = (
     metrics: {
       activeAccounts,
       activeWorkloads: activeRows.length,
-      arrUsd: activeRows.reduce((total, row) => total + (row.arrUsd ?? 0), 0),
-      acrUsd: activeRows.reduce((total, row) => total + (row.acrUsd ?? 0), 0),
+      arrUsd: wonAmounts ? Array.from(wonAmounts.values()).reduce((total, item) => total + item.arrUsd, 0) : activeRows.reduce((total, row) => total + (row.arrUsd ?? 0), 0),
+      acrUsd: wonAmounts ? Array.from(wonAmounts.values()).reduce((total, item) => total + item.acrUsd, 0) : activeRows.reduce((total, row) => total + (row.acrUsd ?? 0), 0),
       importantWorkloads: activeRows.filter((row) => row.isImportant).length,
       targetCoverageWorkloads,
       targetCoveragePercent: activeRows.length === 0 ? 0 : Math.round((targetCoverageWorkloads / activeRows.length) * 100)

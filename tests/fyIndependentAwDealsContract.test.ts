@@ -62,7 +62,9 @@ async function run() {
         { id: 22, workloadId: 21, sourcePlanId: 10, sourcePlanNumber: " 0009.0 ", versionNo: 1 },
         { id: 23, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "42416424", versionNo: 1 },
         { id: 24, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "   ", versionNo: 1 },
-        { id: 25, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "9A", versionNo: 1 }
+        { id: 25, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "9A", versionNo: 1 },
+        { id: 26, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "42459532 Active", versionNo: 1 },
+        { id: 27, workloadId: 21, sourcePlanId: null, sourcePlanNumber: "42450000 ACTIVE", versionNo: 1 }
       ]
     }]
   }];
@@ -71,12 +73,14 @@ async function run() {
       ...candidates,
       { candidateKey: "PLAN_ID:81", accountName: "Acme", normalizedAccount: "ACME", salesRep: "Alice", planId: 81, planNumber: "PLAN-81", linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "PLAN_ID:82", accountName: "Different plan match", normalizedAccount: "DIFFERENT PLAN MATCH", salesRep: null, planId: 82, planNumber: "42416424", linked: false, linkedWorkloadIds: [], excluded: false },
+      { candidateKey: "PLAN_ID:83", accountName: "Legacy suffix match", normalizedAccount: "LEGACY SUFFIX MATCH", salesRep: null, planId: 83, planNumber: "42459532", linked: false, linkedWorkloadIds: [], excluded: false },
+      { candidateKey: "PLAN_ID:84", accountName: "Malformed suffix", normalizedAccount: "MALFORMED SUFFIX", salesRep: null, planId: 84, planNumber: "42450000", linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "PLAN_ID:9", accountName: "No cross-domain match", normalizedAccount: "NO CROSS DOMAIN MATCH", salesRep: null, planId: 9, planNumber: "OTHER-9", linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "PLAN_ID:10", accountName: "Internal id match", normalizedAccount: "INTERNAL ID MATCH", salesRep: null, planId: 10, planNumber: "OTHER-10", linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY", accountName: "draft   only", normalizedAccount: "DRAFT ONLY", salesRep: null, planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false },
       { candidateKey: "ACCOUNT:DRAFT ONLY PLUS", accountName: "Draft only plus", normalizedAccount: "DRAFT ONLY PLUS", salesRep: "Carol", planId: null, planNumber: null, linked: false, linkedWorkloadIds: [], excluded: false }
     ], existingAccounts).map((item) => [item.accountName, item.planNumber]),
-    [["No cross-domain match", "OTHER-9"], ["Draft only plus", null]],
+    [["Malformed suffix", "42450000"], ["No cross-domain match", "OTHER-9"], ["Draft only plus", null]],
     "Plan Code, internal Plan ID, and exact normalized account names are independent exclusions; archived plans count and numeric-looking codes never cross-match internal IDs"
   );
   let candidateUrl = "";

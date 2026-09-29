@@ -333,6 +333,10 @@ assert.match(page, /<header class="accounts-workloads-header consumption-page__h
   "breadcrumb and recommendation action precede the page title in a dedicated first row");
 assert.match(page, /<oj-button[\s\S]*?aria-label="Account Recommendations"[\s\S]*?disabled=\{saving\}[\s\S]*?onojAction=\{\(\) => void fetchForecast\(\)\}[\s\S]*?Account Recommendations/,
   "Account Recommendations remains available for read-only viewing and opens the recommendation dialog");
+assert.doesNotMatch(page, /if \(!force && forecastCandidates\.length > 0\) return/,
+  "opening Recommendations always refreshes server-authoritative candidates instead of exposing an archive-stale cache");
+assert.match(page, /const fetchForecast = async[\s\S]*fetchForecastCandidates\(true\)/,
+  "both initial open and Resync load current recommendation candidates from the API");
 assert.match(page, /<span class="accounts-workloads-recommendations-label--desktop">Account Recommendations<\/span>[\s\S]*?<span class="accounts-workloads-recommendations-label--mobile">Account Recomm\.<\/span>/,
   "the recommendation action provides the full desktop label and Account Recomm. on mobile");
 assert.match(styles, /\.accounts-workloads-recommendations-label--mobile\s*\{[^}]*display:\s*none/,
@@ -432,7 +436,7 @@ assert.doesNotMatch(page.slice(page.indexOf("const updateAw"), page.indexOf("con
   "blur and draft updates cannot release title sort stability before save succeeds");
 assert.match(page, /placeholder="Search account name, plan number, or sales rep"/,
   "recommendations provide searchable Account Name, Plan Number, and Sales Rep fields");
-assert.match(page, /onojAction=\{\(\) => void fetchForecast\(\{ force: true \}\)\}[\s\S]*Resync/,
+assert.match(page, /onojAction=\{\(\) => void fetchForecast\(\)\}[\s\S]*Resync/,
   "recommendations expose an explicit backend resync action");
 assert.match(page, /setShowExcluded[\s\S]*Show excluded/,
   "recommendations hide excluded candidates by default and provide a visibility switch");
