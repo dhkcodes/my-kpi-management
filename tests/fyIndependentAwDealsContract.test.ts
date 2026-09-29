@@ -126,8 +126,10 @@ async function run() {
   assert.match(pageSource, /Account Recommendations/);
   assert.match(pageSource, /미정의 — 수정 필요/);
   assert.match(pageSource, /type="checkbox"/, "candidate dialog supports multi-selection");
-  assert.match(pageSource, /removed independently[\s\S]*internal Plan ID, exact displayed Plan Number, or normalized[\s\S]*Account name/,
-    "candidate dialog explains the three independent exclusion identities");
+  assert.match(pageSource, /Select recommendations to add as unsaved Account &amp; Workload drafts\./,
+    "candidate dialog explains the concise draft-creation outcome");
+  assert.doesNotMatch(pageSource, /removed independently[\s\S]*internal Plan ID/,
+    "candidate dialog omits implementation-detail exclusion guidance");
   assert.match(pageSource, /candidate\.planNumber \?\? "No Plan Number"/, "missing plan numbers are shown explicitly without inventing one");
   assert.match(pageSource, /<th>Sales Rep<\/th>/, "recommendations show Sales Rep");
   assert.match(pageSource, /<td>\{candidate\.salesRep \?\? "—"\}<\/td>/, "missing Sales Rep stays visibly empty");

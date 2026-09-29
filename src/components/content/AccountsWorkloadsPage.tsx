@@ -2994,13 +2994,7 @@ export function AccountsWorkloadsPage({
             <header>
               <div>
                 <h2>Account Recommendations</h2>
-                <p>
-                  Select one or more recommendations, then confirm to add them as
-                  unsaved Account &amp; Workload drafts. Recommendations already
-                  registered under your accessible AW scope are removed independently
-                  by internal Plan ID, exact displayed Plan Number, or normalized
-                  Account name. They will be added as unsaved AW drafts.
-                </p>
+                <p>Select recommendations to add as unsaved Account &amp; Workload drafts.</p>
               </div>
               <button type="button" onClick={closeForecast}>
                 ×

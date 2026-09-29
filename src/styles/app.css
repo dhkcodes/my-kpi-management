@@ -240,6 +240,7 @@ body {
 }
 
 .kpi-header__bar {
+  box-sizing: border-box;
   display: flex;
   flex-wrap: nowrap;
   min-height: 4rem;
@@ -258,7 +259,19 @@ body {
 }
 
 .kpi-header__start { flex: 1 1 auto; }
-.kpi-header__end { flex: 0 1 auto; justify-content: flex-end; }
+.kpi-header__end {
+  align-items: flex-end;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: .05rem;
+  justify-content: center;
+}
+.kpi-header__oracle-logo {
+  display: block;
+  height: auto;
+  margin: -.22rem .55rem 0 0;
+  width: 3.6rem;
+}
 
 .kpi-header__toggle {
   align-items: center;
@@ -3589,11 +3602,15 @@ h4.weekly-activity-section-label--next-week,
 
 /* Compact alignment requested for Home, KPI, Activities, and Accounts. */
 .kap-header-wordmark {
+  background: #fff;
   display: block;
-  width: min(16rem, 45vw);
-  height: 2.15rem;
-  background: url("images/kap-wordmark.png") left center / contain no-repeat;
+  height: auto;
+  max-height: 3.25rem;
+  object-fit: contain;
+  object-position: left center;
+  width: min(18.5rem, 43vw);
 }
+.kap-header-picture { display: block; flex: 0 1 auto; min-width: 0; }
 
 .home-consumption__quarter-list {
   min-height: 18rem;
@@ -4025,7 +4042,7 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-grid tbody td:nth-child(-n+2) { z-index: 8; }
 .accounts-workloads-oppty-grid tr.is-selected > td,
 .accounts-workloads-oppty-grid tr.is-selected > td:nth-child(-n+2) { background: #fdeceb; }
-.kap-header-wordmark { height: 2.6rem; width: min(19rem, 52vw); }
+.kap-header-wordmark { width: min(18.5rem, 43vw); }
 
 /* Additional revision 4: one authoritative cascade for the AW workspace. */
 .accounts-workloads-header-actions { display: flex; align-self: flex-start; }
@@ -4401,6 +4418,7 @@ h4.weekly-activity-section-label--next-week,
   --amo-panel: #fff;
   align-content: start;
   background: var(--oj-core-bg-color-content, #fff);
+  box-sizing: border-box;
   color: var(--kpi-ink);
   display: grid;
   gap: 1rem;
@@ -4784,4 +4802,164 @@ h4.weekly-activity-section-label--next-week,
   .account-overview__hierarchy-scroll { height: 24rem; max-height: 24rem; }
   .account-overview__target-scroll { height: 28rem; max-height: 28rem; }
   .account-overview__target-footer { margin: 0 -.75rem; padding: .7rem .75rem; }
+}
+
+/* Account Management Overview: executive readability and opportunity terminology. */
+.account-overview__exceptions strong,
+.account-overview__exceptions strong b {
+  font-size: clamp(1.05rem, 1.3vw, 1.3rem);
+  font-weight: 850;
+  line-height: 1.18;
+}
+.account-overview__exceptions strong b { margin-right: .28rem; }
+.account-overview__kpis article > span {
+  font-size: .92rem;
+  letter-spacing: .025em;
+}
+.account-overview__metric-lines strong,
+.account-overview__metric-lines strong small {
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+.account-overview__metric-lines strong small { min-width: 2.5rem; }
+.account-overview__won-count b {
+  color: #174f9c;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+.account-overview__actual-details > .account-overview__panel { height: 28rem; }
+.account-overview__quarter-chart .account-overview__panel-heading h3,
+.account-overview__hierarchy .account-overview__panel-heading h3 { font-size: 1rem; }
+.account-overview__legend { font-size: .72rem; font-weight: 750; }
+.account-overview__vertical-chart {
+  grid-template-columns: 62px minmax(560px, 1fr);
+  min-height: 360px;
+  overflow-x: auto;
+  padding: .4rem .75rem 1rem .2rem;
+}
+.account-overview__axis {
+  font-size: .76rem;
+  font-weight: 800;
+  padding: 0 .55rem 26px 0;
+}
+.account-overview__plot {
+  gap: .7rem;
+  height: 342px;
+  min-width: 560px;
+  padding: 0 .55rem;
+}
+.account-overview__bar-group { grid-template-rows: 312px 24px; gap: 5px; }
+.account-overview__bar-group > strong { font-size: .78rem; }
+.account-overview__bar-columns { gap: .45rem; }
+.account-overview__bar-item {
+  max-width: 68px;
+  min-width: 44px;
+}
+.account-overview__bar-item .account-overview__bar-total {
+  color: #263b59;
+  font-size: .72rem;
+  font-weight: 900;
+  line-height: 1.05;
+  margin-bottom: 4px;
+  transform: none;
+}
+.account-overview__bar-stack { border-radius: 4px 4px 0 0; width: 62%; }
+.account-overview__bar-columns .is-new,
+.account-overview__legend .is-new::before { background: #7fb4df; }
+.account-overview__bar-columns .is-expansion,
+.account-overview__legend .is-expansion::before { background: #82c7bd; }
+.account-overview__bar-columns .is-renewal,
+.account-overview__legend .is-renewal::before { background: #b7a6dc; }
+.account-overview__bar-values {
+  display: grid;
+  gap: 1px;
+  margin-top: 4px;
+  width: max-content;
+}
+.account-overview__bar-values small {
+  background: transparent !important;
+  color: #3f4f66;
+  font-size: .62rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0;
+  transform: none;
+}
+.account-overview__bar-values small b {
+  display: inline-block;
+  font-size: inherit;
+  margin: 0 .18rem 0 0;
+  min-width: .7rem;
+}
+.account-overview__bar-values .is-new b { color: #2b6eaa; }
+.account-overview__bar-values .is-expansion b { color: #277b70; }
+.account-overview__bar-values .is-renewal b { color: #6e57a4; }
+.account-overview__hierarchy-head { font-size: .72rem; }
+.account-overview__target-tabs button {
+  align-items: center;
+  justify-content: center;
+  place-content: center;
+}
+.account-overview__target-list .account-overview__panel-heading h3 { font-size: 1.08rem; }
+.account-overview__target-head {
+  font-size: .74rem;
+  line-height: 1.25;
+}
+.account-overview__target-head span:nth-child(6),
+.account-overview__target-head span:nth-child(7),
+.account-overview__target-row > span:nth-child(6),
+.account-overview__latest-update { font-size: .74rem; }
+.account-overview__type-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: .68rem;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: .02em;
+  padding: .24rem .5rem;
+}
+.account-overview__type-badge.is-new { background: #dcecf9; color: #225f91; }
+.account-overview__type-badge.is-expansion { background: #dff2ee; color: #226e65; }
+.account-overview__type-badge.is-renewal { background: #eee8f8; color: #674e97; }
+
+@media (max-width: 520px) {
+  .account-overview__exceptions strong,
+  .account-overview__exceptions strong b { font-size: 1.05rem; }
+  .account-overview__actual-details > .account-overview__panel { height: auto; min-height: 28rem; }
+  .account-overview__vertical-chart { min-width: 0; width: 100%; }
+  .account-overview__target-row > span:nth-child(6),
+  .account-overview__latest-update { font-size: .78rem; }
+}
+
+/* Header brand lockup: one KAP variant per app load plus an independent Oracle mark. */
+@media (max-width: 720px) {
+  .kpi-header__bar { box-sizing: border-box; }
+  .kpi-header__brand { flex: 0 1 auto; overflow: hidden; }
+  .kap-header-wordmark {
+    height: 2.75rem;
+    max-height: 2.75rem;
+    width: 2.86rem;
+  }
+  .kpi-header__end {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 0;
+  }
+  .kpi-header__oracle-logo {
+    margin: -.18rem .38rem 0 0;
+    width: 3.2rem;
+  }
+  .account-management-overview,
+  .account-overview__section,
+  .account-overview__panel,
+  .account-overview__target-kpis,
+  .account-overview__target-kpi,
+  .account-overview__target-tabs,
+  .account-overview__actual-details {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
 }

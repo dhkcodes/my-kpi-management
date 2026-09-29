@@ -436,6 +436,10 @@ assert.doesNotMatch(page.slice(page.indexOf("const updateAw"), page.indexOf("con
   "blur and draft updates cannot release title sort stability before save succeeds");
 assert.match(page, /placeholder="Search account name, plan number, or sales rep"/,
   "recommendations provide searchable Account Name, Plan Number, and Sales Rep fields");
+assert.match(page, /Select recommendations to add as unsaved Account &amp; Workload drafts\./,
+  "recommendation guidance stays on one concise line without changing candidate behavior");
+assert.doesNotMatch(page, /Recommendations already registered under your accessible AW scope|They will be added as unsaved AW drafts/,
+  "the previous multi-sentence recommendation guidance must be removed");
 assert.match(page, /onojAction=\{\(\) => void fetchForecast\(\)\}[\s\S]*Resync/,
   "recommendations expose an explicit backend resync action");
 assert.match(page, /setShowExcluded[\s\S]*Show excluded/,
