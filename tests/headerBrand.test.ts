@@ -21,7 +21,9 @@ assert.match(header, /src=\{selectedKapHeaderLogo\.src\} alt="KAP"/, "desktop re
 assert.doesNotMatch(header, /KAP_HEADER_LOGOS\.map\(/, "all four KAP variants are not rendered together");
 assert.match(header, /data-variant=\{selectedKapHeaderLogo\.variant\}/, "rendered variant is observable for runtime verification");
 assert.match(header, /class="kpi-header__oracle-logo" src="styles\/images\/oracle_logo\.svg"/, "existing Oracle logo asset is rendered independently");
+assert.match(header, /<div class="kpi-header__brand"[\s\S]*<\/picture>\s*<img class="kpi-header__oracle-logo"[\s\S]*<\/div>/, "Oracle sits beside KAP inside the brand lockup");
 assert.match(css, /\.kap-header-wordmark\s*\{[^}]*object-fit:\s*contain;/s, "KAP artwork keeps its original ratio");
+assert.match(css, /\.kap-header-wordmark\s*\{[^}]*height:\s*2\.15rem;[^}]*width:\s*auto;/s, "desktop KAP height is compact without distorting its ratio");
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.kpi-header__oracle-logo/, "mobile header has dedicated Oracle logo sizing");
 
 console.log("header brand tests passed");

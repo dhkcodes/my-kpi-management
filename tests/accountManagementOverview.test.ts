@@ -143,7 +143,7 @@ assert.match(pageSource, /\[null, \.\.\.revenueKinds\]/, "actual KPI cards must 
 assert.match(pageSource, /item\.account\.name} \({item\.workload\.name}\)/, "open Opportunities must lead with Account (Workload)");
 assert.match(pageSource, /item\.deal\.name} \({item\.deal\.opportunityNo/, "open Opportunities must show Opportunity (Opportunity ID) second");
 assert.match(pageSource, /account-overview__bar-total/, "quarter bars must render bold total labels");
-assert.match(pageSource, /account-overview__bar-values/, "quarter bars must render New, Expansion and Renewal values separately");
+assert.doesNotMatch(pageSource, /account-overview__bar-values/, "quarter bars must not repeat N, E and R values below the graph");
 assert.match(pageSource, /account-overview__target-footer/, "open Opportunity list must keep a footer outside the scrolling rows");
 assert.match(pageSource, /account-overview__type-badge/, "Opportunity types must render as distinct badges");
 assert.match(pageSource, /<span>ACR<\/span>/, "Target Actions must label the all-type ACR card as ACR");
@@ -151,7 +151,7 @@ assert.doesNotMatch(pageSource, /RENEWAL ACR PIPELINE/, "the obsolete renewal-on
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*overflow:\s*auto/s, "open deal rows must scroll internally");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*overflow:\s*auto/s, "account hierarchy must scroll internally");
 assert.match(appCss, /\.account-overview__target-scroll\s*\{[^}]*height:\s*24rem/s, "open deal list must have a fixed desktop height");
-assert.match(appCss, /\.account-overview__actual-details > \.account-overview__panel\s*\{[^}]*height:\s*28rem/s, "quarter chart and hierarchy panels must leave room for segment values and Q1-Q4 labels");
+assert.match(appCss, /\.account-overview__actual-details > \.account-overview__panel\s*\{[^}]*height:\s*24rem/s, "quarter chart and hierarchy panels must use the compact shared height");
 assert.match(appCss, /\.account-overview__hierarchy-scroll\s*\{[^}]*flex:\s*1 1 auto/s, "hierarchy rows must fit the shared panel height and scroll internally");
 assert.match(appCss, /\.account-overview__latest-update\s*\{[^}]*text-overflow:\s*ellipsis/s, "latest update must stay on one line");
 assert.doesNotMatch(appCss, /\.account-management-overview\s*\{[^}]*background:\s*#f7f8fa/s, "later cascade rules must not override the white overview background");
@@ -178,11 +178,15 @@ assert.doesNotMatch(pageSource, /`ACR \$\{fmtUsd/, "deal rows must keep the ACR 
 assert.match(appCss, /\.account-overview__bar-columns \.is-new,[\s\S]*background:\s*#7fb4df/, "New bars must use a pastel blue");
 assert.match(appCss, /\.account-overview__bar-columns \.is-expansion,[\s\S]*background:\s*#82c7bd/, "Expansion bars must use a pastel teal");
 assert.match(appCss, /\.account-overview__bar-columns \.is-renewal,[\s\S]*background:\s*#b7a6dc/, "Renewal bars must use a pastel violet");
+assert.match(appCss, /\.account-overview__legend \.is-new \{ color: #7fb4df; \}/, "NEW legend text must match the bar color");
+assert.match(appCss, /\.account-overview__legend \.is-expansion \{ color: #82c7bd; \}/, "EXPANSION legend text must match the bar color");
+assert.match(appCss, /\.account-overview__legend \.is-renewal \{ color: #b7a6dc; \}/, "RENEWAL legend text must match the bar color");
 assert.match(appCss, /\.account-overview__tree-row\.is-workload\s*>\s*span:first-child/, "workload indentation must be limited to the name cell");
 assert.match(appCss, /\.account-overview__deal-row\s*>\s*span:first-child/, "deal indentation must be limited to the name cell");
 assert.match(pageSource, /<b>\{overview\.exceptions\.overdue\}<\/b> Overdue<\/strong>/, "exception label casing must be exact");
 assert.match(pageSource, /<b>\{overview\.exceptions\.targetNotSet\}<\/b> Target not set<\/strong>/, "exception label casing must be exact");
 assert.match(pageSource, /<b>\{overview\.exceptions\.closeDateMissing\}<\/b> Close date missing<\/strong>/, "exception label casing must be exact");
-assert.match(appCss, /\.account-overview__exceptions strong,\s*\.account-overview__exceptions strong b\s*\{[^}]*font-size:\s*clamp/s, "exception labels and counts must share the same enlarged font size");
+assert.match(appCss, /\.account-overview__exceptions strong\s*\{[^}]*white-space:\s*nowrap/s, "exception labels must remain on one line");
+assert.match(appCss, /\.account-overview__exceptions strong b\s*\{[^}]*font-size:\s*clamp\(1\.3rem/s, "exception counts must remain larger than their labels");
 assert.doesNotMatch(pageSource, /WON deals|Open Deal action list|Account → Workload → Deal|No OPEN deals|open deals/, "visible Overview terminology must use Opportunity instead of Deal");
 console.log("accountManagementOverview tests passed");

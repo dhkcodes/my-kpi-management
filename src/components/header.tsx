@@ -44,6 +44,7 @@ export function Header({ profile, navigationOpen, onToggleNavigation, onNavigate
               <source media="(max-width: 720px)" srcSet={selectedKapHeaderLogo.iconSrc} />
               <img class="kap-header-wordmark" src={selectedKapHeaderLogo.src} alt="KAP" data-variant={selectedKapHeaderLogo.variant} />
             </picture>
+            <img class="kpi-header__oracle-logo" src="styles/images/oracle_logo.svg" alt="Oracle" />
           </div>
         </div>
         <div class="oj-flex-bar-end kpi-header__end">
@@ -64,7 +65,6 @@ export function Header({ profile, navigationOpen, onToggleNavigation, onNavigate
               </oj-menu>
             </oj-menu-button>
           </oj-toolbar>
-          <img class="kpi-header__oracle-logo" src="styles/images/oracle_logo.svg" alt="Oracle" />
         </div>
       </div>
     </header>

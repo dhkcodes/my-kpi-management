@@ -243,7 +243,7 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-wrap: nowrap;
-  min-height: 4rem;
+  min-height: 3.35rem;
   padding: 0 1.5rem;
   gap: 1rem;
   width: 100%;
@@ -260,17 +260,17 @@ body {
 
 .kpi-header__start { flex: 1 1 auto; }
 .kpi-header__end {
-  align-items: flex-end;
+  align-items: center;
   flex: 0 1 auto;
-  flex-direction: column;
-  gap: .05rem;
+  flex-direction: row;
+  gap: .35rem;
   justify-content: center;
 }
 .kpi-header__oracle-logo {
   display: block;
   height: auto;
-  margin: -.22rem .55rem 0 0;
-  width: 3.6rem;
+  margin: 0 0 .12rem .15rem;
+  width: 3.15rem;
 }
 
 .kpi-header__toggle {
@@ -281,12 +281,12 @@ body {
 }
 
 .kpi-header__brand {
-  align-items: center;
+  align-items: flex-end;
   border-left: 1px solid var(--oj-core-divider-color, var(--kpi-border));
   display: flex;
-  gap: .75rem;
+  gap: .35rem;
   min-width: 0;
-  padding: .35rem 0 .35rem 1rem;
+  padding: .25rem 0 .25rem 1rem;
 }
 
 .kpi-header__brand .demo-oracle-icon { flex: 0 0 auto; }
@@ -3604,11 +3604,12 @@ h4.weekly-activity-section-label--next-week,
 .kap-header-wordmark {
   background: #fff;
   display: block;
-  height: auto;
-  max-height: 3.25rem;
+  height: 2.15rem;
+  max-height: 2.15rem;
+  max-width: none;
   object-fit: contain;
   object-position: left center;
-  width: min(18.5rem, 43vw);
+  width: auto;
 }
 .kap-header-picture { display: block; flex: 0 1 auto; min-width: 0; }
 
@@ -4042,7 +4043,7 @@ h4.weekly-activity-section-label--next-week,
 .accounts-workloads-oppty-grid tbody td:nth-child(-n+2) { z-index: 8; }
 .accounts-workloads-oppty-grid tr.is-selected > td,
 .accounts-workloads-oppty-grid tr.is-selected > td:nth-child(-n+2) { background: #fdeceb; }
-.kap-header-wordmark { width: min(18.5rem, 43vw); }
+.kap-header-wordmark { width: auto; }
 
 /* Additional revision 4: one authoritative cascade for the AW workspace. */
 .accounts-workloads-header-actions { display: flex; align-self: flex-start; }
@@ -4806,13 +4807,20 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* Account Management Overview: executive readability and opportunity terminology. */
-.account-overview__exceptions strong,
-.account-overview__exceptions strong b {
-  font-size: clamp(1.05rem, 1.3vw, 1.3rem);
+.account-overview__exceptions strong {
+  font-size: clamp(.76rem, .85vw, .86rem);
   font-weight: 850;
-  line-height: 1.18;
+  line-height: 1.15;
+  white-space: nowrap;
 }
-.account-overview__exceptions strong b { margin-right: .28rem; }
+.account-overview__exceptions strong b {
+  color: #22375c;
+  font-size: clamp(1.3rem, 1.55vw, 1.6rem);
+  font-weight: 900;
+  line-height: 1;
+  margin-right: .3rem;
+}
+.account-overview__exceptions button:first-child strong b { color: #a52c18; }
 .account-overview__kpis article > span {
   font-size: .92rem;
   letter-spacing: .025em;
@@ -4829,10 +4837,25 @@ h4.weekly-activity-section-label--next-week,
   font-variant-numeric: tabular-nums;
   font-weight: 900;
 }
-.account-overview__actual-details > .account-overview__panel { height: 28rem; }
+.account-overview__section { gap: .55rem; padding: .7rem .8rem; }
+.account-overview__actual-details { gap: .55rem; }
+.account-overview__actual-details > .account-overview__panel { height: 24rem; }
+.account-overview__quarter-chart,
+.account-overview__hierarchy,
+.account-overview__target-list { padding: .65rem; }
+.account-overview__quarter-chart .account-overview__panel-heading,
+.account-overview__hierarchy .account-overview__panel-heading,
+.account-overview__target-list .account-overview__panel-heading {
+  margin-bottom: .35rem;
+  padding: 0;
+}
 .account-overview__quarter-chart .account-overview__panel-heading h3,
 .account-overview__hierarchy .account-overview__panel-heading h3 { font-size: 1rem; }
-.account-overview__legend { font-size: .72rem; font-weight: 750; }
+.account-overview__legend { font-size: .72rem; font-weight: 800; }
+.account-overview__legend .is-new { color: #7fb4df; }
+.account-overview__legend .is-expansion { color: #82c7bd; }
+.account-overview__legend .is-renewal { color: #b7a6dc; }
+.account-overview__legend span::before { background: currentColor; }
 .account-overview__vertical-chart {
   grid-template-columns: 62px minmax(560px, 1fr);
   min-height: 360px;
@@ -4872,31 +4895,7 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__legend .is-expansion::before { background: #82c7bd; }
 .account-overview__bar-columns .is-renewal,
 .account-overview__legend .is-renewal::before { background: #b7a6dc; }
-.account-overview__bar-values {
-  display: grid;
-  gap: 1px;
-  margin-top: 4px;
-  width: max-content;
-}
-.account-overview__bar-values small {
-  background: transparent !important;
-  color: #3f4f66;
-  font-size: .62rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  line-height: 1.15;
-  margin: 0;
-  transform: none;
-}
-.account-overview__bar-values small b {
-  display: inline-block;
-  font-size: inherit;
-  margin: 0 .18rem 0 0;
-  min-width: .7rem;
-}
-.account-overview__bar-values .is-new b { color: #2b6eaa; }
-.account-overview__bar-values .is-expansion b { color: #277b70; }
-.account-overview__bar-values .is-renewal b { color: #6e57a4; }
+
 .account-overview__hierarchy-head { font-size: .72rem; }
 .account-overview__target-tabs button {
   align-items: center;
@@ -4926,9 +4925,9 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__type-badge.is-renewal { background: #eee8f8; color: #674e97; }
 
 @media (max-width: 520px) {
-  .account-overview__exceptions strong,
-  .account-overview__exceptions strong b { font-size: 1.05rem; }
-  .account-overview__actual-details > .account-overview__panel { height: auto; min-height: 28rem; }
+  .account-overview__exceptions strong { font-size: .8rem; }
+  .account-overview__exceptions strong b { font-size: 1.4rem; }
+  .account-overview__actual-details > .account-overview__panel { height: auto; min-height: 24rem; }
   .account-overview__vertical-chart { min-width: 0; width: 100%; }
   .account-overview__target-row > span:nth-child(6),
   .account-overview__latest-update { font-size: .78rem; }
@@ -4939,9 +4938,9 @@ h4.weekly-activity-section-label--next-week,
   .kpi-header__bar { box-sizing: border-box; }
   .kpi-header__brand { flex: 0 1 auto; overflow: hidden; }
   .kap-header-wordmark {
-    height: 2.75rem;
-    max-height: 2.75rem;
-    width: 2.86rem;
+    height: 2rem;
+    max-height: 2rem;
+    width: auto;
   }
   .kpi-header__end {
     align-items: flex-end;
@@ -4949,8 +4948,8 @@ h4.weekly-activity-section-label--next-week,
     gap: 0;
   }
   .kpi-header__oracle-logo {
-    margin: -.18rem .38rem 0 0;
-    width: 3.2rem;
+    margin: 0 0 .1rem .05rem;
+    width: 2.65rem;
   }
   .account-management-overview,
   .account-overview__section,
