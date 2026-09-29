@@ -175,7 +175,14 @@ export const filterForecastCandidates = (
       const sourcePlanId = normalizedPlanIdValue(plan.sourcePlanId);
       if (sourcePlanId !== null) occupiedPlanIds.add(`plan-id:${sourcePlanId}`);
       const sourcePlanNumber = plan.sourcePlanNumber === null ? "" : normalizedPlanIdentity(plan.sourcePlanNumber);
-      if (sourcePlanNumber) occupiedPlanNumbers.add(`plan-number:${sourcePlanNumber}`);
+      if (sourcePlanNumber) {
+        occupiedPlanNumbers.add(`plan-number:${sourcePlanNumber}`);
+        for (const suffix of [" Active", " Archived"] as const) {
+          if (sourcePlanNumber.endsWith(suffix) && sourcePlanNumber.length > suffix.length) {
+            occupiedPlanNumbers.add(`plan-number:${sourcePlanNumber.slice(0, -suffix.length)}`);
+          }
+        }
+      }
     }));
   });
 

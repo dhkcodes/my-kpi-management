@@ -31,8 +31,10 @@ import {
 } from "../data/accountsWorkloadsDataSource";
 import {
   AccountsWorkloadsListQuery,
+  AccountsWorkloadsHierarchy,
   canUseDevelopmentDataFallback,
   fetchAccountsWorkloads,
+  fetchAccountsWorkloadsHierarchy,
   fetchAccountsWorkloadsFiscalYears,
   saveAccountsWorkloadsBatch
 } from "../data/accountsWorkloadsApi";
@@ -182,6 +184,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const [accountsWorkloadsRows, setAccountsWorkloadsRows] = useState<Record<FiscalYear, AccountWorkloadRow[]>>(() =>
       Object.fromEntries(fallbackFiscalYears.map((year) => [year, [] as AccountWorkloadRow[]])) as Record<FiscalYear, AccountWorkloadRow[]>
     );
+    const [accountsWorkloadsHierarchy, setAccountsWorkloadsHierarchy] = useState<AccountsWorkloadsHierarchy | undefined>();
 
     const canReadKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
     const canReadCustomers = canAccessRoute(profile, getNavigationRoute("customers-overview"));
@@ -285,12 +288,16 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         setAccountsWorkloadsLoading(true);
         setAccountsWorkloadsLoadError("");
         try {
-          const result = await fetchAccountsWorkloads(query);
+          const [result, hierarchy] = await Promise.all([
+            fetchAccountsWorkloads(query),
+            fetchAccountsWorkloadsHierarchy({ includeArchived: false, includeDeletedDeals: false })
+          ]);
           if (!active || requestId !== accountsWorkloadsRequestIdRef.current) return;
           setAccountWorkloadMetadata((current) =>
             createApiAccountWorkloadMetadata(fiscalYear, result.total, current)
           );
           setAccountsWorkloadsDataSource("api");
+          setAccountsWorkloadsHierarchy(hierarchy);
           setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: result.items }));
         } catch (error) {
           if (!canUseDevelopmentDataFallback(error)) {
@@ -686,6 +693,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             activeRoute={activeRoute}
             profile={profile}
             accountsWorkloadsRows={accountsWorkloadsRows[fiscalYear]}
+            accountsWorkloadsHierarchy={accountsWorkloadsHierarchy}
             accountsWorkloadsAsOf={accountsWorkloadsAsOf}
             accountsWorkloadsDataSource={accountsWorkloadsDataSource}
             accountsWorkloadsLoadError={accountsWorkloadsLoadError}

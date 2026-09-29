@@ -33,6 +33,7 @@ const hierarchy: AccountsWorkloadsHierarchy = {
           { id: 222, workloadId: 22, versionNo: 1, name: "Open unset", opportunityNo: null, revenueType: "NEW", status: "OPEN", targetFiscalYear: null, targetQuarter: null, actualCloseDate: null, contractStartDate: null, contractEndDate: null, arrUsd: null, arrKrw: null, acrUsd: 8000, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, deleted: false, deletedAt: null, sourceCommitmentId: null },
           { id: 223, workloadId: 22, versionNo: 1, name: "Deleted won", opportunityNo: "D5", revenueType: "NEW", status: "WON", targetFiscalYear: "FY27", targetQuarter: 1, actualCloseDate: "2026-07-01", contractStartDate: null, contractEndDate: null, arrUsd: 999999, arrKrw: null, acrUsd: null, acrKrw: null, winProbability: null, latestUpdate: null, notes: null, deleted: true, deletedAt: "2026-07-02", sourceCommitmentId: null },
           { id: 224, workloadId: 22, versionNo: 1, name: "Active won", opportunityNo: "D6", revenueType: "NEW", status: "WON", targetFiscalYear: "FY27", targetQuarter: 1, actualCloseDate: "2026-07-03", contractStartDate: null, contractEndDate: null, arrUsd: 120000, arrKrw: null, acrUsd: 30000, acrKrw: null, winProbability: null, latestUpdate: "Closed", notes: null, deleted: false, deletedAt: null, sourceCommitmentId: null },
+          { id: 225, workloadId: 22, versionNo: 1, name: "Active lost", opportunityNo: "D7", revenueType: "NEW", status: "LOST", targetFiscalYear: "FY27", targetQuarter: 1, actualCloseDate: "2026-07-04", contractStartDate: null, contractEndDate: null, arrUsd: 880000, arrKrw: null, acrUsd: 440000, acrKrw: null, winProbability: null, latestUpdate: "Lost", notes: null, deleted: false, deletedAt: null, sourceCommitmentId: null },
         ]
       }]
     }
@@ -71,6 +72,23 @@ assert.strictEqual(actual.kpis.newArr.amount, 120000);
 assert.strictEqual(actual.kpis.newArr.enteredAcr, 30000);
 assert.strictEqual(actual.kpis.wonDeals, 1);
 assert.strictEqual(actual.quarters[0].newArr, 120000);
+
+const activeAccount = hierarchy.accounts[1];
+const activeWorkload = activeAccount.workloads[0];
+const activeWon = activeWorkload.deals.find((deal) => deal.id === 224)!;
+const overviewAfterStatus = (status: "OPEN" | "WON" | "LOST") => buildAccountManagementOverview({
+  fiscalYear: null,
+  accounts: [{
+    ...activeAccount,
+    workloads: [{ ...activeWorkload, deals: [{ ...activeWon, status }] }],
+  }],
+}, new Date("2026-09-27T00:00:00Z"));
+assert.strictEqual(overviewAfterStatus("WON").actualFor("FY27", "ALL", "").kpis.newArr.amount, 120000,
+  "OPEN to WON must add the Opportunity amount to Overview actuals");
+assert.strictEqual(overviewAfterStatus("OPEN").actualFor("FY27", "ALL", "").kpis.newArr.amount, 0,
+  "WON to OPEN must remove the Opportunity amount from Overview actuals");
+assert.strictEqual(overviewAfterStatus("LOST").actualFor("FY27", "ALL", "").kpis.newArr.amount, 0,
+  "WON to LOST must remove the Opportunity amount from Overview actuals");
 
 const target = overview.targetFor("PRIORITY", "", new Date("2026-09-27T00:00:00Z"));
 assert.strictEqual(target.deals.length, 2);

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { AccountWorkloadRow } from "../src/data/accountsWorkloadsMockData";
+import type { AccountsWorkloadsHierarchy } from "../src/data/accountsWorkloadsApi";
 import {
   calculateAccountsWorkloadsPulseV2,
   getBusinessAsOfDate,
@@ -80,6 +81,38 @@ assert.deepEqual(summarizeAccountsWorkloadsByAccount(rows), [
   { account: "Account D", workloads: 1, arrUsd: 5_000, acrUsd: 6_000, importantWorkloads: 0, targetCoverageWorkloads: 1 },
   { account: "Account E", workloads: 1, arrUsd: 7_000, acrUsd: 8_000, importantWorkloads: 0, targetCoverageWorkloads: 1 }
 ]);
+
+const hierarchy = {
+  accounts: [
+    {
+      name: "Account A",
+      archived: false,
+      workloads: [{
+        archived: false,
+        deals: [
+          { status: "WON", deleted: false, actualCloseDate: "2026-06-15", arrUsd: 11, acrUsd: 22 },
+          { status: "OPEN", deleted: false, actualCloseDate: "2026-07-15", arrUsd: 9_999, acrUsd: 9_999 },
+          { status: "LOST", deleted: false, actualCloseDate: "2026-07-15", arrUsd: 8_888, acrUsd: 8_888 },
+          { status: "WON", deleted: true, actualCloseDate: "2026-07-15", arrUsd: 7_777, acrUsd: 7_777 },
+          { status: "WON", deleted: false, actualCloseDate: "2025-06-15", arrUsd: 6_666, acrUsd: 6_666 }
+        ]
+      }]
+    },
+    {
+      name: "Archived Account",
+      archived: true,
+      workloads: [{ archived: false, deals: [{ status: "WON", deleted: false, actualCloseDate: "2026-06-15", arrUsd: 5_555, acrUsd: 5_555 }] }]
+    }
+  ]
+} as unknown as AccountsWorkloadsHierarchy;
+
+const hierarchyPulse = calculateAccountsWorkloadsPulseV2(rows, "FY27", "2026-08-05", hierarchy);
+assert.equal(hierarchyPulse.metrics.arrUsd, 11, "Pulse ARR must use only current-FY, active-hierarchy, non-deleted WON opportunities");
+assert.equal(hierarchyPulse.metrics.acrUsd, 22, "Pulse ACR must use only current-FY, active-hierarchy, non-deleted WON opportunities");
+assert.deepEqual(
+  summarizeAccountsWorkloadsByAccount(rows, "FY27", hierarchy).find((item) => item.account === "Account A"),
+  { account: "Account A", workloads: 2, arrUsd: 11, acrUsd: 22, importantWorkloads: 1, targetCoverageWorkloads: 2 }
+);
 
 assert.deepEqual(urgencyCounts(pulse.renewalExpand), {
   critical: { accounts: 1, workloads: 1 },

@@ -18,7 +18,7 @@ import { MyCustomers360Page } from "./MyCustomers360Page";
 import { WeeklyActivitiesPage } from "./WeeklyActivitiesPage";
 import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
-import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
+import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsHierarchy, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
@@ -36,6 +36,7 @@ type Props = Readonly<{
   activeRoute: NavigationRouteDefinition;
   profile: AuthSession;
   accountsWorkloadsRows: AccountWorkloadRow[];
+  accountsWorkloadsHierarchy?: AccountsWorkloadsHierarchy;
   accountsWorkloadsAsOf: string;
   accountsWorkloadsDataSource: AccountsWorkloadsDataSource;
   accountsWorkloadsLoadError: string;
@@ -295,6 +296,7 @@ export function Content({
   profile,
   accountWorkloadMetadata,
   accountsWorkloadsRows,
+  accountsWorkloadsHierarchy,
   accountsWorkloadsAsOf,
   accountsWorkloadsDataSource,
   accountsWorkloadsLoadError,
@@ -506,6 +508,7 @@ export function Content({
           {canReadHomeAccounts && <AccountsWorkloadsPulseV2
             fiscalYear={fiscalYear}
             rows={accountsWorkloadsRows}
+            hierarchy={accountsWorkloadsHierarchy}
             asOf={accountsWorkloadsAsOf}
             dataAvailable={accountsWorkloadsDatasetAvailable}
             loading={accountsWorkloadsLoading}
@@ -627,6 +630,7 @@ export function Content({
           <MyCustomers360Page
             fiscalYear={fiscalYear}
             rows={accountsWorkloadsRows}
+            hierarchy={accountsWorkloadsHierarchy}
             dataAvailable={accountsWorkloadsDatasetAvailable}
             onOpenAccount={openAccountWorkloads}
             breadcrumb={pageNavigation}
