@@ -269,7 +269,8 @@ body {
 .kpi-header__oracle-logo {
   display: block;
   height: auto;
-  margin: 0 0 .12rem .15rem;
+  /* The 1600x300 KAP artwork retains about 330px of white space after “Perform.”. */
+  margin: 0 0 .12rem -2.35rem;
   width: 3.15rem;
 }
 

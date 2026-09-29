@@ -64,6 +64,8 @@ assert.match(app, /const handleAuthenticated[\s\S]*startNewKapHeaderLoginSession
 assert.match(app, /logoutUser\(\)[\s\S]*clearKapHeaderLoginSession\(\)[\s\S]*setSession\(null\)/, "successful logout clears the brand selection");
 assert.match(css, /\.kap-header-wordmark\s*\{[^}]*object-fit:\s*contain;/s, "KAP artwork keeps its original ratio");
 assert.match(css, /\.kap-header-wordmark\s*\{[^}]*height:\s*2\.15rem;[^}]*width:\s*auto;/s, "desktop KAP height is compact without distorting its ratio");
+assert.match(css, /\.kpi-header__oracle-logo\s*\{[^}]*margin:\s*0 0 \.12rem -2\.35rem;/s, "desktop Oracle compensates for the full KAP artwork's trailing white space");
+assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.kpi-header__oracle-logo\s*\{[^}]*margin:\s*0 0 \.1rem \.05rem;/s, "mobile keeps a non-overlapping positive Oracle margin beside the cropped KAP icon");
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.kpi-header__oracle-logo/, "mobile header has dedicated Oracle logo sizing");
 
 console.log("header brand tests passed");
