@@ -1706,8 +1706,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </div>
         <div slot="footer">
           {forecastImportPhase === "preview" && pendingForecastImport && <><oj-button chroming="outlined" onojAction={() => forecastImportDialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={!canWrite || pendingForecastImport.preview.hasBlockedErrors}
-            title={!canWrite ? "Write permission is required." : undefined}
+            disabled={!canWriteForecast || pendingForecastImport.preview.hasBlockedErrors}
+            title={!canWriteForecast ? "Forecast write permission is required." : undefined}
             onojAction={() => void applyPendingForecastImport()}>{`Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
           {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
         </div>

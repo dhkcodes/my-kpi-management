@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { ConsumptionPillar, consumptionPillarOptions } from "../../data/consumptionData";
 import { ForecastActualComparison, fetchForecastActualComparison } from "../../data/consumptionApi";
@@ -21,13 +21,21 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const [quarter, setQuarter] = useState("ALL");
   const [pillar, setPillar] = useState<ConsumptionPillar>("ALL");
   const [salesRep, setSalesRep] = useState("");
-  const [account, setAccount] = useState("");
   const [accountQuery, setAccountQuery] = useState("");
+  const [account, setAccount] = useState("");
+  const previousFiscalYearRef = useRef(fiscalYear);
   const [data, setData] = useState<ForecastActualComparison | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (previousFiscalYearRef.current !== fiscalYear) {
+      previousFiscalYearRef.current = fiscalYear;
+      if (salesRep || account || accountQuery) {
+        resetDependentFilters();
+        return;
+      }
+    }
     let active = true;
     setLoading(true); setError("");
     fetchForecastActualComparison({ fiscalYear, quarter, pillar, salesRep, account })
