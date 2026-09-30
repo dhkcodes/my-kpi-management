@@ -317,6 +317,12 @@ assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-c
 assert.match(insightsPage, /Forecast signals by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, /Forecast Import CSV \/ Excel/, "Forecast import accepts both retained formats");
+assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("attainment"\)\)/,
+  "Forecast import capability follows the backend Attainment WRITE permission");
+assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastCsvFile[\s\S]*Forecast write permission is required/,
+  "Forecast preview and apply use their dedicated write capability");
+assert.match(recordsPage, /forecastImportPhase === "preview"[\s\S]*disabled=\{!canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,
+  "Forecast Apply button uses Attainment WRITE rather than Records WRITE");
 assert.match(recordsPage, /Forecast CSV Export/, "CSV export remains available");
 assert.match(recordsPage, /Forecast Excel Export/, "Excel export is available beside CSV");
 assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastCsv\(\)\}/, "CSV export stays connected");
@@ -511,6 +517,11 @@ assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Acc
 assert.match(forecastActualPage, /Comparable periods:[\s\S]*Full-period Forecast/, "comparison and full Forecast periods are labelled separately");
 assert.match(forecastActualPage, /Confirmed Actual[\s\S]*Comparable Forecast[\s\S]*Actual − Forecast/, "summary compares finalized periods only");
 assert.match(forecastActualPage, /differencePercent[\s\S]*N\/A/, "zero Forecast and unavailable ratios do not fabricate a percentage");
+assert.match(forecastActualPage, /resetDependentFilters[\s\S]*setSalesRep\(""\)[\s\S]*resetAccount/, "Quarter and Pillar changes clear stale dependent filters");
+assert.match(forecastActualPage, /previousFiscalYearRef[\s\S]*previousFiscalYearRef\.current !== fiscalYear[\s\S]*resetDependentFilters\(\)[\s\S]*return;/,
+  "Fiscal Year changes clear stale Sales Rep and Account filters before requesting the new scope");
+assert.match(forecastActualPage, /else if \(value !== account\) setAccount\(""\)/, "typing away from a selected Account clears the hidden applied filter");
+assert.match(forecastActualPage, /row\.status !== "NO_CONFIRMED_ACTUAL"[\s\S]*N\/A/, "future-only Accounts render unconfirmed comparison values as unavailable rather than zero");
 assert.doesNotMatch(forecastActualPage, /MTD|Plan|Opportunity/, "the Account-level comparison has no MTD, Plan, or Opportunity view");
 assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
 assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
