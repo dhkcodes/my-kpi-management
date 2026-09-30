@@ -365,11 +365,12 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
 type Props = Readonly<{
   fiscalYear: FiscalYear;
   canWrite: boolean;
+  canWriteForecast: boolean;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuardChange, breadcrumb }: Props) {
+export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast, onNavigationGuardChange, breadcrumb }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -1153,7 +1154,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   }, [forecastImportPhase]);
 
   const handleForecastCsvFile = async (event: Event) => {
-    if (!canWrite) { setImportError("Write permission is required."); return; }
+    if (!canWriteForecast) { setImportError("Forecast write permission is required."); return; }
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     const file = files[0];
@@ -1176,7 +1177,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
   };
 
   const applyPendingForecastImport = async () => {
-    if (!canWrite) { setImportError("Write permission is required."); return; }
+    if (!canWriteForecast) { setImportError("Forecast write permission is required."); return; }
     if (forecastApplyingRef.current || !pendingForecastImport || forecastImportPhase !== "preview" || pendingForecastImport.preview.hasBlockedErrors) return;
     forecastApplyingRef.current = true;
     setForecastImportPhase("applying");
@@ -1493,8 +1494,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
             disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
-          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : `Import ${forecastFileName}`} disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+            disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
+          <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import CSV / Excel
           </oj-button>

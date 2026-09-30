@@ -41,6 +41,7 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const fullPeriods = data?.fullForecastPeriods ?? [];
   const hasConfirmedActual = confirmedPeriods.length > 0;
   const resetAccount = () => { setAccount(""); setAccountQuery(""); };
+  const resetDependentFilters = () => { setSalesRep(""); resetAccount(); };
 
   return <section class="consumption-page forecast-actual-page" aria-labelledby="forecastActualTitle">
     <header class="consumption-page__header">
@@ -49,10 +50,10 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
 
     <section class="forecast-actual-filters" aria-label="Forecast vs Actual filters">
       <label>FY<select value={fiscalYear} disabled aria-label="Fiscal year"><option value={fiscalYear}>{fiscalYear}</option></select></label>
-      <label>Quarter<select value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); resetAccount(); }}>
+      <label>Quarter<select value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); resetDependentFilters(); }}>
         <option value="ALL">All quarters</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option>
       </select></label>
-      <label>Pillar<select value={pillar} onChange={(event) => { setPillar(event.currentTarget.value as ConsumptionPillar); resetAccount(); }}>
+      <label>Pillar<select value={pillar} onChange={(event) => { setPillar(event.currentTarget.value as ConsumptionPillar); resetDependentFilters(); }}>
         {consumptionPillarOptions.map((option) => <option value={option.value}>{option.label}</option>)}
       </select></label>
       <label>Sales Rep<select value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccount(); }}>
@@ -64,6 +65,7 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           setAccountQuery(value);
           if (!value) setAccount("");
           else if ((data?.accountOptions ?? []).includes(value)) setAccount(value);
+          else if (value !== account) setAccount("");
         }} /></label>
       <datalist id="forecastActualAccounts">{(data?.accountOptions ?? []).map((value) => <option value={value} />)}</datalist>
     </section>
@@ -94,10 +96,10 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           <thead><tr><th>Sales Rep</th><th>Account</th><th>Confirmed Actual</th><th>Comparable Forecast</th><th>Actual − Forecast</th><th>Difference %</th><th>Full-period Forecast</th><th>Status</th></tr></thead>
           <tbody>{data.rows.length ? data.rows.map((row) => <tr key={`${row.salesRep}:${row.account}`} class={`forecast-actual-row forecast-actual-row--${row.status.toLowerCase()}`}>
             <td data-label="Sales Rep">{row.salesRep || "Unassigned"}</td><th scope="row" data-label="Account">{row.account}</th>
-            <td data-label="Confirmed Actual">{hasConfirmedActual ? money(row.confirmedActualAmount) : "N/A"}</td>
-            <td data-label="Comparable Forecast">{hasConfirmedActual ? money(row.confirmedForecastAmount) : "N/A"}</td>
-            <td data-label="Actual − Forecast" class={compareExactDecimals(row.differenceAmount, "0") < 0 ? "is-negative" : "is-positive"}>{hasConfirmedActual ? signedMoney(row.differenceAmount) : "N/A"}</td>
-            <td data-label="Difference %">{hasConfirmedActual ? percent(row.differencePercent) : "N/A"}</td>
+            <td data-label="Confirmed Actual">{hasConfirmedActual && row.status !== "NO_CONFIRMED_ACTUAL" ? money(row.confirmedActualAmount) : "N/A"}</td>
+            <td data-label="Comparable Forecast">{hasConfirmedActual && row.status !== "NO_CONFIRMED_ACTUAL" ? money(row.confirmedForecastAmount) : "N/A"}</td>
+            <td data-label="Actual − Forecast" class={compareExactDecimals(row.differenceAmount, "0") < 0 ? "is-negative" : "is-positive"}>{hasConfirmedActual && row.status !== "NO_CONFIRMED_ACTUAL" ? signedMoney(row.differenceAmount) : "N/A"}</td>
+            <td data-label="Difference %">{hasConfirmedActual && row.status !== "NO_CONFIRMED_ACTUAL" ? percent(row.differencePercent) : "N/A"}</td>
             <td data-label="Full-period Forecast">{money(row.fullPeriodForecastAmount)}</td><td data-label="Status"><span class="forecast-actual-status">{statusLabel(row.status)}</span></td>
           </tr>) : <tr><td colSpan={8} class="forecast-actual-empty">No accounts match the selected filters.</td></tr>}</tbody>
         </table>
