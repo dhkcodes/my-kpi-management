@@ -4,50 +4,40 @@ export type ForecastCompositionDraft = Readonly<{
   expansionAmountExact: string;
 }>;
 
-const NUMBER_20_4_MAX_UNSCALED = "99999999999999999999";
+const MAX_K_UNSCALED = "999999999999999"; // 9,999,999,999,999.99 K
 
 const normalizeDigits = (value: string): string => value.replace(/^0+(?=\d)/, "");
 const addDigits = (left: string, right: string): string => {
   let carry = 0;
   let result = "";
-  for (let leftIndex = left.length - 1, rightIndex = right.length - 1; leftIndex >= 0 || rightIndex >= 0 || carry; leftIndex--, rightIndex--) {
-    const sum = Number(left[leftIndex] ?? 0) + Number(right[rightIndex] ?? 0) + carry;
+  for (let li = left.length - 1, ri = right.length - 1; li >= 0 || ri >= 0 || carry; li--, ri--) {
+    const sum = Number(left[li] ?? 0) + Number(right[ri] ?? 0) + carry;
     result = String(sum % 10) + result;
     carry = Math.floor(sum / 10);
   }
   return normalizeDigits(result);
 };
-const exceedsNumber20Scale4 = (value: string): boolean => {
-  const normalized = normalizeDigits(value);
-  return normalized.length > NUMBER_20_4_MAX_UNSCALED.length
-    || (normalized.length === NUMBER_20_4_MAX_UNSCALED.length && normalized > NUMBER_20_4_MAX_UNSCALED);
-};
 const greaterDigits = (left: string, right: string): boolean => {
-  const normalizedLeft = normalizeDigits(left);
-  const normalizedRight = normalizeDigits(right);
-  return normalizedLeft.length > normalizedRight.length
-    || (normalizedLeft.length === normalizedRight.length && normalizedLeft > normalizedRight);
+  const a = normalizeDigits(left);
+  const b = normalizeDigits(right);
+  return a.length > b.length || (a.length === b.length && a > b);
 };
-
-const internalDecimalFromKUnscaled = (unscaled: string): string => {
-  const digits = normalizeDigits(unscaled).padStart(8, "0");
-  const whole = digits.slice(0, -4).replace(/^0+(?=\d)/, "");
-  const fraction = digits.slice(-4).replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole;
+const internalToRoundedKUnscaled = (internalUnscaled: string): string => {
+  const padded = normalizeDigits(internalUnscaled).padStart(6, "0");
+  const quotient = normalizeDigits(padded.slice(0, -5));
+  return padded.slice(-5, -4) >= "5" ? addDigits(quotient, "1") : quotient;
 };
 
 export const forecastAmountExactToKInput = (amount: string | null | undefined): string => {
   if (amount === null || amount === undefined) return "";
   const normalized = amount.trim();
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/.test(normalized)) {
-    throw new Error("Invalid exact forecast amount.");
-  }
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/.test(normalized)) throw new Error("Invalid exact forecast amount.");
   const [whole, fraction = ""] = normalized.split(".");
-  const internalUnscaled = normalizeDigits(whole + fraction.padEnd(4, "0"));
-  const digits = internalUnscaled.padStart(8, "0");
-  const kWhole = digits.slice(0, -7).replace(/^0+(?=\d)/, "");
-  const kFraction = digits.slice(-7).replace(/0+$/, "");
-  return kFraction ? `${kWhole}.${kFraction}` : kWhole;
+  const rounded = internalToRoundedKUnscaled(whole + fraction.padEnd(4, "0"));
+  if (greaterDigits(rounded, MAX_K_UNSCALED)) throw new Error("Forecast value exceeds the two-decimal K range.");
+  const digits = rounded.padStart(3, "0");
+  const kWhole = normalizeDigits(digits.slice(0, -2));
+  return `${kWhole}.${digits.slice(-2)}`;
 };
 
 export const parseForecastCompositionK = (
@@ -56,21 +46,16 @@ export const parseForecastCompositionK = (
   expansion: string
 ): ForecastCompositionDraft | string => {
   const values = [total, newValue, expansion].map((value) => value.trim());
-  if (values.some((value) => !/^(?:0|[1-9]\d*)(?:\.\d{1,7})?$/.test(value))) {
-    return "Enter non-negative K values with up to 7 decimals.";
+  if (values.some((value) => !/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value))) {
+    return "Enter non-negative K values with up to 2 decimals.";
   }
   const unscaled = values.map((value) => {
     const [whole, fraction = ""] = value.split(".");
-    return normalizeDigits(whole + fraction.padEnd(7, "0"));
+    return normalizeDigits(whole + fraction.padEnd(2, "0"));
   });
-  if (unscaled.some(exceedsNumber20Scale4)) {
-    return "Forecast value must fit NUMBER(20,4).";
-  }
+  if (unscaled.some((value) => greaterDigits(value, MAX_K_UNSCALED))) return "Forecast value exceeds the supported two-decimal K range.";
   const [totalUnscaled, newUnscaled, expansionUnscaled] = unscaled;
-  const classifiedUnscaled = addDigits(newUnscaled, expansionUnscaled);
-  if (greaterDigits(classifiedUnscaled, totalUnscaled)) return "New + Expansion must not exceed Total.";
-  const exact = unscaled.map(internalDecimalFromKUnscaled);
-  return {
-    totalAmountExact: exact[0], newAmountExact: exact[1], expansionAmountExact: exact[2]
-  };
+  if (greaterDigits(addDigits(newUnscaled, expansionUnscaled), totalUnscaled)) return "New + Expansion must not exceed Total.";
+  const exact = unscaled.map((value) => normalizeDigits(value + "0"));
+  return { totalAmountExact: exact[0], newAmountExact: exact[1], expansionAmountExact: exact[2] };
 };

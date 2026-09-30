@@ -11,6 +11,7 @@ export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermission
   if (route.module === "accountManagementOverview") return "accounts-workloads";
   if (route.module === "accountsWorkloads") return "accounts-workloads";
   if (route.module === "consumptionAnalysis") return "analysis";
+  if (route.module === "forecastActual") return "analysis";
   if (route.module === "consumptionAttainment") return "attainment";
   if (route.module === "consumptionRecords") return "records";
   return null;

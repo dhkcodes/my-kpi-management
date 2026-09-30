@@ -57,24 +57,24 @@ void (async () => {
   });
   assert.equal(typeof parseForecastCompositionK("100", "60", "50"), "string");
   assert.equal(typeof parseForecastCompositionK("", "0", "0"), "string");
-  assert.deepEqual(parseForecastCompositionK("0.1234567", "0.0234567", "0.1"), {
-    totalAmountExact: "123.4567", newAmountExact: "23.4567", expansionAmountExact: "100"
+  assert.deepEqual(parseForecastCompositionK("0.12", "0.02", "0.1"), {
+    totalAmountExact: "120", newAmountExact: "20", expansionAmountExact: "100"
   });
-  assert.equal(typeof parseForecastCompositionK("0.12345678", "0", "0"), "string");
+  assert.equal(typeof parseForecastCompositionK("0.123", "0", "0"), "string");
   assert.deepEqual(
-    parseForecastCompositionK("9999999999999.9999999", "5000000000000", "4999999999999.9999999"),
+    parseForecastCompositionK("9999999999999.99", "5000000000000", "4999999999999.99"),
     {
-      totalAmountExact: "9999999999999999.9999", newAmountExact: "5000000000000000",
-      expansionAmountExact: "4999999999999999.9999"
+      totalAmountExact: "9999999999999990", newAmountExact: "5000000000000000",
+      expansionAmountExact: "4999999999999990"
     },
-    "the full NUMBER(20,4) boundary remains exact without creating a lossy numeric alias"
+    "the two-decimal K boundary remains exact without a lossy numeric alias"
   );
-  assert.equal(parseForecastCompositionK("10000000000000", "0", "0"), "Forecast value must fit NUMBER(20,4).");
-  assert.equal(forecastAmountExactToKInput("900719925474.0003"), "900719925.4740003",
-    "reopening an unsafe-integer forecast must not round its editor input");
-  assert.equal(forecastAmountExactToKInput("0.0001"), "0.0000001",
-    "the minimum NUMBER(20,4) unit must remain a valid seven-decimal K input");
-  assert.equal(forecastAmountExactToKInput("1000.0000"), "1");
+  assert.equal(parseForecastCompositionK("10000000000000", "0", "0"), "Forecast value exceeds the supported two-decimal K range.");
+  assert.equal(forecastAmountExactToKInput("900719925474.0003"), "900719925.47",
+    "reopening a legacy high-precision forecast rounds to the explicit two-decimal K editor contract");
+  assert.equal(forecastAmountExactToKInput("0.0001"), "0.00",
+    "sub-ten-dollar legacy values round to the explicit two-decimal K editor contract");
+  assert.equal(forecastAmountExactToKInput("1000.0000"), "1.00");
   assert.equal(forecastAmountExactToKInput(null), "");
   const reopenedHighPrecision = parseForecastCompositionK(
     forecastAmountExactToKInput("900719925474.0003"),
@@ -82,14 +82,14 @@ void (async () => {
     "0"
   );
   assert.equal(typeof reopenedHighPrecision, "object");
-  if (typeof reopenedHighPrecision === "object") assert.equal(reopenedHighPrecision.totalAmountExact, "900719925474.0003");
+  if (typeof reopenedHighPrecision === "object") assert.equal(reopenedHighPrecision.totalAmountExact, "900719925470");
   const reopenedMinimum = parseForecastCompositionK(
     forecastAmountExactToKInput("0.0001"),
     forecastAmountExactToKInput("0.0001"),
     "0"
   );
   assert.equal(typeof reopenedMinimum, "object");
-  if (typeof reopenedMinimum === "object") assert.equal(reopenedMinimum.totalAmountExact, "0.0001");
+  if (typeof reopenedMinimum === "object") assert.equal(reopenedMinimum.totalAmountExact, "0");
 
   const workspace = await fetchConsumptionWorkspace({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1" });
   assert.equal(workspace.etag, '"header-etag"');

@@ -27,6 +27,7 @@ assert.equal(canWriteRoute(user, getNavigationRoute("activity-a")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("account-management-overview")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("accounts-workloads")), false);
 assert.equal(canWriteRoute(user, getNavigationRoute("analysis")), true, "WRITE implies READ");
+assert.equal(getRoutePermission(user, getNavigationRoute("forecast-actual")), "WRITE", "Forecast vs Actual reuses Analysis permission");
 assert.equal(canAccessRoute(user, getNavigationRoute("users")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("profile")), true);
 assert.equal(getNavigationRoute("customers-overview").id, "home", "disabled legacy route resolves to home");
@@ -35,7 +36,7 @@ assert.equal(canAccessRoute(user, { id: "customers-overview", module: "myCustome
 assert.ok(!(assignableMenuPermissionIds as readonly string[]).includes("customers-overview"), "legacy Customer 360 is not assignable in user administration");
 
 const visibleIds = filterNavigationItems(navItems, user).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
-for (const visible of ["home", "kpis-overview", "weekly-activities", "analysis", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
+for (const visible of ["home", "kpis-overview", "weekly-activities", "analysis", "forecast-actual", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
 for (const hidden of ["customers-overview", "account-management-overview", "accounts-workloads", "records"]) assert.ok(!visibleIds.includes(hidden), `${hidden} should be hidden`);
 
 const accountReadOnly = parseAuthProfile({ ...base, menuPermissions: { ...allRead, "accounts-workloads": "READ" } });
@@ -45,7 +46,7 @@ assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("account-manageme
 assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("accounts-workloads")), false);
 
 const admin: AuthSession = { ...base, access: "Admin", menuPermissions: {}, status: "ACTIVE" };
-for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
+for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "forecast-actual", "attainment", "records", "users"]) {
   assert.equal(canWriteRoute(admin, getNavigationRoute(routeId)), true, `Admin can write ${routeId}`);
 }
 assert.equal(canAccessRoute(admin, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,
@@ -58,6 +59,7 @@ for (const routeId of Object.keys(allRead).filter((id) => id !== "customers-over
   assert.equal(canAccessRoute(noGrants, getNavigationRoute(routeId)), false);
 }
 assert.equal(getNavigationRoute("customers-overview").module, "home");
+assert.equal(canAccessRoute(noGrants, getNavigationRoute("forecast-actual")), false);
 assert.equal(canAccessRoute(noGrants, getNavigationRoute("home")), true);
 
 const appSource = readFileSync("src/components/app.tsx", "utf8");

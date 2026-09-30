@@ -4964,3 +4964,66 @@ h4.weekly-activity-section-label--next-week,
     min-width: 0;
   }
 }
+
+.forecast-actual-filters {
+  align-items: end;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(5, minmax(9rem, 1fr));
+  margin: 1rem 0;
+}
+.forecast-actual-filters label { color: var(--oj-core-text-color-secondary); display: grid; font-size: .78rem; font-weight: 700; gap: .35rem; }
+.forecast-actual-filters input,
+.forecast-actual-filters select { border: 1px solid var(--oj-core-divider-color); border-radius: .35rem; box-sizing: border-box; min-height: 2.5rem; padding: .5rem .65rem; width: 100%; }
+.forecast-actual-period-note { background: #f4f7f9; border-left: .25rem solid #315f75; display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; margin: .75rem 0 1rem; padding: .75rem 1rem; }
+.forecast-actual-summary { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
+.forecast-actual-summary article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .35rem; padding: 1rem; }
+.forecast-actual-summary article > span,
+.forecast-actual-summary small { color: var(--oj-core-text-color-secondary); }
+.forecast-actual-summary strong { font-size: 1.25rem; }
+.forecast-actual-summary .is-negative strong,
+.forecast-actual-table .is-negative { color: #b42318; }
+.forecast-actual-summary .is-positive strong,
+.forecast-actual-table .is-positive { color: #18794e; }
+.forecast-actual-table-wrap { overflow-x: auto; }
+.forecast-actual-table { border-collapse: collapse; min-width: 64rem; width: 100%; }
+.forecast-actual-table th,
+.forecast-actual-table td { border-bottom: 1px solid var(--oj-core-divider-color); padding: .75rem; text-align: right; }
+.forecast-actual-table th:first-child,
+.forecast-actual-table th:nth-child(2),
+.forecast-actual-table td:first-child,
+.forecast-actual-table td:nth-child(2),
+.forecast-actual-table td:last-child { text-align: left; }
+.forecast-actual-status { background: #eef2f4; border-radius: 999px; display: inline-block; padding: .25rem .55rem; white-space: nowrap; }
+.forecast-actual-loading { align-items: center; display: flex; gap: .75rem; justify-content: center; min-height: 12rem; }
+.forecast-actual-fy-summary {
+  background: #f7f8f9;
+  border: 1px solid var(--oj-core-divider-color);
+  border-radius: .5rem;
+  display: grid;
+  gap: .55rem 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 1rem;
+  padding: 1rem;
+}
+.forecast-actual-fy-summary h2 { font-size: 1rem; grid-column: 1 / -1; margin: 0; }
+.forecast-actual-fy-summary div { display: grid; gap: .2rem; }
+.forecast-actual-fy-summary span { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
+.forecast-actual-empty { color: var(--oj-core-text-color-secondary); padding: 2rem !important; text-align: center !important; }
+
+@media (max-width: 900px) {
+  .forecast-actual-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .forecast-actual-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .forecast-actual-filters,
+  .forecast-actual-summary,
+  .forecast-actual-fy-summary { grid-template-columns: 1fr; }
+  .forecast-actual-table { min-width: 0; }
+  .forecast-actual-table thead { display: none; }
+  .forecast-actual-table tr { border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: block; margin-bottom: .75rem; padding: .5rem; }
+  .forecast-actual-table td,
+  .forecast-actual-table th { border: 0; display: flex; justify-content: space-between; padding: .4rem .5rem; text-align: right !important; }
+  .forecast-actual-table td::before,
+  .forecast-actual-table th::before { color: var(--oj-core-text-color-secondary); content: attr(data-label); font-weight: 600; padding-right: .75rem; text-align: left; }
+}

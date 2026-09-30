@@ -86,6 +86,7 @@ export const accountManagementNavItems: NavigationItem[] = [
 export const customerNavItems = accountManagementNavItems;
 export const consumptionNavItems: NavigationItem[] = [
   { id: "analysis", label: "Analysis", icon: "oj-ux-ico-chart-line" },
+  { id: "forecast-actual", label: "Forecast vs Actual", icon: "oj-ux-ico-chart-bar" },
   { id: "attainment", label: "Attainment", icon: "oj-ux-ico-chart-bar" },
   { id: "records", label: "Records", icon: "oj-ux-ico-table" }
 ];
