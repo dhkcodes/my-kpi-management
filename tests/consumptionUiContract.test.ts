@@ -514,15 +514,17 @@ assert.match(recordsPage, /actualControlTotals[\s\S]*matchStatus !== "MATCH"/, "
 assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale control must show both amounts and the confirmation-required state");
 
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
-assert.match(forecastActualPage, /Comparable periods:[\s\S]*Full-period Forecast/, "comparison and full Forecast periods are labelled separately");
-assert.match(forecastActualPage, /Confirmed Actual[\s\S]*Comparable Forecast[\s\S]*Actual − Forecast/, "summary compares finalized periods only");
-assert.match(forecastActualPage, /differencePercent[\s\S]*N\/A/, "zero Forecast and unavailable ratios do not fabricate a percentage");
+assert.match(forecastActualPage, /Actual basis[\s\S]*FINAL[\s\S]*MTD/, "Forecast vs Actual exposes distinct FINAL and MTD views");
+assert.match(forecastActualPage, /Full-period Forecast[\s\S]*Actual \/ MTD[\s\S]*Confirmed Actual[\s\S]*Projected period close/, "summary keeps Actual basis, full-period Forecast, and projection explicit");
+assert.match(forecastActualPage, /projectionFormula/, "the projection formula supplied by the API is shown with the result");
+assert.match(forecastActualPage, /value\?\.actualAmount \?\? null/, "missing Actual remains unavailable rather than being fabricated as zero");
+assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf/, "each monthly MTD Actual shows its account-level as-of date");
+assert.match(forecastActualPage, /fullForecastPeriods \?\? \[\]\)\]\.reverse\(\)/, "monthly values are displayed latest month first");
 assert.match(forecastActualPage, /resetDependentFilters[\s\S]*setSalesRep\(""\)[\s\S]*resetAccount/, "Quarter and Pillar changes clear stale dependent filters");
 assert.match(forecastActualPage, /previousFiscalYearRef[\s\S]*previousFiscalYearRef\.current !== fiscalYear[\s\S]*resetDependentFilters\(\)[\s\S]*return;/,
   "Fiscal Year changes clear stale Sales Rep and Account filters before requesting the new scope");
 assert.match(forecastActualPage, /else if \(value !== account\) setAccount\(""\)/, "typing away from a selected Account clears the hidden applied filter");
-assert.match(forecastActualPage, /row\.status !== "NO_CONFIRMED_ACTUAL"[\s\S]*N\/A/, "future-only Accounts render unconfirmed comparison values as unavailable rather than zero");
-assert.doesNotMatch(forecastActualPage, /MTD|Plan|Opportunity/, "the Account-level comparison has no MTD, Plan, or Opportunity view");
+assert.doesNotMatch(forecastActualPage, /Plan|Opportunity/, "the Account-level comparison does not mix Plan or Opportunity data into Forecast and Actual");
 assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
 assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
 
