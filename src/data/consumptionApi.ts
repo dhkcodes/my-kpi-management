@@ -1254,6 +1254,29 @@ export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): P
   const match = /filename="([^"]+\.csv)"/i.exec(disposition);
   return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.csv" };
 };
+
+export const exportConsumptionForecastXlsx = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
+  if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+  let response: Response;
+  try {
+    response = await apiFetch(`${apiBase()}/consumption/exports/forecast-xlsx?pillar=${pillar}`, { method: "GET" });
+  } catch (cause) {
+    throw new ConsumptionNetworkError(cause);
+  }
+  if (!response.ok) {
+    let error: { code?: unknown; message?: unknown } = {};
+    try { error = await response.clone().json() as typeof error; } catch { /* sanitized below */ }
+    throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
+      typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const blob = await response.blob();
+  if (!contentType.toLowerCase().startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") || blob.size === 0)
+    throw new Error("Malformed Consumption Forecast XLSX export response");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+\.xlsx)"/i.exec(disposition);
+  return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.xlsx" };
+};
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
 export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar, validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionMultiImportResult>;
 export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL", validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
@@ -1370,7 +1393,8 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
       code: error.code, message: error.message };
   });
   return { etag: raw.etag, sourceFileName: source.fileName as string, sourceSha256: source.sha256 as string,
-    sourceRowCount, forecastCellCount: raw.populatedCellCount as number, blankNoOpCount: 0, explicitZeroCount,
+    sourceRowCount, forecastCellCount: raw.populatedCellCount as number,
+    blankNoOpCount: typeof raw.blankNoOpCount === "number" ? raw.blankNoOpCount : 0, explicitZeroCount,
     exactReplay: false, referenceColumns: (raw.referenceColumns as string[] | undefined) ?? [], referenceNotice: (raw.referenceNotice as string | null | undefined) ?? null,
     canonicalPeriods: raw.canonicalPeriods as string[],
     similarAccountResolutionCount: 0, planUnassignedCount: sourceRowCount,
@@ -1398,4 +1422,89 @@ export const saveConsumptionForecasts = async (etag: string,
   controlUpdates: ConsumptionControlForecastUpdate[], selectedPillar: ConsumptionPillar): Promise<ConsumptionApiWorkspace> => {
   const { response, payload } = await request("/consumption/forecasts", { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": etag }, body: JSON.stringify({ updates: [], controlUpdates }) }, selectedPillar);
   return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
+};
+
+export type ForecastActualSummary = Readonly<{
+  confirmedActualAmount: string;
+  confirmedForecastAmount: string;
+  confirmedDifferenceAmount: string;
+  confirmedDifferencePercent: string | null;
+  fullPeriodForecastAmount: string;
+  accountCount: number;
+}>;
+export type ForecastActualRow = Readonly<{
+  salesRep: string;
+  account: string;
+  confirmedActualAmount: string;
+  confirmedForecastAmount: string;
+  differenceAmount: string;
+  differencePercent: string | null;
+  fullPeriodForecastAmount: string;
+  status: "NO_CONFIRMED_ACTUAL" | "NO_FORECAST" | "BELOW_FORECAST" | "ABOVE_FORECAST" | "ON_FORECAST";
+}>;
+export type ForecastActualComparison = Readonly<{
+  fiscalYear: string;
+  quarter: string;
+  selectedPillar: ConsumptionPillar;
+  selectedSalesRep: string;
+  selectedAccount: string;
+  salesRepOptions: string[];
+  accountOptions: string[];
+  confirmedComparisonPeriods: string[];
+  fullForecastPeriods: string[];
+  summary: ForecastActualSummary;
+  fiscalYearSummary: ForecastActualSummary;
+  rows: ForecastActualRow[];
+}>;
+
+const forecastActualAmount = (value: unknown): string => {
+  const decoded = decodeExactDecimal(value, true);
+  if (!decoded) throw new Error("Malformed Forecast vs Actual response");
+  return decoded.exact;
+};
+const decodeForecastSummary = (value: Record<string, unknown>): ForecastActualSummary => ({
+  confirmedActualAmount: forecastActualAmount(value.confirmedActualAmount),
+  confirmedForecastAmount: forecastActualAmount(value.confirmedForecastAmount),
+  confirmedDifferenceAmount: forecastActualAmount(value.confirmedDifferenceAmount),
+  confirmedDifferencePercent: value.confirmedDifferencePercent === null ? null : forecastActualAmount(value.confirmedDifferencePercent),
+  fullPeriodForecastAmount: forecastActualAmount(value.fullPeriodForecastAmount),
+  accountCount: Number(value.accountCount)
+});
+
+export const fetchForecastActualComparison = async (filters: Readonly<{
+  fiscalYear: string;
+  quarter: string;
+  pillar: ConsumptionPillar;
+  salesRep?: string;
+  account?: string;
+}>): Promise<ForecastActualComparison> => {
+  const query = new URLSearchParams({ fiscalYear: filters.fiscalYear, quarter: filters.quarter, pillar: filters.pillar });
+  if (filters.salesRep) query.set("salesRep", filters.salesRep);
+  if (filters.account) query.set("account", filters.account);
+  const { payload } = await request(`/consumption/forecast-vs-actual?${query}`);
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast vs Actual response");
+  const raw = payload as Record<string, unknown>;
+  if (!Array.isArray(raw.rows) || !Array.isArray(raw.salesRepOptions) || !Array.isArray(raw.accountOptions)
+    || !Array.isArray(raw.confirmedComparisonPeriods) || !Array.isArray(raw.fullForecastPeriods)
+    || typeof raw.summary !== "object" || raw.summary === null
+    || typeof raw.fiscalYearSummary !== "object" || raw.fiscalYearSummary === null) throw new Error("Malformed Forecast vs Actual response");
+  const summary = raw.summary as Record<string, unknown>;
+  const fiscalYearSummary = raw.fiscalYearSummary as Record<string, unknown>;
+  const decodePercent = (value: unknown): string | null => value === null ? null : forecastActualAmount(value);
+  return {
+    fiscalYear: String(raw.fiscalYear), quarter: String(raw.quarter), selectedPillar: raw.selectedPillar as ConsumptionPillar,
+    selectedSalesRep: String(raw.selectedSalesRep ?? ""), selectedAccount: String(raw.selectedAccount ?? ""),
+    salesRepOptions: raw.salesRepOptions.map(String), accountOptions: raw.accountOptions.map(String),
+    confirmedComparisonPeriods: raw.confirmedComparisonPeriods.map(String), fullForecastPeriods: raw.fullForecastPeriods.map(String),
+    summary: decodeForecastSummary(summary),
+    fiscalYearSummary: decodeForecastSummary(fiscalYearSummary),
+    rows: raw.rows.map((value) => {
+      if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast vs Actual response");
+      const row = value as Record<string, unknown>;
+      return { salesRep: String(row.salesRep ?? ""), account: String(row.account ?? ""),
+        confirmedActualAmount: forecastActualAmount(row.confirmedActualAmount), confirmedForecastAmount: forecastActualAmount(row.confirmedForecastAmount),
+        differenceAmount: forecastActualAmount(row.differenceAmount), differencePercent: decodePercent(row.differencePercent),
+        fullPeriodForecastAmount: forecastActualAmount(row.fullPeriodForecastAmount), status: row.status as ForecastActualRow["status"] };
+    })
+  };
 };

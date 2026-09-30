@@ -6,6 +6,7 @@ export type NavigationRouteModule =
   | "accountsWorkloads"
   | "weeklyActivities"
   | "consumptionAnalysis"
+  | "forecastActual"
   | "consumptionAttainment"
   | "consumptionRecords"
   | "profile"
@@ -32,6 +33,7 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Account & Workload" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
   { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },
+  { id: "forecast-actual", module: "forecastActual", pageTitle: "Forecast vs Actual", path: "/consumption/forecast-vs-actual" },
   { id: "attainment", module: "consumptionAttainment", pageTitle: "Consumption Attainment", path: "/consumption/attainment" },
   { id: "records", module: "consumptionRecords", pageTitle: "Consumption Records", path: "/consumption/records" },
   { id: "profile", module: "profile", pageTitle: "Profile" },
@@ -51,6 +53,7 @@ const legacyRouteIds: Record<string, string> = {
 const routeIdsByPath: Record<string, string> = {
   "consumption": "analysis",
   "consumption/analysis": "analysis",
+  "consumption/forecast-vs-actual": "forecast-actual",
   "consumption/attainment": "attainment",
   "consumption/records": "records",
   "consumption/usage-insights": "analysis",

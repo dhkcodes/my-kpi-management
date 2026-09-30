@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.tsx", "utf8");
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
+const forecastActualPage = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const sharedMessageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
@@ -315,8 +316,11 @@ assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-c
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
 assert.match(insightsPage, /Forecast signals by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
-assert.match(recordsPage, /oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "actions are ordered Forecast Import, Forecast Export, Actual Import, Actual Export with matching upload/download icons");
-assert.match(recordsPage, /onojAction=\{\(\) => forecastFileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Forecast Import[\s\S]*onojAction=\{\(\) => void exportForecastCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Forecast Export[\s\S]*onojAction=\{\(\) => fileInputRef\.current\?\.click\(\)\}[\s\S]*oj-ux-ico-upload[\s\S]*Actual Import[\s\S]*onojAction=\{\(\) => void exportImportCompatibleCsv\(\)\}[\s\S]*oj-ux-ico-download[\s\S]*Actual Export/, "each ordered action remains connected to its matching Forecast/Actual import/export handler");
+assert.match(recordsPage, /Forecast Import CSV \/ Excel/, "Forecast import accepts both retained formats");
+assert.match(recordsPage, /Forecast CSV Export/, "CSV export remains available");
+assert.match(recordsPage, /Forecast Excel Export/, "Excel export is available beside CSV");
+assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastCsv\(\)\}/, "CSV export stays connected");
+assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Excel export is connected");
 assert.match(recordsPage, /Import \$\{forecastFileName\}/, "Forecast Import names the current editable FY-quarter template without enforcing it as an upload restriction");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
@@ -333,7 +337,7 @@ assert.match(recordsPage, /onDblClick[\s\S]*beginControlEdit/, "double click ent
 assert.match(recordsPage, /selectForecastEditor[\s\S]*requestAnimationFrame[\s\S]*\.focus\(\)[\s\S]*\.select\(\)/, "double-click Forecast editing focuses the mounted input and selects its complete numeric value after pointer default handling");
 assert.match(recordsPage, /ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "each editable Forecast input binds whole-value selection to its stable Account-period key");
 assert.match(recordsPage, /<label><span>Total<\/span><input type="text" inputMode="decimal" value=\{forecastEditor\.total\}[\s\S]*ref=\{selectForecastEditor\(`\$\{forecastEditor\.account\}:\$\{forecastEditor\.month\}`\)\}/, "Forecast composition editor exposes a measurable whole-text selection range on its Total input");
-assert.match(recordsPage, /const validForecastKInput[\s\S]*\\d\{1,7\}[\s\S]*value\.trim/, "Forecast composition inputs preserve NUMBER(20,4) through K values with at most seven decimals");
+assert.match(recordsPage, /const validForecastKInput[\s\S]*\\d\{1,2\}[\s\S]*value\.trim/, "Forecast composition inputs enforce the two-decimal K contract before save");
 assert.match(recordsPage, /applyForecastComposition[\s\S]*parseForecastCompositionK[\s\S]*updateControlForecast/, "Forecast composition apply validates the full composition before updating the Account control total");
 assert.match(recordsPage, /<form onSubmit=\{\(event\) => \{ event\.preventDefault\(\); applyForecastComposition\(\); \}\}[\s\S]*event\.key === "Escape"[\s\S]*cancelForecastComposition/, "submit applies and Escape cancels the Forecast composition popover");
 assert.match(recordsPage, /hasDraftChanges[\s\S]*isSaving \? "Saving…" : "Save"[\s\S]*>Cancel</, "Save and Cancel remain draft-scoped");
@@ -502,5 +506,13 @@ assert.match(
 assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
 assert.match(recordsPage, /actualControlTotals[\s\S]*matchStatus !== "MATCH"/, "stale or mismatched controls must remain visible rather than being silently omitted");
 assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale control must show both amounts and the confirmation-required state");
+
+assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
+assert.match(forecastActualPage, /Comparable periods:[\s\S]*Full-period Forecast/, "comparison and full Forecast periods are labelled separately");
+assert.match(forecastActualPage, /Confirmed Actual[\s\S]*Comparable Forecast[\s\S]*Actual − Forecast/, "summary compares finalized periods only");
+assert.match(forecastActualPage, /differencePercent[\s\S]*N\/A/, "zero Forecast and unavailable ratios do not fabricate a percentage");
+assert.doesNotMatch(forecastActualPage, /MTD|Plan|Opportunity/, "the Account-level comparison has no MTD, Plan, or Opportunity view");
+assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
+assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
 
 console.log("consumptionUiContract tests passed");

@@ -23,6 +23,7 @@ import { FxRateRecord, KpiGuideRecord } from "../../data/kpiConfigurationApi";
 import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
 import { ConsumptionAnalysisPage } from "./ConsumptionAnalysisPage";
+import { ForecastActualPage } from "./ForecastActualPage";
 import { AttainmentPage } from "./AttainmentPage";
 import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
@@ -652,6 +653,8 @@ export function Content({
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
         <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
+      ) : activeRoute.module === "forecastActual" ? (
+        <ForecastActualPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAttainment" ? (
         <AttainmentPage fiscalYear={fiscalYear} canWrite={canWrite} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (

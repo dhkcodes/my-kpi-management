@@ -48,6 +48,7 @@ import {
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
   exportConsumptionForecastCsv,
+  exportConsumptionForecastXlsx,
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
@@ -343,7 +344,7 @@ type ForecastCompositionEditor = Readonly<{
   error: string;
 }>;
 const forecastDraftKey = (account: string, month: string) => `${account}::${month}`;
-const validForecastKInput = (value: string) => /^(?:0|[1-9]\d*)(?:\.\d{1,7})?$/.test(value.trim());
+const validForecastKInput = (value: string) => /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value.trim());
 
 const renderConsumptionChartItem = (context: Readonly<{ data: ConsumptionChartPoint }>) => (
   <oj-chart-item
@@ -1167,7 +1168,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
       setPendingForecastImport({ file, preview });
       setForecastImportPhase("preview");
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Forecast CSV could not be previewed.");
+      const message = consumptionRecordsOperationError(error, "Forecast CSV or Excel file could not be previewed.");
       setImportError(message);
       setForecastImportResult(message);
       setForecastImportPhase("error");
@@ -1194,7 +1195,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         setImportError(`반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`);
       }
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Forecast CSV could not be applied.");
+      const message = consumptionRecordsOperationError(error, "Forecast CSV or Excel file could not be applied.");
       setImportError(message);
       setForecastImportResult(`반영 실패: ${message}`);
       setForecastImportPhase("error");
@@ -1315,6 +1316,32 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
       }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption Forecast CSV could not be exported.");
+    } finally {
+      exportingRef.current = false;
+      setIsExporting(false);
+    }
+  };
+
+  const exportForecastXlsx = async () => {
+    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    exportingRef.current = true;
+    setIsExporting(true);
+    setImportError("");
+    try {
+      const exported = await exportConsumptionForecastXlsx("ALL");
+      const url = URL.createObjectURL(exported.blob);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = exported.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Consumption Forecast Excel file could not be exported.");
     } finally {
       exportingRef.current = false;
       setIsExporting(false);
@@ -1465,17 +1492,23 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
             disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
-          <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv"
+          <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
           <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : `Import ${forecastFileName}`} disabled={!canWrite || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
-            Forecast Import
+            Forecast Import CSV / Excel
           </oj-button>
           <oj-button chroming="outlined" title="Export FORECAST data in the Forecast Import CSV format"
             disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportForecastCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Forecast Export"}
+            {isExporting ? "Exporting…" : "Forecast CSV Export"}
+          </oj-button>
+          <oj-button chroming="outlined" title="Export FORECAST data in the Excel template format"
+            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            onojAction={() => void exportForecastXlsx()}>
+            <span slot="startIcon" class="oj-ux-ico-download"></span>
+            {isExporting ? "Exporting…" : "Forecast Excel Export"}
           </oj-button>
           <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
@@ -1641,6 +1674,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, onNavigationGuard
           </div>}
           {forecastImportPhase === "preview" && pendingForecastImport && <div class="consumption-import-preview">
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>
+            <p class="consumption-import-reference-note"><strong>K-unit contract:</strong> Forecast Total, New, and EXP accept at most 2 decimal places; persisted amounts equal the entered K value × 1,000. Existing data is not bulk-rounded by this Import.</p>
             <p class="consumption-import-reference-note"><strong>Actual reference only:</strong> Actual values are read-only and are never imported by Forecast Import. {pendingForecastImport.preview.referenceNotice ?? ""}</p>
             <dl class="consumption-import-decision-summary">
               <div><dt>Forecast cells</dt><dd>{pendingForecastImport.preview.forecastCellCount}</dd></div>

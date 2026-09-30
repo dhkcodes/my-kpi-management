@@ -6,7 +6,7 @@ import { navItems, NavigationItem } from "../src/data/kpiMockData";
 const flattenLeaves = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => item.children ? flattenLeaves(item.children) : [item]);
 
-assert.equal(flattenLeaves(navItems).length, 15, "the provider exposes Home plus fourteen real leaf destinations");
+assert.equal(flattenLeaves(navItems).length, 16, "the provider exposes Home plus fifteen real leaf destinations");
 
 assert.deepEqual(
   navItems.map(({ id, label, children }) => ({ id, label, childIds: children?.map((child) => child.id) })),
@@ -27,13 +27,13 @@ assert.deepEqual(
       label: "KPI",
       childIds: ["kpis-overview", "activity-a", "activity-b", "activity-c1", "activity-c2", "activity-d1", "activity-f", "activity-h"]
     },
-    { id: "consumption", label: "Consumption", childIds: ["analysis", "attainment", "records"] }
+    { id: "consumption", label: "Consumption", childIds: ["analysis", "forecast-actual", "attainment", "records"] }
   ],
   "TreeDataProvider owns hierarchy and labels without duplicating Router href data"
 );
 assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a Router destination");
 assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
-assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 15, "every real leaf destination has a unique navigation id");
+assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 16, "every real leaf destination has a unique navigation id");
 assert.equal(
   flattenLeaves(navItems).find((item) => item.id === "records")?.icon,
   "oj-ux-ico-table",
@@ -107,7 +107,7 @@ assert.match(appSource, /const closeNavigation = \(\) => \{\s*navigationIntentOp
 assert.match(appSource, /if \(popup\.isOpen\(\)\) \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*popup\.close\(\);\s*\} else \{\s*navigationIntentOpenRef\.current = true;\s*setNavigationOpen\(true\);\s*popup\.open\(launcher\);\s*\}/s, "the launcher icon updates optimistically before the popup animation completes");
 assert.match(appSource, /appName = "My KPI & Account Planner"/, "the authenticated header uses the approved product title");
 assert.match(appSource, /onojOpen=\{\(\) => setNavigationOpen\(navigationIntentOpenRef\.current\)\}/, "a queued close intent cannot be overwritten by a stale popup-open event");
-assert.match(headerSource, /aria-label=\{appName\}/, "the header brand accessible name follows the visible title");
+assert.match(headerSource, /class="kpi-header__brand" aria-label="KAP"/, "the header brand exposes the visible KAP product mark");
 assert.match(indexSource, /<title>My KPI &amp; Account Planner<\/title>/, "the HTML document title uses the approved product name");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
 assert.match(appSource, /anchor\.closest\("#kpiNavigationPopup"\)/, "the document capture guard does not compete with popup leaf navigation");
