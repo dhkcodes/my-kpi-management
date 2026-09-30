@@ -638,6 +638,13 @@ async function run() {
   assert.equal(exclusionRequest.method, "PUT");
   assert.deepEqual(exclusionRequest.body, { candidateKey: "PLAN_ID:101", excluded: true });
 
+  await setForecastCandidateExcluded("PLAN_ID:101", true, async () =>
+    new Response(null, { status: 200 })
+  );
+  await setForecastCandidateExcluded("PLAN_ID:101", false, async () =>
+    new Response(null, { status: 204 })
+  );
+
   delete (globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string }).__KPI_API_BASE_URL__;
   console.log("accountsWorkloadsApi tests passed");
 }
