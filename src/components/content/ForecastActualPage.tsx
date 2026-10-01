@@ -18,12 +18,19 @@ import { compareExactDecimals, formatExactKFixed } from "../../data/exactDecimal
 import { FiscalYear } from "../../data/kpiMockData";
 import { formatMtdAppliedDate } from "../../data/mtdDate";
 
-const formatAmount = (value: string | null, unavailable = "미확정") => value === null ? unavailable : formatExactKFixed(value, 2);
+const formatAmount = (value: string | null, unavailable = "Unconfirmed") => value === null ? unavailable : formatExactKFixed(value, 2);
 const SortIndicator = ({ active, direction }: { active: boolean; direction: ForecastActualSortDirection }) => active
   ? <span class={`forecast-actual-sort-indicator is-${direction}`} aria-hidden="true"></span> : null;
 const ScrollChevron = ({ direction }: { direction: "left" | "right" }) => <span class={`forecast-actual-chevron is-${direction}`} aria-hidden="true"></span>;
 const monthByPeriod = (row: ForecastActualRow, periodKey: string) => row.months.find((month) => month.periodKey === periodKey);
-const monthLabel = (periodKey: string) => periodKey.split("-")[1] ?? periodKey;
+const MONTH_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  JAN: "JANUARY", FEB: "FEBRUARY", MAR: "MARCH", APR: "APRIL", MAY: "MAY", JUN: "JUNE",
+  JUL: "JULY", AUG: "AUGUST", SEP: "SEPTEMBER", OCT: "OCTOBER", NOV: "NOVEMBER", DEC: "DECEMBER"
+});
+const monthLabel = (periodKey: string) => {
+  const code = periodKey.split("-")[1] ?? periodKey;
+  return MONTH_NAMES[code] ?? code;
+};
 
 export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) => {
   const [quarter, setQuarter] = useState("ALL");
@@ -54,7 +61,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError("");
-    fetchForecastActualComparison({ fiscalYear, quarter, pillar, actualMode, salesRep, account })
+    fetchForecastActualComparison({ fiscalYear, quarter, pillar, actualMode, salesRep, account }, controller.signal)
       .then((next) => { if (!controller.signal.aborted) setData(next); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load Forecast vs Actual."); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -83,14 +90,9 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     if (!account) setAccountOptionCache(data.accountOptions);
   }, [account, data]);
 
-  const currentData = data
-    && data.fiscalYear === fiscalYear
-    && data.quarter === quarter
-    && data.selectedPillar === pillar
-    && data.selectedSalesRep === salesRep
-    && data.selectedAccount === account
-    && data.actualMode === actualMode
-    ? data : null;
+  // Preserve the previous result while the next filtered request is in flight.
+  // The effect cleanup guards against stale responses replacing newer ones.
+  const currentData = data;
 
   const periods = useMemo(
     () => visibleForecastActualPeriods(currentData?.fullForecastPeriods ?? [], currentData?.rows ?? []),
@@ -158,8 +160,8 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       <div class="forecast-actual-title-block">{breadcrumb}<span class="kpi-eyebrow">Consumption / Forecast vs Actual</span><h1 id="forecastActualTitle">Forecast vs Actual</h1></div>
       <div class="forecast-actual-toolbar" aria-label="Forecast vs Actual filters">
         <div class="forecast-actual-control forecast-actual-mtd-control">
-          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">반영 일자 {mtdAppliedDate}</span>}
           <span>MTD</span>
+          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">As of {mtdAppliedDate}</span>}
           <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
             onClick={() => { setProblemFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
             <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
@@ -189,27 +191,25 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
             </div>}
           </div>
         </div>
-        {loading && <small class="forecast-actual-updating" role="status">Updating…</small>}
       </div>
     </header>
 
     {loading && !currentData && <div class="forecast-actual-loading" role="status"><oj-progress-circle size="sm" value={-1}></oj-progress-circle><span>Loading comparison…</span></div>}
     {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
 
-    {currentData && summary && <div class={loading ? "forecast-actual-results is-updating" : "forecast-actual-results"} aria-busy={loading}>
+    {currentData && summary && <div class="forecast-actual-results" aria-busy={loading}>
       <section class="forecast-actual-summary" aria-label="Comparison summary">
-        <article><span>Forecast</span><strong>{formatAmount(summary.fullPeriodForecastAmount)}</strong><small>K USD · 선택 범위</small></article>
+        <article class="is-forecast" title="Full-period Forecast for the selected filters."><span>Forecast</span><strong>{formatAmount(summary.fullPeriodForecastAmount)}</strong><small>K USD · selected scope</small></article>
         <article><span>Actual</span><strong>{formatAmount(actualTotals.totalAmount)}</strong><small>{actualTotals.includesMtd
-          ? `K USD · 확정 ${formatAmount(actualTotals.confirmedAmount, "없음")} + MTD ${formatAmount(actualTotals.mtdAmount, "없음")}`
-          : `K USD · ${actualTotals.hasActual ? "확정 합계" : "미확정은 0으로 집계하지 않음"}`}</small></article>
-        <button type="button" class={problemFilter === "FINAL_SHORTFALL" ? "forecast-actual-problem-card is-selected" : "forecast-actual-problem-card"} aria-pressed={problemFilter === "FINAL_SHORTFALL"} onClick={() => toggleProblemFilter("FINAL_SHORTFALL")}><span>확정 미달</span><strong>{problemCounts.finalShortfall}</strong><small>Account · 다시 클릭해 해제</small></button>
-        <button type="button" class={problemFilter === "MTD_SHORTFALL" ? "forecast-actual-problem-card is-selected" : "forecast-actual-problem-card"} aria-pressed={problemFilter === "MTD_SHORTFALL"} onClick={() => toggleProblemFilter("MTD_SHORTFALL")}><span>MTD 미달 예상</span><strong>{problemCounts.mtdShortfall}</strong><small>Account · 월말 예상 기준</small></button>
-        <article><span>Accounts</span><strong>{problemFilter ? displayedAccountCount : allAccountCount}</strong><small>{problemFilter ? "filtered · distinct Account" : "현재 필터 · distinct Account"}</small></article>
+          ? `K USD · Final ${formatAmount(actualTotals.confirmedAmount, "None")} + MTD ${formatAmount(actualTotals.mtdAmount, "None")}`
+          : `K USD · ${actualTotals.hasActual ? "Final total" : "Unconfirmed is not counted as zero"}`}</small></article>
+        <button type="button" title="Final Actual is below Forecast. Accounts are counted once; activate to filter rows." class={problemFilter === "FINAL_SHORTFALL" ? "forecast-actual-problem-card is-final-shortfall is-selected" : "forecast-actual-problem-card is-final-shortfall"} aria-pressed={problemFilter === "FINAL_SHORTFALL"} onClick={() => toggleProblemFilter("FINAL_SHORTFALL")}><span>Final shortfall</span><strong>{problemCounts.finalShortfall}</strong><small>Accounts · activate to filter</small></button>
+        <button type="button" title="Projected month-end Actual is below Forecast using MTD through the as-of date minus three days. Accounts are counted once; activate to filter rows." class={problemFilter === "MTD_SHORTFALL" ? "forecast-actual-problem-card is-mtd-shortfall is-selected" : "forecast-actual-problem-card is-mtd-shortfall"} aria-pressed={problemFilter === "MTD_SHORTFALL"} onClick={() => toggleProblemFilter("MTD_SHORTFALL")}><span>Projected MTD shortfall</span><strong>{problemCounts.mtdShortfall}</strong><small>Accounts · activate to filter</small></button>
+        <article><span>Accounts</span><strong>{problemFilter ? displayedAccountCount : allAccountCount}</strong><small>{problemFilter ? "filtered · distinct Accounts" : "current filters · distinct Accounts"}</small></article>
       </section>
-      <p class="forecast-actual-card-guide"><strong>확정 미달</strong>은 확정 Actual이 Forecast보다 작은 Account, <strong>MTD 미달 예상</strong>은 반영 일자−3일을 누적 기준으로 월말까지 환산했을 때 Forecast보다 작을 것으로 예상되는 Account입니다. 여러 월·담당자에 같은 Account가 있어도 카드에서는 한 번만 세며, 카드를 누르면 해당 Account 행만 표시합니다.</p>
 
       <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar"><span class="forecast-actual-unit-note">금액: K USD</span><div class="consumption-scroll-controls" aria-label="Monthly horizontal scroll controls">
+        <div class="forecast-actual-matrix-toolbar"><span class="forecast-actual-unit-note">Amount: K USD</span><div class="consumption-scroll-controls" aria-label="Monthly horizontal scroll controls">
           <button type="button" aria-label="Scroll monthly columns left" disabled={!monthScroll.left} onClick={() => scrollMonths(-1)}><ScrollChevron direction="left" /></button>
           <button type="button" aria-label="Scroll monthly columns right" disabled={!monthScroll.right} onClick={() => scrollMonths(1)}><ScrollChevron direction="right" /></button>
         </div></div>
@@ -224,9 +224,9 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
               <tr class="forecast-actual-subheader">
                 {periods.flatMap((periodKey) => [
                   <th key={`${periodKey}-forecast`} class="forecast-actual-month-subhead" aria-sort={ariaSort(`month:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`month:${periodKey}`)}>Forecast<SortIndicator active={sortKey === `month:${periodKey}`} direction={sortDirection} /></button></th>,
-                  <th key={`${periodKey}-actual`} class="forecast-actual-month-subhead">Actual</th>,
-                  <th key={`${periodKey}-difference`} class="forecast-actual-month-subhead is-difference">Difference</th>,
-                  <th key={`${periodKey}-status`} class="forecast-actual-month-subhead is-status forecast-actual-status-cell">판정</th>
+                  <th key={`${periodKey}-actual`} class="forecast-actual-month-subhead" aria-sort={ariaSort(`actual:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`actual:${periodKey}`)}>Actual{currentData?.partialActualPeriods.includes(periodKey) ? " (Partial)" : ""}<SortIndicator active={sortKey === `actual:${periodKey}`} direction={sortDirection} /></button></th>,
+                  <th key={`${periodKey}-difference`} class="forecast-actual-month-subhead is-difference" aria-sort={ariaSort(`difference:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`difference:${periodKey}`)}>Difference<SortIndicator active={sortKey === `difference:${periodKey}`} direction={sortDirection} /></button></th>,
+                  <th key={`${periodKey}-status`} class="forecast-actual-month-subhead is-status forecast-actual-status-cell" aria-sort={ariaSort(`status:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`status:${periodKey}`)}>Status<SortIndicator active={sortKey === `status:${periodKey}`} direction={sortDirection} /></button></th>
                 ])}
               </tr>
             </thead>
@@ -237,24 +237,24 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
                 {periods.flatMap((periodKey) => {
                   const month = monthByPeriod(row, periodKey);
                   if (!month) return [
-                    <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-empty">미입력</td>,
-                    <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-empty">미확정</td>,
-                    <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty">비교 불가</td>,
-                    <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable">미확정</span></td>
+                    <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-empty">Not entered</td>,
+                    <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-empty">Unconfirmed</td>,
+                    <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty">Not comparable</td>,
+                    <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable">Unconfirmed</span></td>
                   ];
                   const assessment = assessForecastActualMonth(month);
                   const statusClass = assessment.kind === "FINAL_SHORTFALL" ? "is-shortfall" : assessment.kind === "MTD_SHORTFALL" ? "is-projection-watch" : assessment.kind === "NORMAL" ? "is-on-track" : "is-unavailable";
                   const differenceClass = assessment.differenceAmount === null ? "" : compareExactDecimals(assessment.differenceAmount, "0") < 0
                     ? "is-negative" : compareExactDecimals(assessment.differenceAmount, "0") > 0 ? "is-positive" : "";
                   return [
-                    <td key={`${periodKey}-forecast`} class="forecast-actual-month-value forecast-actual-number">{month.forecastAmount === null ? "미입력" : formatAmount(month.forecastAmount)}</td>,
-                    <td key={`${periodKey}-actual`} class={`forecast-actual-month-value forecast-actual-number ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualState === "MTD" ? "MTD 누적 Actual · 확정값 아님" : "확정 Actual"}>{month.actualAmount === null ? "미확정" : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small>MTD</small> : null}</td>,
-                    <td key={`${periodKey}-difference`} class={`forecast-actual-month-value forecast-actual-number is-difference ${differenceClass}`} title={assessment.tooltip}>{assessment.differenceAmount === null ? "비교 불가" : formatAmount(assessment.differenceAmount)}<small>{assessment.differenceLabel}</small></td>,
-                    <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class={`forecast-actual-status ${statusClass}`} title={assessment.tooltip}>{assessment.label}</span>{assessment.projectedAmount !== null ? <small>월말 {formatAmount(assessment.projectedAmount)}</small> : null}</td>
+                    <td key={`${periodKey}-forecast`} class="forecast-actual-month-value forecast-actual-number">{month.forecastAmount === null ? "Not entered" : formatAmount(month.forecastAmount)}</td>,
+                    <td key={`${periodKey}-actual`} class={`forecast-actual-month-value forecast-actual-number ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? "Unconfirmed" : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
+                    <td key={`${periodKey}-difference`} class={`forecast-actual-month-value forecast-actual-number is-difference ${differenceClass}`} title={assessment.tooltip}>{assessment.differenceAmount === null ? "Not comparable" : formatAmount(assessment.differenceAmount)}</td>,
+                    <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class={`forecast-actual-status ${statusClass}`} title={assessment.tooltip}>{assessment.label}</span>{assessment.projectedAmount !== null ? <small>Month-end {formatAmount(assessment.projectedAmount)}</small> : null}</td>
                   ];
                 })}
               </tr>)}
-              {!rows.length && <tr><td class="forecast-actual-empty" colSpan={2 + periods.length * 4}>{problemFilter ? "선택한 문제 조건에 해당하는 Account가 없습니다." : "No accounts match the selected filters."}</td></tr>}
+              {!rows.length && <tr><td class="forecast-actual-empty" colSpan={2 + periods.length * 4}>{problemFilter ? "No accounts match the selected exception filter." : "No accounts match the selected filters."}</td></tr>}
             </tbody>
           </table>
         </div>

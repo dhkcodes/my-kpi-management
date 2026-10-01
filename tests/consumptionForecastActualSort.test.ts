@@ -36,21 +36,34 @@ const high = row({
   projectedAmount: "900",
   actualShortfall: false,
   attention: true,
-  months: [{ periodKey: "FY27-OCT", forecastAmount: "200", actualAmount: "9", actualState: "FINAL", actualAsOf: null, differenceAmount: "-191", differencePercent: "-95.5", monthEndProjection: null }]
+  months: [{ periodKey: "FY27-OCT", forecastAmount: "200", actualAmount: "209", actualState: "FINAL", actualAsOf: null, differenceAmount: "9", differencePercent: "4.5", monthEndProjection: null }]
 });
 const unavailable = row({ account: "Unavailable" });
 
-for (const key of ["forecast", "actual", "projected", "month:FY27-OCT"] as const) {
+for (const key of ["forecast", "actual", "projected", "month:FY27-OCT", "actual:FY27-OCT", "difference:FY27-OCT"] as const) {
   assert.ok(compareForecastActualRows(low, high, key, "asc") < 0, `${key} must sort numerically ascending`);
   assert.ok(compareForecastActualRows(low, high, key, "desc") > 0, `${key} must sort numerically descending`);
 }
-for (const key of ["actual", "projected", "month:FY27-OCT"] as const) {
+for (const key of ["actual", "projected", "month:FY27-OCT", "actual:FY27-OCT", "difference:FY27-OCT"] as const) {
   assert.ok(compareForecastActualRows(unavailable, low, key, "asc") > 0, `${key} unavailable values stay last ascending`);
   assert.ok(compareForecastActualRows(unavailable, low, key, "desc") > 0, `${key} unavailable values stay last descending`);
 }
 
 assert.ok(compareForecastActualRows(low, high, "status", "asc") > 0,
   "status sorting must include finalized Actual shortfall before projected watch");
+assert.ok(compareForecastActualRows(low, high, "status:FY27-OCT", "asc") < 0,
+  "month status sorting must use the rendered month assessment instead of text");
+
+const lowForecastHighActual = row({
+  account: "Low forecast",
+  months: [{ periodKey: "FY27-OCT", forecastAmount: "1", actualAmount: "999", actualState: "FINAL", actualAsOf: null, differenceAmount: "998", differencePercent: "99800", monthEndProjection: null }]
+});
+const highForecastLowActual = row({
+  account: "High forecast",
+  months: [{ periodKey: "FY27-OCT", forecastAmount: "2", actualAmount: "0", actualState: "FINAL", actualAsOf: null, differenceAmount: "-2", differencePercent: "-100", monthEndProjection: null }]
+});
+assert.ok(compareForecastActualRows(lowForecastHighActual, highForecastLowActual, "month:FY27-OCT", "asc") < 0,
+  "month Forecast header must sort by Forecast, not Actual");
 
 const periodRows = [
   row({ months: [

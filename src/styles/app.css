@@ -2593,6 +2593,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table tbody tr.is-context > td, .consumption-table tbody tr.is-context > th { background: #fff7f3; }
 .consumption-account-column { left: 0; min-width: 19rem !important; position: sticky; text-align: left !important; width: 19rem; z-index: 3; }
 .consumption-table thead .consumption-account-column { font-size: var(--consumption-grid-font-size); padding-left: 2.35rem; text-align: left; z-index: 6; }
+.consumption-table thead tr:first-child .consumption-account-column { background: #efebe7; z-index: 9; }
 .consumption-account-row .consumption-account-column { background: #f7f5f2; }
 .consumption-account-toggle { background: transparent; border: 0; border-radius: var(--oj-core-border-radius-sm); color: inherit; cursor: pointer; display: block; font: inherit; min-height: 2.25rem; padding: .05rem; text-align: left; width: 100%; }
 .consumption-account-toggle:hover { background: var(--oj-core-bg-color-hover, #eeebe8); }
@@ -5215,3 +5216,49 @@ h4.weekly-activity-section-label--next-week,
   .forecast-actual-matrix .is-account { min-width: 8.5rem; width: 8.5rem; }
   .forecast-actual-matrix .is-rep { display: table-cell; left: 8.5rem; min-width: 7rem; width: 7rem; }
 }
+
+/* Actual vs Forecast follow-up: stable filters, Redwood state emphasis, and reachable rows. */
+.forecast-actual-page { max-height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 1.5rem; }
+.forecast-actual-control select,
+.forecast-actual-search-panel input,
+.forecast-actual-pillar .consumption-pillar-selector button { height: 2.15rem; min-height: 2.15rem; }
+.forecast-actual-mtd-control {
+  align-items: start;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto 2.15rem;
+  min-height: 3.25rem;
+}
+.forecast-actual-mtd-control > span:first-child { grid-column: 1; grid-row: 1; }
+.forecast-actual-mtd-control > .consumption-mtd-applied-date { grid-column: 2; grid-row: 1; }
+.forecast-actual-mtd-control > .consumption-mtd-switch { align-self: center; grid-column: 1 / -1; grid-row: 2; }
+.forecast-actual-summary article,
+.forecast-actual-problem-card { position: relative; padding-inline-end: 2rem; }
+.forecast-actual-summary article::after,
+.forecast-actual-problem-card::after {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "i";
+  display: inline-flex;
+  font: 700 11px/1 Arial, sans-serif;
+  height: 17px;
+  justify-content: center;
+  opacity: .65;
+  position: absolute;
+  right: .55rem;
+  top: .5rem;
+  width: 17px;
+}
+.forecast-actual-summary .is-forecast > span,
+.forecast-actual-summary .is-forecast > strong { color: #0b6f85; }
+.forecast-actual-summary article:nth-child(2) > span,
+.forecast-actual-summary article:nth-child(2) > strong,
+.forecast-actual-month-value.is-provisional > small.is-mtd-label,
+.forecast-actual-problem-card.is-final-shortfall > span,
+.forecast-actual-problem-card.is-final-shortfall > strong { color: #b3312d; }
+.forecast-actual-month-value.is-provisional > small.is-mtd-label { background: #fff0ef; border-color: #e7aaa7; }
+.forecast-actual-problem-card.is-mtd-shortfall > span,
+.forecast-actual-problem-card.is-mtd-shortfall > strong { color: #8f5b00; }
+.forecast-actual-month-value.is-empty,
+.forecast-actual-month-value.is-difference.is-empty { text-align: center; }

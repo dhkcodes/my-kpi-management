@@ -24,6 +24,9 @@ export type ForecastActualSortKey =
   | "actual"
   | "projected"
   | "status"
+  | `actual:${string}`
+  | `difference:${string}`
+  | `status:${string}`
   | `month:${string}`;
 
 export type ForecastActualSortDirection = "asc" | "desc";
@@ -66,10 +69,28 @@ export const compareForecastActualRows = (
     return direction === "asc" ? result : -result;
   }
 
+  if (key.startsWith("actual:") || key.startsWith("difference:") || key.startsWith("status:")) {
+    const separator = key.indexOf(":");
+    const column = key.slice(0, separator);
+    const periodKey = key.slice(separator + 1);
+    const leftMonth = left.months.find((month) => month.periodKey === periodKey);
+    const rightMonth = right.months.find((month) => month.periodKey === periodKey);
+    if (column === "actual") return compareNullableDecimal(leftMonth?.actualAmount, rightMonth?.actualAmount, direction);
+    if (column === "difference") return compareNullableDecimal(leftMonth?.differenceAmount, rightMonth?.differenceAmount, direction);
+    const rank = (month: typeof leftMonth): number => {
+      if (!month || month.forecastAmount === null) return 0;
+      if (month.actualState === null || month.actualAmount === null) return 1;
+      const shortfall = month.actualState === "MTD" && month.monthEndProjection !== null
+        ? compareExactDecimals(month.monthEndProjection, month.forecastAmount) < 0
+        : month.differenceAmount !== null && compareExactDecimals(month.differenceAmount, "0") < 0;
+      return shortfall ? 2 : 3;
+    };
+    const result = rank(leftMonth) - rank(rightMonth);
+    return direction === "asc" ? result : -result;
+  }
+
   const periodKey = key.slice("month:".length);
   const leftMonth = left.months.find((month) => month.periodKey === periodKey);
   const rightMonth = right.months.find((month) => month.periodKey === periodKey);
-  const actualResult = compareNullableDecimal(leftMonth?.actualAmount, rightMonth?.actualAmount, direction);
-  if (actualResult !== 0) return actualResult;
   return compareNullableDecimal(leftMonth?.forecastAmount, rightMonth?.forecastAmount, direction);
 };

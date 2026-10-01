@@ -33,6 +33,7 @@ import {
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCompositionK } from "../../data/forecastComposition";
+import { validateForecastWorkbookFile } from "../../data/forecastWorkbookValidation";
 import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import {
   ConsumptionAccountForecast,
@@ -48,7 +49,6 @@ import {
   applyConsumptionImport,
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
-  exportConsumptionForecastCsv,
   exportConsumptionForecastXlsx,
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
@@ -79,6 +79,7 @@ export const consumptionRecordsOperationError = (error: unknown, fallback: strin
   if (error.status >= 500) return "서버 오류로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   return error.message || fallback;
 };
+
 
 const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
@@ -1165,7 +1166,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     if (forecastImportPhase !== "idle") forecastImportDialogRef.current?.open();
   }, [forecastImportPhase]);
 
-  const handleForecastCsvFile = async (event: Event) => {
+  const handleForecastWorkbookFile = async (event: Event) => {
     if (!canWriteForecast) { setImportError("Forecast write permission is required."); return; }
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
@@ -1175,13 +1176,20 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     setImportError("");
     setForecastImportResult("");
     setPendingForecastImport(null);
+    const validationError = await validateForecastWorkbookFile(file);
+    if (validationError) {
+      setImportError(validationError);
+      setForecastImportResult(validationError);
+      setForecastImportPhase("error");
+      return;
+    }
     setForecastImportPhase("previewing");
     try {
       const preview = await previewConsumptionForecastWide(file);
       setPendingForecastImport({ file, preview });
       setForecastImportPhase("preview");
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Forecast CSV or Excel file could not be previewed.");
+      const message = consumptionRecordsOperationError(error, "Forecast Excel workbook could not be previewed.");
       setImportError(message);
       setForecastImportResult(message);
       setForecastImportPhase("error");
@@ -1303,32 +1311,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption CSV could not be exported.");
-    } finally {
-      exportingRef.current = false;
-      setIsExporting(false);
-    }
-  };
-
-  const exportForecastCsv = async () => {
-    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
-    exportingRef.current = true;
-    setIsExporting(true);
-    setImportError("");
-    try {
-      const exported = await exportConsumptionForecastCsv("ALL");
-      const url = URL.createObjectURL(exported.blob);
-      try {
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = exported.fileName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-      } finally {
-        window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      }
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Consumption Forecast CSV could not be exported.");
     } finally {
       exportingRef.current = false;
       setIsExporting(false);
@@ -1505,23 +1487,17 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
             disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
-          <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastCsvFile(event)} />
+          <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastWorkbookFile(event)} />
           <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
-            Forecast Import CSV / Excel
-          </oj-button>
-          <oj-button chroming="outlined" title="Export FORECAST data in the Forecast Import CSV format"
-            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
-            onojAction={() => void exportForecastCsv()}>
-            <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Forecast CSV Export"}
+            Forecast Import
           </oj-button>
           <oj-button chroming="outlined" title="Export FORECAST data in the Excel template format"
             disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
             onojAction={() => void exportForecastXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Forecast Excel Export"}
+            {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
           <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
@@ -1674,7 +1650,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </div>
       </oj-dialog>
       <oj-dialog id="consumptionForecastImportDialog" ref={forecastImportDialogRef}
-        dialogTitle="Forecast CSV preview and apply"
+        dialogTitle="Forecast Excel preview and apply"
         cancelBehavior={forecastImportPhase === "previewing" || forecastImportPhase === "applying" ? "none" : "icon"}
         onojClose={() => {
           if (forecastImportPhase === "previewing" || forecastImportPhase === "applying") return;
@@ -1683,7 +1659,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
           {(forecastImportPhase === "previewing" || forecastImportPhase === "applying") && <div class="consumption-import-progress" role="status">
             <oj-progress-circle value={-1} size="md"></oj-progress-circle>
-            <div><strong>{forecastImportPhase === "previewing" ? "Validating Forecast CSV…" : "Applying Forecast atomically…"}</strong><p>Blank cells remain unchanged; explicit zero is retained.</p></div>
+            <div><strong>{forecastImportPhase === "previewing" ? "Validating Forecast Excel…" : "Applying Forecast atomically…"}</strong><p>Blank cells remain unchanged; explicit zero is retained.</p></div>
           </div>}
           {forecastImportPhase === "preview" && pendingForecastImport && <div class="consumption-import-preview">
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>

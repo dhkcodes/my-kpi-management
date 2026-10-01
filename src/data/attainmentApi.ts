@@ -35,7 +35,8 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const nullableFinite = (value: unknown): value is number | null => value === null || finite(value);
 const quarterName = (value: unknown): value is AttainmentQuarter => attainmentQuarters.includes(value as AttainmentQuarter);
-const sourceName = (value: unknown): value is AttainmentAppliedSource => ["ACTUAL", "FORECAST", "NONE"].includes(value as string);
+const sourceName = (value: unknown): value is AttainmentAppliedSource =>
+  ["ACTUAL", "FORECAST", "FORECAST_UNCONFIRMED", "NONE"].includes(value as string);
 
 const parsePillarAmounts = (value: unknown): { actual: number; forecast: number; outlook: number | null } | null => {
   if (!isObject(value) || !finite(value.actual) || !finite(value.forecast) ||
