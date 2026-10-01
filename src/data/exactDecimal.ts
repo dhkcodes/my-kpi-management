@@ -129,5 +129,15 @@ export const formatExactK = (value: string): string => {
   return `${negative ? "-" : ""}$${groupWhole(whole)}${fraction === undefined ? "" : `.${fraction}`} K`;
 };
 
+/** Converts base currency to K and rounds once, exactly, for fixed-precision display. */
+export const formatExactKFixed = (value: string, precision = 2): string => {
+  const kValue = divideExactDecimal(value, "1000", precision);
+  if (kValue === null) throw new Error("Unable to format K amount.");
+  const negative = kValue.startsWith("-");
+  const unsigned = negative ? kValue.slice(1) : kValue;
+  const [whole, fraction = ""] = unsigned.split(".");
+  return `${negative ? "-" : ""}$${groupWhole(whole)}.${fraction.padEnd(precision, "0")} K`;
+};
+
 /** Explicitly lossy projection for plotting coordinates only. */
 export const exactDecimalToChartCoordinate = (value: string): number => Number(value);

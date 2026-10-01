@@ -159,6 +159,7 @@ export type ConsumptionAnalysis = Readonly<{
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
   }>;
   mtdSummary: Readonly<{ periodKey: string; amountExact: string; asOf: string | null }> | null;
+  mtdAsOf: string | null;
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
@@ -582,6 +583,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
       || !(mtd.asOf === null || typeof mtd.asOf === "string")) return malformedAnalysis();
     mtdSummary = { periodKey: mtd.periodKey, amountExact: amount.exact, asOf: mtd.asOf as string | null };
   }
+  if (!(raw.mtdAsOf === null || raw.mtdAsOf === undefined || typeof raw.mtdAsOf === "string")) return malformedAnalysis();
+  const mtdAsOf = (raw.mtdAsOf ?? mtdSummary?.asOf ?? null) as string | null;
   // With MTD enabled, the API keeps the saved current-period Forecast visible while Total excludes
   // the overlapping Forecast. Portfolio and that fiscal quarter are therefore intentionally non-additive.
   let mtdQuarter: string | null = null;
@@ -724,7 +727,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     portfolio: { ...portfolioSplit, priorActualAmountExact: priorActual.exact,
       priorForecastAmountExact: priorForecast.exact, priorTotalAmountExact: priorTotal.exact,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, quarters, accountCandidates, contextActualTrend, alerts, accounts,
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, mtdAsOf, quarters, accountCandidates, contextActualTrend, alerts, accounts,
     organicConsumptionGrowthProxy, movementBridge };
 };
 
