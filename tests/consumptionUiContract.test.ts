@@ -5,6 +5,7 @@ const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
 const forecastActualPage = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
+const forecastActualSort = readFileSync("src/data/forecastActualSort.ts", "utf8");
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const sharedMessageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
 const apiSource = readFileSync("src/data/consumptionApi.ts", "utf8");
@@ -533,8 +534,8 @@ assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-
 assert.match(recordsPage, /MTD 수집 시각/, "Forecast Records labels MTD timestamps as collection timestamps");
 assert.match(recordsPage, /MTD 입력 기준일 미확인/, "Forecast Records does not misrepresent collection time as the business data-through date");
 assert.match(forecastActualPage, /MTD 수집 시각[\s\S]*MTD 입력 기준일:? 미확인/, "Forecast vs Actual separates MTD collection time from the unknown business date");
-assert.match(forecastActualPage, /type SortKey = .*"confirmedActual".*`month:\$\{string\}`/, "Forecast vs Actual defines sortable keys for Actual and monthly data columns");
-assert.match(forecastActualPage, /sortable\(monthLabel\(period\), `month:\$\{period\}`\)/, "each monthly table column owns a sort control instead of relying on month display order");
+assert.match(forecastActualPage, /compareForecastActualRows[\s\S]*sortable\("Confirmed Actual", "actual"\)[\s\S]*sortable\(monthLabel\(period\), `month:\$\{period\}`\)/, "Forecast vs Actual wires independent sort controls for Actual and monthly numeric columns");
+assert.match(forecastActualSort, /compareNullableDecimal[\s\S]*compareExactDecimals[\s\S]*key === "forecast"[\s\S]*key === "actual"[\s\S]*key === "projected"[\s\S]*key\.slice\("month:"\.length\)/, "Forecast vs Actual numeric sort keys use exact-decimal comparison");
 assert.match(forecastActualPage, /resetDependentFilters[\s\S]*setSalesRep\(""\)[\s\S]*resetAccount/, "Quarter and Pillar changes clear stale dependent filters");
 assert.match(forecastActualPage, /previousFiscalYearRef[\s\S]*previousFiscalYearRef\.current !== fiscalYear[\s\S]*resetDependentFilters\(\)[\s\S]*return;/,
   "Fiscal Year changes clear stale Sales Rep and Account filters before requesting the new scope");

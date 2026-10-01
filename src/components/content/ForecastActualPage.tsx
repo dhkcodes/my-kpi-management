@@ -2,8 +2,9 @@ import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { ConsumptionPillar, consumptionPillarOptions } from "../../data/consumptionData";
-import { ForecastActualComparison, ForecastActualMode, ForecastActualRow, fetchForecastActualComparison } from "../../data/consumptionApi";
+import { ForecastActualComparison, ForecastActualMode, fetchForecastActualComparison } from "../../data/consumptionApi";
 import { compareExactDecimals, formatExactCurrency } from "../../data/exactDecimal";
+import { compareForecastActualRows, ForecastActualSortKey as SortKey } from "../../data/forecastActualSort";
 import "ojs/ojprogress-circle";
 
 const money = (value: string | null) => value === null ? "N/A" : formatExactCurrency(value);
@@ -11,16 +12,6 @@ const actualMoney = (value: string | null) => value === null ? "미확정" : for
 const monthLabel = (periodKey: string) => {
   const parts = periodKey.split("-");
   return parts[parts.length - 1] ?? periodKey;
-};
-type SortKey = "salesRep" | "account" | "forecast" | "confirmedActual" | "projected" | "attention" | `month:${string}`;
-
-const rowValue = (row: ForecastActualRow, key: SortKey) => {
-  if (key === "forecast") return row.fullPeriodForecastAmount;
-  if (key === "confirmedActual") return row.confirmedActualAmount;
-  if (key === "projected") return row.projectedAmount;
-  if (key === "attention") return row.attention === true ? "2" : row.attention === false ? "1" : "0";
-  if (key.startsWith("month:")) return row.months.find((month) => month.periodKey === key.slice(6))?.actualAmount ?? null;
-  return key === "salesRep" ? row.salesRep.toLocaleLowerCase() : row.account.toLocaleLowerCase();
 };
 
 export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
@@ -54,13 +45,8 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   }, [fiscalYear, quarter, pillar, actualMode, salesRep, account]);
 
   const months = [...(data?.fullForecastPeriods ?? [])].reverse();
-  const sortedRows = useMemo(() => [...(data?.rows ?? [])].sort((left, right) => {
-    const leftValue = rowValue(left, sortKey); const rightValue = rowValue(right, sortKey);
-    const result = sortKey === "forecast" || sortKey === "confirmedActual" || sortKey === "projected" || sortKey === "attention" || sortKey.startsWith("month:")
-      ? (leftValue === null ? -1 : rightValue === null ? 1 : compareExactDecimals(leftValue, rightValue))
-      : String(leftValue).localeCompare(String(rightValue));
-    return sortDirection === "asc" ? result : -result;
-  }), [data, sortKey, sortDirection]);
+  const sortedRows = useMemo(() => [...(data?.rows ?? [])]
+    .sort((left, right) => compareForecastActualRows(left, right, sortKey, sortDirection)), [data, sortKey, sortDirection]);
   const sort = (key: SortKey) => { if (sortKey === key) setSortDirection(sortDirection === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDirection("asc"); } };
   const sortable = (label: string, key: SortKey) => <button type="button" onClick={() => sort(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? " ↑" : " ↓") : ""}</button>;
 
@@ -90,7 +76,7 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
         <article class={data.summary.attentionAccountCount > 0 ? "is-negative" : "is-positive"}><span>Projected watch</span><strong>{data.summary.attentionAccountCount}</strong><small>Projected shortfall vs full-period Forecast</small></article>
       </section>
       <div class="forecast-actual-table-wrap"><table class="forecast-actual-table">
-        <thead><tr><th>{sortable("Sales Rep", "salesRep")}</th><th>{sortable("Account", "account")}</th><th>{sortable("Forecast", "forecast")}</th><th>{sortable("Confirmed Actual", "confirmedActual")}</th><th>{sortable("Projected", "projected")}</th><th>{sortable("Actual / Outlook", "attention")}</th>{months.map((period) => <th>{sortable(monthLabel(period), `month:${period}`)}<small>Forecast / Actual</small></th>)}</tr></thead>
+        <thead><tr><th>{sortable("Sales Rep", "salesRep")}</th><th>{sortable("Account", "account")}</th><th>{sortable("Forecast", "forecast")}</th><th>{sortable("Confirmed Actual", "actual")}</th><th>{sortable("Projected", "projected")}</th><th>{sortable("Actual / Outlook", "status")}</th>{months.map((period) => <th>{sortable(monthLabel(period), `month:${period}`)}<small>Forecast / Actual</small></th>)}</tr></thead>
         <tbody>{sortedRows.length ? sortedRows.map((row) => <tr key={`${row.salesRep}:${row.account}`} class={row.attention ? "forecast-actual-row is-attention" : "forecast-actual-row"}>
           <td>{row.salesRep || "Unassigned"}</td><th scope="row">{row.account}</th><td>{money(row.fullPeriodForecastAmount)}</td><td>{actualMoney(row.confirmedActualAmount)}</td><td>{money(row.projectedAmount)}</td>
           <td><div class="forecast-actual-statuses"><span class="forecast-actual-status">{row.actualShortfall === null ? "Finalized Actual unavailable" : row.actualShortfall ? "Finalized Actual shortfall" : "Finalized Actual on track"}</span><span class="forecast-actual-status">{row.attention === null ? "Projection unavailable" : row.attention ? "Projected shortfall" : "Projected on track"}</span></div></td>
