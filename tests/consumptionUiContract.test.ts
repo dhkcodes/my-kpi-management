@@ -14,6 +14,20 @@ const spreadsheetPage = readFileSync("src/components/content/KpiSpreadsheetPage.
 const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", "utf8");
 const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
+const mtdDate = readFileSync("src/data/mtdDate.ts", "utf8");
+
+assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
+  "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
+assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
+  "Records shows one compact UTC-basis MTD applied date beside the switch");
+assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdSummary\?\.asOf\)[\s\S]*MTD 반영 일자 \{mtdAppliedDate\}/u,
+  "Analysis shows the same compact UTC-basis MTD applied date beside the switch");
+assert.match(forecastActualPage, /MTD 반영 일자 \{mtdAppliedDate\}/u,
+  "Forecast vs Actual shows the same compact MTD applied date beside the switch");
+assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
+  "Records numeric cells contain numbers only");
+assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
+  "Analysis removes unavailable timestamp prose");
 
 assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
@@ -522,18 +536,14 @@ assert.match(forecastActualPage, /Projected period close[\s\S]*MTD mode only/, "
 assert.match(forecastActualPage, /month\.actualState === "FINAL"[\s\S]*month\.actualState === "MTD"[\s\S]*미확정/, "missing Actual is labelled 미확정 rather than N\/A or fabricated zero");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
 assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
-assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf/, "each monthly MTD Actual shows its account-level as-of date");
+assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf[\s\S]*formatMtdAppliedDate/, "Forecast vs Actual derives one header date from actual MTD import timestamps");
 assert.match(forecastActualPage, /확정 실적 미달/, "finalized Actual shortfall is labeled separately");
 assert.match(forecastActualPage, /예상 기반 주시/, "projection-based watch status is labeled separately");
 assert.match(forecastActualPage, /row\.actualShortfall/, "finalized comparison uses the backend Actual shortfall decision");
 assert.match(forecastActualPage, /row\.attention/, "projected watch uses the backend projection decision");
 assert.match(forecastActualPage, /tone\(month\.actualState === "MTD" \? mtdDifference : month\.differenceAmount\)/, "FINAL variance and MTD reference variance keep separate inputs and labels");
 assert.match(forecastActualPage, /forecastActualPeriodsLatestFirst/, "monthly values use fiscal-year-aware latest-first ordering");
-assert.match(insightsPage, /MTD 수집 시각[\s\S]*MTD 입력 기준일 미확인/, "Forecast Analysis separates the collection timestamp from an unavailable MTD business date");
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
-assert.match(recordsPage, /MTD 수집 시각/, "Forecast Records labels MTD timestamps as collection timestamps");
-assert.match(recordsPage, /MTD 입력 기준일 미확인/, "Forecast Records does not misrepresent collection time as the business data-through date");
-assert.match(forecastActualPage, /MTD 수집 시각[\s\S]*MTD 입력 기준일:? 미확인/, "Forecast vs Actual separates MTD collection time from the unknown business date");
 assert.match(forecastActualPage, /monthScrollRef[\s\S]*handleMonthScrollKeyDown[\s\S]*scrollMonths/, "Forecast vs Actual provides synchronized month scrolling with buttons and keyboard controls");
 assert.match(styles, /\.forecast-actual-matrix \.is-sticky[^}]*position:\s*sticky/, "Forecast vs Actual keeps Account and Summary columns fixed while months scroll");
 assert.match(forecastActualSort, /compareNullableDecimal[\s\S]*compareExactDecimals[\s\S]*key === "forecast"[\s\S]*key === "actual"[\s\S]*key === "projected"[\s\S]*key\.slice\("month:"\.length\)/, "Forecast vs Actual numeric sort keys use exact-decimal comparison");
