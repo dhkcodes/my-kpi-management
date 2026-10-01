@@ -99,6 +99,7 @@ export type ConsumptionRecordsTotals = Readonly<{
   incompletePeriods: readonly string[];
   mtdByPeriod?: Readonly<Record<string, string>>;
   mtdStatusByPeriod?: Readonly<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>;
+  mtdAsOfByPeriod?: Readonly<Record<string, string>>;
 }>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
   accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
@@ -1015,14 +1016,23 @@ const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
     incompletePeriods: raw.incompletePeriods as string[],
     ...(raw.mtdByPeriod === undefined ? {} : { mtdByPeriod: decodeMap(raw.mtdByPeriod) })
   };
-  if (raw.mtdStatusByPeriod === undefined) return decoded;
-  if (typeof raw.mtdStatusByPeriod !== "object" || raw.mtdStatusByPeriod === null || Array.isArray(raw.mtdStatusByPeriod))
+  let withStatuses = decoded;
+  if (raw.mtdStatusByPeriod !== undefined) {
+    if (typeof raw.mtdStatusByPeriod !== "object" || raw.mtdStatusByPeriod === null || Array.isArray(raw.mtdStatusByPeriod))
+      throw new Error("Malformed Consumption records totals");
+    const statuses = Object.entries(raw.mtdStatusByPeriod as Record<string, unknown>);
+    if (statuses.some(([period, status]) => !/^FY\d{2}-[A-Z]{3}$/.test(period)
+        || (status !== "PROVISIONAL" && status !== "FINAL_UPLOAD_REQUIRED")))
+      throw new Error("Malformed Consumption records totals");
+    withStatuses = { ...decoded, mtdStatusByPeriod: Object.fromEntries(statuses) as Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED"> };
+  }
+  if (raw.mtdAsOfByPeriod === undefined) return withStatuses;
+  if (typeof raw.mtdAsOfByPeriod !== "object" || raw.mtdAsOfByPeriod === null || Array.isArray(raw.mtdAsOfByPeriod))
     throw new Error("Malformed Consumption records totals");
-  const statuses = Object.entries(raw.mtdStatusByPeriod as Record<string, unknown>);
-  if (statuses.some(([period, status]) => !/^FY\d{2}-[A-Z]{3}$/.test(period)
-      || (status !== "PROVISIONAL" && status !== "FINAL_UPLOAD_REQUIRED")))
+  const asOfEntries = Object.entries(raw.mtdAsOfByPeriod as Record<string, unknown>);
+  if (asOfEntries.some(([period, asOf]) => !/^FY\d{2}-[A-Z]{3}$/.test(period) || typeof asOf !== "string" || !asOf))
     throw new Error("Malformed Consumption records totals");
-  return { ...decoded, mtdStatusByPeriod: Object.fromEntries(statuses) as Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED"> };
+  return { ...withStatuses, mtdAsOfByPeriod: Object.fromEntries(asOfEntries) as Record<string, string> };
 };
 
 export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {
@@ -1454,8 +1464,9 @@ export type ForecastActualRow = Readonly<{
   differencePercent: string | null;
   fullPeriodForecastAmount: string;
   projectedAmount: string | null;
+  actualShortfall: boolean | null;
   attention: boolean | null;
-  months: ForecastActualMonth[];
+  months: readonly ForecastActualMonth[];
 }>;
 export type ForecastActualComparison = Readonly<{
   fiscalYear: string;
@@ -1523,12 +1534,15 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
       if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast vs Actual response");
       const row = value as Record<string, unknown>;
       if (!Array.isArray(row.months)) throw new Error("Malformed Forecast vs Actual response");
+      if ((row.actualShortfall !== null && typeof row.actualShortfall !== "boolean")
+        || (row.attention !== null && typeof row.attention !== "boolean")) throw new Error("Malformed Forecast vs Actual response");
       return { salesRep: String(row.salesRep ?? ""), account: String(row.account ?? ""),
         confirmedActualAmount: nullableForecastActualAmount(row.confirmedActualAmount),
         confirmedForecastAmount: forecastActualAmount(row.confirmedForecastAmount),
         differenceAmount: nullableForecastActualAmount(row.differenceAmount), differencePercent: nullableForecastActualAmount(row.differencePercent),
         fullPeriodForecastAmount: forecastActualAmount(row.fullPeriodForecastAmount), projectedAmount: nullableForecastActualAmount(row.projectedAmount),
-        attention: row.attention === null ? null : Boolean(row.attention),
+        actualShortfall: row.actualShortfall as boolean | null,
+        attention: row.attention as boolean | null,
         months: row.months.map((monthValue) => {
           if (typeof monthValue !== "object" || monthValue === null) throw new Error("Malformed Forecast vs Actual response");
           const month = monthValue as Record<string, unknown>;

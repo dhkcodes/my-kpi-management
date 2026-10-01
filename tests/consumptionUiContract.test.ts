@@ -519,7 +519,15 @@ assert.match(forecastActualPage, /Full-period Forecast[\s\S]*Actual \/ MTD[\s\S]
 assert.match(forecastActualPage, /projectionFormula/, "the projection formula supplied by the API is shown with the result");
 assert.match(forecastActualPage, /value\?\.actualAmount \?\? null/, "missing Actual remains unavailable rather than being fabricated as zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf/, "each monthly MTD Actual shows its account-level as-of date");
+assert.match(forecastActualPage, /Finalized Actual shortfall/, "finalized Actual shortfall is labeled separately");
+assert.match(forecastActualPage, /Projected shortfall/, "projection-based watch status is labeled separately");
+assert.match(forecastActualPage, /row\.actualShortfall/, "finalized comparison uses the backend Actual shortfall decision");
+assert.match(forecastActualPage, /row\.attention/, "projected watch uses the backend projection decision");
+assert.match(forecastActualPage, /value\?\.actualState === "FINAL"[\s\S]*is-negative/, "only FINAL monthly variance is styled as confirmed underperformance");
 assert.match(forecastActualPage, /fullForecastPeriods \?\? \[\]\)\]\.reverse\(\)/, "monthly values are displayed latest month first");
+assert.match(insightsPage, /Latest MTD import[\s\S]*mtdSummary\.asOf/, "Forecast Analysis shows that the MTD timestamp is an import timestamp");
+assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
+assert.match(recordsPage, /MTD imported/, "Forecast Records labels MTD timestamps as import timestamps");
 assert.match(forecastActualPage, /resetDependentFilters[\s\S]*setSalesRep\(""\)[\s\S]*resetAccount/, "Quarter and Pillar changes clear stale dependent filters");
 assert.match(forecastActualPage, /previousFiscalYearRef[\s\S]*previousFiscalYearRef\.current !== fiscalYear[\s\S]*resetDependentFilters\(\)[\s\S]*return;/,
   "Fiscal Year changes clear stale Sales Rep and Account filters before requesting the new scope");
