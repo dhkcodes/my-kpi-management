@@ -20,8 +20,8 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*MTD 반영 일자 \{mtdAppliedDate\}/u,
-  "Analysis shows the authoritative UTC-basis MTD date beside the switch even while amounts stay FINAL");
+assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*const mtdPeriodLabel = analysis\?\.mtdSummary\?\.periodKey[\s\S]*MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
+  "Analysis shows the actual MTD period and authoritative UTC-basis date beside the switch");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
   "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
