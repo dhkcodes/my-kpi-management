@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
 import { ConsumptionPillar, consumptionPillarOptions } from "../../data/consumptionData";
 import { ForecastActualComparison, ForecastActualMode, fetchForecastActualComparison } from "../../data/consumptionApi";
-import { compareExactDecimals, formatExactCurrency } from "../../data/exactDecimal";
+import { addExactDecimals, compareExactDecimals, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import { compareForecastActualRows, ForecastActualSortKey as SortKey } from "../../data/forecastActualSort";
 import "ojs/ojprogress-circle";
 
@@ -47,6 +47,22 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const months = [...(data?.fullForecastPeriods ?? [])].reverse();
   const sortedRows = useMemo(() => [...(data?.rows ?? [])]
     .sort((left, right) => compareForecastActualRows(left, right, sortKey, sortDirection)), [data, sortKey, sortDirection]);
+  const mtdMonthlyComparisons = useMemo(() => actualMode !== "MTD" || !data ? [] : data.fullForecastPeriods.flatMap((periodKey) => {
+    let forecastAmount = "0";
+    let actualAmount = "0";
+    let hasMtdActual = false;
+    for (const row of data.rows) {
+      const month = row.months.find((item) => item.periodKey === periodKey);
+      if (!month) continue;
+      forecastAmount = addExactDecimals(forecastAmount, month.forecastAmount);
+      if (month.actualState === "MTD" && month.actualAmount !== null) {
+        actualAmount = addExactDecimals(actualAmount, month.actualAmount);
+        hasMtdActual = true;
+      }
+    }
+    return hasMtdActual ? [{ periodKey, forecastAmount, actualAmount,
+      differenceAmount: subtractExactDecimals(actualAmount, forecastAmount) }] : [];
+  }), [actualMode, data]);
   const sort = (key: SortKey) => { if (sortKey === key) setSortDirection(sortDirection === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDirection("asc"); } };
   const sortable = (label: string, key: SortKey) => <button type="button" onClick={() => sort(key)}>{label}{sortKey === key ? (sortDirection === "asc" ? " ↑" : " ↓") : ""}</button>;
 
@@ -56,7 +72,7 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       <label>Quarter<select value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); resetDependentFilters(); }}>
         <option value="ALL">All quarters</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option>
       </select></label>
-      <label>Actual basis<select value={actualMode} onChange={(event) => setActualMode(event.currentTarget.value as ForecastActualMode)}><option value="FINAL">Final</option><option value="MTD">MTD</option></select></label>
+      <label class="forecast-actual-mode-switch"><span>MTD</span><span class="forecast-actual-switch-row"><span>OFF · FINAL</span><input type="checkbox" role="switch" aria-label="Use MTD actuals" checked={actualMode === "MTD"} onChange={(event) => setActualMode(event.currentTarget.checked ? "MTD" : "FINAL")} /><span>ON · MTD</span></span></label>
       <label>Pillar<select value={pillar} onChange={(event) => { setPillar(event.currentTarget.value as ConsumptionPillar); resetDependentFilters(); }}>{consumptionPillarOptions.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
       <label>Sales Rep<select value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccount(); }}><option value="">All Sales Reps</option>{(data?.salesRepOptions ?? []).map((value) => <option value={value}>{value || "Unassigned"}</option>)}</select></label>
       <label>Account<input type="search" list="forecastActualAccounts" value={accountQuery} placeholder="Search and select account" onInput={(event) => {
@@ -69,6 +85,12 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     {loading ? <div class="forecast-actual-loading"><oj-progress-circle value={-1} size="md" /><span>Loading comparison…</span></div> : null}
     {!loading && data ? <>
       <div class="forecast-actual-period-note">Actual basis: <strong>{data.actualMode}</strong><span>Months (latest first): <strong>{months.join(", ")}</strong></span></div>
+      {actualMode === "MTD" ? <section class="forecast-actual-mtd-comparison" aria-label="Monthly Forecast and MTD comparison">
+        <p><strong>월 Forecast · MTD 누적액 · 단순 차이</strong><span>월 중간 참고 비교이며 확정 미달 판정이 아님</span></p>
+        {mtdMonthlyComparisons.length ? <div>{mtdMonthlyComparisons.map((comparison) => <article key={comparison.periodKey}>
+          <strong>{comparison.periodKey}</strong><span>월 Forecast {money(comparison.forecastAmount)}</span><span>MTD 누적액 {money(comparison.actualAmount)}</span><span>단순 차이 {money(comparison.differenceAmount)}</span>
+        </article>)}</div> : <small>선택 범위에 MTD 누적액이 없습니다. MTD 입력 기준일: 미확인</small>}
+      </section> : null}
       <section class="forecast-actual-summary" aria-label="Forecast and Actual totals">
         <article><span>Full-period Forecast</span><strong>{money(data.summary.fullPeriodForecastAmount)}</strong><small>{data.fullForecastPeriods.join(" · ")}</small></article>
         <article><span>Confirmed Actual</span><strong>{actualMoney(data.summary.confirmedActualAmount)}</strong><small>{data.comparisonPeriods.join(" · ") || "No finalized Actual"}</small></article>

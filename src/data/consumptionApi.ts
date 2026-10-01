@@ -1485,18 +1485,18 @@ export type ForecastActualComparison = Readonly<{
   rows: ForecastActualRow[];
 }>;
 
-const forecastActualAmount = (value: unknown): string => {
-  const decoded = decodeExactDecimal(value, true);
+const forecastActualAmount = (value: unknown, nonNegative = true): string => {
+  const decoded = decodeExactDecimal(value, nonNegative);
   if (!decoded) throw new Error("Malformed Forecast vs Actual response");
   return decoded.exact;
 };
-const nullableForecastActualAmount = (value: unknown): string | null => value === null || value === undefined
-  ? null : forecastActualAmount(value);
+const nullableForecastActualAmount = (value: unknown, nonNegative = true): string | null => value === null || value === undefined
+  ? null : forecastActualAmount(value, nonNegative);
 const decodeForecastSummary = (value: Record<string, unknown>): ForecastActualSummary => ({
   confirmedActualAmount: nullableForecastActualAmount(value.confirmedActualAmount),
   confirmedForecastAmount: forecastActualAmount(value.confirmedForecastAmount),
-  confirmedDifferenceAmount: nullableForecastActualAmount(value.confirmedDifferenceAmount),
-  confirmedDifferencePercent: nullableForecastActualAmount(value.confirmedDifferencePercent),
+  confirmedDifferenceAmount: nullableForecastActualAmount(value.confirmedDifferenceAmount, false),
+  confirmedDifferencePercent: nullableForecastActualAmount(value.confirmedDifferencePercent, false),
   fullPeriodForecastAmount: forecastActualAmount(value.fullPeriodForecastAmount),
   projectedAmount: nullableForecastActualAmount(value.projectedAmount),
   attentionAccountCount: Number(value.attentionAccountCount),
@@ -1534,22 +1534,22 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
       if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast vs Actual response");
       const row = value as Record<string, unknown>;
       if (!Array.isArray(row.months)) throw new Error("Malformed Forecast vs Actual response");
-      if ((row.actualShortfall !== null && typeof row.actualShortfall !== "boolean")
-        || (row.attention !== null && typeof row.attention !== "boolean")) throw new Error("Malformed Forecast vs Actual response");
+      if ((row.actualShortfall !== null && row.actualShortfall !== undefined && typeof row.actualShortfall !== "boolean")
+        || (row.attention !== null && row.attention !== undefined && typeof row.attention !== "boolean")) throw new Error("Malformed Forecast vs Actual response");
       return { salesRep: String(row.salesRep ?? ""), account: String(row.account ?? ""),
         confirmedActualAmount: nullableForecastActualAmount(row.confirmedActualAmount),
         confirmedForecastAmount: forecastActualAmount(row.confirmedForecastAmount),
-        differenceAmount: nullableForecastActualAmount(row.differenceAmount), differencePercent: nullableForecastActualAmount(row.differencePercent),
+        differenceAmount: nullableForecastActualAmount(row.differenceAmount, false), differencePercent: nullableForecastActualAmount(row.differencePercent, false),
         fullPeriodForecastAmount: forecastActualAmount(row.fullPeriodForecastAmount), projectedAmount: nullableForecastActualAmount(row.projectedAmount),
-        actualShortfall: row.actualShortfall as boolean | null,
-        attention: row.attention as boolean | null,
+        actualShortfall: (row.actualShortfall ?? null) as boolean | null,
+        attention: (row.attention ?? null) as boolean | null,
         months: row.months.map((monthValue) => {
           if (typeof monthValue !== "object" || monthValue === null) throw new Error("Malformed Forecast vs Actual response");
           const month = monthValue as Record<string, unknown>;
           return { periodKey: String(month.periodKey), forecastAmount: forecastActualAmount(month.forecastAmount),
             actualAmount: nullableForecastActualAmount(month.actualAmount), actualState: (month.actualState ?? null) as ForecastActualMode | null,
             actualAsOf: month.actualAsOf == null ? null : String(month.actualAsOf),
-            differenceAmount: nullableForecastActualAmount(month.differenceAmount), differencePercent: nullableForecastActualAmount(month.differencePercent),
+            differenceAmount: nullableForecastActualAmount(month.differenceAmount, false), differencePercent: nullableForecastActualAmount(month.differencePercent, false),
             monthEndProjection: nullableForecastActualAmount(month.monthEndProjection) };
         }) };
     })

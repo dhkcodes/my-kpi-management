@@ -7,6 +7,7 @@ import {
   exportConsumptionForecastCsv,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
+  fetchForecastActualComparison,
   applyConsumptionForecastWide,
   previewConsumptionForecastWide,
   saveConsumptionForecasts
@@ -463,6 +464,37 @@ void (async () => {
       { exactReplay: expected.replay, status: expected.status, appliedCount: expected.appliedCount },
       "Forecast Apply preserves the server status needed for replay, no-change, and changed user messages");
   }
+
+  const mtdComparisonPayload = {
+    fiscalYear: "FY27", quarter: "Q2", selectedPillar: "ALL", selectedSalesRep: "", selectedAccount: "",
+    salesRepOptions: ["SE Choi"], accountOptions: ["SuperConnect"], actualMode: "MTD",
+    comparisonPeriods: [], fullForecastPeriods: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
+    projectionFormula: "MTD 입력 기준일 미확인",
+    summary: { confirmedForecastAmount: "0.00", fullPeriodForecastAmount: "2000.00", attentionAccountCount: 0, accountCount: 1 },
+    fiscalYearSummary: { confirmedForecastAmount: "0.00", fullPeriodForecastAmount: "2000.00", attentionAccountCount: 0, accountCount: 1 },
+    rows: [{ salesRep: "SE Choi", account: "SuperConnect", confirmedForecastAmount: "0.00",
+      fullPeriodForecastAmount: "2000.00",
+      months: [{ periodKey: "FY27-SEP", forecastAmount: "700.00", actualAmount: "125.00", actualState: "MTD",
+        actualAsOf: "2026-09-10T09:00:00+09:00", differenceAmount: "-575.00", differencePercent: "-82.14" }] }]
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(mtdComparisonPayload),
+    { status: 200, headers: { "Content-Type": "application/json" } });
+  const mtdComparison = await fetchForecastActualComparison({ fiscalYear: "FY27", quarter: "Q2", pillar: "ALL", actualMode: "MTD" });
+  assert.equal(mtdComparison.rows[0]?.actualShortfall, null,
+    "MTD responses may omit null finalized-status fields under NON_NULL serialization");
+  assert.equal(mtdComparison.rows[0]?.attention, null,
+    "MTD responses may omit null projection-status fields under NON_NULL serialization");
+  assert.equal(mtdComparison.rows[0]?.months[0]?.actualAsOf, "2026-09-10T09:00:00+09:00",
+    "MTD parsing preserves the complete import timestamp and offset");
+
+  runtime.fetch = async () => new Response(JSON.stringify({ ...mtdComparisonPayload,
+    rows: [{ ...mtdComparisonPayload.rows[0], actualShortfall: "false" }] }),
+  { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(
+    () => fetchForecastActualComparison({ fiscalYear: "FY27", quarter: "Q2", pillar: "ALL", actualMode: "MTD" }),
+    /Malformed Forecast vs Actual response/,
+    "MTD parsing continues to reject present status fields with an invalid type"
+  );
 
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });
