@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { compareForecastActualRows } from "../src/data/forecastActualSort";
+import { compareForecastActualRows, forecastActualPeriodsLatestFirst } from "../src/data/forecastActualSort";
 import type { ForecastActualRow } from "../src/data/consumptionApi";
 
 const row = (overrides: Partial<ForecastActualRow>): ForecastActualRow => ({
@@ -50,5 +50,19 @@ for (const key of ["actual", "projected", "month:FY27-OCT"] as const) {
 
 assert.ok(compareForecastActualRows(low, high, "status", "asc") > 0,
   "status sorting must include finalized Actual shortfall before projected watch");
+
+const periodRows = [
+  row({ months: [
+    { periodKey: "FY27-JUL", forecastAmount: "1", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
+    { periodKey: "FY27-JUN", forecastAmount: "1", actualAmount: "1", actualState: "FINAL", actualAsOf: null, differenceAmount: "0", differencePercent: "0", monthEndProjection: null }
+  ] }),
+  row({ months: [
+    { periodKey: "FY27-JAN", forecastAmount: "2", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
+    { periodKey: "FY27-DEC", forecastAmount: "2", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
+    { periodKey: "FY27-MAY", forecastAmount: "0", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null }
+  ] })
+];
+assert.deepEqual(forecastActualPeriodsLatestFirst(periodRows), ["FY27-JAN", "FY27-DEC", "FY27-JUL", "FY27-JUN"],
+  "actual fiscal chronology must put the latest data-bearing month on the left, including the FY year rollover, without empty future months");
 
 console.log("consumptionForecastActualSort.test.ts: all assertions passed");

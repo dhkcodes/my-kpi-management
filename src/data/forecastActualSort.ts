@@ -1,6 +1,26 @@
 import type { ForecastActualRow } from "./consumptionApi";
 import { compareExactDecimals } from "./exactDecimal";
 
+const FISCAL_MONTH_INDEX: Readonly<Record<string, number>> = Object.freeze({
+  JUN: 0, JUL: 1, AUG: 2, SEP: 3, OCT: 4, NOV: 5,
+  DEC: 6, JAN: 7, FEB: 8, MAR: 9, APR: 10, MAY: 11
+});
+
+const fiscalPeriodOrdinal = (periodKey: string): number => {
+  const match = /^FY(\d{2,4})-(JUN|JUL|AUG|SEP|OCT|NOV|DEC|JAN|FEB|MAR|APR|MAY)$/u.exec(periodKey);
+  if (!match) return Number.NEGATIVE_INFINITY;
+  const fiscalYear = Number(match[1]);
+  return fiscalYear * 12 + FISCAL_MONTH_INDEX[match[2]];
+};
+
+export const forecastActualPeriodsLatestFirst = (rows: readonly ForecastActualRow[]): string[] =>
+  Array.from(new Set(rows.flatMap((row) => row.months
+    .filter((month) => compareExactDecimals(month.forecastAmount, "0") !== 0
+      || month.actualAmount !== null
+      || month.monthEndProjection !== null)
+    .map((month) => month.periodKey))))
+    .sort((left, right) => fiscalPeriodOrdinal(right) - fiscalPeriodOrdinal(left));
+
 export type ForecastActualSortKey =
   | "salesRep"
   | "account"
