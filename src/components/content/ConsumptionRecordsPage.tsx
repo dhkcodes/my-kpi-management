@@ -2,6 +2,7 @@ import { ComponentChildren, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
+import { formatMtdAppliedDate } from "../../data/mtdDate";
 import {
   ConsumptionPlan,
   ConsumptionPillar,
@@ -724,6 +725,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
+  const currentMtdAppliedDate = formatMtdAppliedDate(currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null);
   const staleMtdPeriods = Object.keys(serverMtdStatuses).filter((period) => serverMtdStatuses[period] === "FINAL_UPLOAD_REQUIRED");
   const loadedAccountCount = renderedRecordAccounts.length;
   const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
@@ -1442,7 +1444,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
               class="consumption-value-cell consumption-mtd-cell">
               <span>{hasCurrentMtd ? formatExactCurrency(currentMtdExact[month]) : "—"}</span>
-              <small>MTD 수집 시각 {serverAccountMtdAsOf[series.customer]?.[month] ?? "미확인"} · MTD 입력 기준일 미확인</small>
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
@@ -1462,7 +1463,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           const controlWarnings = accountLevel ? actualControlsRequiringConfirmation(series.customer, month) : [];
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>
             {value === null ? "—" : currency.format(value)}
-            {mtd ? <small>MTD 수집 시각 {serverAccountMtdAsOf[series.customer]?.[month] ?? "미확인"} · MTD 입력 기준일 미확인</small> : null}
             {controlWarnings.map((control) => <small key={controlKey(control)} class="consumption-control-warning">
               {control.pillar} Control {currency.format(control.controlAmount)} · Detail {control.detailAmount === null ? "—" : currency.format(control.detailAmount)} · 확인 필요
             </small>)}
@@ -1783,13 +1783,13 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           <div>
             <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></div>
           <div class="consumption-table-heading__actions">
+            {showMtd && currentMtdAppliedDate
+              ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
             <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
               disabled={dataMode !== "backend" || !currentMtdPeriod}
               onClick={() => setShowMtd((current) => !current)}>
               <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
             </button>
-            {showMtd && currentMtdPeriod
-              ? <small>MTD 수집 시각 {serverMtdAsOfByPeriod[currentMtdPeriod] ?? "미확인"} · MTD 입력 기준일 미확인 · 계정별 수집 시각은 셀에 표시</small> : null}
             {hasDraftChanges && (
               <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
                 <span>Draft changes</span>

@@ -6,6 +6,7 @@ import { fetchForecastActualComparison, type ForecastActualComparison, type Fore
 import { compareForecastActualRows, forecastActualPeriodsLatestFirst, type ForecastActualSortDirection, type ForecastActualSortKey } from "../../data/forecastActualSort";
 import { compareExactDecimals, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import { FiscalYear } from "../../data/kpiMockData";
+import { formatMtdAppliedDate } from "../../data/mtdDate";
 
 const formatAmount = (value: string | null) => {
   if (value === null) return "N/A";
@@ -23,8 +24,6 @@ const SortIndicator = ({ active, direction }: { active: boolean; direction: Fore
   ? <span class={`forecast-actual-sort-indicator is-${direction}`} aria-hidden="true"></span>
   : null;
 const ScrollChevron = ({ direction }: { direction: "left" | "right" }) => <span class={`forecast-actual-chevron is-${direction}`} aria-hidden="true"></span>;
-const formatAsOf = (value: string | null) => value ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "미확인";
-
 const monthByPeriod = (row: ForecastActualRow, periodKey: string) => row.months.find((month) => month.periodKey === periodKey);
 
 export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) => {
@@ -59,7 +58,6 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    setData(null);
     fetchForecastActualComparison({ fiscalYear, quarter, pillar: pillar as "ALL" | "DP" | "OCI", actualMode, salesRep, account })
       .then((next) => { if (!controller.signal.aborted) setData(next); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load Forecast vs Actual."); })
@@ -100,6 +98,15 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   }), [data, sortKey, sortDirection]);
 
   const periods = useMemo(() => forecastActualPeriodsLatestFirst(data?.rows ?? []), [data]);
+  const mtdAppliedDate = useMemo(() => {
+    const timestamps = (data?.rows ?? []).flatMap((row) => row.months)
+      .filter((month) => month.actualState === "MTD" && month.actualAsOf)
+      .map((month) => month.actualAsOf as string)
+      .map((value) => ({ value, time: new Date(value).getTime() }))
+      .filter(({ time }) => !Number.isNaN(time))
+      .sort((left, right) => left.time - right.time);
+    return formatMtdAppliedDate(timestamps[timestamps.length - 1]?.value);
+  }, [data]);
   const accountOptions = account ? accountOptionCache : (data?.accountOptions ?? accountOptionCache);
   const filteredAccountOptions = useMemo(() => {
     const query = debouncedAccountSearch.toLocaleLowerCase();
@@ -171,9 +178,10 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
 
   return <main class="consumption-page forecast-actual-page" aria-labelledby="forecastActualTitle">
     <header class="consumption-page__header forecast-actual-header">
-      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Forecast vs Actual</span><h1 id="forecastActualTitle">Forecast vs Actual</h1><p>확정된 Actual과 Forecast를 비교하고, MTD는 잠정 참고값으로 분리합니다.</p></div>
+      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Forecast vs Actual</span><h1 id="forecastActualTitle">Forecast vs Actual</h1></div>
       <div class="forecast-actual-header-actions">
         <span class="kpi-section-label">Actual basis</span>
+        {actualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</span>}
         <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
           onClick={() => setActualMode((current) => current === "MTD" ? "FINAL" : "MTD")}>
           <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
@@ -207,10 +215,10 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       </label>
     </section>
 
-    {loading && <div class="forecast-actual-loading" role="status"><oj-progress-circle size="sm" value={-1}></oj-progress-circle><span>Loading comparison…</span></div>}
+    {loading && !data && <div class="forecast-actual-loading" role="status"><oj-progress-circle size="sm" value={-1}></oj-progress-circle><span>Loading comparison…</span></div>}
     {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
 
-    {!loading && !error && data && summary && <>
+    {data && summary && <div class={loading ? "forecast-actual-results is-updating" : "forecast-actual-results"} aria-busy={loading}>
       <div class="forecast-actual-period-note"><strong>{data.fiscalYear} · {data.quarter}</strong><span>{periodSpan}</span><span>{periods.length}개 데이터 월 · 최신 월부터 표시</span></div>
       {actualMode === "MTD" && <section class="forecast-actual-mtd-comparison"><p><strong>월 Forecast · MTD 누적액 · 단순 차이</strong><span>월 중간 참고 비교이며 확정 미달 판정이 아님</span></p></section>}
       <section class="forecast-actual-summary" aria-label="Comparison summary">
@@ -241,14 +249,17 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
                 <td class="is-sticky is-summary"><div class="forecast-actual-fixed-summary"><span>Forecast <strong>{formatAmount(row.fullPeriodForecastAmount)}</strong></span><span>Confirmed Actual <strong>{formatAmount(row.confirmedActualAmount)}</strong></span><span class={tone(row.differenceAmount)}>Difference <strong>{formatAmount(row.differenceAmount)}</strong></span><div class="forecast-actual-statuses"><span class={`forecast-actual-status ${row.actualShortfall ? "is-confirmed-risk" : ""}`}>{row.actualShortfall === null ? "확정 판정 대기" : row.actualShortfall ? "확정 실적 미달" : "확정 실적 충족"}</span><span class={`forecast-actual-status ${row.attention === true ? "is-projection-watch" : ""}`}>{row.attention === null ? "예상 판정 불가" : row.attention ? "예상 기반 주시" : "예상 기준 정상"}</span></div></div></td>
                 {periods.map((periodKey) => {
                   const month = monthByPeriod(row, periodKey);
-                  if (!month) return <td class="forecast-actual-month-cell is-empty"><span>데이터 없음</span></td>;
-                  const mtdDifference = month.actualState === "MTD" && month.actualAmount !== null ? subtractExactDecimals(month.actualAmount, month.forecastAmount) : null;
+                  if (!month) return <td class="forecast-actual-month-cell is-empty"><div class="forecast-actual-month-cell__content"><span>데이터 없음</span></div></td>;
+                  const mtdDifference = month.actualState === "MTD" && month.actualAmount !== null && month.forecastAmount !== null
+                    ? subtractExactDecimals(month.actualAmount, month.forecastAmount) : null;
                   return <td class={`forecast-actual-month-cell ${month.actualState === "MTD" ? "is-provisional" : ""}`}>
-                    <span>월 Forecast <strong>{formatAmount(month.forecastAmount)}</strong></span>
-                    <span>{month.actualState === "MTD" ? "MTD 누적액" : "Actual"} <strong>{formatAmount(month.actualAmount)}</strong></span>
-                    {month.monthEndProjection !== null && <span class="forecast-actual-projection">예상 마감 <strong>{formatAmount(month.monthEndProjection)}</strong></span>}
-                    <span class={tone(month.actualState === "MTD" ? mtdDifference : month.differenceAmount)}>{month.actualState === "MTD" ? "단순 차이" : "Difference"} <strong>{formatAmount(month.actualState === "MTD" ? mtdDifference : month.differenceAmount)}</strong></span>
-                    <small class="forecast-actual-month-state"><strong>{month.actualState === "FINAL" ? "확정 Actual" : month.actualState === "MTD" ? "잠정 MTD" : "미확정"}</strong>{month.actualState === "MTD" && <><span>MTD 수집 시각 {formatAsOf(month.actualAsOf)}</span><span>MTD 입력 기준일: 미확인</span></>}</small>
+                    <div class="forecast-actual-month-cell__content">
+                      <span>월 Forecast <strong>{month.forecastAmount === null ? "미입력" : formatAmount(month.forecastAmount)}</strong></span>
+                      <span>{month.actualState === "MTD" ? "MTD 누적액" : "Actual"} <strong>{formatAmount(month.actualAmount)}</strong></span>
+                      {month.monthEndProjection !== null && <span class="forecast-actual-projection">예상 마감 <strong>{formatAmount(month.monthEndProjection)}</strong></span>}
+                      <span class={tone(month.actualState === "MTD" ? mtdDifference : month.differenceAmount)}>{month.actualState === "MTD" ? "단순 차이" : "Difference"} <strong>{formatAmount(month.actualState === "MTD" ? mtdDifference : month.differenceAmount)}</strong></span>
+                      <small class="forecast-actual-month-state"><strong>{month.actualState === "FINAL" ? "확정 Actual" : month.actualState === "MTD" ? "잠정 MTD" : "미확정"}</strong></small>
+                    </div>
                   </td>;
                 })}
               </tr>)}
@@ -257,6 +268,6 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           </table>
         </div>
       </section>
-    </>}
+    </div>}
   </main>;
 };

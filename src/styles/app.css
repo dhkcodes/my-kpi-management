@@ -4965,8 +4965,8 @@ h4.weekly-activity-section-label--next-week,
   }
 }
 
-.forecast-actual-header-actions { align-items: center; display: grid; gap: .25rem .65rem; grid-template-columns: auto auto; justify-items: start; }
-.forecast-actual-header-actions small { color: var(--oj-core-text-color-secondary); font-size: .72rem; grid-column: 1 / -1; }
+.forecast-actual-header-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .35rem .65rem; justify-content: flex-end; }
+.forecast-actual-header-actions small { color: var(--oj-core-text-color-secondary); font-size: .72rem; }
 .forecast-actual-account-rep { display: none; }
 
 .forecast-actual-filters {
@@ -4998,7 +4998,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-mtd-comparison p { align-items: baseline; display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin: 0 0 .65rem; }
 .forecast-actual-mtd-comparison p span { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
 .forecast-actual-summary { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin-bottom: 1rem; }
-.forecast-actual-summary article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); display: grid; gap: .28rem; min-width: 0; overflow: hidden; padding: .85rem .95rem; }
+.forecast-actual-summary article { background: linear-gradient(180deg, color-mix(in srgb, var(--oj-core-brand-color-1) 5%, var(--oj-core-bg-color-content)), var(--oj-core-bg-color-content) 45%); border: 1px solid var(--oj-core-divider-color); border-top: .2rem solid color-mix(in srgb, var(--oj-core-brand-color-1) 65%, var(--oj-core-divider-color)); border-radius: .55rem; box-shadow: 0 1px 3px rgb(0 0 0 / 7%); display: grid; gap: .2rem; min-width: 0; overflow: hidden; padding: .72rem .85rem; }
 .forecast-actual-summary article > span,
 .forecast-actual-summary small { color: var(--oj-core-text-color-secondary); overflow-wrap: anywhere; }
 .forecast-actual-summary strong { font-size: 1.18rem; font-variant-numeric: tabular-nums; }
@@ -5007,21 +5007,20 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-summary .is-positive strong,
 .forecast-actual-matrix .is-positive { color: #18794e; }
 .forecast-actual-matrix-shell { max-width: 100%; position: relative; }
-.forecast-actual-month-scroll { border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; touch-action: pan-x pan-y; }
-.forecast-actual-month-scroll::-webkit-scrollbar { display: none; }
+.forecast-actual-month-scroll { border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; max-height: min(62vh, 38rem); max-width: 100%; overflow: auto; overscroll-behavior: contain; scrollbar-color: var(--oj-core-divider-color) transparent; scrollbar-width: thin; touch-action: pan-x pan-y; }
 .forecast-actual-month-scroll:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 2px; }
 .forecast-actual-matrix-shell .consumption-scroll-controls { right: .75rem; top: 5rem; }
 .forecast-actual-matrix { border-collapse: separate; border-spacing: 0; min-width: max-content; table-layout: fixed; }
 .forecast-actual-matrix th,
-.forecast-actual-matrix td { background: var(--oj-core-bg-color-content); border-bottom: 1px solid color-mix(in srgb, var(--oj-core-divider-color) 72%, transparent); border-right: 1px solid var(--oj-core-divider-color); box-sizing: border-box; padding: .78rem .85rem; text-align: left; vertical-align: top; width: 13rem; }
+.forecast-actual-matrix td { background: var(--oj-core-bg-color-content); border-bottom: 1px solid color-mix(in srgb, var(--oj-core-divider-color) 72%, transparent); border-right: 1px solid var(--oj-core-divider-color); box-sizing: border-box; padding: .55rem .65rem; text-align: left; vertical-align: top; width: 10.5rem; }
 .forecast-actual-matrix tbody tr:nth-child(even) > td,
 .forecast-actual-matrix tbody tr:nth-child(even) > th { background: color-mix(in srgb, var(--oj-core-bg-color-neutral) 45%, var(--oj-core-bg-color-content)); }
-.forecast-actual-matrix thead th { background: var(--oj-core-bg-color-neutral); position: sticky; top: 0; z-index: 6; }
+.forecast-actual-matrix thead th { background: color-mix(in srgb, var(--oj-core-brand-color-1) 9%, var(--oj-core-bg-color-neutral)); box-shadow: inset 0 -.1rem 0 var(--oj-core-divider-color); position: sticky; top: 0; z-index: 6; }
 .forecast-actual-matrix .is-sticky { position: sticky; z-index: 8; }
 .forecast-actual-matrix thead .is-sticky { z-index: 12; }
-.forecast-actual-matrix .is-account { left: 0; width: 13rem; }
-.forecast-actual-matrix .is-rep { left: 13rem; width: 9rem; }
-.forecast-actual-matrix .is-summary { box-shadow: .45rem 0 .65rem -.65rem rgb(0 0 0 / 50%); left: 22rem; width: 13rem; }
+.forecast-actual-matrix .is-account { left: 0; width: 10rem; }
+.forecast-actual-matrix .is-rep { left: 10rem; width: 7.5rem; }
+.forecast-actual-matrix .is-summary { box-shadow: .55rem 0 .8rem -.7rem rgb(0 0 0 / 50%); left: 17.5rem; width: 11rem; }
 .forecast-actual-sort-button { align-items: center; appearance: none; background: transparent; border: 0; border-radius: .25rem; color: inherit; cursor: pointer; display: inline-flex; font: inherit; font-weight: 750; gap: .45rem; min-height: 2rem; padding: .2rem .3rem; text-align: left; }
 .forecast-actual-sort-button:hover { background: var(--oj-core-bg-color-hover); }
 .forecast-actual-sort-button:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 1px; }
@@ -5032,12 +5031,12 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-chevron.is-left { transform: rotate(135deg); }
 .forecast-actual-chevron.is-right { transform: rotate(-45deg); }
 .forecast-actual-fixed-summary,
-.forecast-actual-month-cell { display: grid; gap: .38rem; }
+.forecast-actual-month-cell__content { display: grid; gap: .28rem; min-height: 0; }
 .forecast-actual-fixed-summary > span,
-.forecast-actual-month-cell > span { align-items: baseline; color: var(--oj-core-text-color-secondary); display: flex; flex-wrap: wrap; font-size: .74rem; gap: .25rem .65rem; justify-content: space-between; }
+.forecast-actual-month-cell__content > span { align-items: baseline; color: var(--oj-core-text-color-secondary); display: flex; flex-wrap: wrap; font-size: .74rem; gap: .25rem .65rem; justify-content: space-between; }
 .forecast-actual-month-cell .forecast-actual-projection { color: var(--oj-core-text-color-secondary); font-style: italic; }
 .forecast-actual-fixed-summary > span strong,
-.forecast-actual-month-cell > span strong { color: var(--oj-core-text-color-primary); font-size: .86rem; font-variant-numeric: tabular-nums; margin-left: auto; text-align: right; white-space: nowrap; }
+.forecast-actual-month-cell__content > span strong { color: var(--oj-core-text-color-primary); font-size: .86rem; font-variant-numeric: tabular-nums; margin-left: auto; text-align: right; white-space: nowrap; }
 .forecast-actual-month-cell small { border-top: 1px solid var(--oj-core-divider-color); color: var(--oj-core-text-color-secondary); margin-top: .15rem; padding-top: .35rem; }
 .forecast-actual-month-cell.is-provisional { box-shadow: inset .18rem 0 0 #a97818; }
 .forecast-actual-month-cell.is-empty { color: var(--oj-core-text-color-secondary); }
@@ -5050,7 +5049,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-status.is-projection-watch { border-color: #d7c89e; }
 .consumption-analysis-mtd-control small,
 .consumption-table-heading__actions > small { color: var(--oj-core-text-color-secondary); display: block; font-size: .72rem; }
-.consumption-mtd-cell small { display: block; font-size: .68rem; margin-top: .2rem; white-space: normal; }
+.consumption-mtd-applied-date { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .forecast-actual-loading { align-items: center; display: flex; gap: .75rem; justify-content: center; min-height: 0; padding: 1.25rem 0; }
 .forecast-actual-page .consumption-inline-error { margin: 0; min-height: 0; padding: .75rem 1rem; }
 .forecast-actual-fy-summary {

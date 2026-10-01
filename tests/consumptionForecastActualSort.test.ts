@@ -62,7 +62,7 @@ const periodRows = [
     { periodKey: "FY27-MAY", forecastAmount: "0", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null }
   ] })
 ];
-assert.deepEqual(forecastActualPeriodsLatestFirst(periodRows), ["FY27-JAN", "FY27-DEC", "FY27-JUL", "FY27-JUN"],
-  "actual fiscal chronology must put the latest data-bearing month on the left, including the FY year rollover, without empty future months");
+assert.deepEqual(forecastActualPeriodsLatestFirst(periodRows), ["FY27-MAY", "FY27-JAN", "FY27-DEC", "FY27-JUL", "FY27-JUN"],
+ "fiscal chronology must put every forecast-bearing month, including an explicit zero forecast, latest first");
 
 console.log("consumptionForecastActualSort.test.ts: all assertions passed");

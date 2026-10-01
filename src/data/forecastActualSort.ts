@@ -15,7 +15,7 @@ const fiscalPeriodOrdinal = (periodKey: string): number => {
 
 export const forecastActualPeriodsLatestFirst = (rows: readonly ForecastActualRow[]): string[] =>
   Array.from(new Set(rows.flatMap((row) => row.months
-    .filter((month) => compareExactDecimals(month.forecastAmount, "0") !== 0
+    .filter((month) => month.forecastAmount !== null
       || month.actualAmount !== null
       || month.monthEndProjection !== null)
     .map((month) => month.periodKey))))

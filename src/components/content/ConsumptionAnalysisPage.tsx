@@ -1,6 +1,7 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
+import { formatMtdAppliedDate } from "../../data/mtdDate";
 import {
   ConsumptionAnalysis,
   ConsumptionAnalysisAlert,
@@ -314,6 +315,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactCurrency(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
+  const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdSummary?.asOf);
   if (!analysis && (loading || hasStaleFiscalYearResponse)) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
     <p>Loading Consumption Analysis...</p>
@@ -415,12 +417,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-analysis-mtd-control">
+          {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</small> : null}
           <span class="kpi-section-label">MTD</span>
           <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd} class="consumption-mtd-switch"
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
             <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>
-          {includeMtd ? <small>MTD 수집 시각 {analysis.mtdSummary?.asOf ?? "미확인"} · MTD 입력 기준일 미확인</small> : null}
+
         </div>
         <div class="consumption-insights-export">
           <span>Export</span>

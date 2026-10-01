@@ -1447,7 +1447,7 @@ export type ForecastActualSummary = Readonly<{
 }>;
 export type ForecastActualMonth = Readonly<{
   periodKey: string;
-  forecastAmount: string;
+  forecastAmount: string | null;
   actualAmount: string | null;
   actualState: ForecastActualMode | null;
   actualAsOf: string | null;
@@ -1572,9 +1572,9 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
             || (month.actualState !== null && month.actualState !== undefined && !isActualMode(month.actualState))
             || (month.actualAsOf !== null && month.actualAsOf !== undefined
               && (typeof month.actualAsOf !== "string" || !isForecastActualAsOf(month.actualAsOf)))) throw new Error("Malformed Forecast vs Actual response");
-          return { periodKey: month.periodKey, forecastAmount: forecastActualAmount(month.forecastAmount),
-            actualAmount: nullableForecastActualAmount(month.actualAmount), actualState: month.actualState ?? null,
-            actualAsOf: month.actualAsOf ?? null,
+          return { periodKey: month.periodKey, forecastAmount: nullableForecastActualAmount(month.forecastAmount),
+            actualAmount: nullableForecastActualAmount(month.actualAmount), actualState: (month.actualState ?? null) as ForecastActualMode | null,
+            actualAsOf: (month.actualAsOf ?? null) as string | null,
             differenceAmount: nullableForecastActualAmount(month.differenceAmount, false), differencePercent: nullableForecastActualAmount(month.differencePercent, false),
             monthEndProjection: nullableForecastActualAmount(month.monthEndProjection) };
         }) };
