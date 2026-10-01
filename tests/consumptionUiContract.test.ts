@@ -544,6 +544,8 @@ assert.match(forecastActualPage, /const actualDifference = month\.actualState ==
   "FINAL variance and MTD reference variance keep separate inputs");
 assert.match(forecastActualPage, /forecastActualPeriodsLatestFirst/, "monthly values use fiscal-year-aware latest-first ordering");
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
+assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
+  "Consumption Analysis displays authoritative MTD metadata even when MTD amounts are excluded");
 assert.match(forecastActualPage, /monthScrollRef[\s\S]*handleMonthScrollKeyDown[\s\S]*scrollMonths/, "Forecast vs Actual provides synchronized month scrolling with buttons and keyboard controls");
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account,[\s\S]*\.forecast-actual-matrix tbody \.is-rep[^{]*\{[^}]*position:\s*sticky/,
   "Forecast vs Actual keeps Account and Sales Rep fixed while grouped months scroll");
