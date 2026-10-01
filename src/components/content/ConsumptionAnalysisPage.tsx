@@ -315,7 +315,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactCurrency(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdSummary?.asOf);
+  const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
   if (!analysis && (loading || hasStaleFiscalYearResponse)) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
     <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
     <p>Loading Consumption Analysis...</p>
@@ -417,7 +417,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-analysis-mtd-control">
-          {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</small> : null}
+          {mtdAppliedDate ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</small> : null}
           <span class="kpi-section-label">MTD</span>
           <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd} class="consumption-mtd-switch"
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
