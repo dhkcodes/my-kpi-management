@@ -1436,12 +1436,12 @@ export const saveConsumptionForecasts = async (etag: string,
 
 export type ForecastActualMode = "FINAL" | "MTD";
 export type ForecastActualSummary = Readonly<{
-  confirmedActualAmount: string;
+  confirmedActualAmount: string | null;
   confirmedForecastAmount: string;
-  confirmedDifferenceAmount: string;
+  confirmedDifferenceAmount: string | null;
   confirmedDifferencePercent: string | null;
   fullPeriodForecastAmount: string;
-  projectedAmount: string;
+  projectedAmount: string | null;
   attentionAccountCount: number;
   accountCount: number;
 }>;
@@ -1493,12 +1493,12 @@ const forecastActualAmount = (value: unknown): string => {
 const nullableForecastActualAmount = (value: unknown): string | null => value === null || value === undefined
   ? null : forecastActualAmount(value);
 const decodeForecastSummary = (value: Record<string, unknown>): ForecastActualSummary => ({
-  confirmedActualAmount: forecastActualAmount(value.confirmedActualAmount),
+  confirmedActualAmount: nullableForecastActualAmount(value.confirmedActualAmount),
   confirmedForecastAmount: forecastActualAmount(value.confirmedForecastAmount),
-  confirmedDifferenceAmount: forecastActualAmount(value.confirmedDifferenceAmount),
+  confirmedDifferenceAmount: nullableForecastActualAmount(value.confirmedDifferenceAmount),
   confirmedDifferencePercent: nullableForecastActualAmount(value.confirmedDifferencePercent),
   fullPeriodForecastAmount: forecastActualAmount(value.fullPeriodForecastAmount),
-  projectedAmount: forecastActualAmount(value.projectedAmount),
+  projectedAmount: nullableForecastActualAmount(value.projectedAmount),
   attentionAccountCount: Number(value.attentionAccountCount),
   accountCount: Number(value.accountCount)
 });
