@@ -419,6 +419,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [serverMtdTotals, setServerMtdTotals] = useState<Record<string, string>>({});
   const [serverMtdStatuses, setServerMtdStatuses] = useState<Record<string, "PROVISIONAL" | "FINAL_UPLOAD_REQUIRED">>({});
   const [serverAccountMtdTotals, setServerAccountMtdTotals] = useState<Record<string, Record<string, string>>>({});
+  const [serverMtdAsOfByPeriod, setServerMtdAsOfByPeriod] = useState<Record<string, string>>({});
+  const [serverAccountMtdAsOf, setServerAccountMtdAsOf] = useState<Record<string, Record<string, string>>>({});
   const [showMtd, setShowMtd] = useState(false);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
@@ -602,6 +604,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setServerActualTotals({ ...page.totals.actualByPeriod });
       setServerMtdTotals({ ...(page.totals.mtdByPeriod ?? {}) });
       setServerMtdStatuses({ ...(page.totals.mtdStatusByPeriod ?? {}) });
+      setServerMtdAsOfByPeriod({ ...(page.totals.mtdAsOfByPeriod ?? {}) });
       setServerAccountActualTotals((current) => {
         const next = append ? { ...current } : {};
         page.accountGroups.forEach((group) => { next[group.account] = { ...group.totals.actualByPeriod }; });
@@ -610,6 +613,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setServerAccountMtdTotals((current) => {
         const next = append ? { ...current } : {};
         page.accountGroups.forEach((group) => { next[group.account] = { ...(group.totals.mtdByPeriod ?? {}) }; });
+        return next;
+      });
+      setServerAccountMtdAsOf((current) => {
+        const next = append ? { ...current } : {};
+        page.accountGroups.forEach((group) => { next[group.account] = { ...(group.totals.mtdAsOfByPeriod ?? {}) }; });
         return next;
       });
       setRecordsNextOffset(page.nextOffset);
@@ -664,6 +672,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         setServerMtdTotals({});
         setServerMtdStatuses({});
         setServerAccountMtdTotals({});
+        setServerMtdAsOfByPeriod({});
+        setServerAccountMtdAsOf({});
         setRecordAccountNames(aggregateConsumptionAccounts(fallbackPlans).map((account) => account.customer));
         setRecordsNextOffset(aggregateConsumptionAccounts(fallbackPlans).length);
         setRecordsHasMore(false);
@@ -1432,6 +1442,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             if (mtd) return <td key={key} data-control-cell={`${series.customer}:${month}`} data-readonly="mtd"
               class="consumption-value-cell consumption-mtd-cell">
               <span>{hasCurrentMtd ? formatExactCurrency(currentMtdExact[month]) : "—"}</span>
+              {serverAccountMtdAsOf[series.customer]?.[month] ? <small>MTD imported {serverAccountMtdAsOf[series.customer][month]}</small> : null}
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
@@ -1451,6 +1462,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           const controlWarnings = accountLevel ? actualControlsRequiringConfirmation(series.customer, month) : [];
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>
             {value === null ? "—" : currency.format(value)}
+            {mtd && serverAccountMtdAsOf[series.customer]?.[month] ? <small>MTD imported {serverAccountMtdAsOf[series.customer][month]}</small> : null}
             {controlWarnings.map((control) => <small key={controlKey(control)} class="consumption-control-warning">
               {control.pillar} Control {currency.format(control.controlAmount)} · Detail {control.detailAmount === null ? "—" : currency.format(control.detailAmount)} · 확인 필요
             </small>)}
@@ -1776,6 +1788,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               onClick={() => setShowMtd((current) => !current)}>
               <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
             </button>
+            {showMtd && currentMtdPeriod && serverMtdAsOfByPeriod[currentMtdPeriod]
+              ? <small>Latest MTD import {serverMtdAsOfByPeriod[currentMtdPeriod]} · account timestamps shown in cells</small> : null}
             {hasDraftChanges && (
               <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
                 <span>Draft changes</span>
