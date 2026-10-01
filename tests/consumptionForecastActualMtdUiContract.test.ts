@@ -60,6 +60,6 @@ assert.match(page, /onKeyDown=\{handleMonthScrollKeyDown\}/u);
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);
-assert.match(analysis, /\{mtdAppliedDate \? <small class="consumption-mtd-applied-date">/u);
+assert.match(analysis, /\{mtdPeriodLabel && mtdAppliedDate[\s\S]*<small class="consumption-mtd-applied-date">MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}<\/small>/u);
 
 console.log("forecast actual MTD UI contract tests passed");
