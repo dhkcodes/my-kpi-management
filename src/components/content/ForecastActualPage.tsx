@@ -97,7 +97,8 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     return compared || left.account.localeCompare(right.account, undefined, { sensitivity: "base" });
   }), [data, sortKey, sortDirection]);
 
-  const periods = useMemo(() => forecastActualPeriodsLatestFirst(data?.rows ?? []), [data]);
+  const periods = useMemo(() => forecastActualPeriodsLatestFirst(data?.rows ?? [], data?.comparisonPeriods ?? []), [data]);
+  const displayedActualMode = data?.actualMode ?? actualMode;
   const mtdAppliedDate = useMemo(() => {
     const timestamps = (data?.rows ?? []).flatMap((row) => row.months)
       .filter((month) => month.actualState === "MTD" && month.actualAsOf)
@@ -181,12 +182,13 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Forecast vs Actual</span><h1 id="forecastActualTitle">Forecast vs Actual</h1></div>
       <div class="forecast-actual-header-actions">
         <span class="kpi-section-label">Actual basis</span>
-        {actualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</span>}
+        {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">MTD 반영 일자 {mtdAppliedDate}</span>}
         <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
           onClick={() => setActualMode((current) => current === "MTD" ? "FINAL" : "MTD")}>
           <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
         </button>
-        <small>{actualMode === "MTD" ? "MTD ON · 잠정 참고 비교" : "FINAL · 확정 실적 비교"}</small>
+        <small>{displayedActualMode === "MTD" ? "MTD ON · 잠정 참고 비교" : "FINAL · 확정 실적 비교"}</small>
+        {loading && data && <small role="status">Updating comparison…</small>}
       </div>
     </header>
 
