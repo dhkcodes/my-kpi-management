@@ -15,6 +15,8 @@ assert.doesNotMatch(app, /sessionStorage|readAuthSession|writeAuthSession/, "cli
 assert.match(app, /logoutUser[\s\S]*\.then\([\s\S]*setSession\(null\)/, "logout clears client state only after server invalidation succeeds");
 assert.doesNotMatch(app, /logoutUser\(\)\.finally/, "failed logout cannot appear successful while the server cookie remains valid");
 assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back remains guarded after logout");
+assert.match(login, /Know the pulse, Act on it\. Perform\./, "login, activation, and password-reset views use the approved product name");
+assert.doesNotMatch(login, /My KPI &amp; Account Planner/);
 assert.match(login, /id="kapLoginUserId"[\s\S]*id="kapLoginPassword"[\s\S]*id="kapLoginSubmit"/, "the Redwood sign-in form exposes stable controls");
 assert.match(login, /role="alert"/, "credential failures are announced");
 assert.match(login, /authenticateUser\(submittedLoginId, submittedPassword\)/, "the sign-in form delegates live credentials to the Backend auth API");

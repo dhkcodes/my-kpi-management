@@ -105,10 +105,10 @@ assert.match(cssSource, /\.kpi-menu-link \.kpi-navigation-code-badge\s*\{[\s\S]*
 assert.match(headerSource, /aria-controls="kpiNavigationPopup"[\s\S]*navigationOpen \? "oj-ux-ico-close" : "oj-ux-ico-menu"/, "the existing first header button controls the popup and exposes distinct open/closed icons");
 assert.match(appSource, /const closeNavigation = \(\) => \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*navigationPopupRef\.current\?\.close\(\);\s*\}/s, "all close paths update the launcher icon before the popup closing animation completes");
 assert.match(appSource, /if \(popup\.isOpen\(\)\) \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*popup\.close\(\);\s*\} else \{\s*navigationIntentOpenRef\.current = true;\s*setNavigationOpen\(true\);\s*popup\.open\(launcher\);\s*\}/s, "the launcher icon updates optimistically before the popup animation completes");
-assert.match(appSource, /appName = "My KPI & Account Planner"/, "the authenticated header uses the approved product title");
+assert.match(appSource, /appName = "Know the pulse, Act on it\. Perform\."/, "the authenticated header uses the approved product title");
 assert.match(appSource, /onojOpen=\{\(\) => setNavigationOpen\(navigationIntentOpenRef\.current\)\}/, "a queued close intent cannot be overwritten by a stale popup-open event");
-assert.match(headerSource, /class="kpi-header__brand" aria-label="KAP"/, "the header brand exposes the visible KAP product mark");
-assert.match(indexSource, /<title>My KPI &amp; Account Planner<\/title>/, "the HTML document title uses the approved product name");
+assert.match(headerSource, /class="kpi-header__brand" aria-label="Know the pulse, Act on it\. Perform\."/, "the header brand exposes the approved product name");
+assert.match(indexSource, /<title>Know the pulse, Act on it\. Perform\.<\/title>/, "the HTML document title uses the approved product name");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
 assert.match(appSource, /anchor\.closest\("#kpiNavigationPopup"\)/, "the document capture guard does not compete with popup leaf navigation");
 assert.match(appSource, /const handleNavigate = \(navigationId: string, onAccepted\?: \(\) => void\)/, "popup close can be deferred until navigation is accepted");

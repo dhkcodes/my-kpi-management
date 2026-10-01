@@ -153,7 +153,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
             : actionLabel;
 
   return <main class="kap-login-page oj-bg-neutral-0"><section class="kap-login-card" aria-labelledby="kapLoginTitle">
-    <div class="kap-login-brand"><span class="kap-login-brand__mark" aria-hidden="true">K</span><div><strong>My KPI &amp; Account Planner</strong><span>Secure workspace access</span></div></div>
+    <div class="kap-login-brand"><span class="kap-login-brand__mark" aria-hidden="true">K</span><div><strong>Know the pulse, Act on it. Perform.</strong><span>Secure workspace access</span></div></div>
     <h1 id="kapLoginTitle">{title}</h1>
     {mode === "signIn" && <p>Use your assigned application account.</p>}
     {mode === "forgot" && <p>Enter your Login ID. If the account is eligible, the reset-link flow will issue a one-time password reset URL. It never creates a temporary password.</p>}

@@ -781,7 +781,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
 export const App = registerCustomElement(
   "app-root",
-  ({ appName = "My KPI & Account Planner" }: Props) => {
+  ({ appName = "Know the pulse, Act on it. Perform." }: Props) => {
     const [session, setSession] = useState<AuthSession | null>(null);
     const [authChecking, setAuthChecking] = useState(true);
 

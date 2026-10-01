@@ -13,16 +13,9 @@ const fiscalPeriodOrdinal = (periodKey: string): number => {
   return fiscalYear * 12 + FISCAL_MONTH_INDEX[match[2]];
 };
 
-export const forecastActualPeriodsLatestFirst = (
-  rows: readonly ForecastActualRow[],
-  comparisonPeriods: readonly string[]
-): string[] => {
-  const quarterPeriods = new Set(comparisonPeriods);
-  return Array.from(new Set(rows.flatMap((row) => row.months
-    .filter((month) => quarterPeriods.has(month.periodKey) && month.forecastAmount !== null)
-    .map((month) => month.periodKey))))
+export const forecastActualPeriodsLatestFirst = (fullForecastPeriods: readonly string[]): string[] =>
+  Array.from(new Set(fullForecastPeriods))
     .sort((left, right) => fiscalPeriodOrdinal(right) - fiscalPeriodOrdinal(left));
-};
 
 export type ForecastActualSortKey =
   | "salesRep"
