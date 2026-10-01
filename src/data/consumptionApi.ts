@@ -1492,6 +1492,17 @@ const forecastActualAmount = (value: unknown, nonNegative = true): string => {
 };
 const nullableForecastActualAmount = (value: unknown, nonNegative = true): string | null => value === null || value === undefined
   ? null : forecastActualAmount(value, nonNegative);
+const forecastActualCount = (value: unknown): number => {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new Error("Malformed Forecast vs Actual response");
+  return value;
+};
+const FORECAST_FISCAL_YEAR_PATTERN = /^FY\d{2,4}$/;
+const FORECAST_QUARTER_PATTERN = /^(?:ALL|Q[1-4])$/;
+const FORECAST_PERIOD_PATTERN = /^FY\d{2,4}-(?:JUN|JUL|AUG|SEP|OCT|NOV|DEC|JAN|FEB|MAR|APR|MAY)$/;
+const FORECAST_OFFSET_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const isForecastPeriod = (value: unknown): value is string => typeof value === "string" && FORECAST_PERIOD_PATTERN.test(value);
+const isForecastActualAsOf = (value: string): boolean => FORECAST_OFFSET_DATE_TIME_PATTERN.test(value)
+  && Number.isFinite(Date.parse(value));
 const decodeForecastSummary = (value: Record<string, unknown>): ForecastActualSummary => ({
   confirmedActualAmount: nullableForecastActualAmount(value.confirmedActualAmount),
   confirmedForecastAmount: forecastActualAmount(value.confirmedForecastAmount),
@@ -1499,8 +1510,8 @@ const decodeForecastSummary = (value: Record<string, unknown>): ForecastActualSu
   confirmedDifferencePercent: nullableForecastActualAmount(value.confirmedDifferencePercent, false),
   fullPeriodForecastAmount: forecastActualAmount(value.fullPeriodForecastAmount),
   projectedAmount: nullableForecastActualAmount(value.projectedAmount),
-  attentionAccountCount: Number(value.attentionAccountCount),
-  accountCount: Number(value.accountCount)
+  attentionAccountCount: forecastActualCount(value.attentionAccountCount),
+  accountCount: forecastActualCount(value.accountCount)
 });
 
 export const fetchForecastActualComparison = async (filters: Readonly<{
@@ -1518,25 +1529,36 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
   const { payload } = await request(`/consumption/forecast-vs-actual?${query}`);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast vs Actual response");
   const raw = payload as Record<string, unknown>;
-  if (!Array.isArray(raw.rows) || !Array.isArray(raw.salesRepOptions) || !Array.isArray(raw.accountOptions)
-    || !Array.isArray(raw.comparisonPeriods) || !Array.isArray(raw.fullForecastPeriods)
+  const stringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+  const isActualMode = (value: unknown): value is ForecastActualMode => value === "FINAL" || value === "MTD";
+  const isPillar = (value: unknown): value is ConsumptionPillar => value === "ALL" || value === "DP" || value === "OCI";
+  if (!Array.isArray(raw.rows) || !stringArray(raw.salesRepOptions) || !stringArray(raw.accountOptions)
+    || !stringArray(raw.comparisonPeriods) || !stringArray(raw.fullForecastPeriods)
+    || typeof raw.fiscalYear !== "string" || !FORECAST_FISCAL_YEAR_PATTERN.test(raw.fiscalYear)
+    || typeof raw.quarter !== "string" || !FORECAST_QUARTER_PATTERN.test(raw.quarter) || !isPillar(raw.selectedPillar)
+    || !raw.comparisonPeriods.every(isForecastPeriod) || !raw.fullForecastPeriods.every(isForecastPeriod)
+    || !isActualMode(raw.actualMode)
+    || (raw.selectedSalesRep !== null && raw.selectedSalesRep !== undefined && typeof raw.selectedSalesRep !== "string")
+    || (raw.selectedAccount !== null && raw.selectedAccount !== undefined && typeof raw.selectedAccount !== "string")
+    || (raw.projectionFormula !== null && raw.projectionFormula !== undefined && typeof raw.projectionFormula !== "string")
     || typeof raw.summary !== "object" || raw.summary === null
     || typeof raw.fiscalYearSummary !== "object" || raw.fiscalYearSummary === null) throw new Error("Malformed Forecast vs Actual response");
   return {
-    fiscalYear: String(raw.fiscalYear), quarter: String(raw.quarter), selectedPillar: raw.selectedPillar as ConsumptionPillar,
-    selectedSalesRep: String(raw.selectedSalesRep ?? ""), selectedAccount: String(raw.selectedAccount ?? ""),
-    salesRepOptions: raw.salesRepOptions.map(String), accountOptions: raw.accountOptions.map(String),
-    actualMode: raw.actualMode as ForecastActualMode, comparisonPeriods: raw.comparisonPeriods.map(String),
-    fullForecastPeriods: raw.fullForecastPeriods.map(String), projectionFormula: String(raw.projectionFormula ?? ""),
+    fiscalYear: raw.fiscalYear as string, quarter: raw.quarter as string, selectedPillar: raw.selectedPillar,
+    selectedSalesRep: (raw.selectedSalesRep ?? "") as string, selectedAccount: (raw.selectedAccount ?? "") as string,
+    salesRepOptions: raw.salesRepOptions, accountOptions: raw.accountOptions,
+    actualMode: raw.actualMode, comparisonPeriods: raw.comparisonPeriods,
+    fullForecastPeriods: raw.fullForecastPeriods, projectionFormula: raw.projectionFormula ?? "",
     summary: decodeForecastSummary(raw.summary as Record<string, unknown>),
     fiscalYearSummary: decodeForecastSummary(raw.fiscalYearSummary as Record<string, unknown>),
     rows: raw.rows.map((value) => {
       if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast vs Actual response");
       const row = value as Record<string, unknown>;
-      if (!Array.isArray(row.months)) throw new Error("Malformed Forecast vs Actual response");
+      if (!Array.isArray(row.months) || typeof row.account !== "string"
+        || (row.salesRep !== null && row.salesRep !== undefined && typeof row.salesRep !== "string")) throw new Error("Malformed Forecast vs Actual response");
       if ((row.actualShortfall !== null && row.actualShortfall !== undefined && typeof row.actualShortfall !== "boolean")
         || (row.attention !== null && row.attention !== undefined && typeof row.attention !== "boolean")) throw new Error("Malformed Forecast vs Actual response");
-      return { salesRep: String(row.salesRep ?? ""), account: String(row.account ?? ""),
+      return { salesRep: (row.salesRep ?? "") as string, account: row.account,
         confirmedActualAmount: nullableForecastActualAmount(row.confirmedActualAmount),
         confirmedForecastAmount: forecastActualAmount(row.confirmedForecastAmount),
         differenceAmount: nullableForecastActualAmount(row.differenceAmount, false), differencePercent: nullableForecastActualAmount(row.differencePercent, false),
@@ -1546,9 +1568,13 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
         months: row.months.map((monthValue) => {
           if (typeof monthValue !== "object" || monthValue === null) throw new Error("Malformed Forecast vs Actual response");
           const month = monthValue as Record<string, unknown>;
-          return { periodKey: String(month.periodKey), forecastAmount: forecastActualAmount(month.forecastAmount),
-            actualAmount: nullableForecastActualAmount(month.actualAmount), actualState: (month.actualState ?? null) as ForecastActualMode | null,
-            actualAsOf: month.actualAsOf == null ? null : String(month.actualAsOf),
+          if (typeof month.periodKey !== "string" || !isForecastPeriod(month.periodKey)
+            || (month.actualState !== null && month.actualState !== undefined && !isActualMode(month.actualState))
+            || (month.actualAsOf !== null && month.actualAsOf !== undefined
+              && (typeof month.actualAsOf !== "string" || !isForecastActualAsOf(month.actualAsOf)))) throw new Error("Malformed Forecast vs Actual response");
+          return { periodKey: month.periodKey, forecastAmount: forecastActualAmount(month.forecastAmount),
+            actualAmount: nullableForecastActualAmount(month.actualAmount), actualState: month.actualState ?? null,
+            actualAsOf: month.actualAsOf ?? null,
             differenceAmount: nullableForecastActualAmount(month.differenceAmount, false), differencePercent: nullableForecastActualAmount(month.differencePercent, false),
             monthEndProjection: nullableForecastActualAmount(month.monthEndProjection) };
         }) };
