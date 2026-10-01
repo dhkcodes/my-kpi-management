@@ -531,17 +531,18 @@ assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale c
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
 assert.match(forecastActualPage, /aria-label="Include MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
   "Forecast vs Actual exposes the shared MTD switch");
-assert.match(forecastActualPage, /<span>Forecast<\/span>[\s\S]*<span>Actual<\/span>[\s\S]*<span>Difference<\/span>/,
-  "summary uses Forecast, Actual, and Difference labels without Confirmed");
-assert.match(forecastActualPage, /FINAL periods only/, "Actual summary states its finalized-period scope");
+assert.match(forecastActualPage, /확정 미달[\s\S]*MTD 미달 예상[\s\S]*Accounts/,
+  "summary cards show deduplicated problem-account counts and the current account scope");
+assert.doesNotMatch(forecastActualPage, /Full-period summary|FINAL periods only/,
+  "misleading mixed-period summary columns are removed from the monthly matrix");
 assert.match(forecastActualPage, /미확정[\s\S]*비교 불가/, "missing Actual and impossible comparisons stay distinct");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
 assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf[\s\S]*formatMtdAppliedDate/, "Forecast vs Actual derives one header date from actual MTD import timestamps");
-assert.match(forecastActualPage, /row\.attention === null \? "불가" : row\.attention \? "주의" : "정상"/,
-  "projection decision is rendered as the requested three-state badge");
-assert.match(forecastActualPage, /const actualDifference = month\.actualState === "MTD"[\s\S]*subtractExactDecimals/,
-  "FINAL variance and MTD reference variance keep separate inputs");
+assert.match(forecastActualPage, /assessForecastActualMonth\(month\)[\s\S]*assessment\.label/,
+  "monthly Difference and status use the explicit FINAL/MTD assessment contract");
+assert.doesNotMatch(forecastActualPage, /actualState === "MTD"[^\n]*subtractExactDecimals/,
+  "raw MTD cumulative variance is not presented as a month-end projection Difference");
 assert.match(forecastActualPage, /forecastActualPeriodsLatestFirst/, "monthly values use fiscal-year-aware latest-first ordering");
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
 assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
@@ -550,7 +551,7 @@ assert.match(forecastActualPage, /monthScrollRef[\s\S]*handleMonthScrollKeyDown[
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account,[\s\S]*\.forecast-actual-matrix tbody \.is-rep[^{]*\{[^}]*position:\s*sticky/,
   "Forecast vs Actual keeps Account and Sales Rep fixed while grouped months scroll");
 assert.match(forecastActualSort, /compareNullableDecimal[\s\S]*compareExactDecimals[\s\S]*key === "forecast"[\s\S]*key === "actual"[\s\S]*key === "projected"[\s\S]*key\.slice\("month:"\.length\)/, "Forecast vs Actual numeric sort keys use exact-decimal comparison");
-assert.match(forecastActualPage, /setQuarter[\s\S]*setSalesRep\(""\)[\s\S]*setAccount\(""\)/, "Quarter changes clear stale dependent filters");
+assert.match(forecastActualPage, /setQuarter\(event\.currentTarget\.value\); setSalesRep\(""\); resetAccountScope\(\)/, "Quarter changes clear stale dependent filters");
 assert.match(forecastActualPage, /useEffect\(\(\) => \{[\s\S]*setSalesRep\(""\)[\s\S]*setAccount\(""\)[\s\S]*\}, \[fiscalYear\]\)/,
   "Fiscal Year changes from the shared page context clear stale Sales Rep and Account filters before requesting the new scope");
 assert.match(forecastActualPage, /onInput[\s\S]*setAccount\(""\)/, "typing away from a selected Account clears the hidden applied filter");

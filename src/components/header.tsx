@@ -43,10 +43,10 @@ export function Header({ profile, navigationOpen, onToggleNavigation, onNavigate
               <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
             </oj-button>
           </span>
-          <div class="kpi-header__brand" aria-label="KAP">
+          <div class="kpi-header__brand" aria-label="Know the pulse, Act on it. Perform.">
             <picture class="kap-header-picture">
               <source media="(max-width: 720px)" srcSet={selectedKapHeaderLogo.iconSrc} />
-              <img class="kap-header-wordmark" src={selectedKapHeaderLogo.src} alt="KAP" data-variant={selectedKapHeaderLogo.variant} />
+              <img class="kap-header-wordmark" src={selectedKapHeaderLogo.src} alt="Know the pulse, Act on it. Perform." data-variant={selectedKapHeaderLogo.variant} />
             </picture>
             <img class="kpi-header__oracle-logo" src="styles/images/oracle_logo.svg" alt="Oracle" />
           </div>

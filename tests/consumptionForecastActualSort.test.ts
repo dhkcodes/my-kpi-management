@@ -66,9 +66,9 @@ const periodRows = [
   ] })
 ];
 assert.deepEqual(
-  forecastActualPeriodsLatestFirst(periodRows, ["FY27-JUN", "FY27-JUL", "FY27-MAY", "FY27-APR", "FY27-MAR"]),
-  ["FY27-MAY", "FY27-JUL", "FY27-JUN"],
-  "periods must be quarter-scoped, Forecast-bearing only, preserve explicit zero, and sort latest first"
+  forecastActualPeriodsLatestFirst(["FY27-JUN", "FY27-JUL", "FY27-MAY", "FY27-APR", "FY27-MAR"]),
+  ["FY27-MAY", "FY27-APR", "FY27-MAR", "FY27-JUL", "FY27-JUN"],
+  "authoritative quarter-scoped fullForecastPeriods must remain visible and sort latest first even when rows omit a month"
 );
 
 assert.equal(formatMtdAppliedDate(null), null);
