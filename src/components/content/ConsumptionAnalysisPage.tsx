@@ -420,7 +420,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
             <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>
-          {includeMtd && analysis.mtdSummary?.asOf ? <small>Latest MTD import {analysis.mtdSummary.asOf}</small> : null}
+          {includeMtd ? <small>MTD 수집 시각 {analysis.mtdSummary?.asOf ?? "미확인"} · MTD 입력 기준일 미확인</small> : null}
         </div>
         <div class="consumption-insights-export">
           <span>Export</span>

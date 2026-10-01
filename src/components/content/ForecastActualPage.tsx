@@ -7,17 +7,20 @@ import { compareExactDecimals, formatExactCurrency } from "../../data/exactDecim
 import "ojs/ojprogress-circle";
 
 const money = (value: string | null) => value === null ? "N/A" : formatExactCurrency(value);
+const actualMoney = (value: string | null) => value === null ? "미확정" : formatExactCurrency(value);
 const monthLabel = (periodKey: string) => {
   const parts = periodKey.split("-");
   return parts[parts.length - 1] ?? periodKey;
 };
-type SortKey = "salesRep" | "account" | "forecast" | "projected" | "attention";
+type SortKey = "salesRep" | "account" | "forecast" | "confirmedActual" | "projected" | "attention" | `month:${string}`;
 
 const rowValue = (row: ForecastActualRow, key: SortKey) => {
   if (key === "forecast") return row.fullPeriodForecastAmount;
+  if (key === "confirmedActual") return row.confirmedActualAmount;
   if (key === "projected") return row.projectedAmount;
   if (key === "attention") return row.attention === true ? "2" : row.attention === false ? "1" : "0";
-  return row[key].toLocaleLowerCase();
+  if (key.startsWith("month:")) return row.months.find((month) => month.periodKey === key.slice(6))?.actualAmount ?? null;
+  return key === "salesRep" ? row.salesRep.toLocaleLowerCase() : row.account.toLocaleLowerCase();
 };
 
 export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
@@ -53,7 +56,7 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const months = [...(data?.fullForecastPeriods ?? [])].reverse();
   const sortedRows = useMemo(() => [...(data?.rows ?? [])].sort((left, right) => {
     const leftValue = rowValue(left, sortKey); const rightValue = rowValue(right, sortKey);
-    const result = sortKey === "forecast" || sortKey === "projected" || sortKey === "attention"
+    const result = sortKey === "forecast" || sortKey === "confirmedActual" || sortKey === "projected" || sortKey === "attention" || sortKey.startsWith("month:")
       ? (leftValue === null ? -1 : rightValue === null ? 1 : compareExactDecimals(leftValue, rightValue))
       : String(leftValue).localeCompare(String(rightValue));
     return sortDirection === "asc" ? result : -result;
@@ -82,17 +85,17 @@ export function ForecastActualPage({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       <div class="forecast-actual-period-note">Actual basis: <strong>{data.actualMode}</strong><span>Months (latest first): <strong>{months.join(", ")}</strong></span></div>
       <section class="forecast-actual-summary" aria-label="Forecast and Actual totals">
         <article><span>Full-period Forecast</span><strong>{money(data.summary.fullPeriodForecastAmount)}</strong><small>{data.fullForecastPeriods.join(" · ")}</small></article>
-        <article><span>{data.actualMode === "MTD" ? "Actual / MTD" : "Confirmed Actual"}</span><strong>{money(data.summary.confirmedActualAmount)}</strong><small>{data.comparisonPeriods.join(" · ") || "No available Actual"}</small></article>
-        <article><span>Projected period close</span><strong>{money(data.summary.projectedAmount)}</strong><small>{data.projectionFormula}</small></article>
+        <article><span>Confirmed Actual</span><strong>{actualMoney(data.summary.confirmedActualAmount)}</strong><small>{data.comparisonPeriods.join(" · ") || "No finalized Actual"}</small></article>
+        <article><span>Projected period close</span><strong>{actualMoney(data.summary.projectedAmount)}</strong><small>{data.projectionFormula}</small></article>
         <article class={data.summary.attentionAccountCount > 0 ? "is-negative" : "is-positive"}><span>Projected watch</span><strong>{data.summary.attentionAccountCount}</strong><small>Projected shortfall vs full-period Forecast</small></article>
       </section>
       <div class="forecast-actual-table-wrap"><table class="forecast-actual-table">
-        <thead><tr><th>{sortable("Sales Rep", "salesRep")}</th><th>{sortable("Account", "account")}</th><th>{sortable("Forecast", "forecast")}</th><th>{sortable("Projected", "projected")}</th><th>{sortable("Actual / Outlook", "attention")}</th>{months.map((month) => <th>{monthLabel(month)}<small>Forecast / Actual</small></th>)}</tr></thead>
+        <thead><tr><th>{sortable("Sales Rep", "salesRep")}</th><th>{sortable("Account", "account")}</th><th>{sortable("Forecast", "forecast")}</th><th>{sortable("Confirmed Actual", "confirmedActual")}</th><th>{sortable("Projected", "projected")}</th><th>{sortable("Actual / Outlook", "attention")}</th>{months.map((period) => <th>{sortable(monthLabel(period), `month:${period}`)}<small>Forecast / Actual</small></th>)}</tr></thead>
         <tbody>{sortedRows.length ? sortedRows.map((row) => <tr key={`${row.salesRep}:${row.account}`} class={row.attention ? "forecast-actual-row is-attention" : "forecast-actual-row"}>
-          <td>{row.salesRep || "Unassigned"}</td><th scope="row">{row.account}</th><td>{money(row.fullPeriodForecastAmount)}</td><td>{money(row.projectedAmount)}</td>
+          <td>{row.salesRep || "Unassigned"}</td><th scope="row">{row.account}</th><td>{money(row.fullPeriodForecastAmount)}</td><td>{actualMoney(row.confirmedActualAmount)}</td><td>{money(row.projectedAmount)}</td>
           <td><div class="forecast-actual-statuses"><span class="forecast-actual-status">{row.actualShortfall === null ? "Finalized Actual unavailable" : row.actualShortfall ? "Finalized Actual shortfall" : "Finalized Actual on track"}</span><span class="forecast-actual-status">{row.attention === null ? "Projection unavailable" : row.attention ? "Projected shortfall" : "Projected on track"}</span></div></td>
-          {months.map((month) => { const value = row.months.find((item) => item.periodKey === month); const below = value?.actualState === "FINAL" && value.actualAmount !== null && compareExactDecimals(value.actualAmount, value.forecastAmount) < 0; return <td class={below ? "is-negative" : value?.actualState === "MTD" ? "is-provisional" : ""}><strong>{money(value?.forecastAmount ?? "0")}</strong><span>{money(value?.actualAmount ?? null)}</span>{value?.actualState === "MTD" && value.actualAsOf ? <small>MTD imported {value.actualAsOf}</small> : null}</td>; })}
-        </tr>) : <tr><td colSpan={5 + months.length} class="forecast-actual-empty">No accounts match the selected filters.</td></tr>}</tbody>
+          {months.map((month) => { const value = row.months.find((item) => item.periodKey === month); const below = value?.actualState === "FINAL" && value.actualAmount !== null && compareExactDecimals(value.actualAmount, value.forecastAmount) < 0; return <td class={below ? "is-negative" : value?.actualState === "MTD" ? "is-provisional" : ""}><strong>{money(value?.forecastAmount ?? "0")}</strong><span>{actualMoney(value?.actualAmount ?? null)}</span>{value?.actualState === "MTD" ? <><small>MTD 수집 시각 {value.actualAsOf ?? "미확인"}</small><small>MTD 입력 기준일: 미확인</small></> : null}</td>; })}
+        </tr>) : <tr><td colSpan={6 + months.length} class="forecast-actual-empty">No accounts match the selected filters.</td></tr>}</tbody>
       </table></div>
     </> : null}
   </section>;

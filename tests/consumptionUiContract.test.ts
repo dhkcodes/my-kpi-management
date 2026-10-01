@@ -515,9 +515,12 @@ assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale c
 
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
 assert.match(forecastActualPage, /Actual basis[\s\S]*FINAL[\s\S]*MTD/, "Forecast vs Actual exposes distinct FINAL and MTD views");
-assert.match(forecastActualPage, /Full-period Forecast[\s\S]*Actual \/ MTD[\s\S]*Confirmed Actual[\s\S]*Projected period close/, "summary keeps Actual basis, full-period Forecast, and projection explicit");
+assert.match(forecastActualPage, /Full-period Forecast[\s\S]*Confirmed Actual[\s\S]*Projected period close/, "summary keeps finalized Actual, full-period Forecast, and projection explicit");
+assert.doesNotMatch(forecastActualPage, />Actual \/ MTD</, "MTD view does not mislabel finalized-only summary Actual as including MTD");
 assert.match(forecastActualPage, /projectionFormula/, "the projection formula supplied by the API is shown with the result");
-assert.match(forecastActualPage, /value\?\.actualAmount \?\? null/, "missing Actual remains unavailable rather than being fabricated as zero");
+assert.match(forecastActualPage, /actualMoney[\s\S]*미확정/, "missing Actual is labelled 미확정 rather than N\/A or fabricated zero");
+assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
+assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf/, "each monthly MTD Actual shows its account-level as-of date");
 assert.match(forecastActualPage, /Finalized Actual shortfall/, "finalized Actual shortfall is labeled separately");
 assert.match(forecastActualPage, /Projected shortfall/, "projection-based watch status is labeled separately");
@@ -525,9 +528,13 @@ assert.match(forecastActualPage, /row\.actualShortfall/, "finalized comparison u
 assert.match(forecastActualPage, /row\.attention/, "projected watch uses the backend projection decision");
 assert.match(forecastActualPage, /value\?\.actualState === "FINAL"[\s\S]*is-negative/, "only FINAL monthly variance is styled as confirmed underperformance");
 assert.match(forecastActualPage, /fullForecastPeriods \?\? \[\]\)\]\.reverse\(\)/, "monthly values are displayed latest month first");
-assert.match(insightsPage, /Latest MTD import[\s\S]*mtdSummary\.asOf/, "Forecast Analysis shows that the MTD timestamp is an import timestamp");
+assert.match(insightsPage, /MTD 수집 시각[\s\S]*MTD 입력 기준일 미확인/, "Forecast Analysis separates the collection timestamp from an unavailable MTD business date");
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
-assert.match(recordsPage, /MTD imported/, "Forecast Records labels MTD timestamps as import timestamps");
+assert.match(recordsPage, /MTD 수집 시각/, "Forecast Records labels MTD timestamps as collection timestamps");
+assert.match(recordsPage, /MTD 입력 기준일 미확인/, "Forecast Records does not misrepresent collection time as the business data-through date");
+assert.match(forecastActualPage, /MTD 수집 시각[\s\S]*MTD 입력 기준일:? 미확인/, "Forecast vs Actual separates MTD collection time from the unknown business date");
+assert.match(forecastActualPage, /type SortKey = .*"confirmedActual".*`month:\$\{string\}`/, "Forecast vs Actual defines sortable keys for Actual and monthly data columns");
+assert.match(forecastActualPage, /sortable\(monthLabel\(period\), `month:\$\{period\}`\)/, "each monthly table column owns a sort control instead of relying on month display order");
 assert.match(forecastActualPage, /resetDependentFilters[\s\S]*setSalesRep\(""\)[\s\S]*resetAccount/, "Quarter and Pillar changes clear stale dependent filters");
 assert.match(forecastActualPage, /previousFiscalYearRef[\s\S]*previousFiscalYearRef\.current !== fiscalYear[\s\S]*resetDependentFilters\(\)[\s\S]*return;/,
   "Fiscal Year changes clear stale Sales Rep and Account filters before requesting the new scope");
