@@ -4,7 +4,7 @@ import type { KeyboardEvent } from "preact/compat";
 import "ojs/ojprogress-circle";
 import { fetchForecastActualComparison, type ForecastActualComparison, type ForecastActualMode, type ForecastActualRow } from "../../data/consumptionApi";
 import { compareForecastActualRows, forecastActualPeriodsLatestFirst, type ForecastActualSortDirection, type ForecastActualSortKey } from "../../data/forecastActualSort";
-import { formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
+import { compareExactDecimals, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import { FiscalYear } from "../../data/kpiMockData";
 
 const formatAmount = (value: string | null) => {
@@ -14,7 +14,11 @@ const formatAmount = (value: string | null) => {
   return `${whole}.${fraction.padEnd(2, "0")}`;
 };
 const formatPercent = (value: string | null) => value === null ? "N/A" : `${value}%`;
-const tone = (value: string | null) => value === null ? "" : value.startsWith("-") ? "is-negative" : value === "0" || value === "0.00" ? "" : "is-positive";
+const tone = (value: string | null) => {
+  if (value === null) return "";
+  const compared = compareExactDecimals(value, "0");
+  return compared < 0 ? "is-negative" : compared > 0 ? "is-positive" : "";
+};
 const SortIndicator = ({ active, direction }: { active: boolean; direction: ForecastActualSortDirection }) => active
   ? <span class={`forecast-actual-sort-indicator is-${direction}`} aria-hidden="true"></span>
   : null;
@@ -55,6 +59,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    setData(null);
     fetchForecastActualComparison({ fiscalYear, quarter, pillar: pillar as "ALL" | "DP" | "OCI", actualMode, salesRep, account })
       .then((next) => { if (!controller.signal.aborted) setData(next); })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load Forecast vs Actual."); })
@@ -78,7 +83,15 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   }, [accountComposing, accountSearch]);
 
   useEffect(() => {
-    if (!account && data?.accountOptions) setAccountOptionCache(data.accountOptions);
+    if (!data) return;
+    if (account && !data.accountOptions.includes(account)) {
+      setAccount("");
+      setAccountSearch("");
+      setAccountSearchOpen(false);
+      setActiveAccountIndex(0);
+      return;
+    }
+    if (!account) setAccountOptionCache(data.accountOptions);
   }, [account, data]);
 
   const rows = useMemo(() => [...(data?.rows ?? [])].sort((left, right) => {
@@ -121,6 +134,16 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     setSortKey(key);
     setSortDirection(key === "salesRep" || key === "account" ? "asc" : "desc");
   };
+  const ariaSort = (key: ForecastActualSortKey): "ascending" | "descending" | "none" =>
+    sortKey === key ? (sortDirection === "asc" ? "ascending" : "descending") : "none";
+
+  const resetAccountScope = () => {
+    setAccount("");
+    setAccountSearch("");
+    setAccountSearchOpen(false);
+    setAccountOptionCache([]);
+    setActiveAccountIndex(0);
+  };
 
   const chooseAccount = (value: string) => {
     setAccount(value);
@@ -146,18 +169,23 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const summary = data?.summary;
   const periodSpan = periods.length ? `${periods[0]} → ${periods[periods.length - 1]}` : "표시할 데이터 월 없음";
 
-  return <main class="content-page forecast-actual-page">
-    <header class="content-page__header">
-      <div>{breadcrumb}<span>Consumption</span><h1>Forecast vs Actual</h1><p>확정된 Actual과 Forecast를 비교하고, MTD는 잠정 참고값으로 분리합니다.</p></div>
+  return <main class="consumption-page forecast-actual-page" aria-labelledby="forecastActualTitle">
+    <header class="consumption-page__header forecast-actual-header">
+      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Forecast vs Actual</span><h1 id="forecastActualTitle">Forecast vs Actual</h1><p>확정된 Actual과 Forecast를 비교하고, MTD는 잠정 참고값으로 분리합니다.</p></div>
+      <div class="forecast-actual-header-actions">
+        <span class="kpi-section-label">Actual basis</span>
+        <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
+          onClick={() => setActualMode((current) => current === "MTD" ? "FINAL" : "MTD")}>
+          <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+        </button>
+        <small>{actualMode === "MTD" ? "MTD ON · 잠정 참고 비교" : "FINAL · 확정 실적 비교"}</small>
+      </div>
     </header>
 
     <section class="forecast-actual-filters" aria-label="Forecast vs Actual filters">
-      <label>Quarter<select value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setSalesRep(""); setAccount(""); setAccountSearch(""); }}><option value="ALL">All quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
-      <label>Pillar<select value={pillar} onChange={(event) => { setPillar(event.currentTarget.value); setSalesRep(""); setAccount(""); setAccountSearch(""); }}><option value="ALL">All pillars</option><option value="DP">Data Platform</option><option value="OCI">OCI</option></select></label>
-      <label class="forecast-actual-mode-switch">Actual basis
-        <span class="forecast-actual-switch-row"><span>OFF · FINAL</span><input type="checkbox" role="switch" aria-label="Use MTD Actual" checked={actualMode === "MTD"} onChange={(event) => setActualMode(event.currentTarget.checked ? "MTD" : "FINAL")} /><span>ON · MTD</span></span>
-      </label>
-      <label>Sales Rep<select value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); setAccount(""); }}><option value="">All sales reps</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
+      <label>Quarter<select value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setSalesRep(""); resetAccountScope(); }}><option value="ALL">All quarters</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
+      <label>Pillar<select value={pillar} onChange={(event) => { setPillar(event.currentTarget.value); setSalesRep(""); resetAccountScope(); }}><option value="ALL">All pillars</option><option value="DP">Data Platform</option><option value="OCI">OCI</option></select></label>
+      <label>Sales Rep<select value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccountScope(); }}><option value="">All sales reps</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
       <label>Account
         <div class="consumption-insights-combobox forecast-actual-account-search" ref={accountComboboxRef}>
           <input type="search" role="combobox" aria-autocomplete="list" aria-expanded={accountSearchOpen} aria-controls="forecastActualAccountOptions"
@@ -201,16 +229,16 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
         <div class="forecast-actual-month-scroll" ref={monthScrollRef} tabIndex={0} onScroll={refreshMonthScrollState} onKeyDown={handleMonthScrollKeyDown}>
           <table class="forecast-actual-matrix">
             <thead><tr>
-              <th class="is-sticky is-account"><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("account")}>Account<SortIndicator active={sortKey === "account"} direction={sortDirection} /></button></th>
-              <th class="is-sticky is-rep"><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("salesRep")}>Sales rep<SortIndicator active={sortKey === "salesRep"} direction={sortDirection} /></button></th>
-              <th class="is-sticky is-summary"><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("forecast")}>Full-period summary<SortIndicator active={sortKey === "forecast"} direction={sortDirection} /></button></th>
-              {periods.map((periodKey) => <th><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`month:${periodKey}`)}>{periodKey}<SortIndicator active={sortKey === `month:${periodKey}`} direction={sortDirection} /></button></th>)}
+              <th class="is-sticky is-account" aria-sort={ariaSort("account")}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("account")}>Account<SortIndicator active={sortKey === "account"} direction={sortDirection} /></button></th>
+              <th class="is-sticky is-rep" aria-sort={ariaSort("salesRep")}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("salesRep")}>Sales rep<SortIndicator active={sortKey === "salesRep"} direction={sortDirection} /></button></th>
+              <th class="is-sticky is-summary" aria-sort={ariaSort("forecast")}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort("forecast")}>Full-period summary<SortIndicator active={sortKey === "forecast"} direction={sortDirection} /></button></th>
+              {periods.map((periodKey) => <th aria-sort={ariaSort(`month:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`month:${periodKey}`)}>{periodKey}<SortIndicator active={sortKey === `month:${periodKey}`} direction={sortDirection} /></button></th>)}
             </tr></thead>
             <tbody>
               {rows.map((row) => <tr>
-                <th scope="row" class="is-sticky is-account"><strong>{row.account}</strong></th>
+                <th scope="row" class="is-sticky is-account"><strong>{row.account}</strong><small class="forecast-actual-account-rep">{row.salesRep || "Unassigned"}</small></th>
                 <td class="is-sticky is-rep"><span class="forecast-actual-secondary">{row.salesRep || "Unassigned"}</span></td>
-                <td class="is-sticky is-summary"><div class="forecast-actual-fixed-summary"><span>Forecast <strong>{formatAmount(row.fullPeriodForecastAmount)}</strong></span><span>Confirmed Actual <strong>{formatAmount(row.confirmedActualAmount)}</strong></span><span class={tone(row.differenceAmount)}>Difference <strong>{formatAmount(row.differenceAmount)}</strong></span><div class="forecast-actual-statuses"><span class={`forecast-actual-status ${row.actualShortfall ? "is-confirmed-risk" : ""}`}>{row.actualShortfall === null ? "확정 판정 대기" : row.actualShortfall ? "확정 실적 미달" : "확정 실적 충족"}</span>{row.attention === true && <span class="forecast-actual-status is-projection-watch">예상 기반 주시</span>}</div></div></td>
+                <td class="is-sticky is-summary"><div class="forecast-actual-fixed-summary"><span>Forecast <strong>{formatAmount(row.fullPeriodForecastAmount)}</strong></span><span>Confirmed Actual <strong>{formatAmount(row.confirmedActualAmount)}</strong></span><span class={tone(row.differenceAmount)}>Difference <strong>{formatAmount(row.differenceAmount)}</strong></span><div class="forecast-actual-statuses"><span class={`forecast-actual-status ${row.actualShortfall ? "is-confirmed-risk" : ""}`}>{row.actualShortfall === null ? "확정 판정 대기" : row.actualShortfall ? "확정 실적 미달" : "확정 실적 충족"}</span><span class={`forecast-actual-status ${row.attention === true ? "is-projection-watch" : ""}`}>{row.attention === null ? "예상 판정 불가" : row.attention ? "예상 기반 주시" : "예상 기준 정상"}</span></div></div></td>
                 {periods.map((periodKey) => {
                   const month = monthByPeriod(row, periodKey);
                   if (!month) return <td class="forecast-actual-month-cell is-empty"><span>데이터 없음</span></td>;

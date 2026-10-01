@@ -496,6 +496,35 @@ void (async () => {
     "MTD parsing continues to reject present status fields with an invalid type"
   );
 
+  const malformedForecastCases: Array<[string, (value: Record<string, unknown>) => void]> = [
+    ["fiscal year", (value) => { value.fiscalYear = "FY27<script>"; }],
+    ["quarter", (value) => { value.quarter = "Q9"; }],
+    ["period key", (value) => {
+      const rows = value.rows as Array<Record<string, unknown>>;
+      const months = rows[0].months as Array<Record<string, unknown>>;
+      months[0].periodKey = "FY27-WHENEVER";
+    }],
+    ["Actual timestamp", (value) => {
+      const rows = value.rows as Array<Record<string, unknown>>;
+      const months = rows[0].months as Array<Record<string, unknown>>;
+      months[0].actualAsOf = "not-a-timestamp";
+    }],
+    ["summary count", (value) => {
+      (value.summary as Record<string, unknown>).accountCount = 1.5;
+    }]
+  ];
+  for (const [label, corrupt] of malformedForecastCases) {
+    const malformed = structuredClone(mtdComparisonPayload) as unknown as Record<string, unknown>;
+    corrupt(malformed);
+    runtime.fetch = async () => new Response(JSON.stringify(malformed),
+      { status: 200, headers: { "Content-Type": "application/json" } });
+    await assert.rejects(
+      () => fetchForecastActualComparison({ fiscalYear: "FY27", quarter: "Q2", pillar: "ALL", actualMode: "MTD" }),
+      /Malformed Forecast vs Actual response/,
+      `Forecast vs Actual parsing rejects malformed ${label}`
+    );
+  }
+
   delete runtime.__KPI_API_BASE_URL__;
   Object.defineProperty(globalThis, "location", { configurable: true, writable: true, value: { hostname: "127.0.0.1" } });
   assert.equal(canUseConsumptionFallback(new ConsumptionNetworkError(new Error("offline"))), true);

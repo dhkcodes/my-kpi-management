@@ -4965,6 +4965,10 @@ h4.weekly-activity-section-label--next-week,
   }
 }
 
+.forecast-actual-header-actions { align-items: center; display: grid; gap: .25rem .65rem; grid-template-columns: auto auto; justify-items: start; }
+.forecast-actual-header-actions small { color: var(--oj-core-text-color-secondary); font-size: .72rem; grid-column: 1 / -1; }
+.forecast-actual-account-rep { display: none; }
+
 .forecast-actual-filters {
   align-items: end;
   background: var(--oj-core-bg-color-content);
@@ -4972,7 +4976,7 @@ h4.weekly-activity-section-label--next-week,
   border-radius: .65rem;
   display: grid;
   gap: .85rem;
-  grid-template-columns: repeat(6, minmax(9rem, 1fr));
+  grid-template-columns: repeat(4, minmax(9rem, 1fr));
   margin: 1rem 0;
   padding: 1rem;
 }
@@ -5078,6 +5082,7 @@ h4.weekly-activity-section-label--next-week,
   .forecast-actual-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .forecast-actual-summary article { padding: .7rem .75rem; }
   .forecast-actual-matrix .is-account { width: 7.5rem; }
+  .forecast-actual-account-rep { color: var(--oj-core-text-color-secondary); display: block; font-size: .68rem; font-weight: 400; margin-top: .25rem; overflow-wrap: anywhere; }
   .forecast-actual-matrix .is-rep { display: none; }
   .forecast-actual-matrix .is-summary { left: 7.5rem; width: 8.5rem; }
   .forecast-actual-matrix th,
