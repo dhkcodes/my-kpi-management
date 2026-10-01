@@ -22,8 +22,9 @@ assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MT
   "Records shows one compact UTC-basis MTD applied date beside the switch");
 assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*MTD 반영 일자 \{mtdAppliedDate\}/u,
   "Analysis shows the authoritative UTC-basis MTD date beside the switch even while amounts stay FINAL");
-assert.match(forecastActualPage, /MTD 반영 일자 \{mtdAppliedDate\}/u,
-  "Forecast vs Actual shows the same compact MTD applied date beside the switch");
+assert.match(forecastActualPage, /반영 일자 \{mtdAppliedDate\}/u,
+  "Forecast vs Actual shows the same compact applied date beside the switch without repeating MTD");
+assert.doesNotMatch(forecastActualPage, /MTD 반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
   "Records numeric cells contain numbers only");
 assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
@@ -543,7 +544,7 @@ assert.match(forecastActualPage, /assessForecastActualMonth\(month\)[\s\S]*asses
   "monthly Difference and status use the explicit FINAL/MTD assessment contract");
 assert.doesNotMatch(forecastActualPage, /actualState === "MTD"[^\n]*subtractExactDecimals/,
   "raw MTD cumulative variance is not presented as a month-end projection Difference");
-assert.match(forecastActualPage, /forecastActualPeriodsLatestFirst/, "monthly values use fiscal-year-aware latest-first ordering");
+assert.match(forecastActualPage, /visibleForecastActualPeriods/, "monthly values remain latest-first and stop at the latest period with Forecast data");
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
 assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
   "Consumption Analysis displays authoritative MTD metadata even when MTD amounts are excluded");

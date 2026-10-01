@@ -13,6 +13,7 @@ import {
 } from "../auth/authApi";
 import type { AuthSession } from "../auth/authSession";
 import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from "../auth/passwordPolicy";
+import { startNewKapHeaderLoginSession } from "./kapHeaderBrand";
 
 type LoginPageProps = Readonly<{ appName?: string; onAuthenticated: (session: AuthSession) => void }>;
 type Mode = "signIn" | "forgot" | "validating" | "action" | "invalid" | "success";
@@ -42,6 +43,7 @@ const readCurrentJetValue = (input: JetCredentialInput | null, fallback: string)
 
 export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const initialRoute = useMemo(requestedAction, []);
+  const [loginBrand] = useState(startNewKapHeaderLoginSession);
   const initialAction = initialRoute.action;
   const [mode, setMode] = useState<Mode>(
     initialAction ? "validating" : initialRoute.missingActionToken ? "invalid" : initialRoute.requestReset ? "forgot" : "signIn"
@@ -153,7 +155,7 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
             : actionLabel;
 
   return <main class="kap-login-page oj-bg-neutral-0"><section class="kap-login-card" aria-labelledby="kapLoginTitle">
-    <div class="kap-login-brand"><span class="kap-login-brand__mark" aria-hidden="true">K</span><div><strong>Know the pulse, Act on it. Perform.</strong><span>Secure workspace access</span></div></div>
+    <div class="kap-login-brand"><img class="kap-login-brand__mark" src={loginBrand.iconSrc} alt="" aria-hidden="true" /><div><strong><b>K</b>now the pulse, <b>A</b>ct on it. <b>P</b>erform.</strong><span>Secure workspace access</span></div></div>
     <h1 id="kapLoginTitle">{title}</h1>
     {mode === "signIn" && <p>Use your assigned application account.</p>}
     {mode === "forgot" && <p>Enter your Login ID. If the account is eligible, the reset-link flow will issue a one-time password reset URL. It never creates a temporary password.</p>}
