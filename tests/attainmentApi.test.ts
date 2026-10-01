@@ -34,6 +34,20 @@ void (async () => {
   assert.equal(result.summary.outlook, 400);
   assert.equal(result.summary.outlookVarianceToBudget, null);
 
+  const unconfirmedForecastFetch = async () => new Response(JSON.stringify({
+    ...payload,
+    quarters: payload.quarters.map((quarter, index) => index === 0 ? {
+      ...quarter,
+      details: [{ account: "Open Month Account", pillar: "OCI", quarterTotal: 10, months: [{
+        periodKey: "FY26-JUN", month: "JUN", actual: null, forecast: 10,
+        appliedAmount: 10, appliedSource: "FORECAST_UNCONFIRMED"
+      }] }]
+    } : quarter)
+  }), { status: 200 });
+  const withUnconfirmedForecast = await fetchAttainment("FY26", unconfirmedForecastFetch);
+  assert.equal(withUnconfirmedForecast.quarters[0].details[0].months[0].appliedSource, "FORECAST_UNCONFIRMED",
+    "backend source marker for an unconfirmed forecast must not invalidate the full Attainment response");
+
   const incompletePayload = {
     ...payload,
     quarters: payload.quarters.map((quarter, index) => index === 0 ? {

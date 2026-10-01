@@ -1525,12 +1525,12 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
   actualMode: ForecastActualMode;
   salesRep?: string;
   account?: string;
-}>): Promise<ForecastActualComparison> => {
+}>, signal?: AbortSignal): Promise<ForecastActualComparison> => {
   const query = new URLSearchParams({ fiscalYear: filters.fiscalYear, quarter: filters.quarter,
     pillar: filters.pillar, actualMode: filters.actualMode });
   if (filters.salesRep) query.set("salesRep", filters.salesRep);
   if (filters.account) query.set("account", filters.account);
-  const { payload } = await request(`/consumption/forecast-vs-actual?${query}`);
+  const { payload } = await request(`/consumption/forecast-vs-actual?${query}`, { signal });
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast vs Actual response");
   const raw = payload as Record<string, unknown>;
   const stringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");

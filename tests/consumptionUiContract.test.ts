@@ -22,9 +22,9 @@ assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MT
   "Records shows one compact UTC-basis MTD applied date beside the switch");
 assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*MTD 반영 일자 \{mtdAppliedDate\}/u,
   "Analysis shows the authoritative UTC-basis MTD date beside the switch even while amounts stay FINAL");
-assert.match(forecastActualPage, /반영 일자 \{mtdAppliedDate\}/u,
-  "Forecast vs Actual shows the same compact applied date beside the switch without repeating MTD");
-assert.doesNotMatch(forecastActualPage, /MTD 반영 일자/u);
+assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
+  "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
+assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
   "Records numeric cells contain numbers only");
 assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
@@ -536,11 +536,11 @@ assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale c
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
 assert.match(forecastActualPage, /aria-label="Include MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
   "Forecast vs Actual exposes the shared MTD switch");
-assert.match(forecastActualPage, /확정 미달[\s\S]*MTD 미달 예상[\s\S]*Accounts/,
+assert.match(forecastActualPage, /Final shortfall[\s\S]*Projected MTD shortfall[\s\S]*Accounts/,
   "summary cards show deduplicated problem-account counts and the current account scope");
 assert.doesNotMatch(forecastActualPage, /Full-period summary|FINAL periods only/,
   "misleading mixed-period summary columns are removed from the monthly matrix");
-assert.match(forecastActualPage, /미확정[\s\S]*비교 불가/, "missing Actual and impossible comparisons stay distinct");
+assert.match(forecastActualPage, /Unconfirmed[\s\S]*Not comparable/, "missing Actual and impossible comparisons stay distinct");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
 assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf[\s\S]*formatMtdAppliedDate/, "Forecast vs Actual derives one header date from actual MTD import timestamps");

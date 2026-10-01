@@ -37,13 +37,13 @@ const row = (account: string, months: ForecastActualMonth[], salesRep = "Rep"): 
 
 const finalShortfall = assessForecastActualMonth(month({ actualState: "FINAL", actualAmount: "80" }));
 assert.equal(finalShortfall.kind, "FINAL_SHORTFALL");
-assert.equal(finalShortfall.label, "확정 미달");
+assert.equal(finalShortfall.label, "Final shortfall");
 assert.equal(finalShortfall.differenceAmount, "-20");
-assert.equal(finalShortfall.differenceLabel, "확정 Actual − Forecast");
+assert.equal(finalShortfall.differenceLabel, "Difference");
 
 const finalOnTrack = assessForecastActualMonth(month({ actualState: "FINAL", actualAmount: "100" }));
 assert.equal(finalOnTrack.kind, "NORMAL");
-assert.equal(finalOnTrack.label, "확정 정상");
+assert.equal(finalOnTrack.label, "On track");
 
 const mtdShortfall = assessForecastActualMonth(month({
   actualState: "MTD",
@@ -52,13 +52,13 @@ const mtdShortfall = assessForecastActualMonth(month({
   forecastAmount: "30"
 }));
 assert.equal(mtdShortfall.kind, "MTD_SHORTFALL");
-assert.equal(mtdShortfall.label, "예상 미달");
+assert.equal(mtdShortfall.label, "Projected shortfall");
 assert.equal(mtdShortfall.differenceAmount, "-20", "current Difference uses MTD Actual, not projected Actual");
-assert.equal(mtdShortfall.differenceLabel, "현재 MTD − Forecast");
+assert.equal(mtdShortfall.differenceLabel, "Difference");
 assert.equal(mtdShortfall.projectedAmount, "12", "Sep 28 minus 3 days gives effective day 25; 10 / 25 * 30 = 12");
 assert.equal(mtdShortfall.projectedDifferenceAmount, "-18");
-assert.match(mtdShortfall.tooltip, /유효 누적 기준일 2026-09-25/u);
-assert.match(mtdShortfall.tooltip, /남은 5일/u);
+assert.match(mtdShortfall.tooltip, /through 2026-09-25/u);
+assert.match(mtdShortfall.tooltip, /month-end 12/u);
 
 const recurringProjectionNearThreshold = assessForecastActualMonth(month({
   periodKey: "FY27-OCT",
@@ -72,7 +72,7 @@ assert.equal(recurringProjectionNearThreshold.projectedDifferenceAmount, "0",
   "the exact positive difference may round to zero for display but must never change sign");
 assert.equal(recurringProjectionNearThreshold.kind, "NORMAL",
   "31 / 3 is exactly above 10.3333332; display rounding must not classify it as a shortfall");
-assert.equal(recurringProjectionNearThreshold.label, "예상 정상");
+assert.equal(recurringProjectionNearThreshold.label, "Projected on track");
 
 const mtdZero = assessForecastActualMonth(month({
   actualState: "MTD",
@@ -83,11 +83,11 @@ const mtdZero = assessForecastActualMonth(month({
 assert.equal(mtdZero.projectedAmount, "0", "zero MTD is a real value, not missing");
 assert.equal(mtdZero.kind, "MTD_SHORTFALL");
 
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: null, actualAsOf: "2026-09-28" })).label, "비교 불가");
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: null })).label, "비교 불가");
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: "2026-09-02" })).label, "비교 불가",
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: null, actualAsOf: "2026-09-28" })).label, "Not comparable");
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: null })).label, "Not comparable");
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: "2026-09-02" })).label, "Not comparable",
   "an adjusted date outside the target month is not extrapolated across a month boundary");
-assert.equal(assessForecastActualMonth(month({ forecastAmount: null, actualState: "FINAL", actualAmount: "80" })).label, "비교 불가");
+assert.equal(assessForecastActualMonth(month({ forecastAmount: null, actualState: "FINAL", actualAmount: "80" })).label, "Not comparable");
 
 const rows = [
   row("A", [month({ actualState: "FINAL", actualAmount: "80" }), month({ periodKey: "FY27-OCT", actualState: "FINAL", actualAmount: "70" })]),

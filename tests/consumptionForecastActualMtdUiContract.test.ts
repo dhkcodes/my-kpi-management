@@ -31,13 +31,13 @@ assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/mo
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
 assert.match(page, /forecast-actual-unit-note[^]*K USD/u, "the K unit remains as a concise standalone note");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
-for (const label of ["Forecast", "Actual", "Difference", "판정"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
+for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");
-assert.match(page, /assessment\.differenceLabel/u, "Difference states whether it is current MTD or confirmed Actual minus Forecast");
-assert.match(page, /미달 예상/u);
-assert.match(page, /미달/u);
-assert.match(page, /미확정/u);
-assert.match(page, /비교 불가/u);
+assert.doesNotMatch(page, /assessment\.differenceLabel/u, "Difference does not repeat a verbose formula label");
+assert.match(page, /Projected MTD shortfall/u);
+assert.match(page, /Final shortfall/u);
+assert.match(page, /Unconfirmed/u);
+assert.match(page, /Not comparable/u);
 assert.match(page, /forecast-actual-status-cell/u, "monthly status badges have a dedicated centered cell");
 
 assert.match(page, /countForecastActualProblemAccounts/u);
@@ -46,8 +46,8 @@ assert.match(page, /MTD_SHORTFALL/u);
 assert.match(page, /setProblemFilter\(\(current\) => current ===/u, "clicking an active problem card clears it");
 assert.match(page, /filterForecastActualProblemRows/u, "problem cards and visible rows share one assessment source");
 assert.match(page, /summarizeForecastActualActuals/u, "Actual total keeps confirmed and MTD components distinct");
-assert.match(page, /확정 \$\{formatAmount\(actualTotals\.confirmedAmount/u);
-assert.match(page, /여러 월·담당자에 같은 Account가 있어도 카드에서는 한 번만/u, "the card aggregation unit is explained in the page");
+assert.match(page, /Final \$\{formatAmount\(actualTotals\.confirmedAmount/u);
+assert.match(page, /Accounts are counted once; activate to filter rows/u, "the card aggregation unit is explained by the accessible card tooltip");
 
 assert.match(styles, /\.forecast-actual-toolbar[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/u);
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account[^}]*background:/u);

@@ -2,7 +2,7 @@ export type AttainmentQuarter = "Q1" | "Q2" | "Q3" | "Q4";
 export const attainmentQuarters: readonly AttainmentQuarter[] = ["Q1", "Q2", "Q3", "Q4"];
 
 export type AttainmentAmount = number | null;
-export type AttainmentAppliedSource = "ACTUAL" | "FORECAST" | "NONE";
+export type AttainmentAppliedSource = "ACTUAL" | "FORECAST" | "FORECAST_UNCONFIRMED" | "NONE";
 
 export type AttainmentMonthDetail = Readonly<{
   periodKey: string;
