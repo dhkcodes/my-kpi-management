@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { compareForecastActualRows, forecastActualPeriodsLatestFirst } from "../src/data/forecastActualSort";
 import type { ForecastActualRow } from "../src/data/consumptionApi";
+import { formatMtdAppliedDate } from "../src/data/mtdDate";
 
 const row = (overrides: Partial<ForecastActualRow>): ForecastActualRow => ({
   salesRep: "Rep",
@@ -59,10 +60,21 @@ const periodRows = [
   row({ months: [
     { periodKey: "FY27-JAN", forecastAmount: "2", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
     { periodKey: "FY27-DEC", forecastAmount: "2", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
-    { periodKey: "FY27-MAY", forecastAmount: "0", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null }
+    { periodKey: "FY27-MAY", forecastAmount: "0", actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
+    { periodKey: "FY27-APR", forecastAmount: null, actualAmount: "8", actualState: "FINAL", actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: null },
+    { periodKey: "FY27-MAR", forecastAmount: null, actualAmount: null, actualState: null, actualAsOf: null, differenceAmount: null, differencePercent: null, monthEndProjection: "9" }
   ] })
 ];
-assert.deepEqual(forecastActualPeriodsLatestFirst(periodRows), ["FY27-MAY", "FY27-JAN", "FY27-DEC", "FY27-JUL", "FY27-JUN"],
- "fiscal chronology must put every forecast-bearing month, including an explicit zero forecast, latest first");
+assert.deepEqual(
+  forecastActualPeriodsLatestFirst(periodRows, ["FY27-JUN", "FY27-JUL", "FY27-MAY", "FY27-APR", "FY27-MAR"]),
+  ["FY27-MAY", "FY27-JUL", "FY27-JUN"],
+  "periods must be quarter-scoped, Forecast-bearing only, preserve explicit zero, and sort latest first"
+);
+
+assert.equal(formatMtdAppliedDate(null), null);
+assert.equal(formatMtdAppliedDate("not-a-date"), null);
+assert.equal(formatMtdAppliedDate("2026-09-28T03:16:25.664401Z"), "2026-09-28");
+assert.equal(formatMtdAppliedDate("2026-09-28T23:30:00-02:00"), "2026-09-29",
+  "MTD date must use the UTC ISO date part");
 
 console.log("consumptionForecastActualSort.test.ts: all assertions passed");
