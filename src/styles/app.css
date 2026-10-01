@@ -4975,7 +4975,20 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-filters label { color: var(--oj-core-text-color-secondary); display: grid; font-size: .78rem; font-weight: 700; gap: .35rem; }
 .forecast-actual-filters input,
 .forecast-actual-filters select { border: 1px solid var(--oj-core-divider-color); border-radius: .35rem; box-sizing: border-box; min-height: 2.5rem; padding: .5rem .65rem; width: 100%; }
+.forecast-actual-filters .forecast-actual-mode-switch { align-self: stretch; }
+.forecast-actual-switch-row { align-items: center; display: flex; gap: .45rem; min-height: 2.5rem; white-space: nowrap; }
+.forecast-actual-switch-row > span { font-size: .7rem; }
+.forecast-actual-filters .forecast-actual-switch-row input { appearance: none; background: #6b7280; border: 0; border-radius: 999px; cursor: pointer; min-height: 1.35rem; padding: .15rem; position: relative; width: 2.5rem; }
+.forecast-actual-filters .forecast-actual-switch-row input::after { background: white; border-radius: 50%; content: ""; display: block; height: 1.05rem; transition: transform .15s ease; width: 1.05rem; }
+.forecast-actual-filters .forecast-actual-switch-row input:checked { background: var(--oj-core-brand-color-1); }
+.forecast-actual-filters .forecast-actual-switch-row input:checked::after { transform: translateX(1.15rem); }
+.forecast-actual-filters .forecast-actual-switch-row input:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 2px; }
 .forecast-actual-period-note { background: #f4f7f9; border-left: .25rem solid #315f75; display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; margin: .75rem 0 1rem; padding: .75rem 1rem; }
+.forecast-actual-mtd-comparison { background: #f7f2e7; border: 1px solid #d7c89e; border-radius: .5rem; margin: 0 0 1rem; padding: .85rem 1rem; }
+.forecast-actual-mtd-comparison p { align-items: baseline; display: flex; flex-wrap: wrap; gap: .35rem 1rem; margin: 0 0 .65rem; }
+.forecast-actual-mtd-comparison p span { color: var(--oj-core-text-color-secondary); font-size: .78rem; }
+.forecast-actual-mtd-comparison > div { display: grid; gap: .65rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.forecast-actual-mtd-comparison article { background: var(--oj-core-bg-color-content); border-radius: .35rem; display: grid; gap: .2rem; padding: .65rem; }
 .forecast-actual-summary { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
 .forecast-actual-summary article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .35rem; padding: 1rem; }
 .forecast-actual-summary article > span,
@@ -5000,7 +5013,8 @@ h4.weekly-activity-section-label--next-week,
 .consumption-analysis-mtd-control small,
 .consumption-table-heading__actions > small { color: var(--oj-core-text-color-secondary); display: block; font-size: .72rem; }
 .consumption-mtd-cell small { display: block; font-size: .68rem; margin-top: .2rem; white-space: normal; }
-.forecast-actual-loading { align-items: center; display: flex; gap: .75rem; justify-content: center; min-height: 12rem; }
+.forecast-actual-loading { align-items: center; display: flex; gap: .75rem; justify-content: center; min-height: 0; padding: 1.25rem 0; }
+.forecast-actual-page .consumption-inline-error { margin: 0; min-height: 0; padding: .75rem 1rem; }
 .forecast-actual-fy-summary {
   background: #f7f8f9;
   border: 1px solid var(--oj-core-divider-color);
@@ -5024,6 +5038,8 @@ h4.weekly-activity-section-label--next-week,
   .forecast-actual-filters,
   .forecast-actual-summary,
   .forecast-actual-fy-summary { grid-template-columns: 1fr; }
+  .forecast-actual-filters { gap: .65rem; margin: .5rem 0 .75rem; }
+  .forecast-actual-loading { justify-content: flex-start; padding: .75rem 0; }
   .forecast-actual-table { min-width: 0; }
   .forecast-actual-table thead { display: none; }
   .forecast-actual-table tr { border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: block; margin-bottom: .75rem; padding: .5rem; }
