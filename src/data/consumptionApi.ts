@@ -1481,6 +1481,7 @@ export type ForecastActualComparison = Readonly<{
   accountOptions: string[];
   actualMode: ForecastActualMode;
   comparisonPeriods: string[];
+  partialActualPeriods: string[];
   fullForecastPeriods: string[];
   projectionFormula: string;
   summary: ForecastActualSummary;
@@ -1533,13 +1534,15 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast vs Actual response");
   const raw = payload as Record<string, unknown>;
   const stringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+  const partialActualPeriods = raw.partialActualPeriods ?? [];
   const isActualMode = (value: unknown): value is ForecastActualMode => value === "FINAL" || value === "MTD";
   const isPillar = (value: unknown): value is ConsumptionPillar => value === "ALL" || value === "DP" || value === "OCI";
   if (!Array.isArray(raw.rows) || !stringArray(raw.salesRepOptions) || !stringArray(raw.accountOptions)
-    || !stringArray(raw.comparisonPeriods) || !stringArray(raw.fullForecastPeriods)
+    || !stringArray(raw.comparisonPeriods) || !stringArray(partialActualPeriods) || !stringArray(raw.fullForecastPeriods)
     || typeof raw.fiscalYear !== "string" || !FORECAST_FISCAL_YEAR_PATTERN.test(raw.fiscalYear)
     || typeof raw.quarter !== "string" || !FORECAST_QUARTER_PATTERN.test(raw.quarter) || !isPillar(raw.selectedPillar)
-    || !raw.comparisonPeriods.every(isForecastPeriod) || !raw.fullForecastPeriods.every(isForecastPeriod)
+    || !raw.comparisonPeriods.every(isForecastPeriod) || !partialActualPeriods.every(isForecastPeriod)
+    || !raw.fullForecastPeriods.every(isForecastPeriod)
     || !isActualMode(raw.actualMode)
     || (raw.selectedSalesRep !== null && raw.selectedSalesRep !== undefined && typeof raw.selectedSalesRep !== "string")
     || (raw.selectedAccount !== null && raw.selectedAccount !== undefined && typeof raw.selectedAccount !== "string")
@@ -1550,7 +1553,7 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
     fiscalYear: raw.fiscalYear as string, quarter: raw.quarter as string, selectedPillar: raw.selectedPillar,
     selectedSalesRep: (raw.selectedSalesRep ?? "") as string, selectedAccount: (raw.selectedAccount ?? "") as string,
     salesRepOptions: raw.salesRepOptions, accountOptions: raw.accountOptions,
-    actualMode: raw.actualMode, comparisonPeriods: raw.comparisonPeriods,
+    actualMode: raw.actualMode, comparisonPeriods: raw.comparisonPeriods, partialActualPeriods,
     fullForecastPeriods: raw.fullForecastPeriods, projectionFormula: raw.projectionFormula ?? "",
     summary: decodeForecastSummary(raw.summary as Record<string, unknown>),
     fiscalYearSummary: decodeForecastSummary(raw.fiscalYearSummary as Record<string, unknown>),

@@ -224,7 +224,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
               <tr class="forecast-actual-subheader">
                 {periods.flatMap((periodKey) => [
                   <th key={`${periodKey}-forecast`} class="forecast-actual-month-subhead" aria-sort={ariaSort(`month:${periodKey}`)}><button type="button" class="forecast-actual-sort-button" onClick={() => toggleSort(`month:${periodKey}`)}>Forecast<SortIndicator active={sortKey === `month:${periodKey}`} direction={sortDirection} /></button></th>,
-                  <th key={`${periodKey}-actual`} class="forecast-actual-month-subhead">Actual</th>,
+                  <th key={`${periodKey}-actual`} class="forecast-actual-month-subhead">Actual{currentData?.partialActualPeriods.includes(periodKey) ? " (부분 확정)" : ""}</th>,
                   <th key={`${periodKey}-difference`} class="forecast-actual-month-subhead is-difference">Difference</th>,
                   <th key={`${periodKey}-status`} class="forecast-actual-month-subhead is-status forecast-actual-status-cell">판정</th>
                 ])}

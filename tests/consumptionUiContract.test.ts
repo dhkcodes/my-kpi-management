@@ -32,13 +32,13 @@ assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
 
 assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
-assert.match(insightsPage, /<strong>Actual \{formatExactK\(account\.actualAmountExact\)\}<\/strong>/,
+assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
-assert.match(insightsPage, /Forecast \{formatExactK\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactK\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+assert.match(insightsPage, /Forecast \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
   "entered Forecast and covered-period expected use separate fields without changing contribution totals");
 assert.match(insightsPage, /Forecast missing · Covered-period expected unavailable/,
   "missing Forecast remains distinct and does not fabricate an expected amount");
-assert.match(insightsPage, /Forecast \{formatExactK\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactK\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+assert.match(insightsPage, /Forecast \{formatExactKFixed\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
   "an explicit zero Forecast remains distinct while showing the covered-period sum");
 assert.doesNotMatch(insightsPage, /FY Expected/, "partial-year coverage is never presented as a full-year expectation");
 assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.consumption-sales-attention-list button\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*\}/,
@@ -221,7 +221,7 @@ assert.doesNotMatch(apiSource, /otherContribution|ConsumptionOtherContribution/,
 assert.match(insightsPage, /ojs\/ojchart[\s\S]*ArrayDataProvider[\s\S]*consumption-insights-totals-chart[\s\S]*consumption-insights-actual-chart/, "approved Insights visualizations use Oracle JET chart DataProviders");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}/, "selected Alert drives an ACTUAL-only JET line chart");
 assert.match(insightsPage, /type="line"[\s\S]*data=\{trendChart\}[\s\S]*dataLabel=\{trendChartCoordinateLabel\}[\s\S]*dataLabelPosition:\s*"aboveMarker"[\s\S]*hideOverlappingLabels:\s*"on"/, "the ACTUAL Trend uses Oracle JET native collision-aware point labels");
-assert.match(insightsPage, /const trendChartCoordinateLabel[\s\S]*chartCurrency\.format\(value\)/, "Chart-coordinate value labels use the approved compact USD format");
+assert.match(insightsPage, /const trendChartCoordinateLabel[\s\S]*chartCurrencyK\.format\(value \/ 1000\)[\s\S]*K/, "Chart-coordinate monetary labels use K with two decimals");
 assert.match(insightsPage, /fiscalTotalsChart\} dataLabel=\{trendChartCoordinateLabel\}[\s\S]*quarterTotalsChart\} dataLabel=\{trendChartCoordinateLabel\}/, "FY and Quarter totals expose each chart coordinate through the official JET chart dataLabel callback");
 assert.doesNotMatch(insightsPage, /Organic Consumption Growth Proxy|organicGrowthChart/, "the UI does not relabel Forecast movement composition as an organic-growth proxy");
 assert.doesNotMatch(insightsPage, /consumption-insights-trend-periods/, "the redundant six-month period and amount tile list below the chart is removed");
@@ -264,7 +264,7 @@ assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Consumption Records sends the selected pillar with every records request");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Consumption Analysis sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar, fromQuarter, toQuarter\)/, "Consumption Records exports Actual for the selected pillar and currently displayed quarter range");
-assert.match(recordsPage, /exportConsumptionForecastCsv\("ALL"\)/, "Consumption Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
+assert.match(recordsPage, /exportConsumptionForecastXlsx\("ALL"\)/, "Consumption Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
 assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}[\s\S]*DC \{display\.primary\}/, "all Plan presentations keep one scoped Data Center total for the current query");
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
@@ -299,7 +299,7 @@ assert.match(recordsPage, /renderSalesRepPreview\(pendingImport\.preview\.salesR
 assert.match(recordsPage, /renderSalesRepPreview\(pendingForecastImport\.preview\.salesRepChanges/, "Forecast preview renders Sales Rep changes before Apply");
 assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Changed[\s\S]*Unchanged/, "Sales Rep preview exposes account, before-to-after, and changed/unchanged semantics");
 assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
-assert.match(recordsPage, /exportConsumptionImportCompatibleCsv[\s\S]*exportConsumptionForecastCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
+assert.match(recordsPage, /exportConsumptionForecastXlsx[\s\S]*exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompositionCategory \} \| null>/, "Forecast composition supports All and each classified drill category");
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
@@ -332,17 +332,20 @@ assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-c
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
 assert.match(insightsPage, /Forecast signals by quarter/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
-assert.match(recordsPage, /Forecast Import CSV \/ Excel/, "Forecast import accepts both retained formats");
+assert.match(recordsPage, />\s*Forecast Import\s*</, "Forecast import button omits file-format wording");
+assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/,
+  "Forecast file picker accepts Excel workbooks only");
+assert.match(recordsPage, /validateForecastWorkbookFile\(file\)[\s\S]*previewConsumptionForecastWide\(file\)/,
+  "Forecast validates extension, MIME, and XLSX signature before preview upload");
 assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("attainment"\)\)/,
   "Forecast import capability follows the backend Attainment WRITE permission");
-assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastCsvFile[\s\S]*Forecast write permission is required/,
+assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastWorkbookFile[\s\S]*Forecast write permission is required/,
   "Forecast preview and apply use their dedicated write capability");
 assert.match(recordsPage, /forecastImportPhase === "preview"[\s\S]*disabled=\{!canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,
   "Forecast Apply button uses Attainment WRITE rather than Records WRITE");
-assert.match(recordsPage, /Forecast CSV Export/, "CSV export remains available");
-assert.match(recordsPage, /Forecast Excel Export/, "Excel export is available beside CSV");
-assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastCsv\(\)\}/, "CSV export stays connected");
-assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Excel export is connected");
+assert.doesNotMatch(recordsPage, /Forecast CSV Export|exportForecastCsv|exportConsumptionForecastCsv/, "Forecast CSV entry point is absent from the UI");
+assert.match(recordsPage, /Forecast Export/, "Forecast export button omits file-format wording");
+assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Forecast export remains connected to XLSX");
 assert.match(recordsPage, /Import \$\{forecastFileName\}/, "Forecast Import names the current editable FY-quarter template without enforcing it as an upload restriction");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
@@ -467,6 +470,7 @@ assert.doesNotMatch(recordsPage + staticServer, /serviceWorker|navigator\.servic
 assert.doesNotMatch(styles, /\.consumption-table-scroll\s*\{[^}]*max-height:/, "200% zoom does not clamp the required 18rem minimum table viewport");
 assert.match(styles, /\.consumption-table th, \.consumption-table td\s*\{[^}]*height:\s*2\.75rem[^}]*padding:\s*\.3rem \.48rem/, "compact Redwood rows preserve a 44px minimum cell height");
 assert.match(styles, /\.consumption-account-column\s*\{[^}]*left:\s*0[^}]*position:\s*sticky/, "Account column remains sticky");
+assert.match(styles, /\.consumption-table thead tr:first-child \.consumption-account-column\s*\{[^}]*background:\s*#efebe7[^}]*z-index:\s*9/, "sticky header intersection stays opaque and above scrolling month and quarter headers with a selector that outranks the first-row header rule");
 assert.match(styles, /\.consumption-table thead tr:first-child th\s*\{[^}]*position:\s*sticky[^}]*top:\s*0/, "first header row remains sticky");
 assert.match(styles, /\.consumption-table thead tr:nth-child\(2\) th\s*\{[^}]*position:\s*sticky[^}]*top:\s*2\.6rem/, "second compact header row remains sticky");
 assert.match(styles, /\.consumption-insights-page[\s\S]*\.consumption-insights-alert-trend-grid[\s\S]*\.consumption-insights-contribution-list/, "Insights styling is page-scoped");

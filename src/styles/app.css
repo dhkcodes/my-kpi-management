@@ -2593,6 +2593,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table tbody tr.is-context > td, .consumption-table tbody tr.is-context > th { background: #fff7f3; }
 .consumption-account-column { left: 0; min-width: 19rem !important; position: sticky; text-align: left !important; width: 19rem; z-index: 3; }
 .consumption-table thead .consumption-account-column { font-size: var(--consumption-grid-font-size); padding-left: 2.35rem; text-align: left; z-index: 6; }
+.consumption-table thead tr:first-child .consumption-account-column { background: #efebe7; z-index: 9; }
 .consumption-account-row .consumption-account-column { background: #f7f5f2; }
 .consumption-account-toggle { background: transparent; border: 0; border-radius: var(--oj-core-border-radius-sm); color: inherit; cursor: pointer; display: block; font: inherit; min-height: 2.25rem; padding: .05rem; text-align: left; width: 100%; }
 .consumption-account-toggle:hover { background: var(--oj-core-bg-color-hover, #eeebe8); }

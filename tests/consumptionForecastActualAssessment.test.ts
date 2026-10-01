@@ -102,6 +102,9 @@ assert.deepEqual(filterForecastActualProblemRows(rows, "MTD_SHORTFALL", ["FY27-S
 assert.equal(countDistinctForecastActualAccounts(rows), 3);
 
 const periodRows = [row("A", [
+  month({ periodKey: "FY27-JUN", actualAmount: "100", actualState: "FINAL" }),
+  month({ periodKey: "FY27-JUL", actualAmount: "120", actualState: "FINAL" }),
+  month({ periodKey: "FY27-AUG", actualAmount: "140", actualState: "FINAL" }),
   month({ periodKey: "FY27-SEP", forecastAmount: "100" }),
   month({ periodKey: "FY27-OCT", forecastAmount: "0" }),
   month({ periodKey: "FY27-NOV", forecastAmount: "200" }),
@@ -109,8 +112,17 @@ const periodRows = [row("A", [
 ])];
 assert.deepEqual(
   visibleForecastActualPeriods(["FY27-MAY", "FY27-DEC", "FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG"], periodRows),
-  ["FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG"],
-  "months display through the latest entered Forecast; zero is entered and future null months are excluded"
+  ["FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG", "FY27-JUL", "FY27-JUN"],
+  "Forecast and Actual-only months are both visible; entered zero is retained and null-only months are excluded"
+);
+assert.deepEqual(
+  visibleForecastActualPeriods([], [row("Actual only", [
+    month({ periodKey: "FY27-JUN", actualAmount: "100", actualState: "FINAL" }),
+    month({ periodKey: "FY27-JUL", actualAmount: "0", actualState: "FINAL" }),
+    month({ periodKey: "FY27-AUG", forecastAmount: null, actualAmount: null, actualState: null })
+  ])]),
+  ["FY27-JUL", "FY27-JUN"],
+  "Q1 remains visible without Forecast, explicit zero stays distinct from missing Actual"
 );
 
 const totals = summarizeForecastActualActuals([

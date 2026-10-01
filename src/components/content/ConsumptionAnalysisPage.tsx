@@ -25,8 +25,7 @@ import {
   compareExactDecimals,
   divideExactDecimal,
   exactDecimalToChartCoordinate,
-  formatExactCurrency,
-  formatExactK,
+  formatExactKFixed,
   formatExactPercent,
   negateExactDecimal,
   subtractExactDecimals
@@ -40,21 +39,20 @@ import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
 
-const chartCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
-const chartCurrencyK = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const chartCurrencyK = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** Ratio displays use two percentage-point decimals and decimal HALF_UP rounding. */
 const PERCENT_DISPLAY_PRECISION = 2;
 const signedCurrencyExact = (amountExact: string | null) => amountExact === null ? "N/A"
-  : `${compareExactDecimals(amountExact, "0") > 0 ? "+" : ""}${formatExactCurrency(amountExact)}`;
+  : `${compareExactDecimals(amountExact, "0") > 0 ? "+" : ""}${formatExactKFixed(amountExact, 2)}`;
 const percentageTextExact = (percentageExact: string | null, signed = false) => percentageExact === null ? "N/A"
   : `${signed && compareExactDecimals(percentageExact, "0") > 0 ? "+" : ""}${divideExactDecimal(percentageExact, "1", PERCENT_DISPLAY_PRECISION)}%`;
 const qoqKind = (status: ConsumptionAnalysisQuarter["status"]) => status === "ACTUAL" ? "ACTUAL"
   : status === "FORECAST" ? "FORECAST" : status === "MIXED" ? "MIXED" : status === "NOT_OPEN" ? "NOT OPEN" : "INCOMPLETE";
-const splitLabel = (value: { actualAmountExact: string; forecastAmountExact: string }) => `ACTUAL ${formatExactCurrency(value.actualAmountExact)} · FORECAST ${formatExactCurrency(value.forecastAmountExact)}`;
-const planSplitLabel = (value: ConsumptionAnalysisPlan) => `ACTUAL ${formatExactCurrency(value.actualAmountExact)} · FORECAST ${value.forecastEntryStatus === "UNAVAILABLE" ? "N/A" : formatExactCurrency(value.forecastAmountExact)}`;
+const splitLabel = (value: { actualAmountExact: string; forecastAmountExact: string }) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · FORECAST ${formatExactKFixed(value.forecastAmountExact, 2)}`;
+const planSplitLabel = (value: ConsumptionAnalysisPlan) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · FORECAST ${value.forecastEntryStatus === "UNAVAILABLE" ? "N/A" : formatExactKFixed(value.forecastAmountExact, 2)}`;
 // Oracle JET accepts Number coordinates only. These helpers are the sole lossy chart boundary.
 const amountExactToKChartCoordinate = (amountExact: string): number => exactDecimalToChartCoordinate(divideExactDecimal(amountExact, "1000", 12)!);
-const trendChartCoordinateLabel = ({ value }: Readonly<{ value: number }>) => chartCurrency.format(value);
+const trendChartCoordinateLabel = ({ value }: Readonly<{ value: number }>) => `${chartCurrencyK.format(value / 1000)} K`;
 const movementChartCoordinateLabel = ({ value }: Readonly<{ value: number }>) => `${chartCurrencyK.format(value)} K`;
 const movementAxisChartCoordinateConverter = {
   format: (value: string | number) => `${chartCurrencyK.format(Number(value))} K`,
@@ -277,16 +275,16 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     ];
     return chart(rows.flatMap((row) => [
       { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmountChartCoordinate, color: ACTUAL_COLOR,
-        dataLabel: formatExactCurrency(row.actualAmountExact), shortDesc: `${row.label} ACTUAL ${formatExactCurrency(row.actualAmountExact)}` },
+        dataLabel: formatExactKFixed(row.actualAmountExact), shortDesc: `${row.label} ACTUAL ${formatExactKFixed(row.actualAmountExact)}` },
       { id: `${row.label}-forecast`, seriesId: "FORECAST", groupId: row.label, value: row.forecastAmountChartCoordinate, color: FORECAST_COLOR,
-        dataLabel: formatExactCurrency(row.forecastAmountExact), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} FORECAST ${formatExactCurrency(row.forecastAmountExact)}` }
+        dataLabel: formatExactKFixed(row.forecastAmountExact), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} FORECAST ${formatExactKFixed(row.forecastAmountExact)}` }
     ]));
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
     return chart(analysis.quarters.flatMap((quarter) => [
-      { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: quarter.actualAmountChartCoordinate, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${formatExactCurrency(quarter.actualAmountExact)}` },
-      { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmountChartCoordinate, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${formatExactCurrency(quarter.forecastAmountExact)}` }
+      { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: quarter.actualAmountChartCoordinate, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${formatExactKFixed(quarter.actualAmountExact)}` },
+      { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmountChartCoordinate, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${formatExactKFixed(quarter.forecastAmountExact)}` }
     ]));
   }, [analysis]);
   const movementChart = useMemo(() => {
@@ -296,7 +294,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
         const signedAmountExact = category === "Reduction" ? negateExactDecimal(amountExact) : amountExact;
         return { id: `${point.quarter}-${category}`, seriesId: category, groupId: point.quarter,
           value: amountExactToKChartCoordinate(signedAmountExact), color,
-          shortDesc: `${point.quarter} ${category}${category === "All" ? " Forecast" : ""} ${formatExactK(signedAmountExact)} USD · ${point.includedForecastPeriods.join(", ")}` };
+          shortDesc: `${point.quarter} ${category}${category === "All" ? " Forecast" : ""} ${formatExactKFixed(signedAmountExact)} USD · ${point.includedForecastPeriods.join(", ")}` };
       };
       const points: InsightChartPoint[] = [];
       if (point.totalForecastAmountExact !== null) points.push(chartPoint("All", point.totalForecastAmountExact, "#4b5563"));
@@ -313,7 +311,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     value: point.actualAmountChartCoordinate,
     color: ACTUAL_COLOR,
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
-    shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactCurrency(point.actualAmountExact)}`
+    shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
   if (!analysis && (loading || hasStaleFiscalYearResponse)) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
@@ -496,19 +494,19 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={analysis.selectedSalesRep === row.salesRep ? "is-selected" : ""}>
           <th><button type="button" onClick={() => { setLoading(true); setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
-          <td>{formatExactK(row.actualAmountExact)}</td><td class={row.actualGrowthAmountExact === null ? "" : compareExactDecimals(row.actualGrowthAmountExact, "0") < 0 ? "is-negative" : "is-positive"}>
+          <td>{formatExactKFixed(row.actualAmountExact)}</td><td class={row.actualGrowthAmountExact === null ? "" : compareExactDecimals(row.actualGrowthAmountExact, "0") < 0 ? "is-negative" : "is-positive"}>
             {row.actualGrowthAmountExact === null ? "N/A"
-              : <>{formatExactK(row.actualGrowthAmountExact)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : percentageTextExact(row.actualGrowthPercentExact, true)}</>}
+              : <>{formatExactKFixed(row.actualGrowthAmountExact)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : percentageTextExact(row.actualGrowthPercentExact, true)}</>}
           </td>
-          <td>{formatExactK(row.fyExpectedAmountExact)}</td><td>{row.accountCount}</td><td>{percentageTextExact(row.topThreeConcentrationPercentExact)}</td><td>{row.attentionAccountCount}</td>
+          <td>{formatExactKFixed(row.fyExpectedAmountExact)}</td><td>{row.accountCount}</td><td>{percentageTextExact(row.topThreeConcentrationPercentExact)}</td><td>{row.attentionAccountCount}</td>
         </tr>)}
       </tbody></table></div>
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactCurrency(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactCurrency(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {formatExactCurrency(analysis.portfolio.forecastAmountExact)}</span></small></article>
-      <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactCurrency(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
-      <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactCurrency(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
+      <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
+      <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
     </section>
 
@@ -554,10 +552,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             <div class="consumption-insights-movement-list">
               {selectedMovementAccounts.length > 0 ? <table><thead><tr><th>Account</th>{selectedMovement.category === "All" ? <><th>Total</th><th>New</th><th>Expansion</th><th>Reduction</th></> : <th>{selectedMovement.category}</th>}</tr></thead><tbody>
                 {selectedMovementAccounts.map((account) => <tr key={account.account}><td>{account.account}</td>{selectedMovement.category === "All" ? <>
-                  <td>{formatExactK(account.totalForecastAmountExact)}</td><td>{formatExactK(account.newAmountExact)}</td><td>{formatExactK(account.expansionAmountExact)}</td><td>{formatExactK(account.reductionAmountExact)}</td>
-                </> : <td>{formatExactK(movementValueExact(account))}</td>}</tr>)}
-              </tbody>{selectedMovement.category === "All" ? <tfoot><tr><th>Total</th><th>{formatExactK(compositionTotals.totalForecastAmountExact)}</th><th>{formatExactK(compositionTotals.newAmountExact)}</th><th>{formatExactK(compositionTotals.expansionAmountExact)}</th><th>{formatExactK(compositionTotals.reductionAmountExact)}</th></tr></tfoot>
-                : <tfoot><tr><th>Total</th><th>{formatExactK(selectedMovementAccounts.reduce((sum, account) => addExactDecimals(sum, movementValueExact(account)), "0"))}</th></tr></tfoot>}</table>
+                  <td>{formatExactKFixed(account.totalForecastAmountExact)}</td><td>{formatExactKFixed(account.newAmountExact)}</td><td>{formatExactKFixed(account.expansionAmountExact)}</td><td>{formatExactKFixed(account.reductionAmountExact)}</td>
+                </> : <td>{formatExactKFixed(movementValueExact(account))}</td>}</tr>)}
+              </tbody>{selectedMovement.category === "All" ? <tfoot><tr><th>Total</th><th>{formatExactKFixed(compositionTotals.totalForecastAmountExact)}</th><th>{formatExactKFixed(compositionTotals.newAmountExact)}</th><th>{formatExactKFixed(compositionTotals.expansionAmountExact)}</th><th>{formatExactKFixed(compositionTotals.reductionAmountExact)}</th></tr></tfoot>
+                : <tfoot><tr><th>Total</th><th>{formatExactKFixed(selectedMovementAccounts.reduce((sum, account) => addExactDecimals(sum, movementValueExact(account)), "0"))}</th></tr></tfoot>}</table>
                 : <p class="consumption-empty-state">No Account has a visible Forecast amount or confirmed component for this quarter.</p>}
             </div>
           </> : <div class="consumption-insights-composition-empty"><span class="kpi-section-label">Forecast composition detail</span><h3>Select a composition bar</h3></div>}
@@ -572,7 +570,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           class={selectedAlert?.alertId === alert.alertId ? "consumption-signal is-selected" : "consumption-signal"}
           aria-pressed={selectedAlert?.alertId === alert.alertId} onClick={() => setSelectedAlertId((current) => current === alert.alertId ? "" : alert.alertId)}>
           <span class="consumption-signal-main"><strong>{alert.account}</strong><span>{alert.workloadMapped && <>{alert.workload} · </>}Plan {alert.planId}{plan && <> · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /></>}</span><span class="consumption-signal-badges"><span class={`consumption-signal-type ${presentation.typeTone}`} aria-label={`Change type ${presentation.typeLabel}`}><i class={presentation.typeIcon} aria-hidden="true"></i>{presentation.typeLabel}</span><span class={`consumption-signal-grade ${presentation.gradeTone}`} aria-label={`Severity ${alert.grade}`}><i class={presentation.gradeIcon} aria-hidden="true"></i>{alert.grade}</span></span></span>
-          <span class="consumption-signal-metrics"><strong>{formatExactCurrency(alert.actualAmountExact)}</strong><small>{signedCurrencyExact(alert.changeAmountExact)} · {percentageTextExact(alert.changePercentExact, true)}</small></span>
+          <span class="consumption-signal-metrics"><strong>{formatExactKFixed(alert.actualAmountExact)}</strong><small>{signedCurrencyExact(alert.changeAmountExact)} · {percentageTextExact(alert.changePercentExact, true)}</small></span>
         </button>; })}{analysis.alerts.length === 0 && <p class="consumption-empty-state">No ACTUAL usage change alerts for this context.</p>}</div>
         <div class="consumption-insights-linked-trend">
           <div><h3>ACTUAL Trend</h3><p>{selectedAlert ? `${selectedAlert.account} · ${selectedAlert.workloadMapped ? `${selectedAlert.workload} · ` : ""}${selectedAlert.planId}` : contextTrendLabel}</p></div>
@@ -588,18 +586,18 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     <section class="consumption-sales-account-review" aria-label="Sales Account growth and attention">
       <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY same-period ACTUAL contribution · K USD</span><h2>Account Growth / Reduction</h2></div></div>
         <div class="consumption-sales-movement-columns">
-          <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactK(account.actualGrowthAmountExact!)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
-          <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactK(account.actualGrowthAmountExact!)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
+          <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
+          <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
         </div>
       </section>
       <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2><p>{attentionCoverageLabel}</p></div></div>
         <div class="consumption-sales-attention-list">{attentionAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}>
           <span><strong>{account.account}</strong><small>{account.salesRep} · {account.attentionReasons.join(" · ")}</small></span>
-          <span class="consumption-sales-attention-amounts"><strong>Actual {formatExactK(account.actualAmountExact)}</strong><small>{account.forecastEntryStatus === "MISSING"
+          <span class="consumption-sales-attention-amounts"><strong>Actual {formatExactKFixed(account.actualAmountExact)}</strong><small>{account.forecastEntryStatus === "MISSING"
             ? "Forecast missing · Covered-period expected unavailable"
             : account.forecastEntryStatus === "ZERO"
-              ? <>Forecast {formatExactK(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactK(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>
-              : <>Forecast {formatExactK(account.forecastAmountExact)} · Covered-period expected {formatExactK(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>}</small></span>
+              ? <>Forecast {formatExactKFixed(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>
+              : <>Forecast {formatExactKFixed(account.forecastAmountExact)} · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>}</small></span>
         </button>)}{attentionAccounts.length === 0 && <p class="consumption-empty-state">No Accounts require attention for this context.</p>}</div>
       </section>
     </section>
@@ -611,11 +609,11 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
             class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
             onClick={() => setSelectedAccountName(account.account)}>
-            <span>{account.account} · {account.salesRep}</span><strong>{formatExactK(account.actualAmountExact)}</strong><small>{contributionPercentText(account.percentageExact)} · {actualEntryText(account.actualEntryStatus, account.actualAmountExact)}</small><i><b style={`width:${contributionBarWidthChartCoordinate(account.percentageExact)}%`}></b></i>
+            <span>{account.account} · {account.salesRep}</span><strong>{formatExactKFixed(account.actualAmountExact)}</strong><small>{contributionPercentText(account.percentageExact)} · {actualEntryText(account.actualEntryStatus, account.actualAmountExact)}</small><i><b style={`width:${contributionBarWidthChartCoordinate(account.percentageExact)}%`}></b></i>
           </button>)}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"} · {contributionPeriodLabel}</p></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentageExact)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentageExact)} of ${percentageContext}; ACTUAL ${formatExactCurrency(plan.actualAmountExact)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidthChartCoordinate(plan.percentageExact)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {formatExactCurrency(plan.actualAmountExact)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmountExact)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentageExact)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentageExact)} of ${percentageContext}; ACTUAL ${formatExactKFixed(plan.actualAmountExact)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidthChartCoordinate(plan.percentageExact)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {formatExactKFixed(plan.actualAmountExact)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmountExact)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>

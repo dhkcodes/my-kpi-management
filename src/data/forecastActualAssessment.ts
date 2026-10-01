@@ -181,13 +181,12 @@ export const visibleForecastActualPeriods = (
   fullPeriods: readonly string[],
   rows: readonly ForecastActualRow[]
 ): string[] => {
-  const sorted = forecastActualPeriodsLatestFirst(fullPeriods);
-  const periodsWithForecast = new Set<string>();
+  const periodsWithValues = new Set<string>();
   rows.forEach((row) => row.months.forEach((item) => {
-    if (item.forecastAmount !== null) periodsWithForecast.add(item.periodKey);
+    if (item.forecastAmount !== null || item.actualAmount !== null) periodsWithValues.add(item.periodKey);
   }));
-  const latestIndex = sorted.findIndex((period) => periodsWithForecast.has(period));
-  return latestIndex < 0 ? [] : sorted.slice(latestIndex);
+  return forecastActualPeriodsLatestFirst([...new Set([...fullPeriods, ...periodsWithValues])])
+    .filter((period) => periodsWithValues.has(period));
 };
 
 const addNullable = (current: string | null, value: string): string => current === null ? value : addExactDecimals(current, value);
