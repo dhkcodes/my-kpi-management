@@ -5,6 +5,7 @@ import {
   divideExactDecimal,
   formatExactCurrency,
   formatExactK,
+  formatExactKFixed,
   formatExactPercent,
   negateExactDecimal,
   subtractExactDecimals
@@ -23,6 +24,9 @@ assert.equal(formatExactCurrency("0.0001"), "$0.0001");
 assert.equal(formatExactCurrency("-12.3"), "-$12.3");
 assert.equal(formatExactK("900719925474.0003"), "$900,719,925.4740003 K");
 assert.equal(formatExactK("0.0001"), "$0.0000001 K");
+assert.equal(formatExactKFixed("1234567", 2), "$1,234.57 K");
+assert.equal(formatExactKFixed("0", 2), "$0.00 K");
+assert.equal(formatExactKFixed("-1255", 2), "-$1.26 K");
 
 assert.equal(divideExactDecimal("1", "6", 1), "0.2", "division uses round-half-away-from-zero");
 assert.equal(divideExactDecimal("-1", "6", 1), "-0.2");
