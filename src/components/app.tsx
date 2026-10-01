@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import Context = require("ojs/ojcontext");
 import { Footer } from "./footer";
 import { Header } from "./header";
-import { clearKapHeaderLoginSession, startNewKapHeaderLoginSession } from "./kapHeaderBrand";
+import { clearKapHeaderLoginSession } from "./kapHeaderBrand";
 import { LoginPage } from "./LoginPage";
 import { Content } from "./content/index";
 import type { KpiNavigationGuard } from "./content/KpiSpreadsheetPage";
@@ -836,7 +836,6 @@ export const App = registerCustomElement(
 
     const handleAuthenticated = useCallback((authenticatedSession: AuthSession) => {
       window.history.replaceState(null, "", "/");
-      startNewKapHeaderLoginSession();
       setSession(authenticatedSession);
     }, []);
 
