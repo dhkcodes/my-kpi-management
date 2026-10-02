@@ -65,7 +65,8 @@ import {
 import type { AuthSession } from "../auth/authSession";
 import { canAccessRoute, canWriteRoute, filterNavigationItems } from "../auth/menuPermissions";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
-import { subscribeAuthRequired } from "../auth/apiFetch";
+import { apiFetch, subscribeAuthRequired } from "../auth/apiFetch";
+import { AppBusyOverlay } from "./AppBusyOverlay";
 import "ojs/ojbutton";
 import "ojs/ojpopup";
 import type { ojPopup } from "ojs/ojpopup";
@@ -750,7 +751,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
                 rows,
                 committedQuery,
                 draftFxRate,
-                fetch,
+                apiFetch,
                 permanentDeleteIds
               );
               setAccountsWorkloadsRows((current) => ({ ...current, [fiscalYear]: authoritative.items }));
@@ -850,11 +851,11 @@ export const App = registerCustomElement(
         .catch(() => undefined);
     }, []);
 
-    if (authChecking) {
-      return <main class="kap-login" aria-label="Checking sign-in session" />;
-    }
-    return session
-      ? <AuthenticatedApp appName={appName} profile={session} onLogout={handleLogout} />
-      : <LoginPage appName={appName} onAuthenticated={handleAuthenticated} />;
+    const content = authChecking
+      ? <main class="kap-login" aria-label="Checking sign-in session" />
+      : session
+        ? <AuthenticatedApp appName={appName} profile={session} onLogout={handleLogout} />
+        : <LoginPage appName={appName} onAuthenticated={handleAuthenticated} />;
+    return <>{content}<AppBusyOverlay /></>;
   }
 );

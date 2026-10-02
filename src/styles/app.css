@@ -5217,48 +5217,135 @@ h4.weekly-activity-section-label--next-week,
   .forecast-actual-matrix .is-rep { display: table-cell; left: 8.5rem; min-width: 7rem; width: 7rem; }
 }
 
-/* Actual vs Forecast follow-up: stable filters, Redwood state emphasis, and reachable rows. */
-.forecast-actual-page { max-height: 100%; overflow-x: hidden; overflow-y: auto; padding-bottom: 1.5rem; }
+/* Actual vs Forecast follow-up: stable filters, accessible explanations, and readable columns. */
+.forecast-actual-page { max-height: 100%; min-height: min(44rem, calc(100vh - 7rem)); overflow-x: hidden; overflow-y: auto; padding-bottom: 1.5rem; }
 .forecast-actual-control select,
 .forecast-actual-search-panel input,
 .forecast-actual-pillar .consumption-pillar-selector button { height: 2.15rem; min-height: 2.15rem; }
-.forecast-actual-mtd-control {
-  align-items: start;
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-rows: auto 2.15rem;
-  min-height: 3.25rem;
+.forecast-actual-mtd-control,
+.consumption-analysis-mtd-control {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .5rem;
+  min-height: 2.15rem;
 }
-.forecast-actual-mtd-control > span:first-child { grid-column: 1; grid-row: 1; }
-.forecast-actual-mtd-control > .consumption-mtd-applied-date { grid-column: 2; grid-row: 1; }
-.forecast-actual-mtd-control > .consumption-mtd-switch { align-self: center; grid-column: 1 / -1; grid-row: 2; }
+.forecast-actual-mtd-control > .consumption-mtd-applied-date,
+.consumption-analysis-mtd-control > .consumption-mtd-applied-date { order: 1; }
+.forecast-actual-mtd-control > .kpi-section-label,
+.consumption-analysis-mtd-control > .kpi-section-label { order: 2; }
+.forecast-actual-mtd-control > .consumption-mtd-switch,
+.consumption-analysis-mtd-control > .consumption-mtd-switch { order: 3; }
 .forecast-actual-summary article,
 .forecast-actual-problem-card { position: relative; padding-inline-end: 2rem; }
-.forecast-actual-summary article::after,
-.forecast-actual-problem-card::after {
+.forecast-actual-card-action {
+  align-items: flex-start;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  min-height: 100%;
+  padding: 0;
+  text-align: start;
+  width: 100%;
+}
+.forecast-actual-info-trigger {
   align-items: center;
+  background: transparent;
   border: 1px solid currentColor;
   border-radius: 50%;
-  content: "i";
+  color: var(--oj-core-text-color-secondary);
+  cursor: help;
   display: inline-flex;
-  font: 700 11px/1 Arial, sans-serif;
-  height: 17px;
+  font: 800 11px/1 Arial, sans-serif;
+  height: 1.125rem;
   justify-content: center;
-  opacity: .65;
+  padding: 0;
   position: absolute;
   right: .55rem;
   top: .5rem;
-  width: 17px;
+  width: 1.125rem;
+  z-index: 3;
 }
+.forecast-actual-info-trigger::after {
+  background: #24272c;
+  border-radius: .35rem;
+  color: #fff;
+  content: attr(data-tooltip);
+  font: 500 .75rem/1.4 var(--oj-core-font-family, Arial, sans-serif);
+  max-width: min(22rem, calc(100vw - 2rem));
+  opacity: 0;
+  padding: .55rem .65rem;
+  pointer-events: none;
+  position: absolute;
+  right: -.15rem;
+  text-align: start;
+  top: calc(100% + .4rem);
+  transform: translateY(-.15rem);
+  transition: opacity .12s ease, transform .12s ease;
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 20;
+}
+.forecast-actual-info-trigger:hover::after,
+.forecast-actual-info-trigger:focus::after {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+.forecast-actual-info-trigger:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
+.forecast-actual-card-highlight { color: inherit; font-size: inherit; font-weight: 800; }
 .forecast-actual-summary .is-forecast > span,
 .forecast-actual-summary .is-forecast > strong { color: #0b6f85; }
 .forecast-actual-summary article:nth-child(2) > span,
 .forecast-actual-summary article:nth-child(2) > strong,
 .forecast-actual-month-value.is-provisional > small.is-mtd-label,
-.forecast-actual-problem-card.is-final-shortfall > span,
-.forecast-actual-problem-card.is-final-shortfall > strong { color: #b3312d; }
+.forecast-actual-problem-card.is-final-shortfall .forecast-actual-card-action > span,
+.forecast-actual-problem-card.is-final-shortfall .forecast-actual-card-action > strong { color: #9d2b27; }
 .forecast-actual-month-value.is-provisional > small.is-mtd-label { background: #fff0ef; border-color: #e7aaa7; }
-.forecast-actual-problem-card.is-mtd-shortfall > span,
-.forecast-actual-problem-card.is-mtd-shortfall > strong { color: #8f5b00; }
+.forecast-actual-problem-card.is-mtd-shortfall .forecast-actual-card-action > span,
+.forecast-actual-problem-card.is-mtd-shortfall .forecast-actual-card-action > strong { color: #765000; }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-forecast,
+.forecast-actual-matrix .forecast-actual-month-value.is-forecast { background: #edf7f9; }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-actual,
+.forecast-actual-matrix .forecast-actual-month-value.is-actual { background: #fff3f1; }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-difference,
+.forecast-actual-matrix .forecast-actual-month-value.is-difference { background: #f1f4f7; }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-status,
+.forecast-actual-matrix .forecast-actual-month-value.is-status { background: #f7f5eb; }
 .forecast-actual-month-value.is-empty,
 .forecast-actual-month-value.is-difference.is-empty { text-align: center; }
+.consumption-initial-state { min-height: min(44rem, calc(100vh - 7rem)); }
+
+/* One blocking progress surface for API-backed reads and mutations. */
+.kap-busy-overlay {
+  align-items: center;
+  background: color-mix(in srgb, #f7f7f8 72%, transparent);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 4000;
+}
+.kap-busy-overlay__box {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d5d9df;
+  border-radius: .55rem;
+  box-shadow: 0 .7rem 2rem rgb(0 0 0 / 18%);
+  color: #34383e;
+  display: flex;
+  flex-direction: column;
+  font-size: .8rem;
+  font-weight: 700;
+  gap: .55rem;
+  min-width: 7rem;
+  padding: .9rem 1.1rem;
+}
+@media (max-width: 600px) {
+  .forecast-actual-info-trigger::after { position: fixed; left: 1rem; right: 1rem; top: 4.5rem; width: auto; }
+}

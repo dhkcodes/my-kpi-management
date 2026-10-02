@@ -622,22 +622,14 @@ export function Content({
       ) : activeRoute.module === "accountManagementOverview" ? (
         <AccountManagementOverviewPage breadcrumb={pageNavigation} onNavigate={onNavigate} />
       ) : activeRoute.module === "myCustomers360" ? (
-        accountsWorkloadsLoading ? (
-          <section class="accounts-workloads-page accounts-workloads-loading" role="status" aria-busy="true" aria-describedby="accountPortfolioLoadingText">
-            {pageNavigation}
-            <oj-progress-circle value={-1} size="md" aria-label="Loading Account Portfolio"></oj-progress-circle>
-            <span id="accountPortfolioLoadingText">Loading Account Portfolio data…</span>
-          </section>
-        ) : (
-          <MyCustomers360Page
-            fiscalYear={fiscalYear}
-            rows={accountsWorkloadsRows}
-            hierarchy={accountsWorkloadsHierarchy}
-            dataAvailable={accountsWorkloadsDatasetAvailable}
-            onOpenAccount={openAccountWorkloads}
-            breadcrumb={pageNavigation}
-          />
-        )
+        <MyCustomers360Page
+          fiscalYear={fiscalYear}
+          rows={accountsWorkloadsRows}
+          hierarchy={accountsWorkloadsHierarchy}
+          dataAvailable={accountsWorkloadsDatasetAvailable}
+          onOpenAccount={openAccountWorkloads}
+          breadcrumb={pageNavigation}
+        />
       ) : activeRoute.module === "accountsWorkloads" ? (
         <AccountsWorkloadsPage
           canWrite={canWrite}
@@ -697,8 +689,7 @@ export function Content({
             </div>
 
             <div class="kpi-guide-dialog__body">
-              {guideLoading && <div id="kpiGuideLoading" role="status" aria-busy="true"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> Loading KPI Guide…</div>}
-              {(guideError || guideSaveError) && <div id="kpiGuideError" role="alert">{guideSaveError || guideError}</div>}
+              {!guideLoading && (guideError || guideSaveError) && <div id="kpiGuideError" role="alert">{guideSaveError || guideError}</div>}
 
               {!guideLoading && <div class="kpi-guide-layout kpi-guide-layout--unified">
               <aside class="kpi-guide-list" aria-label="KPI guide list">

@@ -112,10 +112,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
       </div>
 
       {loading ? (
-        <div class="home-consumption__state" role="status" aria-live="polite">
-          <oj-progress-circle value={-1} size="sm" aria-label="Loading Consumption Overview"></oj-progress-circle>
-          <span>Loading Consumption Overview…</span>
-        </div>
+        <div class="home-consumption__analysis-grid" aria-hidden="true"></div>
       ) : error ? (
         <div class="home-consumption__state home-consumption__state--error" role="alert">
           Consumption data is unavailable. {error}

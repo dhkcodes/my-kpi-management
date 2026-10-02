@@ -118,10 +118,6 @@ export function AttainmentPage({ fiscalYear, canWrite, breadcrumb }: Readonly<{ 
     ...(dashboard.summary.ociOutlook === null ? [] : [{ id: "oci-total", seriesId: "OCI Total", groupId: "Total", value: dashboard.summary.ociOutlook, shortDesc: `OCI Total ${formatAttainmentAmount(dashboard.summary.ociOutlook)}` } as const])
   ] : [], [dashboard]);
   const compositionData = useMemo(() => new ArrayDataProvider(compositionPoints, { keyAttributes: "id" }), [compositionPoints]);
-  if (loading && !dashboard) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Attainment loading">
-    <oj-progress-circle value={-1} size="md" aria-label="Consumption Attainment loading"></oj-progress-circle>
-    <p>Loading Consumption Attainment...</p>
-  </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "attainment-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];

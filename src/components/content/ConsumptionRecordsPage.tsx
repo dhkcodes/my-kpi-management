@@ -1471,11 +1471,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   if (controlsRequiringConfirmation.length > 0) pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${controlsRequiringConfirmation.length}건의 과거 또는 불일치 Control이 있습니다. Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
 
-  if (dataMode === "loading" || blockingRecordsLoading) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Records loading">
-    <oj-progress-circle value={-1} size="md" aria-label="Consumption Records loading"></oj-progress-circle>
-    <p>Loading Consumption Records...</p>
-  </section>;
-
   return (
     <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
       <header class="consumption-page__header">
@@ -1555,7 +1550,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           <button type="button" class="consumption-record-search__submit" aria-label="Apply filters and search" title="Apply filters and search"
             disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || !!forecastEditor || searchComposing || dataMode !== "backend"}
             onClick={() => void submitRecordsQuery()}>
-            {rangeLoading ? <oj-progress-circle value={-1} size="sm" /> : <span class="oj-ux-ico-search" aria-hidden="true" />}
+            <span class="oj-ux-ico-search" aria-hidden="true" />
           </button>
         </label>
 
@@ -1573,12 +1568,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           setImportResult("");
         }}>
         <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
-          {(importPhase === "previewing" || importPhase === "applying") && (
-            <div class="consumption-import-progress" role="status">
-              <oj-progress-circle value={-1} size="md"></oj-progress-circle>
-              <div><strong>{importPhase === "previewing" ? "Validating CSV…" : "Importing Consumption CSV…"}</strong><p>Keep this dialog open while the atomic import completes.</p></div>
-            </div>
-          )}
+
           {importPhase === "preview" && pendingImport && (
             <div class="consumption-import-preview">
               <p><strong>{pendingImport.files.length} CSV file{pendingImport.files.length === 1 ? "" : "s"}</strong> passed filename, pillar, range, and content validation.</p>
@@ -1657,10 +1647,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           setForecastImportPhase("idle"); setPendingForecastImport(null); setForecastImportResult("");
         }}>
         <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
-          {(forecastImportPhase === "previewing" || forecastImportPhase === "applying") && <div class="consumption-import-progress" role="status">
-            <oj-progress-circle value={-1} size="md"></oj-progress-circle>
-            <div><strong>{forecastImportPhase === "previewing" ? "Validating Forecast Excel…" : "Applying Forecast atomically…"}</strong><p>Blank cells remain unchanged; explicit zero is retained.</p></div>
-          </div>}
+
           {forecastImportPhase === "preview" && pendingForecastImport && <div class="consumption-import-preview">
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>
             <p class="consumption-import-reference-note"><strong>K-unit contract:</strong> Forecast Total, New, and EXP accept at most 2 decimal places; persisted amounts equal the entered K value × 1,000. Existing data is not bulk-rounded by this Import.</p>
@@ -1751,10 +1738,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       )}
 
       <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle" aria-busy={recordsLoadingPhase === "query" ? "true" : undefined}>
-        {recordsLoadingPhase === "query" && <div class="consumption-results-refresh" role="status">
-          <oj-progress-circle value={-1} size="sm" aria-label="Refreshing Consumption Records results"></oj-progress-circle>
-          <span>Refreshing results…</span>
-        </div>}
+
         <div class="consumption-section-heading consumption-table-heading">
           <div>
             <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></div>
@@ -1857,10 +1841,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           <div ref={recordsSentinelRef} class="consumption-records-sentinel" data-records-sentinel aria-hidden="true"></div>
         </div>
         <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
-          <span class="consumption-records-loading" role="status" aria-live="polite" aria-atomic="true">
-            {(recordsLoading || rangeLoading) && <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>Loading Consumption Records…</span></>}
-          </span>
-          {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>{recordsLoading ? "Loading…" : "Load More"}</button>}
+          {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>Load More</button>}
           {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
           <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts · {visiblePlans.length} plans</small>
         </div>

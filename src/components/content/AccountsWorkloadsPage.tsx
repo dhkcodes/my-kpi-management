@@ -2488,12 +2488,7 @@ export function AccountsWorkloadsPage({
           </ul>
         </div>
       )}
-      {loading ? (
-        <div class="accounts-workloads-loading">
-          <oj-progress-circle value={-1} size="md" /> Loading hierarchy…
-        </div>
-      ) : (
-        <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact">
+      <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy={loading ? "true" : "false"}>
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
               <tr>
@@ -2912,8 +2907,7 @@ export function AccountsWorkloadsPage({
               )}
             </tbody>
           </table>
-        </div>
-      )}
+      </div>
       <oj-dialog
         ref={permanentDeleteDialogRef}
         dialogTitle="Delete archived AW permanently?"

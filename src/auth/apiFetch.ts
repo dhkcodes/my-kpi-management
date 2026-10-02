@@ -1,3 +1,5 @@
+import { beginAppBusy } from "../app/appBusy";
+
 export const AUTH_REQUIRED_EVENT = "kap-auth-required";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -31,7 +33,12 @@ export async function apiFetch(
   fetchImpl: FetchLike = fetch,
   notifyAuthRequired = true
 ): Promise<Response> {
-  const response = await fetchImpl(input, { ...init, credentials: "include" });
-  if (notifyAuthRequired && response.status === 401) emitAuthRequired();
-  return response;
+  const finishBusy = beginAppBusy();
+  try {
+    const response = await fetchImpl(input, { ...init, credentials: "include" });
+    if (notifyAuthRequired && response.status === 401) emitAuthRequired();
+    return response;
+  } finally {
+    finishBusy();
+  }
 }

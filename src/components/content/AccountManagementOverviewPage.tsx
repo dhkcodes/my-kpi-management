@@ -173,8 +173,6 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
       <AppMessageBanner ariaLabel="Account overview notifications" messages={error ? [{ id: "overview-load-error", severity: "error", summary: "Unable to load Account Management Overview", detail: error, persistence: "sticky" }] : []} onClose={() => setError("")} />
 
-      {loading && <div class="account-overview__loading" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> Loading overview</div>}
-
       {overview && <>
         <div class="account-overview__top-row">
           <div class="account-overview__search">
