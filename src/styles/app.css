@@ -5421,20 +5421,27 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-matrix-shell > .consumption-scroll-controls button:first-child { margin-inline-end: auto; }
 
 /* Reserve the application footer and scroll only each workspace's data surface. */
-.kpi-content:has(.kpi-spreadsheet-page:not([data-kpi-tab="Overview"])),
+.kpi-content:has(.kpi-spreadsheet-page),
 .kpi-content:has(.attainment-page) {
   height: calc(100dvh - 4rem - var(--kpi-footer-reserved-height) - 3rem);
   min-height: 0;
   overflow: hidden;
 }
-.kpi-spreadsheet-page:not([data-kpi-tab="Overview"]) {
+.kpi-spreadsheet-page {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
-.kpi-spreadsheet-page:not([data-kpi-tab="Overview"]) .kpi-activities-table-wrap {
+.kpi-overview-scroll-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.kpi-spreadsheet-page .kpi-activities-table-wrap {
   block-size: 0;
   flex: 1 1 16rem;
   overflow: auto;
@@ -5453,6 +5460,6 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 720px) {
   .forecast-actual-matrix-shell { --forecast-rep-width: 6.5rem; --forecast-month-width: 5.25rem; --forecast-difference-width: 6rem; --forecast-status-width: 6.25rem; }
   .forecast-actual-matrix-shell > .consumption-scroll-controls { flex-direction: row; left: .2rem; right: .2rem; top: 50%; }
-  .kpi-content:has(.kpi-spreadsheet-page:not([data-kpi-tab="Overview"])),
+  .kpi-content:has(.kpi-spreadsheet-page),
   .kpi-content:has(.attainment-page) { height: calc(100dvh - 4.5rem - var(--kpi-footer-reserved-height) - 1.5rem); }
 }
