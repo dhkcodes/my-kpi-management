@@ -201,7 +201,7 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   }
 
   const runNavigationSaveScenario = async (scenario, editAw, editOpportunity) => {
-    await evaluate("localStorage.clear(); sessionStorage.clear(); true");
+    await cdp.send("Storage.clearDataForOrigin", { origin: baseUrl, storageTypes: "local_storage,session_storage" });
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?scenario=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} fixture`);
     const before = savePosts;
