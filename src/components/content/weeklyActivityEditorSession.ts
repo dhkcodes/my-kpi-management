@@ -13,8 +13,8 @@ export interface SharedEditorAdapter {
 
 export const ALLOWED_QUILL_FORMATS = ["bold", "color", "size", "list"] as const;
 export const WEEKLY_ACTIVITY_COLORS = [
-  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B",
-  "#B3261E", "#D45B13", "#C58A00", "#007C91", "#A13E75", "#6E46A5"
+  "#161513", "#c74634", "#7a2e1e", "#8a5b00", "#0b5f66", "#2458a6", "#2e6b3f", "#5f4b8b",
+  "#b3261e", "#d45b13", "#c58a00", "#007c91", "#a13e75", "#6e46a5"
 ] as const;
 
 const escapeHtml = (value: string) => value
