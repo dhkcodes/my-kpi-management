@@ -148,7 +148,7 @@ assert.match(page, /window\.addEventListener\("keydown", retainEditorFocusUntilK
   "Tab and Escape default focus movement must be blocked at capture time");
 assert.match(page, /getBoundingClientRect\(\)[\s\S]*width <= 0[\s\S]*popup\.open/,
   "workload results may open only after the real launcher has non-zero geometry");
-assert.match(page, /oj-progress-circle[\s\S]*Saving KPI activities/, "Save must expose a modal progress dialog");
+assert.match(page, /class="kpi-saving-dialog"[\s\S]*kpi-saving-content" aria-hidden="true"/, "Save retains the modal lifecycle while the application-level overlay exposes progress");
 assert.match(page, /savingDialogDesiredRef[\s\S]*savingDialogGenerationRef[\s\S]*settleSavingDialogClosed/,
   "saving dialog continuations must be generation-guarded and explicitly settled closed");
 assert.match(page, /settleSavingDialogClosed[\s\S]*whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*whenReady\(\)[\s\S]*!dialog\.isOpen\(\)/,

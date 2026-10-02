@@ -5319,6 +5319,34 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-matrix .forecast-actual-month-value.is-status { background: #f7f5eb; }
 .forecast-actual-month-value.is-empty,
 .forecast-actual-month-value.is-difference.is-empty { text-align: center; }
+.forecast-actual-status[data-tooltip] { cursor: help; position: relative; }
+.forecast-actual-status[data-tooltip]::after {
+  background: #24272c;
+  border-radius: .35rem;
+  color: #fff;
+  content: attr(data-tooltip);
+  font: 500 .75rem/1.4 var(--oj-core-font-family, Arial, sans-serif);
+  left: 50%;
+  max-width: min(22rem, calc(100vw - 2rem));
+  opacity: 0;
+  padding: .55rem .65rem;
+  pointer-events: none;
+  position: absolute;
+  top: calc(100% + .4rem);
+  transform: translate(-50%, -.15rem);
+  transition: opacity .12s ease, transform .12s ease;
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 30;
+}
+.forecast-actual-status[data-tooltip]:hover::after,
+.forecast-actual-status[data-tooltip]:focus::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+.forecast-actual-status[data-tooltip]:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
 .consumption-initial-state { min-height: min(44rem, calc(100vh - 7rem)); }
 
 /* One blocking progress surface for API-backed reads and mutations. */
