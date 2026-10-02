@@ -13,6 +13,9 @@ assert.match(users, /Account Management — Overview & Account & Workload/,
   "user permissions expose the complete Account Management area under its existing user-level grant");
 assert.doesNotMatch(users, /Customer 360/, "legacy Customer 360 is not assignable in user administration");
 assert.match(users, /assignableMenuPermissionIds\.map/, "permission editor renders only assignable menu permissions");
+assert.match(users, /Forecast vs Actual/, "Forecast vs Actual is independently assignable");
+assert.match(users, /menu === "forecast-actual" \? <span[^>]*>Read-only<\/span>/,
+  "Forecast vs Actual does not expose a write permission control");
 const content = read("src/components/content/index.tsx");
 const routes = read("src/components/navigationRoutes.ts");
 const passwordPolicy = read("src/auth/passwordPolicy.ts");

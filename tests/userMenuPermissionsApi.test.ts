@@ -4,7 +4,7 @@ import type { MenuPermissionMap } from "../src/auth/authSession";
 
 const permissions: MenuPermissionMap = {
   "kpis-overview": "READ", "weekly-activities": "WRITE", "customers-overview": "NONE",
-  "accounts-workloads": "READ", analysis: "WRITE", attainment: "READ", records: "NONE"
+  "accounts-workloads": "READ", analysis: "WRITE", "forecast-actual": "READ", attainment: "READ", records: "NONE"
 };
 void (async () => {
   let request: { input: string; init?: RequestInit } | undefined;

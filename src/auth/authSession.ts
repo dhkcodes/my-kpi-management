@@ -7,6 +7,7 @@ export const menuPermissionIds = [
   "customers-overview",
   "accounts-workloads",
   "analysis",
+  "forecast-actual",
   "attainment",
   "records"
 ] as const;
@@ -17,6 +18,7 @@ export const assignableMenuPermissionIds = [
   "weekly-activities",
   "accounts-workloads",
   "analysis",
+  "forecast-actual",
   "attainment",
   "records"
 ] as const satisfies readonly MenuPermissionId[];
@@ -58,7 +60,8 @@ export function parseAuthProfile(value: unknown): AuthSession {
     const entries = Object.entries(rawPermissions as Record<string, unknown>);
     if (entries.length !== menuPermissionIds.length
         || entries.some(([id, permission]) => !menuPermissionIds.includes(id as MenuPermissionId)
-          || !["NONE", "READ", "WRITE"].includes(String(permission)))) {
+          || !["NONE", "READ", "WRITE"].includes(String(permission))
+          || (id === "forecast-actual" && permission === "WRITE"))) {
       throw new Error("Invalid authentication response.");
     }
     menuPermissions = Object.fromEntries(entries) as unknown as MenuPermissionMap;

@@ -11,7 +11,7 @@ export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermission
   if (route.module === "accountManagementOverview") return "accounts-workloads";
   if (route.module === "accountsWorkloads") return "accounts-workloads";
   if (route.module === "consumptionAnalysis") return "analysis";
-  if (route.module === "forecastActual") return "analysis";
+  if (route.module === "forecastActual") return "forecast-actual";
   if (route.module === "consumptionAttainment") return "attainment";
   if (route.module === "consumptionRecords") return "records";
   return null;
@@ -24,7 +24,8 @@ export function getRoutePermission(profile: AuthSession, route: NavigationRouteD
   const menuId = getRouteMenuId(route);
   if (!menuId) return "NONE";
   if (profile.access === "Admin") {
-    return menuId === "kpis-overview" || menuId === "weekly-activities" ? "OWN" : "WRITE";
+    if (menuId === "kpis-overview" || menuId === "weekly-activities") return "OWN";
+    return menuId === "forecast-actual" ? "READ" : "WRITE";
   }
   return profile.menuPermissions[menuId] ?? "NONE";
 }
