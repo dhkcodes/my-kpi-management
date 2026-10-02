@@ -48,7 +48,10 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   const page = targets.find((target) => target.type === "page");
   if (!page) throw new Error("No CDP page target");
   const cdp = new Cdp(page.webSocketDebuggerUrl); await cdp.open();
-  let savePosts = 0; let failNextSave = false; const saveBodies = []; const runtimeErrors = [];
+  let savePosts = 0; let failNextSave = false; let mismatchNextDealConfirmation = false;
+  const saveBodies = []; const runtimeErrors = [];
+  const focusedSaveFlow = process.env.KPI_FOCUSED_SAVE_FLOW === "1";
+  let desktop = null; let mobile = null;
   cdp.on("Runtime.exceptionThrown", ({ exceptionDetails }) => runtimeErrors.push(exceptionDetails.exception?.description || exceptionDetails.text));
   cdp.on("Fetch.requestPaused", async ({ requestId, request }) => {
     const path = new URL(request.url).pathname;
@@ -60,15 +63,26 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
       if (failNextSave) { failNextSave = false; return fulfill(500, { message: "Deliberate save failure" }); }
       const body = saveBodies.at(-1);
       for (const workload of body.workloads || []) {
-        if (workload.id === 51 && workload.action === "UPSERT") hierarchy.accounts[0].workloads[0].name = workload.name;
-      }
-      for (const savedDeal of body.deals || []) {
-        if (savedDeal.id === 81 && savedDeal.action === "UPSERT") {
-          hierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
-          if (savedDeal.latestUpdate != null) hierarchy.accounts[0].workloads[0].deals[0].latestUpdate = savedDeal.latestUpdate;
+        if (workload.id === 51 && workload.action === "UPSERT") {
+          hierarchy.accounts[0].workloads[0].name = workload.name;
+          hierarchy.accounts[0].workloads[0].notes = workload.notes;
         }
       }
-      return fulfill(200, { hierarchy, dealResults: [] });
+      let responseHierarchy = hierarchy;
+      for (const savedDeal of body.deals || []) {
+        if (savedDeal.id === 81 && savedDeal.action === "UPSERT") {
+          if (mismatchNextDealConfirmation) {
+            responseHierarchy = structuredClone(hierarchy);
+            responseHierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
+            if (savedDeal.latestUpdate != null) responseHierarchy.accounts[0].workloads[0].deals[0].latestUpdate = savedDeal.latestUpdate;
+            mismatchNextDealConfirmation = false;
+          } else {
+            hierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
+            if (savedDeal.latestUpdate != null) hierarchy.accounts[0].workloads[0].deals[0].latestUpdate = savedDeal.latestUpdate;
+          }
+        }
+      }
+      return fulfill(200, { hierarchy: responseHierarchy, dealResults: [] });
     }
     if (path.endsWith("/api/v1/accounts-workloads/hierarchy")) return fulfill(200, hierarchy);
     if (path.endsWith("/api/v1/fx-rates")) return fulfill(200, fx);
@@ -98,10 +112,11 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   const evaluate = async (expression) => { const result = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }); if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text); return result.result.value; };
   const wait = async (expression, label, timeout = 30000) => { const started = Date.now(); while (Date.now() - started < timeout) { const value = await evaluate(expression); if (value) return value; await delay(40); } const state = await evaluate(`({ href: location.href, readyState: document.readyState, body: document.body?.innerText?.slice(0, 500) })`); throw new Error(`wait timeout: ${label} ${JSON.stringify(state)}`); };
 
+  if (!focusedSaveFlow) {
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?opportunity-save=${Date.now()}` });
   await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "desktop fixture");
-  const desktop = await evaluate(`(async () => {
+  desktop = await evaluate(`(async () => {
     const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await settle();
     const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]');
@@ -183,7 +198,10 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   assert.equal(await evaluate("location.pathname"), "/accounts-workloads", "blocked reverse-order draft does not navigate as saved");
   assert.equal(savePosts, reverseDeleteBefore, "blocked reverse-order draft does not issue a save request");
 
+  }
+
   const runNavigationSaveScenario = async (scenario, editAw, editOpportunity) => {
+    await evaluate("localStorage.clear(); sessionStorage.clear(); true");
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?scenario=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} fixture`);
     const before = savePosts;
@@ -198,10 +216,10 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
         if (settleAfter) await settle();
       };
       const row = document.querySelector('[data-aw-row-key="41:51"]');
-      if (${editAw}) await edit(row.querySelector('[data-aw-field="workload"]'), ' ${scenario}');
+      if (${editAw}) await edit(row.querySelector('[data-aw-field="notes"]'), ' ${scenario}');
       if (${editOpportunity}) {
         row.querySelector('.accounts-workloads-expander').click(); await settle();
-        await edit(document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]'), ' ${scenario}', false);
+        await edit(document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]'), ' ${scenario}');
       }
       document.querySelector('[data-navigation-id="home"]').click();
     })()`);
@@ -213,11 +231,11 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     const expectedPosts = Number(editAw) + Number(editOpportunity);
     assert.equal(savePosts, before + expectedPosts, `${scenario} rapid duplicate confirmation saves each changed resource exactly once`);
     assert.ok((await evaluate(`globalThis.__kapSaveDialogStates.slice(${stateBefore})`)).every(({ cancelOpen, navigationOpen }) => !cancelOpen && !navigationOpen), `${scenario} save requests start only after the navigation dialog closes`);
-    await evaluate(`document.querySelector('[data-navigation-id="accounts-workloads"]').click()`);
+    await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?return=${scenario}-${Date.now()}` });
     await wait("location.pathname === '/accounts-workloads' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} return`);
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?refresh=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} refresh`);
-    const persisted = await evaluate(`(async () => { const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); return { aw: row.querySelector('[data-aw-field="workload"]')?.textContent, opportunity: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]')?.textContent }; })()`);
+    const persisted = await evaluate(`(async () => { const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); return { aw: row.querySelector('[data-aw-field="notes"]')?.textContent, opportunity: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]')?.textContent }; })()`);
     if (editAw) assert.ok(persisted.aw.includes(scenario), `${scenario} AW survives return and refresh`);
     if (editOpportunity) assert.ok(persisted.opportunity.includes(scenario), `${scenario} Opportunity survives return and refresh`);
     return saveBodies.slice(before, before + expectedPosts);
@@ -228,7 +246,25 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   assert.ok(opportunityOnly[0].deals?.[0]?.latestUpdate?.includes("opportunity-only") && opportunityOnly[0].workloads?.length === 0, "Opportunity-only Save & Continue writes Latest Update only through the Opportunity request");
   const both = await runNavigationSaveScenario("both", true, true);
   assert.ok(both.some((body) => body.workloads?.length > 0), "combined Save & Continue writes AW");
+  assert.ok(both.some((body) => body.workloads?.[0]?.notes?.includes("both")), "combined Save & Continue includes the changed AW Notes value");
   assert.ok(both.some((body) => body.deals?.[0]?.latestUpdate?.includes("both")), "combined Save & Continue preserves the pre-AW Latest Update snapshot");
+
+  await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?mismatch=${Date.now()}` });
+  await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "mismatch fixture");
+  await evaluate(`(async () => {
+    const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await settle();
+    const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]');
+    cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 })); await settle();
+    const input = cell.querySelector('textarea'); input.value += ' mismatch'; input.dispatchEvent(new InputEvent('input', { bubbles: true, data: ' mismatch' })); input.dispatchEvent(new FocusEvent('blur', { bubbles: true })); await settle();
+    [...document.querySelectorAll('.accounts-workloads-opportunities button')].find((button) => button.textContent.trim() === 'Save').click(); await settle();
+  })()`);
+  await wait("document.querySelector('oj-dialog.kpi-cancel-dialog')?.isOpen()", "mismatch save confirmation");
+  mismatchNextDealConfirmation = true;
+  await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((button) => button.textContent.trim().startsWith('Save'))).querySelector('button').click()`);
+  await wait("document.querySelector('.app-message-region')?.textContent.includes('저장 확인 대기')", "confirmation mismatch error");
+  const mismatch = await evaluate(`(() => { const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]'); const message = document.querySelector('.app-message-region')?.textContent ?? ''; return { path: location.pathname, retained: (cell?.querySelector('textarea')?.value ?? cell?.textContent ?? '').includes('mismatch'), blocked: message.includes('저장 확인 대기'), falseSuccess: message.includes('Opportunities saved') }; })()`);
+  assert.deepEqual(mismatch, { path: "/accounts-workloads", retained: true, blocked: true, falseSuccess: false }, "GET mismatch preserves the draft and never reports success");
 
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?failure=${Date.now()}` });
   await wait("location.search.includes('failure=') && document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "failure fixture");
@@ -244,13 +280,14 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   failNextSave = true;
   await evaluate(`([...document.querySelectorAll('oj-dialog.kpi-cancel-dialog oj-button')].find((button) => button.textContent.trim().startsWith('Save'))).querySelector('button').click()`);
   await wait("document.querySelector('.app-message-region')", "save failure message");
-  const failed = await evaluate(`(() => { const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]'); return { path: location.pathname, retained: (cell?.querySelector('input')?.value ?? cell?.textContent ?? '').includes('Retain On Failure'), error: Boolean(document.querySelector('.app-message-region')) }; })()`);
-  assert.deepEqual(failed, { path: "/accounts-workloads", retained: true, error: true }, "save failure keeps route, draft value, and visible error");
+  const failed = await evaluate(`(() => { const cell = document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]'); const message = document.querySelector('.app-message-region')?.textContent ?? ''; return { path: location.pathname, retained: (cell?.querySelector('input')?.value ?? cell?.textContent ?? '').includes('Retain On Failure'), error: Boolean(message), falseSuccess: message.includes('Opportunities saved') }; })()`);
+  assert.deepEqual(failed, { path: "/accounts-workloads", retained: true, error: true, falseSuccess: false }, "save failure keeps route and draft, shows error, and never reports success");
 
+  if (!focusedSaveFlow) {
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?draft-deleted=${Date.now()}` });
   await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:52\"]')", "mobile fixture");
-  const mobile = await evaluate(`(async () => {
+  mobile = await evaluate(`(async () => {
     const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const includeDeleted = document.querySelector('.accounts-workloads-include-deleted input');
     if (includeDeleted && !includeDeleted.checked) { includeDeleted.click(); await settle(); }
@@ -264,6 +301,7 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   assert.equal(mobile.dealVisible, true, "Include Deleted exposes the archived Opportunity for guard verification");
   assert.equal(mobile.editorOpened, false, "Draft Deleted opportunity cannot enter edit mode");
   assert.ok(mobile.scrollWidth <= mobile.width, "mobile page has no viewport-level horizontal overflow");
+  }
   assert.deepEqual(runtimeErrors, []);
   console.log(JSON.stringify({ desktop, mobile, savePosts, saveBodies, runtimeErrors: runtimeErrors.length }, null, 2));
   cdp.socket.close();
