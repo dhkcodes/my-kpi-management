@@ -5377,3 +5377,82 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 600px) {
   .forecast-actual-info-trigger::after { position: fixed; left: 1rem; right: 1rem; top: 4.5rem; width: auto; }
 }
+
+/* UI stability follow-up: keep document headings anchored while async data loads. */
+.kpi-content:has(.consumption-initial-state),
+.kpi-content:has(.consumption-insights-page),
+.kpi-content:has(.weekly-activities-page),
+.kpi-content:has(.consumption-page) {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+.consumption-initial-state {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+/* Forecast vs Actual compact matrix and accessible overlay controls. */
+.forecast-actual-mtd-row { align-items: center; display: flex; gap: .5rem; min-height: 2.25rem; }
+.forecast-actual-mtd-row .consumption-mtd-applied-date { white-space: nowrap; }
+.forecast-actual-summary article { overflow: visible; }
+.forecast-actual-matrix-shell { --forecast-rep-width: 7rem; --forecast-month-width: 5.5rem; --forecast-difference-width: 6.25rem; --forecast-status-width: 6.5rem; }
+.forecast-actual-matrix .is-rep { min-width: var(--forecast-rep-width); text-align: center; width: var(--forecast-rep-width); }
+.forecast-actual-matrix .forecast-actual-period-group {
+  min-width: calc((2 * var(--forecast-month-width)) + var(--forecast-difference-width) + var(--forecast-status-width));
+  width: calc((2 * var(--forecast-month-width)) + var(--forecast-difference-width) + var(--forecast-status-width));
+}
+.forecast-actual-matrix .forecast-actual-month-subhead,
+.forecast-actual-matrix .forecast-actual-month-value { min-width: var(--forecast-month-width); width: var(--forecast-month-width); }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-difference,
+.forecast-actual-matrix .forecast-actual-month-value.is-difference { min-width: var(--forecast-difference-width); width: var(--forecast-difference-width); }
+.forecast-actual-matrix .forecast-actual-month-subhead.is-status,
+.forecast-actual-matrix .forecast-actual-month-value.is-status { min-width: var(--forecast-status-width); width: var(--forecast-status-width); }
+.forecast-actual-month-value.is-forecast,
+.forecast-actual-month-value.is-actual,
+.forecast-actual-month-value.is-difference { text-align: right; }
+.forecast-actual-matrix-shell > .consumption-scroll-controls {
+  left: .35rem;
+  position: absolute;
+  right: .35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 12;
+}
+.forecast-actual-matrix-shell > .consumption-scroll-controls button:first-child { margin-inline-end: auto; }
+
+/* Reserve the application footer and scroll only each workspace's data surface. */
+.kpi-content:has(.kpi-spreadsheet-page:not([data-kpi-tab="Overview"])),
+.kpi-content:has(.attainment-page) {
+  height: calc(100dvh - 4rem - var(--kpi-footer-reserved-height) - 3rem);
+  min-height: 0;
+  overflow: hidden;
+}
+.kpi-spreadsheet-page:not([data-kpi-tab="Overview"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.kpi-spreadsheet-page:not([data-kpi-tab="Overview"]) .kpi-activities-table-wrap {
+  block-size: 0;
+  flex: 1 1 16rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.attainment-page {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 720px) {
+  .forecast-actual-matrix-shell { --forecast-rep-width: 6.5rem; --forecast-month-width: 5.25rem; --forecast-difference-width: 6rem; --forecast-status-width: 6.25rem; }
+  .forecast-actual-matrix-shell > .consumption-scroll-controls { flex-direction: row; left: .2rem; right: .2rem; top: 50%; }
+  .kpi-content:has(.kpi-spreadsheet-page:not([data-kpi-tab="Overview"])),
+  .kpi-content:has(.attainment-page) { height: calc(100dvh - 4.5rem - var(--kpi-footer-reserved-height) - 1.5rem); }
+}

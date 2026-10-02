@@ -82,6 +82,7 @@ export type HomeConsumptionOverviewData = Readonly<{
   quarters: ConsumptionAnalysis["quarters"];
   months: readonly HomeConsumptionMonth[];
   finalUploadRequiredPeriods: readonly string[];
+  mtdAsOf: string | null;
   alerts: ConsumptionAnalysis["alerts"];
 }>;
 
@@ -93,17 +94,23 @@ export const buildHomeConsumptionOverview = (
   const actualSet = new Set(analysis.periodCoverage.actualPeriods);
   const forecastPeriods = analysis.periodCoverage.forecastPeriods.filter((period) => !actualSet.has(period));
   const finalUploadRequiredPeriods = sortConsumptionMonths(Object.entries(totals.mtdStatusByPeriod ?? {})
-    .filter(([, status]) => status === "FINAL_UPLOAD_REQUIRED")
+    .filter(([period, status]) => status === "FINAL_UPLOAD_REQUIRED"
+      && !actualSet.has(period)
+      && totals.mtdByPeriod?.[period] !== undefined
+      && totals.mtdByPeriod?.[period] !== null)
     .map(([period]) => period));
-  const finalUploadRequiredSet = new Set(finalUploadRequiredPeriods);
+  const currentMtdAmount = currentFiscalMonth === undefined ? undefined : totals.mtdByPeriod?.[currentFiscalMonth];
   const hasCurrentMtd = currentFiscalMonth !== undefined
-    && totals.mtdStatusByPeriod?.[currentFiscalMonth] === "PROVISIONAL"
-    && Object.prototype.hasOwnProperty.call(totals.mtdByPeriod ?? {}, currentFiscalMonth);
+    && !actualSet.has(currentFiscalMonth)
+    && currentMtdAmount !== undefined
+    && currentMtdAmount !== null
+    && (totals.mtdStatusByPeriod?.[currentFiscalMonth] === "PROVISIONAL"
+      || totals.mtdStatusByPeriod?.[currentFiscalMonth] === "FINAL_UPLOAD_REQUIRED");
   const includedPeriods = sortConsumptionMonths([...new Set([
     ...analysis.periodCoverage.actualPeriods,
     ...forecastPeriods,
     ...(hasCurrentMtd ? [currentFiscalMonth] : [])
-  ])]).filter((period) => !finalUploadRequiredSet.has(period));
+  ])]);
   const incompletePeriods = new Set(totals.incompletePeriods);
   const sortedActualPeriods = sortConsumptionMonths(analysis.periodCoverage.actualPeriods);
   const lastActualPeriod = sortedActualPeriods[sortedActualPeriods.length - 1];
@@ -161,6 +168,7 @@ export const buildHomeConsumptionOverview = (
       };
     }),
     finalUploadRequiredPeriods,
+    mtdAsOf: !hasCurrentMtd || currentFiscalMonth === undefined ? null : totals.mtdAsOfByPeriod?.[currentFiscalMonth] ?? null,
     alerts: analysis.alerts.slice(0, 10)
   };
 };
