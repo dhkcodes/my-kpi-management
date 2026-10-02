@@ -63,7 +63,10 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
         if (workload.id === 51 && workload.action === "UPSERT") hierarchy.accounts[0].workloads[0].name = workload.name;
       }
       for (const savedDeal of body.deals || []) {
-        if (savedDeal.id === 81 && savedDeal.action === "UPSERT") hierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
+        if (savedDeal.id === 81 && savedDeal.action === "UPSERT") {
+          hierarchy.accounts[0].workloads[0].deals[0].name = savedDeal.name;
+          if (savedDeal.latestUpdate != null) hierarchy.accounts[0].workloads[0].deals[0].latestUpdate = savedDeal.latestUpdate;
+        }
       }
       return fulfill(200, { hierarchy, dealResults: [] });
     }
@@ -187,17 +190,18 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     const stateBefore = await evaluate("globalThis.__kapSaveDialogStates.length");
     await evaluate(`(async () => {
       const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const edit = async (cell, suffix) => {
+      const edit = async (cell, suffix, settleAfter = true) => {
         cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 })); await settle();
         const input = cell.querySelector('input,textarea'); input.value += suffix;
         input.dispatchEvent(new InputEvent('input', { bubbles: true, data: suffix }));
-        input.dispatchEvent(new FocusEvent('blur', { bubbles: true })); await settle();
+        input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+        if (settleAfter) await settle();
       };
       const row = document.querySelector('[data-aw-row-key="41:51"]');
       if (${editAw}) await edit(row.querySelector('[data-aw-field="workload"]'), ' ${scenario}');
       if (${editOpportunity}) {
         row.querySelector('.accounts-workloads-expander').click(); await settle();
-        await edit(document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]'), ' ${scenario}');
+        await edit(document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]'), ' ${scenario}', false);
       }
       document.querySelector('[data-navigation-id="home"]').click();
     })()`);
@@ -213,7 +217,7 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
     await wait("location.pathname === '/accounts-workloads' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} return`);
     await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?refresh=${scenario}-${Date.now()}` });
     await wait("document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", `${scenario} refresh`);
-    const persisted = await evaluate(`(async () => { const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); return { aw: row.querySelector('[data-aw-field="workload"]')?.textContent, opportunity: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="name"]')?.textContent }; })()`);
+    const persisted = await evaluate(`(async () => { const row = document.querySelector('[data-aw-row-key="41:51"]'); row.querySelector('.accounts-workloads-expander').click(); await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); return { aw: row.querySelector('[data-aw-field="workload"]')?.textContent, opportunity: document.querySelector('[data-deal-draft-key="deal:81"] [data-deal-field="latestUpdate"]')?.textContent }; })()`);
     if (editAw) assert.ok(persisted.aw.includes(scenario), `${scenario} AW survives return and refresh`);
     if (editOpportunity) assert.ok(persisted.opportunity.includes(scenario), `${scenario} Opportunity survives return and refresh`);
     return saveBodies.slice(before, before + expectedPosts);
@@ -221,10 +225,10 @@ const fx = { fxRateId: 9, fiscalYear: "FY27", fromCurrency: "USD", toCurrency: "
   const awOnly = await runNavigationSaveScenario("aw-only", true, false);
   assert.ok(awOnly[0].workloads?.length > 0 && awOnly[0].deals?.length === 0, "AW-only Save & Continue writes only AW");
   const opportunityOnly = await runNavigationSaveScenario("opportunity-only", false, true);
-  assert.ok(opportunityOnly[0].deals?.length > 0 && opportunityOnly[0].workloads?.length === 0, "Opportunity-only Save & Continue writes only Opportunity");
+  assert.ok(opportunityOnly[0].deals?.[0]?.latestUpdate?.includes("opportunity-only") && opportunityOnly[0].workloads?.length === 0, "Opportunity-only Save & Continue writes Latest Update only through the Opportunity request");
   const both = await runNavigationSaveScenario("both", true, true);
   assert.ok(both.some((body) => body.workloads?.length > 0), "combined Save & Continue writes AW");
-  assert.ok(both.some((body) => body.deals?.length > 0), "combined Save & Continue writes Opportunity");
+  assert.ok(both.some((body) => body.deals?.[0]?.latestUpdate?.includes("both")), "combined Save & Continue preserves the pre-AW Latest Update snapshot");
 
   await cdp.send("Page.navigate", { url: `${baseUrl}/accounts-workloads?failure=${Date.now()}` });
   await wait("location.search.includes('failure=') && document.readyState === 'complete' && document.querySelector('[data-aw-row-key=\"41:51\"]')", "failure fixture");

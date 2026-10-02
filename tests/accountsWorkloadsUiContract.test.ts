@@ -50,8 +50,8 @@ assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
   "Sales Rep participates in the existing AW batch save flow");
 assert.match(saveAwHandler, /catch \(saveError\)[\s\S]*setError\(friendlyError\(saveError\)\)[\s\S]*return false/,
   "a rejected Account rename keeps the dirty hierarchy in place for correction");
-assert.match(saveAllHandler, /runAccountsWorkloadsSaveFlow\(\{\s*saveAwDrafts,\s*saveDealDrafts,\s*reload,\s*\}\)/,
-  "one outer busy transaction spans AW save, Opportunity save and the final authoritative reload");
+assert.match(saveAllHandler, /runAccountsWorkloadsSaveFlow\(\{[\s\S]*saveAwDrafts,[\s\S]*prepareDealSave:[\s\S]*dealDraftsRef\.current[\s\S]*saveDealDrafts\(snapshot\)[\s\S]*reload,/,
+  "one outer busy transaction snapshots Opportunity edits before AW save, then spans both saves and the authoritative reload");
 assert.match(page, /\(current\.salesRep \?\? ""\)\.trim\(\)[\s\S]*\(original\.salesRep \?\? ""\)\.trim\(\)/,
   "Sales-Rep-only edits and clears participate in AW dirty tracking");
 assert.match(page, /aria-label={`\$\{field === "account"[\s\S]*field === "salesRep" \? "Sales Rep"/,
@@ -69,7 +69,7 @@ assert.match(deleteHandler, /const savedHierarchy = await saveAccountsWorkloadsH
   "Draft Delete persists immediately and retains the server-confirmed hierarchy");
 assert.match(deleteHandler, /reconcileArchivedWorkloads\(source, savedHierarchy, targetIds, includeDeletedRef\.current\)[\s\S]*setHierarchy\([\s\S]*setBaseline\(/,
   "successful Draft Delete reconciles both visible hierarchy and baseline without a second Save action");
-assert.match(deleteHandler, /setDealDrafts\([\s\S]*!targetIds\.has\(draft\.workloadId\)/,
+assert.match(deleteHandler, /updateDealDrafts\([\s\S]*!targetIds\.has\(draft\.workloadId\)/,
   "Draft Delete removes only child Opportunity drafts belonging to the deleted AW");
 assert.match(unsavedDeleteHandler, /workload\.id < 0[\s\S]*filter\([\s\S]*!removedWorkloadIds\.has\(workload\.id\)/,
   "unsaved workload deletion is local removal");
@@ -77,7 +77,7 @@ assert.match(page, /const sortedRows = allRows[\s\S]*const rows = titleEditOrder
   "visible hierarchy rows derive from the server response while title editing can hold a stable order");
 assert.match(cancelHandler, /setHierarchy\(baseline\)/,
   "AW Cancel restores the complete last-saved hierarchy without depending on row selection");
-assert.match(cancelHandler, /setDealDrafts\(new Map\(\)\)/);
+assert.match(cancelHandler, /updateDealDrafts\(new Map\(\)\)/);
 assert.match(cancelHandler, /setPendingDeleteWorkloadIds\(new Set\(\)\)/);
 assert.match(cancelHandler, /setFxRateValue\(savedFxRateValue\)/,
   "AW Cancel clears opportunity drafts, delete drafts and unsaved FX state together");
@@ -121,8 +121,8 @@ assert.match(page, /accounts-workloads-child-row/);
 assert.match(page, /Oppty Name/);
 assert.match(page, /Oppty ID/);
 assert.match(page, /Add Opportunity/);
-assert.match(page, /const changedDrafts = \[\.\.\.dealDrafts\.values\(\)\]\.filter\(isDealDraftChanged\)[\s\S]*const drafts = dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*const dealWrites = drafts\.map[\s\S]*deals: dealWrites/,
-  "one opportunity Save sends every changed opportunity draft in one atomic hierarchy request");
+assert.match(page, /const changedDrafts = draftSnapshot\.filter\(isDealDraftChanged\)[\s\S]*const drafts = dealSaveLock\.tryStart\(changedDrafts\)[\s\S]*const dealWrites = drafts\.map[\s\S]*deals: dealWrites/,
+  "one opportunity Save sends every changed opportunity draft from its immutable snapshot in one atomic hierarchy request");
 assert.match(page, /dealWrite\(draft\.deal, draft\.workloadId, draft\.original, draft\.key\)/,
   "every submitted opportunity write carries its stable draft key as clientId");
 assert.match(page, /applyConfirmedDeals\([\s\S]*clearSubmittedDealDrafts\(drafts\)/,
@@ -139,7 +139,7 @@ assert.match(saveDealHandler, /저장 확인 대기[\s\S]*Save is blocked until 
   "an uncertain save with recoverable correlation is visibly separated and cannot be retried as a POST");
 assert.match(saveDealHandler, /hasUnrecoverableNewDealCorrelationLoss\(pendingConfirmation\)[\s\S]*일반 재조회로 해당 행을 안전하게 연결할 수 없습니다[\s\S]*입력은 보존되고 재전송은 차단됩니다[\s\S]*관리자 확인이 필요합니다/,
   "a lost new-row correlation preserves input without promising that a general GET can unlock it");
-assert.doesNotMatch(saveDealHandler, /setDealDrafts\(new Map\(\)\)/,
+assert.doesNotMatch(saveDealHandler, /updateDealDrafts\(new Map\(\)\)/,
   "a completed request cannot clear opportunity drafts created or changed while it was in flight");
 assert.match(page, /const updateDealDraft[\s\S]*if \(dealSaveLock\.isLocked\(\)\) return/,
   "opportunity draft mutation is blocked immediately while a save is in flight");
@@ -312,8 +312,8 @@ assert.match(messageBanner, /window\.setTimeout[\s\S]*onClose\?\.\(message\.id\)
   "the shared banner auto-dismisses non-sticky informational notices");
 assert.match(saveAwHandler, /const saved = await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*setBaseline\(withoutArchived\)[\s\S]*setNotice\(/,
   "AW save success appears only after the authoritative save response is adopted");
-assert.match(saveFlow, /const dealsSaved = await saveDealDrafts\(\)[\s\S]*if \(!dealsSaved\) return false;[\s\S]*await reload\(\)[\s\S]*return true/,
-  "a successful save reapplies the active Account search and existing archive/deleted filters");
+assert.match(saveFlow, /const dealsSaved = await savePreparedDeals\(\)[\s\S]*if \(!dealsSaved\) return false;[\s\S]*await reload\(\)[\s\S]*return true/,
+  "a successful prepared Opportunity save reapplies the active Account search and existing archive/deleted filters");
 assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
   "sticky Opportunity identity headers share the other header background");
 assert.match(page, /type="button"[\s\S]*class="accounts-workloads-add-aw"[\s\S]*onClick=\{addAw\}/,
@@ -387,10 +387,10 @@ assert.match(page, /hasUnrecoverableNewDealCorrelationLoss[\s\S]*originalId === 
   "a new row whose correlation was lost is identified as not recoverable by ordinary GET matching");
 assert.match(page, /저장 결과 확인 불가 — 관리자 확인 필요/,
   "the UI does not promise GET recovery when a new-row correlation was lost");
-assert.doesNotMatch(page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete")), /setDealDrafts\(new Map\(\)\)/,
+assert.doesNotMatch(page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete")), /updateDealDrafts\(new Map\(\)\)/,
   "deleting selected opportunities cannot erase unrelated drafts");
-assert.match(saveFlow, /const awSaved = await saveAwDrafts\(\)[\s\S]*const dealsSaved = await saveDealDrafts\(\)/,
-  "Save & Continue persists both AW and Opportunity drafts before navigating");
+assert.match(saveFlow, /const savePreparedDeals = prepareDealSave\?\.\(\) \?\? saveDealDrafts[\s\S]*const awSaved = await saveAwDrafts\(\)[\s\S]*const dealsSaved = await savePreparedDeals\(\)/,
+  "Save & Continue snapshots Opportunity drafts before persisting AW, then persists both before navigating");
 assert.match(page, /const saveAndContinue = async \(\) => \{[\s\S]*const saved = await saveAllDrafts\(\)[\s\S]*if \(!saved\) return;[\s\S]*pending\.action\(\)/,
   "navigation is deferred until every pending write succeeds");
 assert.match(page, /opportunity-save[\s\S]*Save Opportunity changes\?[\s\S]*Save Opportunities/,

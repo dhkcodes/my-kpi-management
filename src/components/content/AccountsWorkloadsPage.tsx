@@ -51,7 +51,10 @@ import {
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
-import { runAccountsWorkloadsSaveFlow } from "../../app/accountsWorkloadsSaveFlow";
+import {
+  runAccountsWorkloadsOpportunitySaveFlow,
+  runAccountsWorkloadsSaveFlow,
+} from "../../app/accountsWorkloadsSaveFlow";
 
 type NavigationGuard = (label: string, action: () => void) => void;
 
@@ -339,6 +342,14 @@ export function AccountsWorkloadsPage({
   const [dealDrafts, setDealDrafts] = useState<Map<string, DealDraft>>(
     new Map(),
   );
+  const dealDraftsRef = useRef(dealDrafts);
+  const updateDealDrafts = (
+    update: Map<string, DealDraft> | ((current: Map<string, DealDraft>) => Map<string, DealDraft>),
+  ) => {
+    const next = typeof update === "function" ? update(dealDraftsRef.current) : update;
+    dealDraftsRef.current = next;
+    setDealDrafts(next);
+  };
   const [pendingDealConfirmation, setPendingDealConfirmation] =
     useState<PendingDealConfirmation | null>(null);
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
@@ -912,7 +923,7 @@ export function AccountsWorkloadsPage({
       (current) =>
         new Set([...current].filter((id) => !removedWorkloadIds.has(id))),
     );
-    setDealDrafts(
+    updateDealDrafts(
       (current) =>
         new Map(
           [...current].filter(
@@ -975,7 +986,7 @@ export function AccountsWorkloadsPage({
           }))
           .filter((account) => account.workloads.length > 0),
       }));
-      setDealDrafts(
+      updateDealDrafts(
         (current) =>
           new Map(
             [...current].filter(
@@ -1081,7 +1092,7 @@ export function AccountsWorkloadsPage({
         new Set(targets.map((deal) => deal.workloadId)),
       );
       const deletedDraftKeys = new Set(targets.map((deal) => `deal:${deal.id}`));
-      setDealDrafts((current) => new Map(
+      updateDealDrafts((current) => new Map(
         [...current].filter(([key]) => !deletedDraftKeys.has(key)),
       ));
       setSelectedDeals(new Map());
@@ -1192,7 +1203,7 @@ export function AccountsWorkloadsPage({
       setHierarchy((current) => current ? reconcileArchive(current) : current);
       setBaseline((current) => reconcileArchive(current));
       setDirtyWorkloads((current) => new Set([...current].filter((id) => !targetIds.has(id))));
-      setDealDrafts((current) => new Map([...current].filter(([, draft]) => !targetIds.has(draft.workloadId))));
+      updateDealDrafts((current) => new Map([...current].filter(([, draft]) => !targetIds.has(draft.workloadId))));
       setSelectedDeals((current) => new Map([...current].filter(([, deal]) => !targetIds.has(deal.workloadId))));
       setSelectedRows(new Set());
       if (editCell && targetRowKeys.has(editCell.key)) setEditCell(null);
@@ -1239,7 +1250,7 @@ export function AccountsWorkloadsPage({
     setDirtyAccounts(new Set());
     setDirtyWorkloads(new Set());
     setPendingDeleteWorkloadIds(new Set());
-    setDealDrafts(new Map());
+    updateDealDrafts(new Map());
     setSelectedRows(new Set());
     setSelectedDeals(new Map());
     setEditCell(null);
@@ -1401,7 +1412,7 @@ export function AccountsWorkloadsPage({
         setBaseline(withoutArchived);
         setDirtyAccounts(new Set());
         setDirtyWorkloads(new Set());
-        setDealDrafts(
+        updateDealDrafts(
           (current) =>
             new Map(
               [...current].filter(
@@ -1475,7 +1486,7 @@ export function AccountsWorkloadsPage({
 
   const saveAllDrafts = async (): Promise<boolean> => {
     if (!canWrite) return false;
-    const blockedOpportunityDraft = [...dealDrafts.values()].some(
+    const blockedOpportunityDraft = [...dealDraftsRef.current.values()].some(
       (draft) => isDealDraftChanged(draft) && !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId),
     );
     if (blockedOpportunityDraft) {
@@ -1485,6 +1496,10 @@ export function AccountsWorkloadsPage({
     return runAccountsWorkloadsSaveFlow({
       saveAwDrafts,
       saveDealDrafts,
+      prepareDealSave: () => {
+        const snapshot = Object.freeze([...dealDraftsRef.current.values()]);
+        return () => saveDealDrafts(snapshot);
+      },
       reload,
     });
   };
@@ -1503,7 +1518,7 @@ export function AccountsWorkloadsPage({
         return;
       }
       if (action === "opportunity-save") {
-        await saveDealDrafts();
+        await runAccountsWorkloadsOpportunitySaveFlow({ saveDealDrafts });
         return;
       }
       if (action === "cancel") {
@@ -1629,7 +1644,7 @@ export function AccountsWorkloadsPage({
     if (!canWrite || dealSaveLock.isLocked()) return;
     const key = deal.id > 0 ? `deal:${deal.id}` : `draft:${deal.id}`;
     dealEditSnapshot.current = field === "latestUpdate" ? (deal.latestUpdate ?? "") : "";
-    setDealDrafts((current) => {
+    updateDealDrafts((current) => {
       if (current.has(key)) return current;
       const next = new Map(current);
       next.set(key, {
@@ -1644,14 +1659,14 @@ export function AccountsWorkloadsPage({
   };
   const updateDealDraft = (key: string, field: DealField, value: string) => {
     if (!canWrite || dealSaveLock.isLocked()) return;
-    const existing = dealDrafts.get(key);
+    const existing = dealDraftsRef.current.get(key);
     if (existing && isDraftDeletedWorkload(existing.workloadId)) {
       setError("Archived AW의 Opportunity는 수정할 수 없습니다.");
       return;
     }
     setError("");
     setSaveErrors([]);
-    setDealDrafts((current) => {
+    updateDealDrafts((current) => {
       const draft = current.get(key);
       if (!draft) return current;
       let deal = { ...draft.deal };
@@ -1716,14 +1731,14 @@ export function AccountsWorkloadsPage({
     const id = nextTempId.current--;
     const deal = emptyDeal(id, workloadId);
     const key = `draft:${id}`;
-    setDealDrafts((current) =>
+    updateDealDrafts((current) =>
       new Map(current).set(key, { key, workloadId, original: null, deal }),
     );
     setDealEditCell({ key, field: "name" });
   };
   const cancelDeal = (key: string) => {
     if (dealSaveLock.isLocked()) return;
-    setDealDrafts((current) => {
+    updateDealDrafts((current) => {
       const next = new Map(current);
       next.delete(key);
       return next;
@@ -1740,7 +1755,7 @@ export function AccountsWorkloadsPage({
       (field) => String(submitted.deal[field] ?? "") === String(current.deal[field] ?? ""),
     );
   const clearSubmittedDealDrafts = (drafts: ReadonlyArray<DealDraft>) =>
-    setDealDrafts((current) => {
+    updateDealDrafts((current) => {
       const next = new Map(current);
       for (const submitted of drafts) {
         const latest = next.get(submitted.key);
@@ -1798,7 +1813,7 @@ export function AccountsWorkloadsPage({
           .map((submission) => submission.clientId),
       );
       if (confirmedDeleteKeys.size) {
-        setDealDrafts((current) => new Map(
+        updateDealDrafts((current) => new Map(
           [...current].filter(([key]) => !confirmedDeleteKeys.has(key)),
         ));
       }
@@ -1815,10 +1830,12 @@ export function AccountsWorkloadsPage({
       setSaving(false);
     }
   };
-  const saveDealDrafts = async () => {
+  const saveDealDrafts = async (
+    draftSnapshot: ReadonlyArray<DealDraft> = [...dealDraftsRef.current.values()],
+  ) => {
     if (!canWrite) return false;
     if (dealSaveLock.isLocked()) return false;
-    const changedDrafts = [...dealDrafts.values()].filter(isDealDraftChanged);
+    const changedDrafts = draftSnapshot.filter(isDealDraftChanged);
     if (!changedDrafts.length) return true;
     if (changedDrafts.some((draft) => !draft.deal.deleted && isDraftDeletedWorkload(draft.workloadId))) {
       setError("Archived AW 아래 Opportunity 변경은 저장할 수 없습니다.");

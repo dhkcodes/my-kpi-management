@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { beginAppBusy, getAppBusyCount, subscribeAppBusy } from "../src/app/appBusy";
-import { runAccountsWorkloadsSaveFlow } from "../src/app/accountsWorkloadsSaveFlow";
+import {
+  runAccountsWorkloadsOpportunitySaveFlow,
+  runAccountsWorkloadsSaveFlow,
+} from "../src/app/accountsWorkloadsSaveFlow";
 
 const apiStep = (
   name: string,
@@ -134,6 +137,52 @@ async function run(): Promise<void> {
     assert.deepEqual(calls, ["aw-save", "deal-save", "reload"]);
     assert.deepEqual(snapshots, [1, 2, 1, 2, 1, 2, 1, 0]);
     assert.equal(getAppBusyCount(), 0, "reload failure releases the outer busy scope");
+  }
+
+  {
+    const calls: string[] = [];
+    let liveDrafts = ["Latest Update entered immediately before Save"];
+    let submittedDrafts: string[] = [];
+    const saved = await runAccountsWorkloadsSaveFlow({
+      saveAwDrafts: async () => {
+        calls.push("aw-save");
+        liveDrafts = [];
+        return true;
+      },
+      saveDealDrafts: async () => {
+        throw new Error("prepared Opportunity save must be used");
+      },
+      prepareDealSave: () => {
+        const snapshot = [...liveDrafts];
+        calls.push("deal-snapshot");
+        return async () => {
+          calls.push("deal-save");
+          submittedDrafts = snapshot;
+          return true;
+        };
+      },
+      reload: async () => {
+        calls.push("reload");
+      },
+    });
+    assert.equal(saved, true);
+    assert.deepEqual(calls, ["deal-snapshot", "aw-save", "deal-save", "reload"]);
+    assert.deepEqual(submittedDrafts, ["Latest Update entered immediately before Save"],
+      "combined save submits the Opportunity snapshot captured before the awaited AW save");
+  }
+
+  {
+    const calls: string[] = [];
+    const snapshots: number[] = [];
+    const unsubscribe = subscribeAppBusy((count) => snapshots.push(count));
+    const saved = await runAccountsWorkloadsOpportunitySaveFlow({
+      saveDealDrafts: apiStep("deal-post-and-confirm", calls, true),
+    });
+    unsubscribe();
+    assert.equal(saved, true);
+    assert.deepEqual(calls, ["deal-post-and-confirm"]);
+    assert.deepEqual(snapshots, [1, 2, 1, 0],
+      "standalone Opportunity save keeps one outer busy scope across POST and confirmation GET");
   }
 
   console.log("Accounts & Workloads save-flow busy lifecycle tests passed");

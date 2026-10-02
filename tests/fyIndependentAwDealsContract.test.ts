@@ -25,12 +25,16 @@ const emptyHierarchy = { fiscalYear: null, accounts: [] } as const;
 
 async function run() {
   let hierarchyUrl = "";
-  await fetchAccountsWorkloadsHierarchy({ search: "Acme", includeArchived: true }, async (input) => {
+  let hierarchyInit: RequestInit | undefined;
+  await fetchAccountsWorkloadsHierarchy({ search: "Acme", includeArchived: true }, async (input, init) => {
     hierarchyUrl = String(input);
+    hierarchyInit = init;
     return new Response(JSON.stringify(emptyHierarchy), { status: 200 });
   });
   assert.match(hierarchyUrl, /accounts-workloads\/hierarchy\?/);
   assert.match(hierarchyUrl, /search=Acme/);
+  assert.equal(hierarchyInit?.cache, "no-store",
+    "authoritative hierarchy reads must bypass browser caches after writes");
   assert.match(hierarchyUrl, /includeArchived=true/);
   assert.doesNotMatch(hierarchyUrl, /fiscalYear/i, "hierarchy request is FY-independent");
 

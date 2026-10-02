@@ -543,7 +543,9 @@ export const fetchAccountsWorkloadsHierarchy = async (
     includeDeletedDeals: String(query.includeDeletedDeals ?? false)
   });
   return parseHierarchy(await requestJson<unknown>(fetchImpl,
-    `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy?${params.toString()}`));
+    `${accountsWorkloadsApiBase()}/accounts-workloads/hierarchy?${params.toString()}`, {
+      cache: "no-store",
+    }));
 };
 
 export const reconcileArchivedWorkloads = (
