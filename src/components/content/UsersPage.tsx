@@ -17,7 +17,7 @@ type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthS
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
 const menuLabels: Record<(typeof assignableMenuPermissionIds)[number], string> = {
   "kpis-overview": "KPI", "weekly-activities": "Weekly", "accounts-workloads": "Account Management — Overview & Account & Workload",
-  analysis: "Consumption Analysis", attainment: "Consumption Attainment", records: "Consumption Records"
+  analysis: "Consumption Analysis", "forecast-actual": "Forecast vs Actual", attainment: "Consumption Attainment", records: "Consumption Records"
 };
 
 // `rawValue` is current even when Enter submits before JET commits `value`.
@@ -232,11 +232,12 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
             return <tr key={menu}><th scope="row">{menuLabels[menu]}</th>
               <td><input type="checkbox" aria-label={`${menuLabels[menu]} read`} checked={access === "READ" || access === "WRITE"}
                 disabled={busy} onChange={(event) => changePermission(menu, "READ", event.currentTarget.checked)} /></td>
-              <td><input type="checkbox" aria-label={`${menuLabels[menu]} write`} checked={access === "WRITE"}
-                disabled={busy} onChange={(event) => changePermission(menu, "WRITE", event.currentTarget.checked)} /></td></tr>;
+              <td>{menu === "forecast-actual" ? <span aria-label="Forecast vs Actual read only">Read-only</span> :
+                <input type="checkbox" aria-label={`${menuLabels[menu]} write`} checked={access === "WRITE"}
+                  disabled={busy} onChange={(event) => changePermission(menu, "WRITE", event.currentTarget.checked)} />}</td></tr>;
           })}</tbody>
         </table></div>
-        <p class="kap-field__hint">Write permission includes read access. KPI and Weekly remain limited to each user's own data.</p>
+        <p class="kap-field__hint">Write permission includes read access. Forecast vs Actual is read-only. KPI and Weekly remain limited to each user's own data.</p>
         {permissionError && <div class="kap-error" role="alert">{permissionError}</div>}
       </div>
       <div slot="footer">
