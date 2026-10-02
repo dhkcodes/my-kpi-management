@@ -50,6 +50,8 @@ assert.deepStrictEqual(overview.fiscalYears, ["FY27"]);
 assert.strictEqual(overview.actualDeals.length, 1, "Draft Deleted parents must be excluded from actuals and aggregates");
 assert.strictEqual(overview.actualDeals[0].deal.id, 224);
 assert.strictEqual(overview.exceptions.closeDateMissing, 0, "Draft Deleted missing-close records must not enter exceptions");
+assert.deepStrictEqual(overview.closeDateMissingFor("").map((item) => item.deal.id), [],
+  "the clickable exception result must share the same active-only scope as its count");
 assert.strictEqual(overview.exceptions.overdue, 1, "archived OPEN deals must not enter target actions");
 assert.strictEqual(overview.exceptions.targetNotSet, 1);
 assert.strictEqual(overview.targetDeals.length, 2);
@@ -76,6 +78,18 @@ assert.strictEqual(actual.quarters[0].newArr, 120000);
 const activeAccount = hierarchy.accounts[1];
 const activeWorkload = activeAccount.workloads[0];
 const activeWon = activeWorkload.deals.find((deal) => deal.id === 224)!;
+const activeMissingClose = buildAccountManagementOverview({
+  fiscalYear: null,
+  accounts: [{
+    ...activeAccount,
+    workloads: [{ ...activeWorkload, deals: [{ ...activeWon, id: 226, actualCloseDate: null }] }],
+  }],
+}, new Date("2026-09-27T00:00:00Z"));
+assert.strictEqual(activeMissingClose.exceptions.closeDateMissing, 1);
+assert.deepStrictEqual(activeMissingClose.closeDateMissingFor("").map((item) => item.deal.id), [226],
+  "clickable Close date missing rows must exactly match the displayed count");
+assert.strictEqual(activeMissingClose.actualFor("FY27", "ALL", "").deals.length, 0,
+  "missing-close rows must stay excluded from dated Actual KPI totals");
 const overviewAfterStatus = (status: "OPEN" | "WON" | "LOST") => buildAccountManagementOverview({
   fiscalYear: null,
   accounts: [{
@@ -186,6 +200,9 @@ assert.match(appCss, /\.account-overview__deal-row\s*>\s*span:first-child/, "dea
 assert.match(pageSource, /<b>\{overview\.exceptions\.overdue\}<\/b> Overdue<\/strong>/, "exception label casing must be exact");
 assert.match(pageSource, /<b>\{overview\.exceptions\.targetNotSet\}<\/b> Target not set<\/strong>/, "exception label casing must be exact");
 assert.match(pageSource, /<b>\{overview\.exceptions\.closeDateMissing\}<\/b> Close date missing<\/strong>/, "exception label casing must be exact");
+assert.match(pageSource, /overview\?\.closeDateMissingFor/, "Close date missing click must use the same scoped result set as its count");
+assert.match(pageSource, /actualOpportunityList/, "Close date missing click must target the filtered Opportunity list");
+assert.match(pageSource, /Close date missing Opportunities/, "the filtered list must clearly identify the active exception filter");
 assert.match(appCss, /\.account-overview__exceptions strong\s*\{[^}]*white-space:\s*nowrap/s, "exception labels must remain on one line");
 assert.match(appCss, /\.account-overview__exceptions strong b\s*\{[^}]*font-size:\s*clamp\(1\.3rem/s, "exception counts must remain larger than their labels");
 assert.doesNotMatch(pageSource, /WON deals|Open Deal action list|Account → Workload → Deal|No OPEN deals|open deals/, "visible Overview terminology must use Opportunity instead of Deal");
