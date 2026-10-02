@@ -157,17 +157,22 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
     !item.account.archived && !item.workload.archived && !item.deal.deleted
   );
   const actualDeals = flattened.filter((item) => item.deal.status === "WON" && item.actualPeriod !== null);
+  const closeDateMissingDeals = flattened.filter((item) => item.deal.status === "WON" && !item.deal.actualCloseDate);
   const targetDeals = flattened.filter((item) => item.deal.status === "OPEN");
   const fiscalYears = [...new Set(actualDeals.map((item) => item.actualPeriod!.fiscalYear))].sort().reverse();
 
   return {
     actualDeals,
+    closeDateMissingDeals,
     targetDeals,
     fiscalYears,
     exceptions: {
       overdue: targetDeals.filter((item) => isOverdue(item, today)).length,
       targetNotSet: targetDeals.filter((item) => !item.deal.targetFiscalYear || item.deal.targetQuarter === null).length,
-      closeDateMissing: flattened.filter((item) => item.deal.status === "WON" && !item.deal.actualCloseDate).length,
+      closeDateMissing: closeDateMissingDeals.length,
+    },
+    closeDateMissingFor(search: string, accountFilter?: OverviewAccountFilter) {
+      return closeDateMissingDeals.filter((item) => matchesAccount(item, accountFilter) && matchesSearch(item, search));
     },
     actualFor(fiscalYear: string, quarter: ActualQuarterFilter, search: string, accountFilter?: OverviewAccountFilter) {
       const yearDeals = actualDeals.filter((item) => item.actualPeriod?.fiscalYear === fiscalYear && matchesAccount(item, accountFilter) && matchesSearch(item, search));

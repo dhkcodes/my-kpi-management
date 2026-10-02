@@ -94,6 +94,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [actualFy, setActualFy] = useState(current.fiscalYear);
   const [actualQuarter, setActualQuarter] = useState<ActualQuarterFilter>("ALL");
   const [actualMeasure, setActualMeasure] = useState<RevenueMeasure>("ALL");
+  const [actualListFilter, setActualListFilter] = useState<"CLOSE_DATE_MISSING" | null>(null);
   const [targetView, setTargetView] = useState<TargetView>("PRIORITY");
   const [targetPeriod, setTargetPeriod] = useState(`${current.fiscalYear} Q${current.quarter}`);
   const [expanded, setExpanded] = useState(new Set<string>());
@@ -129,7 +130,10 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const actual = overview?.actualFor(actualFy, actualQuarter, "", selectedAccountFilter);
   const actualYear = overview?.actualFor(actualFy, "ALL", "", selectedAccountFilter);
   const target = overview?.targetFor(targetView, "", new Date(), targetPeriod, selectedAccountFilter);
-  const grouped = groupActual(actual?.deals ?? []);
+  const actualListDeals = actualListFilter === "CLOSE_DATE_MISSING"
+    ? overview?.closeDateMissingFor("", selectedAccountFilter) ?? []
+    : actual?.deals ?? [];
+  const grouped = groupActual(actualListDeals);
   const visibleMeasures = actualMeasure === "ALL" ? (["ARR", "ACR"] as const) : [actualMeasure];
   const quarterSeries = ([1, 2, 3, 4] as const).map((quarter) => {
     const deals = (actualYear?.deals ?? []).filter((item) => item.actualPeriod?.quarter === quarter);
@@ -190,7 +194,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
             <button type="button" onClick={() => { setTargetView("OVERDUE"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Target quarter ended</small></span></button>
             <button type="button" onClick={() => { setTargetView("PRIORITY"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> Target not set</strong><small>Open Opportunities without FY/Q</small></span></button>
-            <button type="button" onClick={() => document.getElementById("actualPerformance")?.scrollIntoView({ behavior: "smooth" })}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
+            <button type="button" aria-pressed={actualListFilter === "CLOSE_DATE_MISSING"} onClick={() => { setActualListFilter("CLOSE_DATE_MISSING"); document.getElementById("actualOpportunityList")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
           </section>
         </div>
 
@@ -211,15 +215,16 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
               <div class="account-overview__vertical-chart"><div class="account-overview__axis"><span>{fmtUsd(maxQuarter)}</span><span>{fmtUsd(maxQuarter * .67)}</span><span>{fmtUsd(maxQuarter * .33)}</span><span>$0K</span></div><div class="account-overview__plot">{quarterSeries.map((item) => <div key={item.quarter} class={`account-overview__bar-group ${actualQuarter === item.quarter ? "is-selected" : ""}`}><div class="account-overview__bar-columns">{item.bars.map((bar) => { const total = bar.segments.reduce((sum, segment) => sum + segment.value, 0); return <span key={bar.measure} class="account-overview__bar-item" title={`${bar.measure} total ${fmtUsd(total)}`}><small class="account-overview__bar-total">{fmtUsd(total)}</small><span class="account-overview__bar-stack" style={{ height: `${Math.max(2, total / maxQuarter * 68)}%` }}>{bar.segments.map((segment) => <i key={segment.kind} class={`is-${segment.kind.toLocaleLowerCase()}`} title={`${segment.kind} ${bar.measure} ${fmtUsd(segment.value)}`} style={{ flexGrow: segment.value, minHeight: segment.value ? "3px" : "0" }}></i>)}</span><b>{bar.measure}</b></span>; })}</div><strong>Q{item.quarter}</strong></div>)}</div></div>
             </article>
 
-            <article class="account-overview__panel account-overview__hierarchy">
-              <div class="account-overview__panel-heading"><div><h3>Account → Workload → Opportunity</h3></div></div>
+            <article id="actualOpportunityList" class="account-overview__panel account-overview__hierarchy">
+              <div class="account-overview__panel-heading"><div><h3>{actualListFilter === "CLOSE_DATE_MISSING" ? "Close date missing Opportunities" : "Account → Workload → Opportunity"}</h3></div>{actualListFilter && <button type="button" onClick={() => setActualListFilter(null)}>Clear filter</button>}</div>
               <div class="account-overview__hierarchy-head"><span>Name</span><span>NEW<small>ARR</small></span><span>EXPANSION<small>ARR</small></span><span>RENEWAL<small>ARR</small></span><span>ACR</span></div>
-              <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">No WON Opportunities in this scope.</p> : grouped.map(({ account, workloads }) => {
+              <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">{actualListFilter === "CLOSE_DATE_MISSING" ? "No Close date missing Opportunities in this scope." : "No WON Opportunities in this scope."}</p> : grouped.map(({ account, workloads }) => {
                 const accountDeals = [...workloads.values()].flatMap((item) => item.deals);
                 const accountKey = `account-${account.id}`;
-                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={expanded.has(accountKey)}><span><i>{expanded.has(accountKey) ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(accountDeals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b></button>
-                  {expanded.has(accountKey) && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={expanded.has(workloadKey)}><span><i>{expanded.has(workloadKey) ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(deals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(deals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(deals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(deals))}</b></button>
-                    {expanded.has(workloadKey) && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · Close {item.deal.actualCloseDate} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b></div>)}</div>; })}
+                const accountExpanded = actualListFilter !== null || expanded.has(accountKey);
+                return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={accountExpanded}><span><i>{accountExpanded ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(accountDeals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b></button>
+                  {accountExpanded && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; const workloadExpanded = actualListFilter !== null || expanded.has(workloadKey); return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={workloadExpanded}><span><i>{workloadExpanded ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(deals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(deals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(deals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(deals))}</b></button>
+                    {workloadExpanded && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · {item.deal.actualCloseDate ? `Close ${item.deal.actualCloseDate}` : "Close date missing"} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b></div>)}</div>; })}
                 </div>;
               })}</div>
             </article>
