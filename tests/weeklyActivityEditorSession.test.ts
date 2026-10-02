@@ -73,9 +73,9 @@ session.switchTarget(sameTarget);
 assert.equal(editor.focusCount, 3, "same-target selection focuses without creating another editor");
 assert.deepEqual(ALLOWED_QUILL_FORMATS, ["bold", "color", "size", "list"]);
 assert.deepEqual(WEEKLY_ACTIVITY_COLORS, [
-  "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B",
-  "#B3261E", "#D45B13", "#C58A00", "#007C91", "#A13E75", "#6E46A5"
-]);
+  "#161513", "#c74634", "#7a2e1e", "#8a5b00", "#0b5f66", "#2458a6", "#2e6b3f", "#5f4b8b",
+  "#b3261e", "#d45b13", "#c58a00", "#007c91", "#a13e75", "#6e46a5"
+], "toolbar colors use Quill's lowercase normalized values so selection state can round-trip");
 assert.equal(WEEKLY_ACTIVITY_DEFAULT_SIZE, "16px", "unformatted weekly activity text has one explicit visual default");
 assert.deepEqual(WEEKLY_ACTIVITY_SIZES, ["12px", "14px", "16px", "18px", "24px"], "toolbar sizes match the supported Weekly Activities contract");
 assert.deepEqual(WEEKLY_ACTIVITY_PERSISTED_SIZES, ["10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"], "previously persisted explicit sizes remain loadable without widening the picker");

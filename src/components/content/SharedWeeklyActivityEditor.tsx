@@ -103,7 +103,7 @@ export function SharedWeeklyActivityEditor({
     QuillRuntime.register(SizeStyle, true);
 
     let lastSelection: { index: number; length: number } | null = null;
-    let syncSizeToolbarState = () => undefined;
+    let syncToolbarState = () => undefined;
     const quill = new QuillRuntime(editorRef.current, {
       theme: "snow",
       formats: [...ALLOWED_QUILL_FORMATS],
@@ -114,16 +114,16 @@ export function SharedWeeklyActivityEditor({
           handlers: {
             undo: function (this: { quill: QuillClass }) { this.quill.history.undo(); },
             redo: function (this: { quill: QuillClass }) { this.quill.history.redo(); },
-            size: function (this: { quill: QuillClass }, value: string) {
+            size: function (this: { quill: QuillClass }, value: string | false) {
               const currentRange = this.quill.getSelection();
               const range = lastSelection?.length ? lastSelection : currentRange ?? lastSelection;
-              if (!range || !value) return;
+              if (!range) return;
               this.quill.setSelection(range.index, range.length, "silent");
-              this.quill.format("size", value === WEEKLY_ACTIVITY_DEFAULT_SIZE ? false : value, "user");
+              this.quill.format("size", value === false ? WEEKLY_ACTIVITY_DEFAULT_SIZE : value, "user");
               this.quill.setSelection(range.index, range.length, "silent");
               lastSelection = { index: range.index, length: range.length };
               this.quill.focus();
-              requestAnimationFrame(syncSizeToolbarState);
+              requestAnimationFrame(syncToolbarState);
             }
           }
         }
@@ -147,12 +147,14 @@ export function SharedWeeklyActivityEditor({
       }
       return sizes;
     };
-    syncSizeToolbarState = () => {
+    syncToolbarState = () => {
       const picker = toolbarRef.current?.querySelector<HTMLElement>(".ql-size.ql-picker");
       const label = picker?.querySelector<HTMLElement>(".ql-picker-label");
-      if (!picker || !label) return;
+      const nativeSelect = toolbarRef.current?.querySelector<HTMLSelectElement>("select.ql-size");
+      if (!picker || !label || !nativeSelect) return;
       const range = quill.getSelection() ?? lastSelection;
       const state = resolveWeeklyActivitySizeState(range ? selectedVisualSizes(range) : []);
+      nativeSelect.value = state.mixed ? "" : state.value ?? WEEKLY_ACTIVITY_DEFAULT_SIZE;
       picker.dataset.sizeState = state.mixed ? "mixed" : "uniform";
       label.dataset.value = state.label;
       label.setAttribute("aria-label", `Text size: ${state.label}`);
@@ -170,38 +172,59 @@ export function SharedWeeklyActivityEditor({
         quill.setContents(delta, "silent");
         quill.history.clear();
         syncWeeklyActivityListMarkerStyles(quill.root);
-        syncSizeToolbarState();
+        syncToolbarState();
       },
       focus: () => quill.focus()
     };
     const session = new SharedEditorSession(adapter, drafts, initialTarget);
+    const scheduleToolbarStateSync = () => requestAnimationFrame(syncToolbarState);
     const handleTextChange = (_delta: unknown, _old: unknown, source: string) => {
       if (source === "silent") return;
       syncWeeklyActivityListMarkerStyles(quill.root);
-      syncSizeToolbarState();
+      scheduleToolbarStateSync();
       onDraftsChangeRef.current(session.flush());
     };
     const handleSelectionChange = (range: { index: number; length: number } | null) => {
       if (range) lastSelection = { index: range.index, length: range.length };
-      syncSizeToolbarState();
+      scheduleToolbarStateSync();
     };
     const rememberSelectionBeforeToolbarAction = () => {
       const range = quill.getSelection();
       if (range) lastSelection = { index: range.index, length: range.length };
     };
+    const rearmSelectedSizePickerItem = (event: Event) => {
+      if (event.type === "keydown" && (event as KeyboardEvent).key !== "Enter") return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const item = target.closest<HTMLElement>(".ql-size.ql-picker .ql-picker-item");
+      if (!item || !toolbarRef.current?.contains(item) || !item.classList.contains("ql-selected")) return;
+      // Quill Picker.selectItem returns early when the clicked item already owns ql-selected.
+      // Re-arm that item during capture so Quill still dispatches the native select change
+      // and applies an explicit size to the preserved text selection.
+      item.classList.remove("ql-selected");
+      item.setAttribute("aria-selected", "false");
+    };
+    toolbarRef.current.addEventListener("pointerdown", rememberSelectionBeforeToolbarAction, true);
+    toolbarRef.current.addEventListener("touchstart", rememberSelectionBeforeToolbarAction, true);
     toolbarRef.current.addEventListener("mousedown", rememberSelectionBeforeToolbarAction, true);
+    toolbarRef.current.addEventListener("click", rearmSelectedSizePickerItem, true);
+    toolbarRef.current.addEventListener("keydown", rearmSelectedSizePickerItem, true);
     quill.on("text-change", handleTextChange);
     quill.on("selection-change", handleSelectionChange);
     quill.enable(!disabled);
     quillRef.current = quill;
     sessionRef.current = session;
     registerFlush?.(() => session.flush());
-    syncSizeToolbarState();
+    syncToolbarState();
 
     return () => {
       quill.off("text-change", handleTextChange);
       quill.off("selection-change", handleSelectionChange);
+      toolbarRef.current?.removeEventListener("pointerdown", rememberSelectionBeforeToolbarAction, true);
+      toolbarRef.current?.removeEventListener("touchstart", rememberSelectionBeforeToolbarAction, true);
       toolbarRef.current?.removeEventListener("mousedown", rememberSelectionBeforeToolbarAction, true);
+      toolbarRef.current?.removeEventListener("click", rearmSelectedSizePickerItem, true);
+      toolbarRef.current?.removeEventListener("keydown", rearmSelectedSizePickerItem, true);
       quillRef.current = null;
       sessionRef.current = null;
       registerFlush?.(null);

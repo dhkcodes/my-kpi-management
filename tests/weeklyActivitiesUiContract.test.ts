@@ -45,6 +45,16 @@ assert.match(editor, /dangerouslySetInnerHTML=\{\{ __html: sanitizeWeeklyActivit
 assert.match(editor, /defaultValue=\{WEEKLY_ACTIVITY_DEFAULT_SIZE\}/, "the size picker starts from the shared 16px visual default");
 assert.match(editor, /selection-change/, "the size picker follows the current Quill selection");
 assert.match(editor, /lastSelection/, "toolbar actions can restore the editor selection after picker focus");
+assert.match(editor, /value: string \| false/, "the size handler accepts Quill's false value for its default option");
+assert.match(editor, /value === false \? WEEKLY_ACTIVITY_DEFAULT_SIZE : value/, "Quill's false default becomes an explicit 16px format so inherited parent sizing cannot leak through");
+assert.match(editor, /nativeSelect\.value = state\.mixed \? "" : state\.value \?\? WEEKLY_ACTIVITY_DEFAULT_SIZE/, "the native size select remains aligned with the custom picker state");
+assert.match(editor, /requestAnimationFrame\(syncToolbarState\)/, "picker synchronization runs after Quill's own editor-change update");
+assert.match(editor, /rearmSelectedSizePickerItem/, "clicking an already-highlighted size is re-armed before Quill's picker handles it");
+assert.match(editor, /item\.classList\.remove\("ql-selected"\)/, "the Quill picker cannot short-circuit an explicit reapplication to the selected text");
+assert.match(editor, /addEventListener\("pointerdown", rememberSelectionBeforeToolbarAction, true\)/, "pointer input preserves the text selection before the mobile picker takes focus");
+assert.match(editor, /addEventListener\("touchstart", rememberSelectionBeforeToolbarAction, true\)/, "iPhone Safari touch input preserves the text selection before the picker opens");
+assert.match(editorSession, /"#c74634"/);
+assert.match(editorSession, /"#b3261e"/, "color options use Quill-normalized lowercase hex values so reselection can match the native select");
 assert.match(css, /\.weekly-activity-rich-text[\s\S]*font-size:\s*16px/, "editor, card, and preview share a 16px typography contract");
 assert.match(page, /weekly-activity-rich-text/, "saved card content opts into the shared rich-text typography contract");
 assert.match(editor, /weekly-activity-rich-text/, "editor and inactive preview opt into the shared rich-text typography contract");
