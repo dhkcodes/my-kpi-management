@@ -42,6 +42,12 @@ assert.equal((page.match(/dangerouslySetInnerHTML/g) ?? []).length, 1, "one acti
 assert.match(page, /dangerouslySetInnerHTML=\{\{ __html: sanitizeWeeklyActivityHtml\(html\) \}\}/);
 assert.equal((editor.match(/dangerouslySetInnerHTML/g) ?? []).length, 1, "one preview HTML sink");
 assert.match(editor, /dangerouslySetInnerHTML=\{\{ __html: sanitizeWeeklyActivityHtml\(inactiveHtml\) \}\}/);
+assert.match(editor, /defaultValue=\{WEEKLY_ACTIVITY_DEFAULT_SIZE\}/, "the size picker starts from the shared 16px visual default");
+assert.match(editor, /selection-change/, "the size picker follows the current Quill selection");
+assert.match(editor, /lastSelection/, "toolbar actions can restore the editor selection after picker focus");
+assert.match(css, /\.weekly-activity-rich-text[\s\S]*font-size:\s*16px/, "editor, card, and preview share a 16px typography contract");
+assert.match(page, /weekly-activity-rich-text/, "saved card content opts into the shared rich-text typography contract");
+assert.match(editor, /weekly-activity-rich-text/, "editor and inactive preview opt into the shared rich-text typography contract");
 assert.doesNotMatch(readFileSync("src/components/content/weeklyActivityEditorSession.ts", "utf8"), /element\.tagName === "SPAN"/, "safe color and size styles are retained on every allowed tag, not only span");
 assert.match(page, /const requestId = requestGuardRef\.current\.begin\(\)/, "each list request gets a generation");
 assert.match(page, /if \(!requestGuardRef\.current\.isLatest\(requestId\)\) return;/, "stale list responses are ignored");

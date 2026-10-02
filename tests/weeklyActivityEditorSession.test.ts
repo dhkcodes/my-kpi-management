@@ -24,9 +24,13 @@ import {
   hasWeeklyActivityFormattingParity,
   normalizeWeeklyActivityBreakableSpaces,
   promoteWeeklyActivityListMarkerStyles,
+  resolveWeeklyActivitySizeState,
   sanitizeWeeklyActivityStyle,
   sanitizeWeeklyActivityHtml,
   SharedEditorSession,
+  WEEKLY_ACTIVITY_DEFAULT_SIZE,
+  WEEKLY_ACTIVITY_PERSISTED_SIZES,
+  WEEKLY_ACTIVITY_SIZES,
   WeeklyActivityTarget
 } from "../src/components/content/weeklyActivityEditorSession";
 import {
@@ -72,6 +76,14 @@ assert.deepEqual(WEEKLY_ACTIVITY_COLORS, [
   "#161513", "#C74634", "#7A2E1E", "#8A5B00", "#0B5F66", "#2458A6", "#2E6B3F", "#5F4B8B",
   "#B3261E", "#D45B13", "#C58A00", "#007C91", "#A13E75", "#6E46A5"
 ]);
+assert.equal(WEEKLY_ACTIVITY_DEFAULT_SIZE, "16px", "unformatted weekly activity text has one explicit visual default");
+assert.deepEqual(WEEKLY_ACTIVITY_SIZES, ["12px", "14px", "16px", "18px", "24px"], "toolbar sizes match the supported Weekly Activities contract");
+assert.deepEqual(WEEKLY_ACTIVITY_PERSISTED_SIZES, ["10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"], "previously persisted explicit sizes remain loadable without widening the picker");
+assert.deepEqual(resolveWeeklyActivitySizeState([]), { label: "16px", value: "16px", mixed: false }, "unformatted text reports its actual default size");
+assert.deepEqual(resolveWeeklyActivitySizeState([undefined, "16px", null]), { label: "16px", value: "16px", mixed: false }, "explicit and inherited 16px are one visual state");
+assert.deepEqual(resolveWeeklyActivitySizeState(["14px", "14px"]), { label: "14px", value: "14px", mixed: false }, "a uniform explicit size remains selected");
+assert.deepEqual(resolveWeeklyActivitySizeState([undefined, "14px"]), { label: "Mixed", value: null, mixed: true }, "inherited 16px and explicit 14px report a mixed selection");
+assert.deepEqual(resolveWeeklyActivitySizeState(["14px", "18px"]), { label: "Mixed", value: null, mixed: true }, "different explicit sizes report a mixed selection");
 
 const colorEditor = new FakeEditor();
 const colorSession = new SharedEditorSession(colorEditor, {
