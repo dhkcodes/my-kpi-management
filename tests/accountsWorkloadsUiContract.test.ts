@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
+const saveFlow = readFileSync("src/app/accountsWorkloadsSaveFlow.ts", "utf8");
 const messageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 const unsavedDeleteHandler = page.slice(page.indexOf("const removeUnsavedSelected"), page.indexOf("const deleteSelected"));
@@ -49,6 +50,8 @@ assert.match(saveAwHandler, /salesRep: workload\.salesRep/,
   "Sales Rep participates in the existing AW batch save flow");
 assert.match(saveAwHandler, /catch \(saveError\)[\s\S]*setError\(friendlyError\(saveError\)\)[\s\S]*return false/,
   "a rejected Account rename keeps the dirty hierarchy in place for correction");
+assert.match(saveAllHandler, /runAccountsWorkloadsSaveFlow\(\{\s*saveAwDrafts,\s*saveDealDrafts,\s*reload,\s*\}\)/,
+  "one outer busy transaction spans AW save, Opportunity save and the final authoritative reload");
 assert.match(page, /\(current\.salesRep \?\? ""\)\.trim\(\)[\s\S]*\(original\.salesRep \?\? ""\)\.trim\(\)/,
   "Sales-Rep-only edits and clears participate in AW dirty tracking");
 assert.match(page, /aria-label={`\$\{field === "account"[\s\S]*field === "salesRep" \? "Sales Rep"/,
@@ -309,7 +312,7 @@ assert.match(messageBanner, /window\.setTimeout[\s\S]*onClose\?\.\(message\.id\)
   "the shared banner auto-dismisses non-sticky informational notices");
 assert.match(saveAwHandler, /const saved = await saveAccountsWorkloadsHierarchy\(request\)[\s\S]*setBaseline\(withoutArchived\)[\s\S]*setNotice\(/,
   "AW save success appears only after the authoritative save response is adopted");
-assert.match(saveAllHandler, /const dealsSaved = await saveDealDrafts\(\)[\s\S]*if \(!dealsSaved\) return false;[\s\S]*await reload\(\)[\s\S]*return true/,
+assert.match(saveFlow, /const dealsSaved = await saveDealDrafts\(\)[\s\S]*if \(!dealsSaved\) return false;[\s\S]*await reload\(\)[\s\S]*return true/,
   "a successful save reapplies the active Account search and existing archive/deleted filters");
 assert.match(styles, /\.accounts-workloads-oppty-grid thead th:nth-child\(-n \+ 2\)\s*\{[^}]*background:\s*#f4f6f8/,
   "sticky Opportunity identity headers share the other header background");
@@ -386,7 +389,7 @@ assert.match(page, /저장 결과 확인 불가 — 관리자 확인 필요/,
   "the UI does not promise GET recovery when a new-row correlation was lost");
 assert.doesNotMatch(page.slice(page.indexOf("const confirmDealDelete"), page.indexOf("const requestDealDelete")), /setDealDrafts\(new Map\(\)\)/,
   "deleting selected opportunities cannot erase unrelated drafts");
-assert.match(page, /const saveAllDrafts = async \(\): Promise<boolean> => \{[\s\S]*await saveAwDrafts\(\)[\s\S]*await saveDealDrafts\(\)/,
+assert.match(saveFlow, /const awSaved = await saveAwDrafts\(\)[\s\S]*const dealsSaved = await saveDealDrafts\(\)/,
   "Save & Continue persists both AW and Opportunity drafts before navigating");
 assert.match(page, /const saveAndContinue = async \(\) => \{[\s\S]*const saved = await saveAllDrafts\(\)[\s\S]*if \(!saved\) return;[\s\S]*pending\.action\(\)/,
   "navigation is deferred until every pending write succeeds");
