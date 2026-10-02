@@ -1961,6 +1961,17 @@ body {
 .weekly-activity-edit-column h4 { color: var(--kpi-ink); font-size: 0.9rem; margin: 0; }
 .weekly-activity-card__rich-text,
 .weekly-activity-preview__content { overflow-wrap: anywhere; }
+.weekly-activity-rich-text,
+.weekly-activity-rich-text.ql-container {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.weekly-activity-rich-text .ql-editor {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
 .weekly-activity-card__rich-text--editable {
   border-radius: 0.2rem;
   cursor: text;
@@ -2041,6 +2052,8 @@ h4.weekly-activity-section-label--next-week,
   white-space: nowrap;
 }
 .weekly-activity-toolbar .ql-size .ql-picker-label::before { flex: 0 0 auto; text-align: left; }
+.weekly-activity-toolbar .ql-size .ql-picker-label::before,
+.weekly-activity-toolbar .ql-size .ql-picker-item::before { content: attr(data-value); }
 .weekly-activity-toolbar.ql-snow.ql-toolbar > button svg,
 .weekly-activity-toolbar.ql-snow.ql-toolbar .ql-picker-label svg,
 .weekly-activity-toolbar > button > span {

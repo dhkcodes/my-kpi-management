@@ -5,9 +5,12 @@ import * as QuillModule from "quill";
 import {
   ALLOWED_QUILL_FORMATS,
   normalizeWeeklyActivityBreakableSpaces,
+  resolveWeeklyActivitySizeState,
   sanitizeWeeklyActivityHtml,
   SharedEditorSession,
   WEEKLY_ACTIVITY_COLORS,
+  WEEKLY_ACTIVITY_DEFAULT_SIZE,
+  WEEKLY_ACTIVITY_PERSISTED_SIZES,
   WEEKLY_ACTIVITY_SIZES,
   WeeklyActivityDrafts,
   WeeklyActivityTarget
@@ -96,9 +99,11 @@ export function SharedWeeklyActivityEditor({
     if (!toolbarRef.current || !editorRef.current || quillRef.current) return;
 
     const SizeStyle = QuillRuntime.import("attributors/style/size") as any;
-    SizeStyle.whitelist = [...WEEKLY_ACTIVITY_SIZES];
+    SizeStyle.whitelist = [...WEEKLY_ACTIVITY_PERSISTED_SIZES];
     QuillRuntime.register(SizeStyle, true);
 
+    let lastSelection: { index: number; length: number } | null = null;
+    let syncSizeToolbarState = () => undefined;
     const quill = new QuillRuntime(editorRef.current, {
       theme: "snow",
       formats: [...ALLOWED_QUILL_FORMATS],
@@ -108,7 +113,18 @@ export function SharedWeeklyActivityEditor({
           container: toolbarRef.current,
           handlers: {
             undo: function (this: { quill: QuillClass }) { this.quill.history.undo(); },
-            redo: function (this: { quill: QuillClass }) { this.quill.history.redo(); }
+            redo: function (this: { quill: QuillClass }) { this.quill.history.redo(); },
+            size: function (this: { quill: QuillClass }, value: string) {
+              const currentRange = this.quill.getSelection();
+              const range = lastSelection?.length ? lastSelection : currentRange ?? lastSelection;
+              if (!range || !value) return;
+              this.quill.setSelection(range.index, range.length, "silent");
+              this.quill.format("size", value === WEEKLY_ACTIVITY_DEFAULT_SIZE ? false : value, "user");
+              this.quill.setSelection(range.index, range.length, "silent");
+              lastSelection = { index: range.index, length: range.length };
+              this.quill.focus();
+              requestAnimationFrame(syncSizeToolbarState);
+            }
           }
         }
       },
@@ -116,7 +132,36 @@ export function SharedWeeklyActivityEditor({
     });
     installWeeklyActivityListIcons(toolbarRef.current);
     toolbarRef.current.querySelector<HTMLElement>(".ql-color .ql-picker-label")?.setAttribute("aria-label", "Text color");
-    toolbarRef.current.querySelector<HTMLElement>(".ql-size .ql-picker-label")?.setAttribute("aria-label", "Text size");
+    const selectedVisualSizes = (range: { index: number; length: number }): Array<string | undefined> => {
+      if (range.length === 0) {
+        const size = quill.getFormat(range.index, 0).size;
+        if (Array.isArray(size)) return size.map((value) => typeof value === "string" ? value : undefined);
+        return [typeof size === "string" ? size : undefined];
+      }
+      const sizes: Array<string | undefined> = [];
+      for (const operation of quill.getContents(range.index, range.length).ops) {
+        const visibleContent = typeof operation.insert !== "string" || /[^\n]/.test(operation.insert);
+        if (!visibleContent) continue;
+        const size = operation.attributes?.size;
+        sizes.push(typeof size === "string" ? size : undefined);
+      }
+      return sizes;
+    };
+    syncSizeToolbarState = () => {
+      const picker = toolbarRef.current?.querySelector<HTMLElement>(".ql-size.ql-picker");
+      const label = picker?.querySelector<HTMLElement>(".ql-picker-label");
+      if (!picker || !label) return;
+      const range = quill.getSelection() ?? lastSelection;
+      const state = resolveWeeklyActivitySizeState(range ? selectedVisualSizes(range) : []);
+      picker.dataset.sizeState = state.mixed ? "mixed" : "uniform";
+      label.dataset.value = state.label;
+      label.setAttribute("aria-label", `Text size: ${state.label}`);
+      for (const item of Array.from(picker.querySelectorAll<HTMLElement>(".ql-picker-item"))) {
+        const selected = state.value !== null && item.dataset.value === state.value;
+        item.classList.toggle("ql-selected", selected);
+        item.setAttribute("aria-selected", String(selected));
+      }
+    };
     const adapter = {
       getSemanticHTML: () => normalizeEditorHtml(quill.getSemanticHTML()),
       setSemanticHTML: (html: string) => {
@@ -125,22 +170,38 @@ export function SharedWeeklyActivityEditor({
         quill.setContents(delta, "silent");
         quill.history.clear();
         syncWeeklyActivityListMarkerStyles(quill.root);
+        syncSizeToolbarState();
       },
       focus: () => quill.focus()
     };
     const session = new SharedEditorSession(adapter, drafts, initialTarget);
-    quill.on("text-change", (_delta, _old, source) => {
+    const handleTextChange = (_delta: unknown, _old: unknown, source: string) => {
       if (source === "silent") return;
       syncWeeklyActivityListMarkerStyles(quill.root);
+      syncSizeToolbarState();
       onDraftsChangeRef.current(session.flush());
-    });
+    };
+    const handleSelectionChange = (range: { index: number; length: number } | null) => {
+      if (range) lastSelection = { index: range.index, length: range.length };
+      syncSizeToolbarState();
+    };
+    const rememberSelectionBeforeToolbarAction = () => {
+      const range = quill.getSelection();
+      if (range) lastSelection = { index: range.index, length: range.length };
+    };
+    toolbarRef.current.addEventListener("mousedown", rememberSelectionBeforeToolbarAction, true);
+    quill.on("text-change", handleTextChange);
+    quill.on("selection-change", handleSelectionChange);
     quill.enable(!disabled);
     quillRef.current = quill;
     sessionRef.current = session;
     registerFlush?.(() => session.flush());
+    syncSizeToolbarState();
 
     return () => {
-      quill.off("text-change");
+      quill.off("text-change", handleTextChange);
+      quill.off("selection-change", handleSelectionChange);
+      toolbarRef.current?.removeEventListener("mousedown", rememberSelectionBeforeToolbarAction, true);
       quillRef.current = null;
       sessionRef.current = null;
       registerFlush?.(null);
@@ -166,7 +227,7 @@ export function SharedWeeklyActivityEditor({
   return (
     <div class="weekly-activity-editor-composition">
       <div ref={toolbarRef} class="weekly-activity-toolbar" role="toolbar" aria-label="Weekly activity rich text formatting">
-        <select class="ql-size" aria-label="Text size" defaultValue="14px">
+        <select class="ql-size" aria-label="Text size" defaultValue={WEEKLY_ACTIVITY_DEFAULT_SIZE}>
           {WEEKLY_ACTIVITY_SIZES.map((size) => <option value={size}>{size}</option>)}
         </select>
         <button type="button" class="ql-bold" aria-label="Bold"></button>
@@ -183,7 +244,7 @@ export function SharedWeeklyActivityEditor({
         <section class="weekly-activity-edit-column weekly-activity-edit-column--active" aria-labelledby="weeklyActivityEditingLabel">
           <h4 id="weeklyActivityEditingLabel" class={`weekly-activity-section-label weekly-activity-section-label--${activeTarget === "thisWeek" ? "this-week" : "next-week"}`}>{TARGET_LABELS[activeTarget]}</h4>
           <span class="weekly-activity-edit-column__status">Editing</span>
-          <div id="weeklyActivitySharedEditor" ref={editorRef}></div>
+          <div id="weeklyActivitySharedEditor" class="weekly-activity-rich-text" ref={editorRef}></div>
         </section>
         <section class="weekly-activity-edit-column weekly-activity-edit-column--inactive" onDblClick={() => selectTarget(inactiveTarget)}>
           <button
@@ -195,7 +256,7 @@ export function SharedWeeklyActivityEditor({
             <span class={`weekly-activity-edit-column__heading weekly-activity-section-label weekly-activity-section-label--${inactiveTarget === "thisWeek" ? "this-week" : "next-week"}`}>{TARGET_LABELS[inactiveTarget]}</span>
             <span class="weekly-activity-edit-column__status">Select and edit</span>
           </button>
-          <div class="weekly-activity-preview__content" aria-label={`${TARGET_LABELS[inactiveTarget]} preview`} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(inactiveHtml) }}></div>
+          <div class="weekly-activity-preview__content weekly-activity-rich-text" aria-label={`${TARGET_LABELS[inactiveTarget]} preview`} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(inactiveHtml) }}></div>
         </section>
       </div>
     </div>

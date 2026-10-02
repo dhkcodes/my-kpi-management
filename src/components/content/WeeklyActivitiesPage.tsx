@@ -62,7 +62,7 @@ const formatWeekDate = (value: string) => {
 };
 
 function ActivityContent({ html, label, editable, onDblClick }: Readonly<{ html: string; label: string; editable: boolean; onDblClick: () => void }>) {
-  return <div class={`weekly-activity-card__rich-text${editable ? " weekly-activity-card__rich-text--editable" : ""}`}
+  return <div class={`weekly-activity-card__rich-text weekly-activity-rich-text${editable ? " weekly-activity-card__rich-text--editable" : ""}`}
     aria-label={label} title={editable ? "Double-click to edit" : undefined}
     onDblClick={() => { if (editable) onDblClick(); }} dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(html) }}></div>;
 }

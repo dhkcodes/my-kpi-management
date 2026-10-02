@@ -41,8 +41,32 @@ const ALLOWED_COLORS = new Map<string, string>([
   ["#a13e75", "#A13E75"], ["rgb(161,62,117)", "#A13E75"],
   ["#6e46a5", "#6E46A5"], ["rgb(110,70,165)", "#6E46A5"]
 ]);
-export const WEEKLY_ACTIVITY_SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"] as const;
-const ALLOWED_SIZES = new Set<string>(WEEKLY_ACTIVITY_SIZES);
+export const WEEKLY_ACTIVITY_SIZES = ["12px", "14px", "16px", "18px", "24px"] as const;
+export const WEEKLY_ACTIVITY_DEFAULT_SIZE = "16px" as const;
+// Keep legacy values readable and round-trippable even though new formatting is
+// intentionally limited to the smaller toolbar contract above.
+export const WEEKLY_ACTIVITY_PERSISTED_SIZES = [
+  "10px", "12px", "14px", "16px", "18px", "20px", "22px", "24px", "26px", "28px", "30px"
+] as const;
+const ALLOWED_SIZES = new Set<string>(WEEKLY_ACTIVITY_PERSISTED_SIZES);
+
+export type WeeklyActivitySizeState = Readonly<{
+  label: string;
+  value: string | null;
+  mixed: boolean;
+}>;
+
+/** Resolve the visual size of a selection; missing inline size inherits the 16px content contract. */
+export const resolveWeeklyActivitySizeState = (
+  sizes: Iterable<string | null | undefined>
+): WeeklyActivitySizeState => {
+  const visualSizes = new Set<string>();
+  for (const size of sizes) visualSizes.add(ALLOWED_SIZES.has(size ?? "") ? size! : WEEKLY_ACTIVITY_DEFAULT_SIZE);
+  if (visualSizes.size === 0) visualSizes.add(WEEKLY_ACTIVITY_DEFAULT_SIZE);
+  if (visualSizes.size > 1) return { label: "Mixed", value: null, mixed: true };
+  const [value] = visualSizes;
+  return { label: value, value, mixed: false };
+};
 
 /**
  * Quill can serialize ordinary typed spaces as non-breaking spaces. A whole
