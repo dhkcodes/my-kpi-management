@@ -105,6 +105,51 @@ assert.deepEqual(mtdOverview.finalUploadRequiredPeriods, []);
 assert.deepEqual(mtdOverview.actualPeriods, mtdAnalysis.periodCoverage.actualPeriods,
   "provisional MTD must not be classified as official Actual");
 
+const pendingFinalOverview = buildHomeConsumptionOverview(mtdAnalysis, {
+  ...totals,
+  mtdByPeriod: { "FY27-SEP": "1250" },
+  mtdStatusByPeriod: { "FY27-SEP": "FINAL_UPLOAD_REQUIRED" },
+  mtdAsOfByPeriod: { "FY27-SEP": "2026-09-28" }
+}, "FY27-SEP");
+assert.equal(pendingFinalOverview.months.find((month) => month.periodKey === "FY27-SEP")?.kind, "MTD",
+  "available MTD stays visible while the monthly final Actual upload is pending");
+assert.equal(pendingFinalOverview.months.find((month) => month.periodKey === "FY27-SEP")?.amountExact, "1250");
+assert.equal(pendingFinalOverview.mtdAsOf, "2026-09-28", "the MTD basis date is preserved");
+assert.deepEqual(pendingFinalOverview.finalUploadRequiredPeriods, ["FY27-SEP"]);
+assert.equal(pendingFinalOverview.actualAmountExact, analysis.portfolio.actualAmountExact,
+  "final-only Actual aggregates remain unchanged by provisional MTD");
+
+const missingMtdOverview = buildHomeConsumptionOverview(mtdAnalysis, {
+  ...totals,
+  mtdByPeriod: {},
+  mtdStatusByPeriod: { "FY27-SEP": "FINAL_UPLOAD_REQUIRED" }
+}, "FY27-SEP");
+assert.equal(missingMtdOverview.months.some((month) => month.kind === "MTD"), false,
+  "a status without a value must not fabricate a zero MTD point");
+assert.deepEqual(missingMtdOverview.finalUploadRequiredPeriods, []);
+
+const finalUploadedAnalysis = {
+  ...mtdAnalysis,
+  periodCoverage: {
+    ...mtdAnalysis.periodCoverage,
+    actualPeriods: [...mtdAnalysis.periodCoverage.actualPeriods, "FY27-SEP"],
+    forecastPeriods: []
+  }
+} as ConsumptionAnalysis;
+const finalUploadedOverview = buildHomeConsumptionOverview(finalUploadedAnalysis, {
+  ...totals,
+  actualByPeriod: { ...totals.actualByPeriod, "FY27-SEP": "1500" },
+  mtdByPeriod: { "FY27-SEP": "1250" },
+  mtdStatusByPeriod: { "FY27-SEP": "FINAL_UPLOAD_REQUIRED" },
+  mtdAsOfByPeriod: { "FY27-SEP": "2026-09-28" }
+}, "FY27-SEP");
+assert.deepEqual(finalUploadedOverview.months.find((month) => month.periodKey === "FY27-SEP"), {
+  periodKey: "FY27-SEP", kind: "ACTUAL", amountExact: "1500", amountChartCoordinate: 1500,
+  forecastAmountExact: null, forecastAmountChartCoordinate: null, incomplete: true
+}, "confirmed Actual takes precedence over an MTD value for the same period");
+assert.equal(finalUploadedOverview.mtdAsOf, null);
+assert.deepEqual(finalUploadedOverview.finalUploadRequiredPeriods, []);
+
 const month = (
   periodKey: string,
   kind: HomeConsumptionMonth["kind"],

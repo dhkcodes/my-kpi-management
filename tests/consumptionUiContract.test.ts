@@ -66,10 +66,11 @@ assert.doesNotMatch(spreadsheetPage, /kpi-page-loading__body|Loading KPI Activit
 assert.doesNotMatch(attainmentPage, /accounts-workloads-loading|Loading Consumption Attainment/u, "Attainment defers loading UI to the shared app overlay");
 assert.doesNotMatch(recordsPage, /accounts-workloads-loading|Loading Consumption Records/u, "Records defers loading UI to the shared app overlay");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
-assert.match(homeConsumption, /확정 업로드 필요/, "Home guides users when a previous MTD remains unresolved");
-assert.match(homeConsumption, />MTD \(잠정\)</, "Home labels current-month MTD as provisional rather than Actual");
-assert.match(homeConsumption, /const showActual = compareExactDecimals\(quarter\.actualAmountExact, "0"\) !== 0;[\s\S]*const showMtd = !showActual && mtd\?\.amountExact !== null && mtd\?\.amountExact !== undefined;/,
-  "Quarterly display treats zero Actual as absent, shows available MTD only then, and hides MTD for non-zero Actual");
+assert.match(homeConsumption, /잠정 MTD 적용/, "Home explains that available MTD remains visible while final Actual is pending");
+assert.match(homeConsumption, />MTD \(잠정\)\{data\.mtdAsOf \? ` · As of \$\{data\.mtdAsOf\}` : ""\}</,
+  "Home labels current-month MTD separately and preserves its basis date");
+assert.match(homeConsumption, /const showActual = data\.actualPeriods\.some[\s\S]*const showMtd = mtd\?\.amountExact !== null && mtd\?\.amountExact !== undefined;/,
+  "Quarterly display uses period coverage for confirmed Actual and independently renders available MTD");
 assert.doesNotMatch(homeConsumption, /Separate values|Actual periods are closed results|Partial or incomplete source coverage|MTD \(잠정\) is provisional|Current-month MTD is provisional|Actual and Forecast remain separate/,
   "Home removes the requested explanatory copy and orphaned footnotes");
 assert.match(homeConsumption, /home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd/,

@@ -179,11 +179,13 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       <div class="forecast-actual-toolbar" aria-label="Forecast vs Actual filters">
         <div class="forecast-actual-control forecast-actual-mtd-control">
           <span>MTD</span>
-          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">As of {mtdAppliedDate}</span>}
-          <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
-            onClick={() => { setProblemFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
-            <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-          </button>
+          <div class="forecast-actual-mtd-row">
+            {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">As of {mtdAppliedDate}</span>}
+            <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
+              onClick={() => { setProblemFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
+              <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+            </button>
+          </div>
         </div>
         <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setSalesRep(""); resetAccountScope(); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
         <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
@@ -232,10 +234,11 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       </section>
 
       <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar"><span class="forecast-actual-unit-note">Amount: K USD</span><div class="consumption-scroll-controls" aria-label="Monthly horizontal scroll controls">
+        <div class="forecast-actual-matrix-toolbar"><span class="forecast-actual-unit-note">Amount: K USD</span></div>
+        <div class="consumption-scroll-controls" aria-label="Monthly horizontal scroll controls">
           <button type="button" aria-label="Scroll monthly columns left" disabled={!monthScroll.left} onClick={() => scrollMonths(-1)}><ScrollChevron direction="left" /></button>
           <button type="button" aria-label="Scroll monthly columns right" disabled={!monthScroll.right} onClick={() => scrollMonths(1)}><ScrollChevron direction="right" /></button>
-        </div></div>
+        </div>
         <div class="forecast-actual-month-scroll" ref={monthScrollRef} tabIndex={0} onScroll={refreshMonthScrollState} onKeyDown={handleMonthScrollKeyDown}>
           <table class="forecast-actual-matrix">
             <thead>

@@ -66,6 +66,23 @@ for (const column of ["is-forecast", "is-actual", "is-difference", "is-status"])
 assert.match(styles, /\.forecast-actual-info-trigger:hover::after[^}]*opacity:\s*1/u, "card help opens on pointer hover");
 assert.match(styles, /\.forecast-actual-info-trigger:focus::after[^}]*opacity:\s*1/u, "card help opens from keyboard or touch focus");
 assert.match(styles, /\.forecast-actual-month-scroll[^}]*max-height:[^;}]+[^}]*overflow:\s*auto/u);
+assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center/u,
+  "Sales Rep values are centered");
+for (const column of ["is-forecast", "is-actual", "is-difference"]) {
+  assert.match(styles, new RegExp(`forecast-actual-month-value\\.${column}[^}]*text-align:\\s*right`, "u"), `${column} values are right aligned`);
+}
+assert.match(styles, /\.forecast-actual-summary article[^}]*overflow:\s*visible/u,
+  "summary help popovers are not clipped by their cards");
+assert.match(styles, /\.forecast-actual-matrix-shell > \.consumption-scroll-controls[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/u,
+  "horizontal scroll buttons stay at the visible matrix midpoint");
+assert.match(styles, /--forecast-rep-width:\s*7rem[^}]*--forecast-month-width:\s*5\.5rem/u,
+  "wide Forecast vs Actual columns are compacted without collapsing content");
+assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*min-width:\s*var\(--forecast-rep-width\)[^}]*width:\s*var\(--forecast-rep-width\)/u,
+  "the compact Sales Rep width is applied to the matrix cells");
+assert.match(styles, /\.forecast-actual-matrix \.forecast-actual-period-group[^}]*var\(--forecast-month-width\)[^}]*var\(--forecast-status-width\)/u,
+  "period groups consume all compacted leaf-column widths");
+assert.match(page, /forecast-actual-control forecast-actual-mtd-control[^]*<span>MTD<\/span>[^]*forecast-actual-mtd-row/u,
+  "MTD is a field label above its date and toggle row");
 assert.match(page, /onKeyDown=\{handleMonthScrollKeyDown\}/u);
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);

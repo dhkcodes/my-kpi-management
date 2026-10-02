@@ -123,12 +123,12 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
         <>
           <div class="home-consumption__coverage" role="note">
             <span><i class="home-consumption__legend home-consumption__legend--actual"></i>Actual {periodRange(data.actualPeriods)}</span>
-            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD (잠정)</span>}
+            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD (잠정){data.mtdAsOf ? ` · As of ${data.mtdAsOf}` : ""}</span>}
             <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Forecast {periodRange(data.forecastPeriods)}</span>
           </div>
           {data.finalUploadRequiredPeriods.length > 0 && (
             <p class="home-consumption__mtd-guidance" role="note">
-              <strong>확정 업로드 필요</strong> · {data.finalUploadRequiredPeriods.join(", ")} MTD는 확정 Actual 업로드 전까지 차트에서 제외됩니다.
+              <strong>잠정 MTD 적용</strong> · {data.finalUploadRequiredPeriods.join(", ")}은 확정 Actual 업로드 전까지 가용한 MTD를 표시하며, 업로드 후 확정값을 우선 적용합니다.
             </p>
           )}
 
@@ -169,8 +169,8 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                   const mtd = data.months.find((month) => month.kind === "MTD" && quarterForPeriod(month.periodKey) === quarter.quarter);
                   const mtdAmountExact = mtd?.amountExact ?? "0";
                   const mtdAmountChartCoordinate = mtd?.amountChartCoordinate ?? 0;
-                  const showActual = compareExactDecimals(quarter.actualAmountExact, "0") !== 0;
-                  const showMtd = !showActual && mtd?.amountExact !== null && mtd?.amountExact !== undefined;
+                  const showActual = data.actualPeriods.some((periodKey) => quarterForPeriod(periodKey) === quarter.quarter);
+                  const showMtd = mtd?.amountExact !== null && mtd?.amountExact !== undefined;
                   const scale = Math.max(showActual ? quarter.actualAmountChartCoordinate : 0, showMtd ? mtdAmountChartCoordinate : 0, quarter.forecastAmountChartCoordinate, 1);
                   const actualWidth = (quarter.actualAmountChartCoordinate / scale) * 100;
                   const mtdWidth = (mtdAmountChartCoordinate / scale) * 100;

@@ -2279,7 +2279,7 @@ export function AccountsWorkloadsPage({
         <div class="accounts-workloads-header-topline">
           <div class="accounts-workloads-header-navigation">
             {breadcrumb}
-            <span class="kpi-eyebrow">My Customers 360</span>
+            <span class="kpi-eyebrow">Account Management</span>
           </div>
           <div class="consumption-import-actions accounts-workloads-header-actions">
             <oj-button
