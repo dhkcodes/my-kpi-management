@@ -131,7 +131,6 @@ assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== f
 assert.match(page, /const settleDialogClosed = useCallback[\s\S]*await busyContext\.whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*await busyContext\.whenReady\(\)/, "all chained KPI dialogs settle their JET BusyContext before another modal or route action starts");
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*var\(--kap-grid-header-ink\)/,
   "KPI header titles use the calm slate token instead of red");
-assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)\s*\{[^}]*align-content:\s*start/);
 assert.match(styles, /\.kpi-sheet-summary\[hidden\]\s*\{[^}]*display:\s*none/);
 assert.doesNotMatch(styles, /\.kpi-activities-table-wrap\s*\{[^}]*min-height:/,
   "empty and one-row KPI tables must not reserve an artificial vertical spacer");
@@ -314,12 +313,22 @@ assert.match(page, /\{!loading && !workloadError && options\.length === 0 && <sp
   "No matching workload is reserved for a successful empty response");
 assert.match(styles, /\.kpi-spreadsheet-page\s*\{[^}]*height:\s*100%[^}]*overflow:\s*hidden/u,
   "every KPI Activity tab reserves the fixed application footer");
-assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)/u,
-  "the footer-reserved viewport includes the KPI Overview tab");
+assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)[^{]*\{[^}]*align-content:\s*stretch[^}]*grid-template-rows:\s*max-content max-content minmax\(0,\s*1fr\)/u,
+  "the footer-reserved viewport gives KPI Activities its remaining height");
 assert.match(page, /activeTab === "Overview" \? <div class="kpi-overview-scroll-area">/u,
   "KPI Overview owns a dedicated scroll surface inside the fixed-footer workspace");
-assert.match(styles, /\.kpi-overview-scroll-area\s*\{[^}]*flex:\s*1[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/u,
-  "KPI Overview content scrolls without being clipped by the fixed footer");
+assert.match(styles, /\.kpi-overview-scroll-area\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)[^}]*grid-template-rows:\s*max-content repeat\(2,\s*minmax\(0,\s*1fr\)\)[^}]*overflow:\s*hidden/u,
+  "KPI Overview preserves the full-width vertical table stack inside the footer-reserved workspace");
+assert.match(styles, /\.kpi-overview-filtered-activities\s*\{[^}]*display:\s*flex[^}]*min-height:\s*0/u,
+  "the filtered Overview table owns a bounded data workspace");
+assert.match(styles, /\.kpi-overview-filtered-activities__table-wrap\s*\{[^}]*flex:\s*1[^}]*min-height:\s*0[^}]*overflow:\s*auto/u,
+  "only the filtered Overview table data surface scrolls");
+assert.match(styles, /\.kpi-overview-portfolio\s*\{[^}]*display:\s*flex[^}]*min-height:\s*0/u,
+  "the portfolio Overview table owns a bounded data workspace");
+assert.match(styles, /\.kpi-overview-portfolio__table-wrap\s*\{[^}]*flex:\s*1[^}]*min-height:\s*0[^}]*overflow:\s*auto/u,
+  "only the portfolio Overview table data surface scrolls");
+assert.match(styles, /\.kpi-overview-portfolio th[^}]*position:\s*sticky[^}]*top:\s*0/u,
+  "the portfolio table header remains fixed while its data scrolls");
 assert.match(styles, /\.kpi-spreadsheet-page \.kpi-activities-table-wrap[^}]*overflow:\s*auto/u,
   "each editable KPI Activity table scrolls inside the reserved workspace");
 assert.match(styles, /\.attainment-page[^}]*height:\s*100%[^}]*overflow-y:\s*auto/u,

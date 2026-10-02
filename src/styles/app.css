@@ -5427,6 +5427,10 @@ h4.weekly-activity-section-label--next-week,
   min-height: 0;
   overflow: hidden;
 }
+.kpi-content:has(.kpi-spreadsheet-page) {
+  align-content: stretch;
+  grid-template-rows: max-content max-content minmax(0, 1fr);
+}
 .kpi-spreadsheet-page {
   display: flex;
   flex-direction: column;
@@ -5435,11 +5439,70 @@ h4.weekly-activity-section-label--next-week,
   overflow: hidden;
 }
 .kpi-overview-scroll-area {
+  display: grid;
   flex: 1 1 auto;
+  gap: .5rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: max-content repeat(2, minmax(0, 1fr));
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.kpi-overview-metrics { flex: 0 0 auto; }
+.kpi-overview-metrics > button { gap: .15rem; padding: .45rem; }
+.kpi-overview-metrics > button span { font-size: .72rem; }
+.kpi-overview-metrics > button strong { font-size: 1.2rem; line-height: 1.1; }
+.kpi-overview-metrics > button small {
+  font-size: .66rem;
+  line-height: 1.1;
+  min-height: 1.1em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kpi-overview-filtered-activities__heading { margin-bottom: .2rem; }
+.kpi-overview-filtered-activities__heading h3,
+.kpi-overview-portfolio__heading h3 { font-size: .85rem; margin: 0 0 .2rem; }
+.kpi-overview-filtered-activities__heading > button { padding: .2rem .45rem; }
+.kpi-overview-filtered-activities th,
+.kpi-overview-filtered-activities td,
+.kpi-overview-portfolio th,
+.kpi-overview-portfolio td { padding-block: .35rem; }
+.kpi-overview-metrics + .kpi-overview-portfolio { grid-row: 2 / -1; }
+.kpi-overview-filtered-activities {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  margin-top: 0;
+  min-height: 0;
+}
+.kpi-overview-filtered-activities__table-wrap {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+.kpi-overview-portfolio {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  margin-top: 0;
+  min-height: 0;
+}
+.kpi-overview-portfolio__table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.kpi-overview-portfolio th {
+  background: var(--kap-grid-header-bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .kpi-spreadsheet-page .kpi-activities-table-wrap {
   block-size: 0;
@@ -5460,6 +5523,35 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 720px) {
   .forecast-actual-matrix-shell { --forecast-rep-width: 6.5rem; --forecast-month-width: 5.25rem; --forecast-difference-width: 6rem; --forecast-status-width: 6.25rem; }
   .forecast-actual-matrix-shell > .consumption-scroll-controls { flex-direction: row; left: .2rem; right: .2rem; top: 50%; }
+  .kpi-overview-scroll-area { gap: .35rem; }
+  .kpi-overview-metrics {
+    gap: .2rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .kpi-overview-metrics > button { gap: 0; padding: .2rem; }
+  .kpi-overview-metrics > button span { font-size: .55rem; line-height: 1; }
+  .kpi-overview-metrics > button strong { font-size: .95rem; line-height: 1; }
+  .kpi-overview-metrics > button small {
+    block-size: 1px;
+    clip-path: inset(50%);
+    inline-size: 1px;
+    min-height: 0;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+  }
+  .kpi-overview-filtered-activities header { margin-bottom: .15rem; }
+  .kpi-overview-filtered-activities header > div { gap: .15rem; }
+  .kpi-overview-filtered-activities h3,
+  .kpi-overview-portfolio h3 { font-size: .75rem; line-height: 1; margin: 0 0 .15rem; }
+  .kpi-overview-filtered-activities header span { font-size: .6rem; }
+  .kpi-overview-filter-clear { font-size: .62rem; min-height: 1.4rem; padding: .1rem .3rem; }
+  .kpi-overview-filtered-activities table,
+  .kpi-overview-portfolio table { font-size: .68rem; line-height: 1.1; }
+  .kpi-overview-filtered-activities th,
+  .kpi-overview-filtered-activities td,
+  .kpi-overview-portfolio th,
+  .kpi-overview-portfolio td { padding-block: .2rem; }
   .kpi-content:has(.kpi-spreadsheet-page),
   .kpi-content:has(.attainment-page) { height: calc(100dvh - 4.5rem - var(--kpi-footer-reserved-height) - 1.5rem); }
 }
