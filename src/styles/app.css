@@ -4446,6 +4446,8 @@ h4.weekly-activity-section-label--next-week,
 .account-overview__exceptions { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-overview__exceptions button { align-items: center; background: #fff; border: 1px solid var(--amo-line); border-radius: .4rem; color: inherit; cursor: pointer; display: flex; font: inherit; gap: .7rem; min-height: 4.3rem; padding: .7rem .85rem; text-align: left; }
 .account-overview__exceptions button:hover { border-color: #b7afa7; box-shadow: 0 2px 8px rgba(33, 31, 29, .08); }
+.account-overview__exceptions button.is-selected { background: #f2f7fc; border-color: var(--amo-actual); box-shadow: 0 0 0 2px rgba(20, 115, 230, .16); }
+.account-overview__exceptions button.is-selected:hover { border-color: var(--amo-actual); box-shadow: 0 0 0 2px rgba(20, 115, 230, .22); }
 .account-overview__exceptions strong,
 .account-overview__exceptions small { display: block; }
 .account-overview__exceptions strong { font-size: .96rem; font-weight: 750; line-height: 1.25; }

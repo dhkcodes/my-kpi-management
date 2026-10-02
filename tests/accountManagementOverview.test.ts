@@ -4,6 +4,7 @@ import * as path from "path";
 import {
   buildAccountManagementOverview,
   fiscalPeriodForDate,
+  toggleOverviewExceptionFilter,
   quarterEndDate,
 } from "../src/data/accountManagementOverview";
 import { AccountsWorkloadsHierarchy } from "../src/data/accountsWorkloadsApi";
@@ -111,6 +112,14 @@ assert.strictEqual(target.pipeline.newArr.missing, 1);
 assert.strictEqual(target.pipeline.newArr.enteredAcr, 8000);
 assert.strictEqual(target.pipeline.acr.amount, 18000,
   "Target Actions ACR must include OPEN New, Expansion, and Renewal opportunities");
+assert.deepStrictEqual(overview.targetFor("TARGET_NOT_SET", "", new Date("2026-09-27T00:00:00Z")).deals.map((item) => item.deal.id), [222],
+  "Target not set card must filter to the same Opportunities counted by the card");
+assert.strictEqual(toggleOverviewExceptionFilter(null, "OVERDUE"), "OVERDUE",
+  "clicking an unselected exception card must select it");
+assert.strictEqual(toggleOverviewExceptionFilter("OVERDUE", "OVERDUE"), null,
+  "clicking the selected exception card again must clear it");
+assert.strictEqual(toggleOverviewExceptionFilter("OVERDUE", "TARGET_NOT_SET"), "TARGET_NOT_SET",
+  "clicking a different exception card must switch the selection");
 
 const searched = overview.targetFor("PRIORITY", "beta", new Date("2026-09-27T00:00:00Z"));
 assert.strictEqual(searched.deals.length, 2);
@@ -203,6 +212,13 @@ assert.match(pageSource, /<b>\{overview\.exceptions\.closeDateMissing\}<\/b> Clo
 assert.match(pageSource, /overview\?\.closeDateMissingFor/, "Close date missing click must use the same scoped result set as its count");
 assert.match(pageSource, /actualOpportunityList/, "Close date missing click must target the filtered Opportunity list");
 assert.match(pageSource, /Close date missing Opportunities/, "the filtered list must clearly identify the active exception filter");
+assert.match(pageSource, /selectedException === "OVERDUE"/, "Overdue card must expose its selected state");
+assert.match(pageSource, /selectedException === "TARGET_NOT_SET"/, "Target not set card must expose its selected state");
+assert.match(pageSource, /selectedException === "CLOSE_DATE_MISSING"/, "Close date missing card must expose its selected state");
+assert.match(pageSource, /setSelectedException\(null\).*Clear filter/s,
+  "Clear filter must clear the exception card selection");
+assert.match(appCss, /\.account-overview__exceptions button\.is-selected\s*\{[^}]*background:[^;}]+;[^}]*border-color:[^;}]+;/s,
+  "selected exception cards must have a distinct background and border");
 assert.match(appCss, /\.account-overview__exceptions strong\s*\{[^}]*white-space:\s*nowrap/s, "exception labels must remain on one line");
 assert.match(appCss, /\.account-overview__exceptions strong b\s*\{[^}]*font-size:\s*clamp\(1\.3rem/s, "exception counts must remain larger than their labels");
 assert.doesNotMatch(pageSource, /WON deals|Open Deal action list|Account → Workload → Deal|No OPEN deals|open deals/, "visible Overview terminology must use Opportunity instead of Deal");
