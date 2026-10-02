@@ -7,7 +7,8 @@ import {
 
 export type ActualQuarter = 1 | 2 | 3 | 4;
 export type ActualQuarterFilter = ActualQuarter | "ALL";
-export type TargetView = "PRIORITY" | "OVERDUE" | "THIS_QUARTER" | "NEXT_QUARTER" | "CHOOSE_PERIOD";
+export type TargetView = "PRIORITY" | "OVERDUE" | "TARGET_NOT_SET" | "THIS_QUARTER" | "NEXT_QUARTER" | "CHOOSE_PERIOD";
+export type OverviewExceptionFilter = "OVERDUE" | "TARGET_NOT_SET" | "CLOSE_DATE_MISSING";
 export type RevenueKind = "NEW" | "EXPANSION" | "RENEWAL";
 export type OverviewAccountFilter = Readonly<{ accountId?: number; accountName?: string }>;
 
@@ -33,6 +34,11 @@ export type QuarterMetric = Readonly<{
   renewalAcr: number;
   wonDeals: number;
 }>;
+
+export const toggleOverviewExceptionFilter = (
+  current: OverviewExceptionFilter | null,
+  requested: OverviewExceptionFilter,
+): OverviewExceptionFilter | null => current === requested ? null : requested;
 
 const revenueKind = (value: string): RevenueKind | null => {
   const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -194,6 +200,7 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
         const status = targetStatus(item, at);
         if (view === "PRIORITY") return ["OVERDUE", "THIS_QUARTER", "NEXT_QUARTER", "TARGET_NOT_SET"].includes(status);
         if (view === "OVERDUE") return status === "OVERDUE";
+        if (view === "TARGET_NOT_SET") return status === "TARGET_NOT_SET";
         if (view === "THIS_QUARTER") return sameTargetPeriod(item, current);
         if (view === "NEXT_QUARTER") return sameTargetPeriod(item, next);
         return `${item.deal.targetFiscalYear ?? ""} Q${item.deal.targetQuarter ?? ""}` === chosenPeriod;

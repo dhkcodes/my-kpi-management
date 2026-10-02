@@ -7,12 +7,14 @@ import {
 } from "../../data/accountsWorkloadsApi";
 import {
   ActualQuarterFilter,
+  OverviewExceptionFilter,
   OverviewDeal,
   TargetView,
   buildAccountManagementOverview,
   currentFiscalPeriod,
   quarterEndDate,
   targetStatus,
+  toggleOverviewExceptionFilter,
 } from "../../data/accountManagementOverview";
 import { AppMessageBanner } from "./AppMessageBanner";
 import "ojs/ojprogress-circle";
@@ -94,7 +96,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [actualFy, setActualFy] = useState(current.fiscalYear);
   const [actualQuarter, setActualQuarter] = useState<ActualQuarterFilter>("ALL");
   const [actualMeasure, setActualMeasure] = useState<RevenueMeasure>("ALL");
-  const [actualListFilter, setActualListFilter] = useState<"CLOSE_DATE_MISSING" | null>(null);
+  const [selectedException, setSelectedException] = useState<OverviewExceptionFilter | null>(null);
   const [targetView, setTargetView] = useState<TargetView>("PRIORITY");
   const [targetPeriod, setTargetPeriod] = useState(`${current.fiscalYear} Q${current.quarter}`);
   const [expanded, setExpanded] = useState(new Set<string>());
@@ -130,7 +132,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const actual = overview?.actualFor(actualFy, actualQuarter, "", selectedAccountFilter);
   const actualYear = overview?.actualFor(actualFy, "ALL", "", selectedAccountFilter);
   const target = overview?.targetFor(targetView, "", new Date(), targetPeriod, selectedAccountFilter);
-  const actualListDeals = actualListFilter === "CLOSE_DATE_MISSING"
+  const actualListDeals = selectedException === "CLOSE_DATE_MISSING"
     ? overview?.closeDateMissingFor("", selectedAccountFilter) ?? []
     : actual?.deals ?? [];
   const grouped = groupActual(actualListDeals);
@@ -159,6 +161,20 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
+
+  const toggleException = (requested: OverviewExceptionFilter) => {
+    const next = toggleOverviewExceptionFilter(selectedException, requested);
+    setSelectedException(next);
+    if (next === "OVERDUE" || next === "TARGET_NOT_SET") {
+      setTargetView(next);
+      document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    setTargetView("PRIORITY");
+    if (next === "CLOSE_DATE_MISSING") {
+      document.getElementById("actualOpportunityList")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const showLatestUpdate = (element: HTMLElement, text: string) => {
     const bounds = element.getBoundingClientRect();
@@ -192,9 +208,9 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
           </div>
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
-            <button type="button" onClick={() => { setTargetView("OVERDUE"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Target quarter ended</small></span></button>
-            <button type="button" onClick={() => { setTargetView("PRIORITY"); document.getElementById("targetActions")?.scrollIntoView({ behavior: "smooth" }); }}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> Target not set</strong><small>Open Opportunities without FY/Q</small></span></button>
-            <button type="button" aria-pressed={actualListFilter === "CLOSE_DATE_MISSING"} onClick={() => { setActualListFilter("CLOSE_DATE_MISSING"); document.getElementById("actualOpportunityList")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
+            <button type="button" class={selectedException === "OVERDUE" ? "is-selected" : ""} aria-pressed={selectedException === "OVERDUE"} onClick={() => toggleException("OVERDUE")}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Target quarter ended</small></span></button>
+            <button type="button" class={selectedException === "TARGET_NOT_SET" ? "is-selected" : ""} aria-pressed={selectedException === "TARGET_NOT_SET"} onClick={() => toggleException("TARGET_NOT_SET")}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> Target not set</strong><small>Open Opportunities without FY/Q</small></span></button>
+            <button type="button" class={selectedException === "CLOSE_DATE_MISSING" ? "is-selected" : ""} aria-pressed={selectedException === "CLOSE_DATE_MISSING"} onClick={() => toggleException("CLOSE_DATE_MISSING")}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
           </section>
         </div>
 
@@ -216,14 +232,14 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
             </article>
 
             <article id="actualOpportunityList" class="account-overview__panel account-overview__hierarchy">
-              <div class="account-overview__panel-heading"><div><h3>{actualListFilter === "CLOSE_DATE_MISSING" ? "Close date missing Opportunities" : "Account → Workload → Opportunity"}</h3></div>{actualListFilter && <button type="button" onClick={() => setActualListFilter(null)}>Clear filter</button>}</div>
+              <div class="account-overview__panel-heading"><div><h3>{selectedException === "CLOSE_DATE_MISSING" ? "Close date missing Opportunities" : "Account → Workload → Opportunity"}</h3></div>{selectedException === "CLOSE_DATE_MISSING" && <button type="button" onClick={() => setSelectedException(null)}>Clear filter</button>}</div>
               <div class="account-overview__hierarchy-head"><span>Name</span><span>NEW<small>ARR</small></span><span>EXPANSION<small>ARR</small></span><span>RENEWAL<small>ARR</small></span><span>ACR</span></div>
-              <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">{actualListFilter === "CLOSE_DATE_MISSING" ? "No Close date missing Opportunities in this scope." : "No WON Opportunities in this scope."}</p> : grouped.map(({ account, workloads }) => {
+              <div class="account-overview__hierarchy-scroll">{grouped.length === 0 ? <p class="account-overview__empty">{selectedException === "CLOSE_DATE_MISSING" ? "No Close date missing Opportunities in this scope." : "No WON Opportunities in this scope."}</p> : grouped.map(({ account, workloads }) => {
                 const accountDeals = [...workloads.values()].flatMap((item) => item.deals);
                 const accountKey = `account-${account.id}`;
-                const accountExpanded = actualListFilter !== null || expanded.has(accountKey);
+                const accountExpanded = selectedException === "CLOSE_DATE_MISSING" || expanded.has(accountKey);
                 return <div class="account-overview__tree-group"><button type="button" class="account-overview__tree-row is-account" onClick={() => toggle(accountKey)} aria-expanded={accountExpanded}><span><i>{accountExpanded ? "−" : "+"}</i>{account.name}{account.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(accountDeals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(accountDeals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(accountDeals))}</b></button>
-                  {accountExpanded && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; const workloadExpanded = actualListFilter !== null || expanded.has(workloadKey); return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={workloadExpanded}><span><i>{workloadExpanded ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(deals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(deals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(deals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(deals))}</b></button>
+                  {accountExpanded && [...workloads.values()].map(({ workload, deals }) => { const workloadKey = `workload-${workload.id}`; const workloadExpanded = selectedException === "CLOSE_DATE_MISSING" || expanded.has(workloadKey); return <div><button type="button" class="account-overview__tree-row is-workload" onClick={() => toggle(workloadKey)} aria-expanded={workloadExpanded}><span><i>{workloadExpanded ? "−" : "+"}</i>{workload.name}{workload.archived && <em>Archived</em>}</span><b>{fmtUsd(sumArrByKind(deals, "NEW"))}</b><b>{fmtUsd(sumArrByKind(deals, "EXPANSION"))}</b><b>{fmtUsd(sumArrByKind(deals, "RENEWAL"))}</b><b>{fmtUsd(sumAcr(deals))}</b></button>
                     {workloadExpanded && deals.map((item) => <div class="account-overview__deal-row"><span><strong>{item.deal.name}</strong><small>{item.deal.revenueType} · {item.deal.actualCloseDate ? `Close ${item.deal.actualCloseDate}` : "Close date missing"} · {displayTarget(item)} · {item.deal.opportunityNo ?? "No opportunity"}</small></span><b>{item.deal.revenueType.toUpperCase() === "NEW" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "EXPANSION" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.arrUsd === null ? "—" : fmtUsd(item.deal.arrUsd) : "—"}</b><b>{item.deal.acrUsd === null ? "—" : fmtUsd(item.deal.acrUsd)}</b></div>)}</div>; })}
                 </div>;
               })}</div>
@@ -235,7 +251,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           <div class="account-overview__section-heading"><div class="account-overview__title-lockup"><span class="account-overview__title-mark"></span><div><h2>Target Actions <small>• Target FY / Quarter</small></h2></div></div>
             <div class="account-overview__target-tabs" role="tablist" aria-label="Target action view">{([
               ["PRIORITY", "Priority"], ["OVERDUE", "Overdue"], ["THIS_QUARTER", "This quarter"], ["NEXT_QUARTER", "Next quarter"], ["CHOOSE_PERIOD", "Choose period"]
-            ] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={targetView === value} class={targetView === value ? "is-selected" : ""} onClick={() => setTargetView(value)}><strong>{label}</strong>{value === "THIS_QUARTER" && <small>{current.fiscalYear} · Q{current.quarter}</small>}{value === "NEXT_QUARTER" && <small>Upcoming</small>}{value === "CHOOSE_PERIOD" && <small>FY / Q</small>}</button>)}</div>
+            ] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={targetView === value} class={targetView === value ? "is-selected" : ""} onClick={() => { setTargetView(value); setSelectedException(null); }}><strong>{label}</strong>{value === "THIS_QUARTER" && <small>{current.fiscalYear} · Q{current.quarter}</small>}{value === "NEXT_QUARTER" && <small>Upcoming</small>}{value === "CHOOSE_PERIOD" && <small>FY / Q</small>}</button>)}</div>
           </div>
           {targetView === "CHOOSE_PERIOD" && <label class="account-overview__target-period">Target period<select value={targetPeriod} onChange={(event) => setTargetPeriod((event.currentTarget as HTMLSelectElement).value)}>{(targetPeriods.length ? targetPeriods : [targetPeriod]).map((period) => <option value={period}>{period}</option>)}</select></label>}
 
