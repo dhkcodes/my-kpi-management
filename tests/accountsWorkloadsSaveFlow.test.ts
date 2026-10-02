@@ -78,6 +78,53 @@ async function run(): Promise<void> {
     const calls: string[] = [];
     const snapshots: number[] = [];
     const unsubscribe = subscribeAppBusy((count) => snapshots.push(count));
+    const saved = await runAccountsWorkloadsSaveFlow({
+      saveAwDrafts: apiStep("aw-save", calls, true),
+      saveDealDrafts: apiStep("deal-save", calls, false),
+      reload: apiStep("reload", calls, undefined),
+    });
+    unsubscribe();
+    assert.equal(saved, false);
+    assert.deepEqual(calls, ["aw-save", "deal-save"],
+      "a rejected Opportunity save is not retried and does not reload");
+    assert.deepEqual(snapshots, [1, 2, 1, 2, 1, 0]);
+    assert.equal(getAppBusyCount(), 0, "Opportunity save failure releases the outer busy scope");
+  }
+
+  {
+    const calls: string[] = [];
+    const snapshots: number[] = [];
+    const unsubscribe = subscribeAppBusy((count) => snapshots.push(count));
+    await assert.rejects(runAccountsWorkloadsSaveFlow({
+      saveAwDrafts: apiStep("aw-save", calls, true, new Error("AW save failed")),
+      saveDealDrafts: apiStep("deal-save", calls, true),
+      reload: apiStep("reload", calls, undefined),
+    }), /AW save failed/u);
+    unsubscribe();
+    assert.deepEqual(calls, ["aw-save"]);
+    assert.deepEqual(snapshots, [1, 2, 1, 0]);
+    assert.equal(getAppBusyCount(), 0, "thrown AW save failure releases the outer busy scope");
+  }
+
+  {
+    const calls: string[] = [];
+    const snapshots: number[] = [];
+    const unsubscribe = subscribeAppBusy((count) => snapshots.push(count));
+    await assert.rejects(runAccountsWorkloadsSaveFlow({
+      saveAwDrafts: apiStep("aw-save", calls, true),
+      saveDealDrafts: apiStep("deal-save", calls, true, new Error("Opportunity save failed")),
+      reload: apiStep("reload", calls, undefined),
+    }), /Opportunity save failed/u);
+    unsubscribe();
+    assert.deepEqual(calls, ["aw-save", "deal-save"]);
+    assert.deepEqual(snapshots, [1, 2, 1, 2, 1, 0]);
+    assert.equal(getAppBusyCount(), 0, "thrown Opportunity save failure releases the outer busy scope");
+  }
+
+  {
+    const calls: string[] = [];
+    const snapshots: number[] = [];
+    const unsubscribe = subscribeAppBusy((count) => snapshots.push(count));
     await assert.rejects(runAccountsWorkloadsSaveFlow({
       saveAwDrafts: apiStep("aw-save", calls, true),
       saveDealDrafts: apiStep("deal-save", calls, true),
