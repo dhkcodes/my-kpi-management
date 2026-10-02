@@ -510,10 +510,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       )}
 
       {loading ? (
-        <div class="weekly-activity-state" role="status" aria-busy="true">
-          <oj-progress-circle value={-1} size="md" aria-label="Loading Weekly Activities"></oj-progress-circle>
-          <span>Loading Weekly Activities…</span>
-        </div>
+        <div class="weekly-activity-list" aria-hidden="true"></div>
       ) : items.length === 0 ? (
         <div class="weekly-activity-state" role="status">No weekly activities match the selected range and content.</div>
       ) : (

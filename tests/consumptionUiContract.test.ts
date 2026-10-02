@@ -20,8 +20,10 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*const mtdPeriodLabel = analysis\?\.mtdSummary\?\.periodKey[\s\S]*MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
-  "Analysis shows the actual MTD period and authoritative UTC-basis date beside the switch");
+assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*As of \{mtdAppliedDate\}[\s\S]*role="switch"/u,
+  "Analysis shows the authoritative UTC-basis As of date immediately before the MTD switch");
+assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
+  "Analysis no longer displays the redundant MTD period prefix");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
   "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
@@ -60,9 +62,9 @@ assert.match(recordsPage, /error\.status === 400 \|\| error\.status === 422[\s\S
   "Consumption Records separates invalid input from authorization failures");
 assert.match(recordsPage, /error\.status >= 500[\s\S]*서버 오류로 저장하지 못했습니다/,
   "Consumption Records distinguishes server failures from permission and input failures");
-assert.match(spreadsheetPage, /const pageHeader = <header class="kpi-spreadsheet-page__header"[\s\S]*if \(pageLoading\)[\s\S]*\{pageHeader\}[\s\S]*kpi-page-loading__body[\s\S]*Loading KPI Activities data/, "KPI Activities loading retains the normal page header before the centered progress body");
-assert.match(attainmentPage, /accounts-workloads-page accounts-workloads-loading[\s\S]*size="md"[\s\S]*Loading Consumption Attainment/, "Attainment loading matches Accounts & Workloads");
-assert.match(recordsPage, /dataMode === "loading" \|\| blockingRecordsLoading[\s\S]*accounts-workloads-page accounts-workloads-loading[\s\S]*Loading Consumption Records/, "Records loading matches Accounts & Workloads");
+assert.doesNotMatch(spreadsheetPage, /kpi-page-loading__body|Loading KPI Activities data/u, "KPI Activities defers loading UI to the shared app overlay");
+assert.doesNotMatch(attainmentPage, /accounts-workloads-loading|Loading Consumption Attainment/u, "Attainment defers loading UI to the shared app overlay");
+assert.doesNotMatch(recordsPage, /accounts-workloads-loading|Loading Consumption Records/u, "Records defers loading UI to the shared app overlay");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
 assert.match(homeConsumption, /확정 업로드 필요/, "Home guides users when a previous MTD remains unresolved");
 assert.match(homeConsumption, />MTD \(잠정\)</, "Home labels current-month MTD as provisional rather than Actual");
@@ -166,13 +168,7 @@ assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]
 assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
 assert.match(insightsPage, /aria-busy=\{loading \? "true" : "false"\}/, "Analysis exposes refresh state without replacing its mounted page shell");
-assert.match(insightsPage, /const hasStaleFiscalYearResponse = analysisResponse !== null && analysisResponse\.fiscalYear !== fiscalYear/, "Analysis recognizes a previous-FY response before the next request effect runs");
-const analysisBlockingLoadingStart = insightsPage.indexOf("if (!analysis && (loading || hasStaleFiscalYearResponse))");
-const analysisBlockingLoadingEnd = insightsPage.indexOf("const messages:", analysisBlockingLoadingStart);
-const analysisBlockingLoadingBranch = insightsPage.slice(analysisBlockingLoadingStart, analysisBlockingLoadingEnd);
-assert.ok(analysisBlockingLoadingStart >= 0 && analysisBlockingLoadingEnd > analysisBlockingLoadingStart, "Analysis has an isolated initial/FY-transition loading branch");
-assert.match(analysisBlockingLoadingBranch, /class="accounts-workloads-page accounts-workloads-loading"[\s\S]*Loading Consumption Analysis\.\.\./, "Analysis blocking loading uses the Attainment loading presentation");
-assert.doesNotMatch(analysisBlockingLoadingBranch, /consumption-page__header|Consumption \/ Analysis|<h1>/, "Analysis title and breadcrumb stay hidden during initial and FY-transition loading");
+assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading|Loading Consumption Analysis/u, "Analysis uses the shared app overlay for initial and FY-transition loading");
 assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
@@ -392,8 +388,8 @@ assert.match(recordsPage, /activeRecordsQueryRef\.current = \{ key: requestKey, 
 assert.match(recordsPage, /mergeRefreshedControlsWithDrafts\(refreshedControls, savedControlTotalsRef\.current, draftControlTotalsRef\.current\)/,
   "Consumption clear refresh merges refreshed results without wiping unsaved Forecast controls");
 assert.match(recordsPage, /initialConsumptionRecordsBatchSize\(window\.innerHeight\)/, "the initial records request is sized to the viewport");
-assert.match(recordsPage, /type RecordsLoadingPhase = "idle" \| "initial" \| "query" \| "append"[\s\S]*blockingRecordsLoading = recordsLoadingPhase === "initial"/, "only initial records loading replaces the page shell");
-assert.match(recordsPage, /recordsLoadingPhase === "query"[\s\S]*consumption-results-refresh[\s\S]*Refreshing results/, "replacement queries retain the Records header and controls while the results region refreshes");
+assert.match(recordsPage, /type RecordsLoadingPhase = "idle" \| "initial" \| "query" \| "append"[\s\S]*blockingRecordsLoading = recordsLoadingPhase === "initial"/, "Records retains explicit loading phases while the shared overlay handles presentation");
+assert.doesNotMatch(recordsPage, /consumption-results-refresh|Refreshing results/u, "replacement queries retain the Records shell and use the shared overlay");
 assert.match(recordsPage, /if \(append && \(recordsLoadingRef\.current[\s\S]*generation !== recordsRequestGeneration\.current/, "new search or sort requests supersede in-flight replacements while stale results are ignored");
 assert.match(recordsPage, /const requestQuery(?:: RecordsQuery)? = append \? recordsQueryRef\.current[\s\S]*offset: append \? recordsNextOffset : 0/, "append requests retain the last applied filter snapshot instead of unsubmitted draft controls");
 const recordsFetchIndex = recordsPage.indexOf("const page = await fetchConsumptionRecords");
@@ -413,7 +409,7 @@ assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.curren
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");
-assert.match(recordsPage, /Loading Consumption Records…[\s\S]*Load More[\s\S]*All accounts loaded\./, "loading, manual fallback, and final-page states remain explicit");
+assert.match(recordsPage, /Load More[\s\S]*All accounts loaded\./, "manual fallback and final-page states remain explicit while loading uses the shared overlay");
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
@@ -495,7 +491,7 @@ assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
 assert.match(insightsPage, /contributionPercentText\(plan\.percentageExact\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidthChartCoordinate\(plan\.percentageExact\)\}%/, "Plan Contribution uses each exact Plan percentage and projects only the visual track width");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
-assert.match(recordsPage, /class="consumption-records-loading" role="status" aria-live="polite"[\s\S]*Loading Consumption Records/, "Records footer exposes a visible polite loading status");
+assert.doesNotMatch(recordsPage, /consumption-records-loading|Loading Consumption Records/u, "Records footer uses the shared app loading overlay instead of a local status");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
 assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Records uses the full Accounts & Workloads loader instead of flashing an initializing Apply control");
@@ -512,8 +508,8 @@ assert.match(styles, /\.kpi-side-nav,[\s\S]*\.kpi-side-nav\.is-open[^}]*height:\
 // Export follow-up: modern CSS colors must be handled inside the capture engine and progress is explicit.
 assert.match(insightsPage, /import html2canvasPro = require\("html2canvas-pro"\)/, "the export-only renderer supports modern CSS color() values without changing the live design");
 assert.match(insightsPage, /html2canvasModule\.default \?\? html2canvasModule\.html2canvas/, "the renderer is resolved from its AMD module shape");
-assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PNG 생성 중…/, "PNG export shows an immediate spinner and progress label");
-assert.match(insightsPage, /<oj-progress-circle[^>]*size="sm"[^>]*><\/oj-progress-circle>[\s\S]*PDF 생성 중…/, "PDF export shows an immediate spinner and progress label");
+assert.doesNotMatch(insightsPage, /PNG 생성 중|PDF 생성 중|oj-progress-circle/u, "exports use the shared app loading overlay instead of local progress UI");
+assert.match(insightsPage, /const finishBusy = beginAppBusy\(\)[\s\S]*finally[\s\S]*finishBusy\(\)/, "export loading always releases the shared busy counter");
 assert.match(insightsPage, /disabled=\{loading \|\| !!exporting\}/, "both export buttons reject duplicate clicks while either export is active");
 assert.match(insightsPage, /finally\s*\{[\s\S]*setExporting\(""\)/, "export controls recover after both success and failure");
 assert.match(styles, /\.consumption-insights-linked-trend h3\s*\{[^}]*font-size:\s*1rem[^}]*font-weight:\s*700/, "ACTUAL Trend matches the card-heading hierarchy rather than inheriting an oversized title");

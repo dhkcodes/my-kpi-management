@@ -1,5 +1,6 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { beginAppBusy } from "../../app/appBusy";
 import { FiscalYear } from "../../data/kpiMockData";
 import { formatMtdAppliedDate } from "../../data/mtdDate";
 import {
@@ -206,7 +207,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   // response with null here would also remove and recreate the header/filter
   // controls before the request completes.
   const analysis = analysisResponse?.fiscalYear === fiscalYear ? analysisResponse : null;
-  const hasStaleFiscalYearResponse = analysisResponse !== null && analysisResponse.fiscalYear !== fiscalYear;
 
   const filteredCandidates = useMemo(() => (analysis?.accountCandidates ?? [])
     .filter((candidate) => matchesCandidate(candidate, candidateSearch)), [analysis, candidateSearch]);
@@ -314,11 +314,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
-  const mtdPeriodLabel = analysis?.mtdSummary?.periodKey;
-  if (!analysis && (loading || hasStaleFiscalYearResponse)) return <section class="accounts-workloads-page accounts-workloads-loading" aria-busy="true" aria-label="Consumption Analysis loading">
-    <oj-progress-circle value={-1} size="md" aria-label="Consumption Analysis loading"></oj-progress-circle>
-    <p>Loading Consumption Analysis...</p>
-  </section>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
@@ -366,6 +361,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     if (!target || exporting) return;
     setExporting(format);
     setExportError("");
+    const finishBusy = beginAppBusy();
     try {
       await document.fonts?.ready;
       const html2canvasModule = html2canvasPro as unknown as {
@@ -407,6 +403,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     } catch (reason) {
       setExportError(reason instanceof Error ? reason.message : "Export failed.");
     } finally {
+      finishBusy();
       setExporting("");
     }
   };
@@ -416,8 +413,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
       <div class="consumption-insights-header-actions">
         <div class="consumption-analysis-mtd-control">
-          {mtdPeriodLabel && mtdAppliedDate
-            ? <small class="consumption-mtd-applied-date">MTD period {mtdPeriodLabel} · as of {mtdAppliedDate}</small>
+          {includeMtd && mtdAppliedDate
+            ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small>
             : null}
           <span class="kpi-section-label">MTD</span>
           <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd} class="consumption-mtd-switch"
@@ -430,10 +427,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           <span>Export</span>
           <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
             <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>
-              {exporting === "png" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PNG 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>}
+              <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>
             </button>
             <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}>
-              {exporting === "pdf" ? <><oj-progress-circle value={-1} size="sm"></oj-progress-circle><span>PDF 생성 중…</span></> : <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>}
+              <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>
             </button>
             {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
           </div>
@@ -489,7 +486,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </header>
 
     <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
-    {loading && <div class="consumption-insights-refresh" role="status"><oj-progress-circle value={-1} size="sm"></oj-progress-circle> 불러오는 중</div>}
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>

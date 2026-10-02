@@ -1133,15 +1133,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     <h2 id="kpiSpreadsheetTitle">{activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}</h2></div>
   </header>;
 
-  if (pageLoading) return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab}
-    role="status" aria-busy="true" aria-describedby="kpiActivitiesLoadingText">
-    {pageHeader}
-    <div class="kpi-page-loading__body">
-      <oj-progress-circle value={-1} size="md" aria-label="Loading KPI Activities"></oj-progress-circle>
-      <span id="kpiActivitiesLoadingText">Loading KPI Activities data…</span>
-    </div>
-  </section>;
-
   return <section class="kpi-spreadsheet-page" aria-labelledby="kpiSpreadsheetTitle" data-kpi-tab={activeTab} data-kpi-edit-phase={editState.phase}>
     {pageHeader}
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
@@ -1299,7 +1290,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     </Fragment>}
 
     <oj-dialog ref={savingDialogRef} class="kpi-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
-      <div class="kpi-saving-content" role="status" aria-live="polite"><oj-progress-circle value={-1} size="sm" aria-label="Saving KPI activities"></oj-progress-circle><span>Saving KPI activities…</span></div>
+      <div class="kpi-saving-content" aria-hidden="true"></div>
     </oj-dialog>
     <oj-dialog ref={cancelDialogRef} class="kpi-cancel-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" modality="modal" cancelBehavior="icon"
       onojOpen={() => cancelKeepButtonRef.current?.focus()}>
