@@ -8,7 +8,6 @@ import "ojs/ojdatetimepicker";
 import "ojs/ojdialog";
 import "ojs/ojbutton";
 import "ojs/ojpopup";
-import "ojs/ojprogress-circle";
 
 import { FiscalYear, Quarter, WorkloadStage } from "../../data/kpiExcelParser";
 import {

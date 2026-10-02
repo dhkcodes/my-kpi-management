@@ -244,8 +244,10 @@ assert.match(styles, /accounts-workloads-oppty-grid th:nth-child\(5\)[\s\S]*posi
   "Target Quarter scrolls normally while only opportunity identity columns remain sticky");
 assert.match(page, /class="accounts-workloads-fx__button"[\s\S]*Exchange Rate \(USD to KRW\)[\s\S]*accounts-workloads-fx-popover[\s\S]*Apply[\s\S]*Cancel/,
   "the exchange-rate button retains its Apply and Cancel popover behavior");
-assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"[\s\S]*\{loading \? \(/,
-  "account count and the compact exchange-rate control share one summary row above the table state");
+assert.match(page, /class="accounts-workloads-table-summary"[\s\S]*class="consumption-table-plan-count">\{hierarchy\.accounts\.length\} accounts[\s\S]*class="accounts-workloads-fx"/,
+  "account count and the compact exchange-rate control remain mounted together while hierarchy data loads");
+assert.match(page, /class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy=\{loading \? "true" : "false"\}/,
+  "the mounted Account and Workload grid exposes loading state without replacing the page DOM");
 assert.match(page, /class="consumption-record-search accounts-workloads-search"[\s\S]*type="search"[\s\S]*class="consumption-record-search__submit"[\s\S]*oj-ux-ico-search[\s\S]*<\/label>/,
   "AW uses the same integrated input-and-icon search control as Consumption Records");
 assert.doesNotMatch(page, /class="consumption-range-apply"[\s\S]*oj-ux-ico-search/,

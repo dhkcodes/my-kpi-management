@@ -42,6 +42,7 @@ assert.match(page, /statusTooltip/u, "short table labels keep their full meaning
 assert.match(page, /forecast-actual-info-trigger/u, "each summary card exposes a keyboard and touch reachable explanation");
 assert.match(page, /forecast-actual-card-highlight/u, "important numbers in summary detail text are highlighted");
 assert.match(page, /forecast-actual-status-cell/u, "monthly status badges have a dedicated centered cell");
+assert.match(page, /forecast-actual-status[^>]*data-tooltip=[^>]*aria-label=[^>]*tabIndex=\{0\}/u, "status details are reachable by hover, keyboard focus, and touch focus");
 
 assert.match(page, /countForecastActualProblemAccounts/u);
 assert.match(page, /FINAL_SHORTFALL/u);

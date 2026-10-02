@@ -22,10 +22,11 @@ assert.doesNotMatch(page, /ojdatagrid|RowDataGridProvider|MutableArrayDataProvid
   "KPI Activities must not retain JET Data Grid or viewport lifecycle code");
 assert.match(page, /import "ojs\/ojdatetimepicker"/);
 assert.match(page, /import "ojs\/ojdialog"/);
-assert.match(page, /import "ojs\/ojprogress-circle"/);
+assert.doesNotMatch(page, /import "ojs\/ojprogress-circle"/, "KPI Activities no longer loads a page-local progress component");
 assert.match(page, /const \[pageLoading, setPageLoading\] = useState\(true\)/, "KPI Activities owns an explicit initial loading state");
 assert.match(page, /setPageLoading\(true\)[\s\S]*Promise\.all\([\s\S]*finally\([\s\S]*setPageLoading\(false\)/, "KPI Activities loading follows its authoritative API request lifecycle");
-assert.match(page, /pageLoading[\s\S]*aria-label="Loading KPI Activities"[\s\S]*Loading KPI Activities data/, "KPI Activities mirrors the Accounts & Workloads indeterminate loading view");
+assert.doesNotMatch(page, /aria-label="Loading KPI Activities"[\s\S]*Loading KPI Activities data/, "KPI Activities keeps its page DOM mounted and delegates visible loading feedback to the shared overlay");
+assert.match(app, /<AppBusyOverlay \/>/, "the application root owns the shared loading overlay");
 assert.match(page, /<table[^>]*class="kpi-activities-table"/);
 assert.match(page, /<tr key=\{`\$\{tableScopeKey\}:\$\{row\.id\}`\} data-kpi-row-id=\{row\.id\}/);
 assert.match(page, /<td key=\{field\.key\} class=\{classes\} data-kpi-grid-row=\{row\.id\} data-kpi-grid-field=\{field\.key\}/);
@@ -97,7 +98,7 @@ assert.match(styles, /tr\.kpi-manage-time-reflected-row td[^}]*background:\s*var
 assert.match(page, /setDrafts\(\[\]\)/);
 
 assert.match(page, /class="kpi-saving-dialog"/);
-assert.match(page, /<oj-progress-circle[^>]*Saving KPI activities/);
+assert.match(page, /<div class="kpi-saving-content" aria-hidden="true"><\/div>/, "save and delete retain the existing modal lifecycle while visible progress is owned by the shared overlay");
 assert.match(page, /cancelBehavior="none"/);
 assert.match(page, /disabled=\{saving/);
 assert.match(page, /Save changes/);

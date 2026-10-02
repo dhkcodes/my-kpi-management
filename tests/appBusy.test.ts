@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beginAppBusy, getAppBusyCount, subscribeAppBusy } from "../src/app/appBusy";
 import { apiFetch } from "../src/auth/apiFetch";
 
@@ -23,6 +25,13 @@ async function run(): Promise<void> {
   };
   await assert.rejects(apiFetch("/test", undefined, failedFetch), /network failure/u);
   assert.equal(getAppBusyCount(), 0, "a rejected API request releases the shared loading state in finally");
+
+  const busySource = readFileSync(join(process.cwd(), "src/app/appBusy.ts"), "utf8");
+  const overlaySource = readFileSync(join(process.cwd(), "src/components/AppBusyOverlay.tsx"), "utf8");
+  assert.match(busySource, /addEventListener\(type, blockInteractionWhileBusy, true\)/, "busy starts install a synchronous capture-phase interaction guard");
+  assert.match(busySource, /removeEventListener\(type, blockInteractionWhileBusy, true\)/, "the interaction guard is removed when the final busy operation finishes");
+  assert.match(overlaySource, /element\.inert = true/, "background application content becomes inert while processing");
+  assert.match(overlaySource, /role="dialog" aria-modal="true"/, "the blocking overlay exposes modal semantics");
 
   console.log("shared app busy state tests passed");
 }
