@@ -51,6 +51,7 @@ import {
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
+import { runAccountsWorkloadsSaveFlow } from "../../app/accountsWorkloadsSaveFlow";
 
 type NavigationGuard = (label: string, action: () => void) => void;
 
@@ -1481,12 +1482,11 @@ export function AccountsWorkloadsPage({
       setError("Archived AW 아래 Opportunity 변경은 저장할 수 없습니다. Opportunity 초안을 Undo한 뒤 다시 시도하세요.");
       return false;
     }
-    const awSaved = await saveAwDrafts();
-    if (!awSaved) return false;
-    const dealsSaved = await saveDealDrafts();
-    if (!dealsSaved) return false;
-    await reload();
-    return true;
+    return runAccountsWorkloadsSaveFlow({
+      saveAwDrafts,
+      saveDealDrafts,
+      reload,
+    });
   };
 
   const confirmPrimaryAction = async () => {
