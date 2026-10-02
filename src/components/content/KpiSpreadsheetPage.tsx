@@ -1145,7 +1145,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       onClose={() => setApiMessage("")}
     />
 
-    {activeTab === "Overview" ? <Fragment>
+    {activeTab === "Overview" ? <div class="kpi-overview-scroll-area">
       <div class="kpi-overview-metrics" aria-label={`${fiscalYear} KPI activity overview metrics`}>
         <button type="button" class={overviewFilter === "target-achieved" ? "is-selected" : ""} aria-pressed={overviewFilter === "target-achieved"}
           onClick={() => setOverviewFilter((current) => current === "target-achieved" ? null : "target-achieved")}>
@@ -1192,7 +1192,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI Performance</h3></div>
         <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioCode = row.code === "C1" ? "C" : row.code; const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{portfolioCode}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span><span class="kpi-tooltip" role="tooltip">{tooltip}</span></span></td>; })}</tr>; })}</tbody></table></div>
       </section>
-    </Fragment> : <Fragment>
+    </div> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
         <div class="kpi-activity-toolbar__left"><button type="button" disabled={!canWrite || saving || drafts.length > 0 || editState.cell !== null}
           title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>

@@ -312,12 +312,16 @@ assert.match(page, /\{!loading && workloadError && <span role="alert">Unable to 
 assert.match(page, /workloadError && <button[\s\S]*onClick=\{retryWorkloadSearch\}[\s\S]*>Retry<\/button>/);
 assert.match(page, /\{!loading && !workloadError && options\.length === 0 && <span>No matching workload\.<\/span>\}/,
   "No matching workload is reserved for a successful empty response");
-assert.match(styles, /\.kpi-spreadsheet-page:not\(\[data-kpi-tab="Overview"\]\)[^{]*\{[^}]*height:\s*100%[^}]*overflow:\s*hidden/u,
-  "KPI Activity pages reserve the fixed application footer");
-assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page:not\(\[data-kpi-tab="Overview"\]\)\)/u,
-  "the footer-reserved viewport excludes the naturally scrolling KPI Overview tab");
-assert.match(styles, /\.kpi-spreadsheet-page:not\(\[data-kpi-tab="Overview"\]\) \.kpi-activities-table-wrap[^}]*overflow:\s*auto/u,
-  "only the KPI Activity data table scrolls inside the reserved workspace");
+assert.match(styles, /\.kpi-spreadsheet-page\s*\{[^}]*height:\s*100%[^}]*overflow:\s*hidden/u,
+  "every KPI Activity tab reserves the fixed application footer");
+assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)/u,
+  "the footer-reserved viewport includes the KPI Overview tab");
+assert.match(page, /activeTab === "Overview" \? <div class="kpi-overview-scroll-area">/u,
+  "KPI Overview owns a dedicated scroll surface inside the fixed-footer workspace");
+assert.match(styles, /\.kpi-overview-scroll-area\s*\{[^}]*flex:\s*1[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/u,
+  "KPI Overview content scrolls without being clipped by the fixed footer");
+assert.match(styles, /\.kpi-spreadsheet-page \.kpi-activities-table-wrap[^}]*overflow:\s*auto/u,
+  "each editable KPI Activity table scrolls inside the reserved workspace");
 assert.match(styles, /\.attainment-page[^}]*height:\s*100%[^}]*overflow-y:\s*auto/u,
   "Consumption Attainment scrolls within the footer-reserved workspace");
 assert.match(styles, /\.consumption-initial-state[^}]*align-content:\s*start[^}]*grid-auto-rows:\s*max-content/u,
