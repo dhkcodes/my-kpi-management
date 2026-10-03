@@ -46,12 +46,17 @@ assert.match(calendarSource, /onDblClick/);
 assert.match(calendarSource, /onTouchEnd[\s\S]*lastTouchRef/, "mobile uses a real two-tap creation path");
 assert.match(calendarSource, /일정 다시 열기[\s\S]*일정 취소[\s\S]*일정 삭제/);
 assert.match(calendarSource, /timeUnknown: true/, "new events start without a designated time");
+assert.match(calendarSource, /Account \/ Workload \/ Oppty 선택/);
+assert.match(calendarSource, /검색 결과가 없습니다/);
+assert.match(calendarSource, /relatedItemType: item\.type[\s\S]*relatedItemId: String\(item\.id\)/);
 assert.doesNotMatch(calendarSource, /calendar-day__add/);
 const notesSource = readFileSync("src/components/content/MeetingNotesPage.tsx", "utf8");
 assert.match(notesSource, /Raw audio stays on this device and browser only/);
 assert.match(notesSource, /I have everyone’s consent to record/);
 assert.match(notesSource, /external AI is not configured/i);
 assert.match(notesSource, /codexConnectionPrimaryLabel\(codexConnection\)/);
+assert.match(notesSource, /codex-connection-notice/);
+assert.match(notesSource, /개인별 Codex 연결은 현재 지원되지 않습니다/);
 assert.match(notesSource, /calendarEventId: event\.id[\s\S]*accountId: event\.accountId/);
 assert.match(notesSource, /never exposed through event sharing/);
 assert.match(notesSource, /permission-error/);
@@ -60,6 +65,9 @@ assert.match(notesSource, /save-error/);
 assert.match(notesSource, /Share settings were not fully synchronized/);
 assert.match(notesSource, /Retry sharing/);
 assert.match(notesSource, /canAccessLocalRecording/);
+const calendarCss = readFileSync("src/styles/app.css", "utf8");
+assert.match(calendarCss, /\.calendar-event-editor\s*\{[\s\S]*?border-radius:\s*1\.25rem;/,
+  "the calendar editor uses the approved rounded modal treatment");
 const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
 assert.match(contentSource, /recordingNamespace=\{profile\.userKey\}/);
 
