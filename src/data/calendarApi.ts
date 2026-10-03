@@ -32,8 +32,9 @@ export type CalendarEvent = Readonly<{
 }>;
 export type CalendarShare = Readonly<{
   userKey: string;
-  visibility: Exclude<CalendarVisibility, "PRIVATE">;
-  ownerBadgeColor: string;
+  direction: "INCOMING" | "OUTGOING";
+  status: "PENDING" | "ACCEPTED";
+  ownerBadgeColor: string | null;
 }>;
 export type SharingUser = Readonly<{ userKey: string; displayName: string }>;
 export type CalendarAccountOption = Readonly<{ accountId: number; account: string }>;
@@ -65,7 +66,12 @@ type EventDto = {
   versionNo: number; effectiveAccess?: CalendarSharePermission; effectiveVisibility?: CalendarVisibility;
 };
 type ShareDto = { userKey: string; access: CalendarSharePermission; visibility: CalendarVisibility };
-type CalendarShareDto = { userKey: string; visibility: Exclude<CalendarVisibility, "PRIVATE">; ownerBadgeColor?: string | null };
+type CalendarShareDto = {
+  userKey: string;
+  direction: CalendarShare["direction"];
+  status: CalendarShare["status"];
+  ownerBadgeColor?: string | null;
+};
 
 const request = async <T>(path: string, init?: RequestInit, fetchImpl: FetchLike = apiFetch): Promise<T> => {
   const response = await fetchImpl(`/api/v1${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -192,18 +198,29 @@ export async function cancelCalendarEvent(event: CalendarEvent, fetchImpl: Fetch
 export async function reopenCalendarEvent(event: CalendarEvent, fetchImpl: FetchLike = apiFetch): Promise<CalendarEvent> {
   return mapEvent(await request<EventDto>(`/calendar/events/${event.id}/reopen?versionNo=${event.versionNo}`, { method: "POST" }, fetchImpl), event.shares);
 }
+export async function deleteCalendarEvent(event: CalendarEvent, fetchImpl: FetchLike = apiFetch): Promise<void> {
+  await request<void>(`/calendar/events/${event.id}?versionNo=${event.versionNo}`, { method: "DELETE" }, fetchImpl);
+}
 export async function listCalendarShares(fetchImpl: FetchLike = apiFetch): Promise<CalendarShare[]> {
   const items = unwrap(await request<CalendarShareDto[] | { items: CalendarShareDto[] }>("/calendar/shares", undefined, fetchImpl));
-  return items.map((item) => ({ userKey: item.userKey, visibility: item.visibility, ownerBadgeColor: item.ownerBadgeColor ?? "#315fa8" }));
+  return items.map((item) => ({ userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? null }));
 }
-export async function saveCalendarShare(share: CalendarShare, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
-  const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(share.userKey)}`, {
-    method: "PUT", body: JSON.stringify(share)
-  }, fetchImpl);
-  return { userKey: item.userKey, visibility: item.visibility, ownerBadgeColor: item.ownerBadgeColor ?? share.ownerBadgeColor };
+export async function requestCalendarShare(ownerUserKey: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(ownerUserKey)}`, { method: "POST" }, fetchImpl);
+  return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? null };
 }
-export async function deleteCalendarShare(userKey: string, fetchImpl: FetchLike = apiFetch): Promise<void> {
-  await request<void>(`/calendar/shares/${encodeURIComponent(userKey)}`, { method: "DELETE" }, fetchImpl);
+export async function acceptCalendarShare(requesterUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(requesterUserKey)}/accept`, { method: "PUT", body: JSON.stringify({ color }) }, fetchImpl);
+  return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? color };
+}
+export async function changeCalendarShareColor(requesterUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(requesterUserKey)}/color`, { method: "PATCH", body: JSON.stringify({ color }) }, fetchImpl);
+  return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? color };
+}
+export async function deleteCalendarShare(share: CalendarShare, fetchImpl: FetchLike = apiFetch): Promise<void> {
+  const pendingOutgoing = share.direction === "OUTGOING" && share.status === "PENDING";
+  const path = pendingOutgoing ? `/calendar/shares/requests/${encodeURIComponent(share.userKey)}` : `/calendar/shares/${encodeURIComponent(share.userKey)}`;
+  await request<void>(path, { method: "DELETE" }, fetchImpl);
 }
 export async function listSharingUsers(query = "", fetchImpl: FetchLike = apiFetch): Promise<SharingUser[]> {
   const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";

@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
-import { CalendarAccountOption, CalendarEvent, CalendarEventInput, CalendarShare, SharingUser, cancelCalendarEvent, createCalendarEvent, deleteCalendarShare, listCalendarAccounts, listCalendarEvents, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, saveCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { CalendarAccountOption, CalendarEvent, CalendarEventInput, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, listCalendarAccounts, listCalendarEvents, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
 import { eventCalendarDate, eventLocalParts, eventOccursOnDate, getEventBadgeText, normalizeEventRange, normalizeEventTimes } from "../../data/calendarUx";
 
@@ -15,7 +15,7 @@ type Draft = {
 };
 const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
 const blankDraft = (date: string): Draft => ({
-  title: "", startDate: date, endDate: date, startTime: "09:00", endTime: "10:00", timeUnknown: false,
+  title: "", startDate: date, endDate: date, startTime: "", endTime: "", timeUnknown: true,
   allDay: false, accountId: "", location: "", description: "", forcePrivate: false, timezone: browserTimezone()
 });
 const draftFromEvent = (event: CalendarEvent): Draft => {
@@ -61,8 +61,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [eventShares, setEventShares] = useState<CalendarEvent["shares"]>([]);
   const [eventShareQuery, setEventShareQuery] = useState("");
+  const [eventShareSearchOpen, setEventShareSearchOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [accountQuery, setAccountQuery] = useState("");
+  const [accountSearchOpen, setAccountSearchOpen] = useState(false);
   const [accountOptions, setAccountOptions] = useState<CalendarAccountOption[]>([]);
   const [accountNames, setAccountNames] = useState<Map<number, string>>(new Map());
   const [saving, setSaving] = useState(false);
@@ -71,8 +73,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [calendarShares, setCalendarShares] = useState<CalendarShare[]>([]);
   const [sharingUsers, setSharingUsers] = useState<SharingUser[]>([]);
   const [shareUserQuery, setShareUserQuery] = useState("");
-  const [shareDraft, setShareDraft] = useState<CalendarShare>({ userKey: "", visibility: "DETAILS", ownerBadgeColor: "#315fa8" });
+  const [shareSearchOpen, setShareSearchOpen] = useState(false);
+  const [shareUserKey, setShareUserKey] = useState("");
+  const [shareColor, setShareColor] = useState("#315fa8");
   const today = todayIso();
+  const accountSearchRef = useRef<HTMLLabelElement>(null);
+  const eventShareSearchRef = useRef<HTMLElement>(null);
+  const shareSearchRef = useRef<HTMLLabelElement>(null);
+  const lastTouchRef = useRef<{ date: string; at: number } | null>(null);
   const cells = useMemo(() => getMonthCells(cursor.getFullYear(), cursor.getMonth()), [cursor]);
   const accountById = accountNames;
   const matchingSharingUsers = useMemo(() => sharingUsers.filter((user) => !calendarShares.some((share) => share.userKey === user.userKey) && `${user.displayName} ${user.userKey}`.toLowerCase().includes(shareUserQuery.trim().toLowerCase())).slice(0, 10), [sharingUsers, calendarShares, shareUserQuery]);
@@ -111,9 +119,30 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     return () => { active = false; window.clearTimeout(timer); };
   }, [fiscalYear, cursor.getFullYear(), cursor.getMonth(), accountQuery]);
 
+  useEffect(() => {
+    const closeSearches = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!accountSearchRef.current?.contains(target)) setAccountSearchOpen(false);
+      if (!eventShareSearchRef.current?.contains(target)) setEventShareSearchOpen(false);
+      if (!shareSearchRef.current?.contains(target)) setShareSearchOpen(false);
+    };
+    document.addEventListener("pointerdown", closeSearches);
+    return () => document.removeEventListener("pointerdown", closeSearches);
+  }, []);
+
+  useEffect(() => {
+    const query = (eventShareSearchOpen ? eventShareQuery : shareUserQuery).trim();
+    if ((!shareSearchOpen && !eventShareSearchOpen) || query.length < 2) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void listSharingUsers(query).then((users) => { if (active) setSharingUsers(users); }).catch(() => undefined);
+    }, 220);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [shareSearchOpen, shareUserQuery, eventShareSearchOpen, eventShareQuery]);
+
   const openCreate = (date: string) => {
     if (!canWrite) { setError("Read-only access. Write permission is required."); return; }
-    setEditing(null); setEventShares([]); setEventShareQuery(""); setDraft(blankDraft(date)); setAdvanced(false); setAccountQuery(""); setError("");
+    setEditing(null); setEventShares([]); setEventShareQuery(""); setDraft(blankDraft(date)); setAdvanced(false); setAccountQuery(""); setAccountSearchOpen(false); setError("");
   };
   const openEdit = (event: CalendarEvent) => { setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setAdvanced(false); setAccountQuery(event.accountId ? accountById.get(event.accountId) ?? "" : ""); setError(""); };
   const closeEditor = () => { setDraft(null); setEditing(null); setError(""); };
@@ -141,6 +170,16 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "일정 상태를 변경하지 못했습니다."); }
     finally { setSaving(false); }
   };
+  const removeEvent = async () => {
+    if (!editing?.canEdit || !window.confirm("이 일정을 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+    setSaving(true);
+    try {
+      await deleteCalendarEvent(editing);
+      setEvents((current) => current.filter((event) => event.id !== editing.id));
+      closeEditor();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 삭제하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
   const openSharing = async () => {
     setSaving(true);
     try {
@@ -150,26 +189,38 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     finally { setSaving(false); }
   };
   const addCalendarShare = async () => {
-    if (!shareDraft.userKey) { setError("공유할 사용자를 선택하세요."); return; }
+    if (!shareUserKey) { setError("공유 요청을 보낼 사용자를 선택하세요."); return; }
     setSaving(true);
     try {
-      const saved = await saveCalendarShare(shareDraft);
+      const saved = await requestCalendarShare(shareUserKey);
       setCalendarShares((current) => [...current.filter((item) => item.userKey !== saved.userKey), saved]);
-      setShareDraft({ userKey: "", visibility: "DETAILS", ownerBadgeColor: "#315fa8" }); setShareUserQuery(""); setError("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "공유 설정을 저장하지 못했습니다."); }
+      setShareUserKey(""); setShareUserQuery(""); setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "공유 요청을 보내지 못했습니다."); }
     finally { setSaving(false); }
   };
-  const removeCalendarShare = async (userKey: string) => {
+  const acceptShare = async (share: CalendarShare) => {
     setSaving(true);
-    try { await deleteCalendarShare(userKey); setCalendarShares((current) => current.filter((item) => item.userKey !== userKey)); setError(""); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "공유를 해제하지 못했습니다."); }
+    try { const saved = await acceptCalendarShare(share.userKey, shareColor); setCalendarShares((current) => current.map((item) => item.userKey === saved.userKey ? saved : item)); setError(""); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "공유 요청을 수락하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const updateShareColor = async (share: CalendarShare, color: string) => {
+    setSaving(true);
+    try { const saved = await changeCalendarShareColor(share.userKey, color); setCalendarShares((current) => current.map((item) => item.userKey === saved.userKey ? saved : item)); setError(""); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "공유 색상을 변경하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const removeCalendarShare = async (share: CalendarShare) => {
+    setSaving(true);
+    try { await deleteCalendarShare(share); setCalendarShares((current) => current.filter((item) => item.userKey !== share.userKey)); setError(""); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "공유 요청 또는 공유를 취소하지 못했습니다."); }
     finally { setSaving(false); }
   };
 
   return <section class="calendar-page" aria-labelledby="calendar-heading">
     {breadcrumb}
     <header class="page-section-header calendar-toolbar">
-      <div><h2 id="calendar-heading">Calendar</h2><p>날짜를 더블 클릭하여 일정을 만드세요.</p></div>
+      <div><h2 id="calendar-heading">Calendar</h2></div>
       <div class="calendar-toolbar__month" aria-label="달력 이동">
         <button type="button" onClick={() => shiftYear(-1)} aria-label="이전 연도">«</button>
         <button type="button" onClick={() => shift(-1)} aria-label="이전 달">‹</button>
@@ -183,9 +234,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     </header>
     {!canWrite && <div class="app-message">Read-only access. Write permission is required.</div>}
     {error && !draft && !sharingOpen && <div class="app-message app-message--error" role="alert">{error}</div>}
+    <section class="calendar-surface" aria-label="월간 달력">
     <div class="calendar-grid" role="grid" aria-label={monthTitle(cursor)}>
-      {["일", "월", "화", "수", "목", "금", "토"].map((day) => <div class="calendar-grid__weekday" role="columnheader">{day}</div>)}
-      {cells.map((cell) => {
+      {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day, index) => <div class={`calendar-grid__weekday${index === 0 ? " is-sunday" : index === 6 ? " is-saturday" : ""}`} role="columnheader">{day}</div>)}
+      {cells.map((cell, cellIndex) => {
         const dayEvents = events.filter((event) => {
           const start = event.timeUnknown || event.allDay
             ? eventCalendarDate(event.startsAt, event.timezone)
@@ -196,7 +248,11 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
           return eventOccursOnDate(start, end, cell.date);
         });
         const holiday = holidays.get(cell.date);
-        return <div class={`calendar-day${cell.inMonth ? "" : " is-outside"}${cell.date === today ? " is-today" : ""}`} role="gridcell" aria-label={`${cell.date}${holiday ? `, ${holiday}` : ""}`} onDblClick={() => { if (canWrite) openCreate(cell.date); }}>
+        return <div class={`calendar-day${cell.inMonth ? "" : " is-outside"}${cell.date === today ? " is-today" : ""}${cellIndex % 7 === 0 ? " is-sunday" : cellIndex % 7 === 6 ? " is-saturday" : ""}${holiday ? " is-holiday" : ""}`} role="gridcell" aria-label={`${cell.date}${holiday ? `, ${holiday}` : ""}`} onDblClick={() => { if (canWrite) openCreate(cell.date); }} onTouchEnd={() => {
+          const now = Date.now(); const previous = lastTouchRef.current;
+          if (canWrite && previous?.date === cell.date && now - previous.at < 400) { lastTouchRef.current = null; openCreate(cell.date); }
+          else lastTouchRef.current = { date: cell.date, at: now };
+        }}>
           <div class="calendar-day__heading"><time dateTime={cell.date}>{cell.day}</time>{holiday && <span class="calendar-day__kind">{holiday}</span>}</div>
           {dayEvents.map((event) => {
             const accountName = event.accountId ? accountById.get(event.accountId) : undefined;
@@ -205,28 +261,30 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             const ownerColor = event.ownerBadgeColor ?? `hsl(${(event.id * 47) % 300} 55% 38%)`;
             return <button type="button" class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": ownerColor }} title={text} onClick={(click) => { click.stopPropagation(); openEdit(event); }}>{text}</button>;
           })}
-          {canWrite && <button type="button" class="calendar-day__mobile-add" onClick={() => openCreate(cell.date)} aria-label={`${cell.date}에 일정 추가`}>＋</button>}
         </div>;
       })}
     </div>
+    </section>
     {sharingOpen && <div class="kap-modal-backdrop" onClick={() => setSharingOpen(false)}>
       <section class="calendar-event-editor" role="dialog" aria-modal="true" aria-labelledby="calendar-sharing-title" onClick={(click) => click.stopPropagation()}>
         <header><h3 id="calendar-sharing-title">전체 Calendar 공유 관리</h3><button type="button" onClick={() => setSharingOpen(false)} aria-label="닫기">×</button></header>
         <div class="calendar-event-form">
-          <p>모든 공유는 보기 전용입니다. 일정 세부정보 또는 바쁨 여부만 공개할 수 있으며 강제 비공개 일정은 공개되지 않습니다.</p>
+          <p>Calendar 공유 요청은 보기 전용입니다. 상대가 요청을 수락해야 일정이 표시되며, 강제 비공개 일정은 공개되지 않습니다.</p>
           <div class="calendar-sharing">
-            {calendarShares.map((share) => <div class="calendar-sharing__row" key={share.userKey}>
-              <span><span class="calendar-share-color" style={{ backgroundColor: share.ownerBadgeColor }} />{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.userKey} · VIEW · {share.visibility}</span>
-              <button type="button" disabled={saving} onClick={() => void removeCalendarShare(share.userKey)}>해제</button>
+            {calendarShares.map((share) => <div class="calendar-sharing__row" key={`${share.direction}-${share.userKey}`}>
+              <span>{share.ownerBadgeColor && <span class="calendar-share-color" style={{ backgroundColor: share.ownerBadgeColor }} />}{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.userKey} · {share.direction === "INCOMING" ? "받은 요청" : "보낸 요청"} · {share.status === "PENDING" ? "대기 중" : "공유 중"}</span>
+              {share.direction === "INCOMING" && share.status === "PENDING" && <><input aria-label="수락 후 표시 색상" type="color" value={shareColor} onInput={(event) => setShareColor(event.currentTarget.value)} /><button type="button" disabled={saving} onClick={() => void acceptShare(share)}>수락</button></>}
+              {share.direction === "INCOMING" && share.status === "ACCEPTED" && <><input aria-label="공유 일정 표시 색상 변경" type="color" value={share.ownerBadgeColor ?? shareColor} onInput={(event) => void updateShareColor(share, event.currentTarget.value)} /><button type="button" disabled={saving} onClick={() => void removeCalendarShare(share)}>공유 취소</button></>}
+              {share.direction === "OUTGOING" && share.status === "PENDING" && <button type="button" disabled={saving} onClick={() => void removeCalendarShare(share)}>요청 취소</button>}
             </div>)}
-            {!calendarShares.length && <span>전체 공유 대상 없음</span>}
+            {!calendarShares.length && <span>공유 요청 또는 연결이 없습니다.</span>}
           </div>
-          <label class="kap-field">사용자 검색<input type="search" value={shareUserQuery} placeholder="이름 또는 사용자 ID" onInput={(event) => { const query = event.currentTarget.value; setShareUserQuery(query); if (query.trim().length >= 2) void listSharingUsers(query).then(setSharingUsers).catch(() => undefined); }} /></label>
-          {shareUserQuery && <div class="account-search-results" role="listbox">{matchingSharingUsers.map((user) => <button type="button" role="option" aria-selected={shareDraft.userKey === user.userKey} onClick={() => { setShareDraft({ ...shareDraft, userKey: user.userKey }); setShareUserQuery(user.displayName); }}>{user.displayName} <small>{user.userKey}</small></button>)}</div>}
-          <div class="calendar-event-form__row"><label class="kap-field">공개 범위<select value={shareDraft.visibility} onChange={(event) => setShareDraft({ ...shareDraft, visibility: event.currentTarget.value as CalendarShare["visibility"] })}><option value="DETAILS">일정 세부정보</option><option value="BUSY_ONLY">바쁨 여부만</option></select></label><label class="kap-field">공유자 색상<input type="color" value={shareDraft.ownerBadgeColor} onInput={(event) => setShareDraft({ ...shareDraft, ownerBadgeColor: event.currentTarget.value })} /></label></div>
+          <label class="kap-field" ref={shareSearchRef}>공유 요청할 사용자 검색<input type="search" value={shareUserQuery} placeholder="이름 또는 사용자 ID" onFocus={() => setShareSearchOpen(true)} onInput={(event) => { setShareUserQuery(event.currentTarget.value); setShareUserKey(""); setShareSearchOpen(true); }} />
+          {shareSearchOpen && shareUserQuery && <div class="account-search-results" role="listbox">{matchingSharingUsers.map((user) => <button type="button" role="option" aria-selected={shareUserKey === user.userKey} onClick={() => { setShareUserKey(user.userKey); setShareUserQuery(user.displayName); setShareSearchOpen(false); }}>{user.displayName} <small>{user.userKey}</small></button>)}</div>}</label>
+          <p>요청을 받은 사용자가 수락하고 표시 색상을 정하면, 요청자에게 상대의 공개 일정이 보기 전용으로 표시됩니다. 비공개 일정·Meeting Notes·녹음은 공유되지 않습니다.</p>
           {error && <div class="app-message app-message--error" role="alert">{error}</div>}
         </div>
-        <footer><span /><button type="button" onClick={() => setSharingOpen(false)}>닫기</button><button type="button" class="primary" disabled={saving || !shareDraft.userKey} onClick={() => void addCalendarShare()}>공유 추가</button></footer>
+        <footer><span /><button type="button" onClick={() => setSharingOpen(false)}>닫기</button><button type="button" class="primary" disabled={saving || !shareUserKey} onClick={() => void addCalendarShare()}>공유 요청</button></footer>
       </section>
     </div>}
     {draft && <div class="kap-modal-backdrop" onClick={closeEditor}>
@@ -238,8 +296,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             <label class="kap-field">From *<input type="date" required value={draft.startDate} onInput={(e) => { const startDate = e.currentTarget.value; setDraft({ ...draft, startDate, endDate: draft.endDate && draft.endDate >= startDate ? draft.endDate : startDate }); }} /></label>
             <label class="kap-field">To<input type="date" min={draft.startDate} value={draft.endDate} placeholder={draft.startDate} onInput={(e) => setDraft({ ...draft, endDate: e.currentTarget.value })} /><small>비워 두면 시작 날짜와 같게 저장됩니다.</small></label>
           </div>
-          <label class="kap-field account-search-field">Account 검색<input type="search" value={accountQuery} placeholder="고객사 이름 검색" onInput={(e) => { setAccountQuery(e.currentTarget.value); setDraft((current) => current ? { ...current, accountId: "" } : current); }} aria-autocomplete="list" />
-            {accountQuery && <div class="account-search-results" role="listbox">{accountOptions.map((account) => <button type="button" role="option" aria-selected={draft.accountId === String(account.accountId)} onClick={() => { setDraft({ ...draft, accountId: String(account.accountId) }); setAccountQuery(account.account); }}>{account.account}</button>)}</div>}
+          <label class="kap-field account-search-field" ref={accountSearchRef}>Account 검색<input type="search" value={accountQuery} placeholder="고객사 이름 검색" onFocus={() => setAccountSearchOpen(true)} onInput={(e) => { setAccountQuery(e.currentTarget.value); setAccountSearchOpen(true); setDraft((current) => current ? { ...current, accountId: "" } : current); }} aria-autocomplete="list" />
+            {accountSearchOpen && accountQuery && <div class="account-search-results" role="listbox">{accountOptions.map((account) => <button type="button" role="option" aria-selected={draft.accountId === String(account.accountId)} onClick={() => { setDraft({ ...draft, accountId: String(account.accountId) }); setAccountQuery(account.account); setAccountSearchOpen(false); }}>{account.account}</button>)}</div>}
           </label>
           <button class="calendar-advanced-toggle" type="button" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>고급 설정 {advanced ? "접기" : "펼치기"}</button>
           {advanced && <div class="calendar-advanced-panel">
@@ -248,15 +306,15 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             <label class="kap-field">장소<input value={draft.location} onInput={(e) => setDraft({ ...draft, location: e.currentTarget.value })} /></label>
             <label class="kap-field">설명<textarea rows={3} value={draft.description} onInput={(e) => setDraft({ ...draft, description: e.currentTarget.value })} /></label>
           </div>}
-          {(!editing || editing.canEdit) && !draft.forcePrivate && <section class="calendar-sharing"><strong>이 일정 공유 · VIEW 전용</strong>
-            {eventShares.map((share) => <div class="calendar-sharing__row" key={share.userKey}><span>{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey} · VIEW</span><select aria-label={`${share.userKey} 공개 범위`} value={share.visibility} onChange={(event) => setEventShares((current) => current.map((item) => item.userKey === share.userKey ? { ...item, visibility: event.currentTarget.value as "BUSY_ONLY" | "DETAILS" } : item))}><option value="DETAILS">DETAILS</option><option value="BUSY_ONLY">BUSY_ONLY</option></select><button type="button" onClick={() => setEventShares((current) => current.filter((item) => item.userKey !== share.userKey))}>제거</button></div>)}
-            <label class="kap-field">사용자 검색<input type="search" value={eventShareQuery} placeholder="이름 또는 사용자 ID" onInput={(event) => { const query = event.currentTarget.value; setEventShareQuery(query); if (query.trim().length >= 2) void listSharingUsers(query).then(setSharingUsers).catch(() => undefined); }} /></label>
-            {eventShareQuery && <div class="account-search-results" role="listbox">{matchingEventUsers.map((user) => <button type="button" role="option" onClick={() => { setEventShares((current) => [...current, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW", visibility: "DETAILS" }]); setEventShareQuery(""); }}>{user.displayName} <small>{user.userKey}</small></button>)}</div>}
+          {(!editing || editing.canEdit) && !draft.forcePrivate && <section ref={eventShareSearchRef} class="calendar-sharing"><strong>이 일정 공유 · 모든 공유는 보기 전용</strong>
+            {eventShares.map((share) => <div class="calendar-sharing__row" key={share.userKey}><span>{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey} · VIEW · DETAILS</span><button type="button" onClick={() => setEventShares((current) => current.filter((item) => item.userKey !== share.userKey))}>제거</button></div>)}
+            <label class="kap-field">사용자 검색<input type="search" value={eventShareQuery} placeholder="이름 또는 사용자 ID" onFocus={() => setEventShareSearchOpen(true)} onInput={(event) => { setEventShareQuery(event.currentTarget.value); setEventShareSearchOpen(true); }} /></label>
+            {eventShareSearchOpen && eventShareQuery && <div class="account-search-results" role="listbox">{matchingEventUsers.map((user) => <button type="button" role="option" onClick={() => { setEventShares((current) => [...current, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW", visibility: "DETAILS" }]); setEventShareQuery(""); setEventShareSearchOpen(false); }}>{user.displayName} <small>{user.userKey}</small></button>)}</div>}
           </section>}
           {editing && !editing.canEdit && <aside class="calendar-sharing-readonly"><strong>공유 일정 (읽기 전용)</strong><p>이 일정의 Calendar 공유 권한은 Meeting Notes·녹음·전사·요약으로 확장되지 않습니다.</p></aside>}
           {error && <div class="app-message app-message--error" role="alert">{error}</div>}
         </fieldset>
-        <footer>{editing?.canEdit && <button type="button" class="danger" disabled={saving} onClick={() => void toggleCancelled()}>{editing.status === "CANCELLED" ? "일정 다시 열기" : "일정 취소"}</button>}<span /><button type="button" onClick={closeEditor}>닫기</button>{(!editing || editing.canEdit) && <button type="button" class="primary" disabled={saving} onClick={() => void save()}>{saving ? "저장 중…" : "저장"}</button>}</footer>
+        <footer>{editing?.canEdit && <button type="button" class="danger" disabled={saving} onClick={() => void toggleCancelled()}>{editing.status === "CANCELLED" ? "일정 다시 열기" : "일정 취소"}</button>}{editing?.canEdit && <button type="button" class="danger calendar-delete" disabled={saving} onClick={() => void removeEvent()}>일정 삭제</button>}<span /><button type="button" onClick={closeEditor}>닫기</button>{(!editing || editing.canEdit) && <button type="button" class="primary" disabled={saving} onClick={() => void save()}>{saving ? "저장 중…" : "저장"}</button>}</footer>
       </section>
     </div>}
   </section>;

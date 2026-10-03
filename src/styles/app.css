@@ -5394,10 +5394,15 @@ h4.weekly-activity-section-label--next-week,
 }
 
 /* UI stability follow-up: keep document headings anchored while async data loads. */
+.forecast-actual-page {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
 .kpi-content:has(.consumption-initial-state),
 .kpi-content:has(.consumption-insights-page),
 .kpi-content:has(.weekly-activities-page),
-.kpi-content:has(.consumption-page) {
+.kpi-content:has(.consumption-page),
+.kpi-content:has(.forecast-actual-page) {
   align-content: start;
   grid-auto-rows: max-content;
 }
@@ -5426,14 +5431,20 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-month-value.is-actual,
 .forecast-actual-month-value.is-difference { text-align: right; }
 .forecast-actual-matrix-shell > .consumption-scroll-controls {
-  left: .35rem;
+  flex-direction: column;
+  left: auto;
   position: absolute;
   right: .35rem;
   top: 50%;
   transform: translateY(-50%);
   z-index: 12;
 }
-.forecast-actual-matrix-shell > .consumption-scroll-controls button:first-child { margin-inline-end: auto; }
+.forecast-actual-matrix-shell > .consumption-scroll-controls button:first-child { margin-inline-end: 0; }
+
+.forecast-actual-loading { align-items: center; background: var(--oj-core-bg-color-neutral); border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; color: var(--oj-core-text-color-secondary); display: flex; min-height: 6rem; padding: 1rem; }
+.forecast-actual-value-badge { border: 1px solid currentColor; border-radius: 999px; display: inline-flex; font-size: .68rem; font-weight: 800; justify-content: center; line-height: 1; min-width: 2.75rem; padding: .3rem .5rem; }
+.forecast-actual-value-badge.is-pending { background: #fff7e8; color: #8a5700; }
+.forecast-actual-value-badge.is-na { background: #f1f3f5; color: #5f6873; }
 
 /* Reserve the application footer and scroll only each workspace's data surface. */
 .kpi-content:has(.kpi-spreadsheet-page),
@@ -5581,18 +5592,20 @@ h4.weekly-activity-section-label--next-week,
 .calendar-toolbar__month button, .calendar-mobile-add, .calendar-sharing button, .local-recorder button, .meeting-note-ai-notice button, .kap-modal button, .codex-auth-status, .meeting-note-view__actions button { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; min-height: 2.25rem; padding: .35rem .65rem; }
 .calendar-toolbar__today { color: var(--kpi-brand) !important; font-weight: 800 !important; }
 .calendar-mobile-add { display: none; }
+.calendar-surface { background: #fff; border: 1px solid var(--kpi-border); border-radius: 1rem; box-shadow: 0 .15rem .6rem rgb(20 26 33 / 7%); overflow: hidden; padding: .75rem; }
 .calendar-grid { border-left: 1px solid var(--kpi-border); border-top: 1px solid var(--kpi-border); display: grid; grid-template-columns: repeat(7, minmax(7rem, 1fr)); overflow-x: auto; }
-.calendar-grid__weekday { background: var(--kap-grid-header-bg); border-bottom: 1px solid var(--kpi-border); border-right: 1px solid var(--kpi-border); color: var(--kap-grid-header-ink); font-size: .75rem; font-weight: 800; padding: .55rem; text-align: center; }
+.calendar-grid__weekday { background: #f2f4f5; border-bottom: 1px solid var(--kpi-border); border-right: 1px solid var(--kpi-border); color: var(--kap-grid-header-ink); font-size: .82rem; font-weight: 800; letter-spacing: .06em; padding: .72rem .55rem; text-align: center; }
+.calendar-grid__weekday.is-sunday { background: #fff1ef; color: #a33a2e; }
+.calendar-grid__weekday.is-saturday { background: #eef4fb; color: #315f92; }
 .calendar-day { background: #fff; border: 0; border-bottom: 1px solid var(--kpi-border); border-right: 1px solid var(--kpi-border); color: inherit; display: flex; flex-direction: column; gap: .35rem; min-height: 8.5rem; padding: .45rem; text-align: left; }
-.calendar-day--saturday { background: #f3f7fb; }
-.calendar-day--sunday { background: #fff5f3; }
-.calendar-day--holiday { background: #fff8e5; }
+.calendar-day.is-saturday { background: #f5f8fc; }
+.calendar-day.is-sunday { background: #fff7f5; }
+.calendar-day.is-holiday { background: #fff8ee; }
 .calendar-day.is-outside { color: var(--kpi-muted); opacity: .55; }
-.calendar-day.is-today { box-shadow: inset 0 0 0 2px var(--kpi-brand); }
-.calendar-day.is-today .calendar-day__heading time { background: var(--kpi-brand); border-radius: 50%; color: #fff; display: grid; height: 1.6rem; place-items: center; width: 1.6rem; }
+.calendar-day.is-today .calendar-day__heading time { color: #c74634; }
 .calendar-day__heading { align-items: flex-start; display: flex; justify-content: space-between; }
 .calendar-day__heading time { font-weight: 800; }
-.calendar-day__kind { font-size: .6rem; font-weight: 700; max-width: 5.8rem; text-align: right; }
+.calendar-day__kind { color: #a33a2e; font-size: .76rem; font-weight: 800; line-height: 1.2; max-width: 7rem; text-align: right; }
 .calendar-event { align-items: flex-start; background: #edf7f4; border: 1px solid #b7d9cf; border-left: .2rem solid #2e7665; border-radius: var(--oj-core-border-radius-sm); color: #194d42; cursor: pointer; display: -webkit-box; font: inherit; font-size: .7rem; line-height: 1.2; overflow: hidden; padding: .35rem; text-align: left; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; width: 100%; }
 .calendar-event--shared { background: #eef3ff; border-color: #b7c8ed; border-left-color: #315fa8; color: #183b73; }
 .calendar-event--private { background: #f4effa; border-color: #cdbce1; border-left-color: #704895; color: #50336c; }
@@ -5618,6 +5631,7 @@ h4.weekly-activity-section-label--next-week,
 .calendar-event-options { display: grid; gap: .5rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-search-field { position: relative; }
 .account-search-results { background: #fff; border: 1px solid var(--kpi-border); box-shadow: 0 .3rem .8rem rgb(0 0 0 / 15%); display: grid; left: 0; max-height: 12rem; overflow-y: auto; position: absolute; right: 0; top: 100%; z-index: 2; }
+.calendar-event-form > .kap-field { position: relative; }
 .account-search-results button { border: 0; border-bottom: 1px solid var(--kpi-border); text-align: left; }
 .calendar-sharing-readonly { background: var(--kpi-soft); border-left: .25rem solid var(--kpi-muted); padding: .65rem; }
 .kap-modal > footer { border-top: 1px solid var(--kpi-border); gap: .5rem; justify-content: flex-end; }
