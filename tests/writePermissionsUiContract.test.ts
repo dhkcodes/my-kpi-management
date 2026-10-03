@@ -7,6 +7,8 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 const content = read("src/components/content/index.tsx");
 const kpi = read("src/components/content/KpiSpreadsheetPage.tsx");
 const weekly = read("src/components/content/WeeklyActivitiesPage.tsx");
+const calendar = read("src/components/content/CalendarPage.tsx");
+const meetingNotes = read("src/components/content/MeetingNotesPage.tsx");
 const accounts = read("src/components/content/AccountsWorkloadsPage.tsx");
 const attainment = read("src/components/content/AttainmentPage.tsx");
 const records = read("src/components/content/ConsumptionRecordsPage.tsx");
@@ -16,11 +18,13 @@ assert.match(content, /const canWrite = canWriteRoute\(profile, activeRoute\)/,
   "the active route permission is resolved once and passed to content pages");
 assert.match(content, /Read-only access\.[\s\S]*Write permission is required/,
   "read-only users receive a visible permission explanation");
-assert.match(content, /\["kpiPage", "weeklyActivities", "consumptionAttainment"\]\.includes\(activeRoute\.module\)/,
-  "read-only banner is omitted on Accounts & Workloads and Consumption Records");
+assert.match(content, /\["kpiPage", "weeklyActivities", "calendar", "meetingNotes", "consumptionAttainment"\]\.includes\(activeRoute\.module\)/,
+  "read-only banner covers editable pages and remains omitted on Accounts & Workloads and Consumption Records");
 assert.match(content, /<KpiSpreadsheetPage[\s\S]{0,180}canWrite=\{canWrite\}/);
 assert.match(content, /<AccountsWorkloadsPage[\s\S]{0,180}canWrite=\{canWrite\}/);
 assert.match(content, /<WeeklyActivitiesPage[^>]*canWrite=\{canWrite\}/);
+assert.match(content, /<CalendarPage[^>]*canWrite=\{canWrite\}/);
+assert.match(content, /<MeetingNotesPage[^>]*canWrite=\{canWrite\}/);
 assert.match(content, /<AttainmentPage[^>]*canWrite=\{canWrite\}/);
 assert.match(content, /<ConsumptionRecordsPage[\s\S]{0,160}canWrite=\{canWrite\}/);
 assert.match(content, /canReadHomeAccounts[\s\S]*accounts-workloads[\s\S]*canReadHomeAccounts && <AccountsWorkloadsPulseV2/,
@@ -44,7 +48,7 @@ assert.match(content, /\) : canEditKpiGuide \? \(/,
 assert.match(content, /id="kpiGuideEditButton"/,
   "KPI Guide retains the Admin edit action");
 
-for (const [name, source] of [["KPI", kpi], ["Weekly", weekly], ["Accounts", accounts], ["Attainment", attainment], ["Records", records]] as const) {
+for (const [name, source] of [["KPI", kpi], ["Weekly", weekly], ["Calendar", calendar], ["Meeting Notes", meetingNotes], ["Accounts", accounts], ["Attainment", attainment], ["Records", records]] as const) {
   assert.match(source, /canWrite: boolean/, `${name} accepts explicit write capability`);
   assert.match(source, /Write permission is required/, `${name} guards mutation handlers and explains denial`);
 }

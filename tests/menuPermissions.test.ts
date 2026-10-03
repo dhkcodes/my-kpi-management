@@ -8,6 +8,8 @@ import { getNavigationRoute } from "../src/components/navigationRoutes";
 const allRead: MenuPermissionMap = {
   "kpis-overview": "READ",
   "weekly-activities": "READ",
+  calendar: "READ",
+  "meeting-notes": "READ",
   "customers-overview": "READ",
   "accounts-workloads": "READ",
   analysis: "READ",
@@ -24,6 +26,8 @@ assert.throws(() => parseAuthProfile({ ...base, menuPermissions: { analysis: "RE
 
 assert.equal(getRoutePermission(user, getNavigationRoute("activity-a")), "READ", "all KPI routes share the KPI permission");
 assert.equal(getRoutePermission(user, getNavigationRoute("weekly-activities")), "READ");
+assert.equal(getRoutePermission(user, getNavigationRoute("calendar")), "READ");
+assert.equal(getRoutePermission(user, getNavigationRoute("meeting-notes")), "READ");
 assert.equal(canWriteRoute(user, getNavigationRoute("activity-a")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("account-management-overview")), false);
 assert.equal(canAccessRoute(user, getNavigationRoute("accounts-workloads")), false);
@@ -38,7 +42,7 @@ assert.equal(canAccessRoute(user, { id: "customers-overview", module: "myCustome
 assert.ok(!(assignableMenuPermissionIds as readonly string[]).includes("customers-overview"), "legacy Customer 360 is not assignable in user administration");
 
 const visibleIds = filterNavigationItems(navItems, user).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
-for (const visible of ["home", "kpis-overview", "weekly-activities", "analysis", "forecast-actual", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
+for (const visible of ["home", "kpis-overview", "weekly-activities", "calendar", "meeting-notes", "analysis", "forecast-actual", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
 for (const hidden of ["customers-overview", "account-management-overview", "accounts-workloads", "records"]) assert.ok(!visibleIds.includes(hidden), `${hidden} should be hidden`);
 
 const accountReadOnly = parseAuthProfile({ ...base, menuPermissions: { ...allRead, "accounts-workloads": "READ" } });
@@ -51,6 +55,11 @@ const admin: AuthSession = { ...base, access: "Admin", menuPermissions: {}, stat
 for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
   assert.equal(canWriteRoute(admin, getNavigationRoute(routeId)), true, `Admin can write ${routeId}`);
 }
+assert.equal(getRoutePermission(admin, getNavigationRoute("calendar")), "WRITE", "Admin can use Calendar without a stored grant");
+assert.equal(getRoutePermission(admin, getNavigationRoute("meeting-notes")), "WRITE", "Admin can use Meeting Notes without a stored grant");
+const adminVisibleIds = filterNavigationItems(navItems, admin).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
+assert.ok(adminVisibleIds.includes("calendar"), "Calendar is visible to Admin without a stored grant");
+assert.ok(adminVisibleIds.includes("meeting-notes"), "Meeting Notes is visible to Admin without a stored grant");
 assert.equal(getRoutePermission(admin, getNavigationRoute("forecast-actual")), "READ", "Forecast vs Actual stays read-only for Admin");
 assert.equal(canWriteRoute(admin, getNavigationRoute("forecast-actual")), false);
 assert.equal(canAccessRoute(admin, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,

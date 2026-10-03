@@ -7,6 +7,8 @@ export type RoutePermission = MenuPermission | "OWN";
 export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermissionId | null {
   if (route.module === "kpiPage") return "kpis-overview";
   if (route.module === "weeklyActivities") return "weekly-activities";
+  if (route.module === "calendar") return "calendar";
+  if (route.module === "meetingNotes") return "meeting-notes";
   if (route.module === "myCustomers360") return "customers-overview";
   if (route.module === "accountManagementOverview") return "accounts-workloads";
   if (route.module === "accountsWorkloads") return "accounts-workloads";

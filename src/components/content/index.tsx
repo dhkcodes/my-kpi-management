@@ -16,6 +16,8 @@ import { AccountsWorkloadsPage } from "./AccountsWorkloadsPage";
 import { AccountsWorkloadsPulseV2 } from "./AccountsWorkloadsPulseV2";
 import { MyCustomers360Page } from "./MyCustomers360Page";
 import { WeeklyActivitiesPage } from "./WeeklyActivitiesPage";
+import { CalendarPage } from "./CalendarPage";
+import { MeetingNotesPage } from "./MeetingNotesPage";
 import { AccountWorkloadMetadata, AccountWorkloadRow } from "../../data/accountsWorkloadsMockData";
 import { AccountsWorkloadsDataSource } from "../../data/accountsWorkloadsDataSource";
 import { AccountsWorkloadsBatchSaveResponse, AccountsWorkloadsHierarchy, AccountsWorkloadsListQuery } from "../../data/accountsWorkloadsApi";
@@ -486,16 +488,16 @@ export function Content({
         </button>}
       </section>}
 
-      {!canWrite && ["kpiPage", "weeklyActivities", "consumptionAttainment"].includes(activeRoute.module) && (
+      {!canWrite && ["kpiPage", "weeklyActivities", "calendar", "meetingNotes", "consumptionAttainment"].includes(activeRoute.module) && (
         <div class="accounts-workloads-source-status" role="status"><strong>Read-only access.</strong> Write permission is required to add, edit, delete, save, clone, restore, or import data.</div>
       )}
 
-      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
+      {canReadHomeAccounts && !['weeklyActivities', 'calendar', 'meetingNotes', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && accountsWorkloadsLoadError && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--error" role="alert">
           <strong>Accounts &amp; Workloads API error.</strong> {accountsWorkloadsLoadError}
         </div>
       )}
-      {canReadHomeAccounts && !['weeklyActivities', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
+      {canReadHomeAccounts && !['weeklyActivities', 'calendar', 'meetingNotes', 'profile', 'users', 'accountsWorkloads'].includes(activeRoute.module) && !accountsWorkloadsLoadError && !accountsWorkloadsLoading && accountsWorkloadsDataSource !== "api" && (
         <div class="accounts-workloads-source-status accounts-workloads-source-status--fallback" role="status">
           <strong>Development fallback data.</strong> The Accounts &amp; Workloads API is unavailable; changes are local only.
         </div>
@@ -644,6 +646,10 @@ export function Content({
         />
       ) : activeRoute.module === "weeklyActivities" ? (
         <WeeklyActivitiesPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} onDirtyStateChange={onWeeklyActivitiesDraftStateChange} breadcrumb={pageNavigation} />
+      ) : activeRoute.module === "calendar" ? (
+        <CalendarPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} breadcrumb={pageNavigation} />
+      ) : activeRoute.module === "meetingNotes" ? (
+        <MeetingNotesPage key={`${profile.userKey}:${fiscalYear}`} fiscalYear={fiscalYear} canWrite={canWrite} recordingNamespace={profile.userKey} accounts={accountsWorkloadsHierarchy?.accounts} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
         <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "forecastActual" ? (

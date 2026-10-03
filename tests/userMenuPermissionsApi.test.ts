@@ -4,6 +4,7 @@ import type { MenuPermissionMap } from "../src/auth/authSession";
 
 const permissions: MenuPermissionMap = {
   "kpis-overview": "READ", "weekly-activities": "WRITE", "customers-overview": "NONE",
+  calendar: "READ", "meeting-notes": "WRITE",
   "accounts-workloads": "READ", analysis: "WRITE", "forecast-actual": "READ", attainment: "READ", records: "NONE"
 };
 void (async () => {

@@ -15,7 +15,7 @@ import {
 
 const topLevelLabels = navItems.map((item) => item.label);
 assert.deepEqual(topLevelLabels, ["Home", "My Activities", "Account Management", "KPI", "Consumption"]);
-assert.deepEqual(navItems[1].children?.map((item) => item.id), ["weekly-activities"]);
+assert.deepEqual(navItems[1].children?.map((item) => item.id), ["calendar", "weekly-activities", "meeting-notes"]);
 assert.deepEqual(navItems[2].children?.map((item) => item.id), ["account-management-overview", "accounts-workloads"]);
 assert.equal(navItems.some((item) => item.children?.some((child) => child.id === "customers-overview")), false);
 assert.equal(getNavigationRoute("customers-overview").module, "home", "legacy portfolio URL is disabled");
