@@ -6,7 +6,7 @@ import { navItems, NavigationItem } from "../src/data/kpiMockData";
 const flattenLeaves = (items: NavigationItem[]): NavigationItem[] =>
   items.flatMap((item) => item.children ? flattenLeaves(item.children) : [item]);
 
-assert.equal(flattenLeaves(navItems).length, 16, "the provider exposes Home plus fifteen real leaf destinations");
+assert.equal(flattenLeaves(navItems).length, 18, "the provider exposes Home plus seventeen real leaf destinations");
 
 assert.deepEqual(
   navItems.map(({ id, label, children }) => ({ id, label, childIds: children?.map((child) => child.id) })),
@@ -15,7 +15,7 @@ assert.deepEqual(
     {
       id: "my-activities",
       label: "My Activities",
-      childIds: ["weekly-activities"]
+      childIds: ["weekly-activities", "calendar", "meeting-notes"]
     },
     {
       id: "account-management",
@@ -33,7 +33,7 @@ assert.deepEqual(
 );
 assert.equal(getNavigationRoute("kpis").id, "home", "KPIs parent must not be a Router destination");
 assert.equal(getNavigationRoute("my-customers-360").id, "home", "synthetic My Customers 360 route must be removed");
-assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 16, "every real leaf destination has a unique navigation id");
+assert.equal(new Set(flattenLeaves(navItems).map((item) => item.id)).size, 18, "every real leaf destination has a unique navigation id");
 assert.equal(
   flattenLeaves(navItems).find((item) => item.id === "records")?.icon,
   "oj-ux-ico-table",

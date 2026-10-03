@@ -7,6 +7,8 @@ export type RoutePermission = MenuPermission | "OWN";
 export function getRouteMenuId(route: NavigationRouteDefinition): MenuPermissionId | null {
   if (route.module === "kpiPage") return "kpis-overview";
   if (route.module === "weeklyActivities") return "weekly-activities";
+  if (route.module === "calendar") return "calendar";
+  if (route.module === "meetingNotes") return "meeting-notes";
   if (route.module === "myCustomers360") return "customers-overview";
   if (route.module === "accountManagementOverview") return "accounts-workloads";
   if (route.module === "accountsWorkloads") return "accounts-workloads";
@@ -24,6 +26,11 @@ export function getRoutePermission(profile: AuthSession, route: NavigationRouteD
   const menuId = getRouteMenuId(route);
   if (!menuId) return "NONE";
   if (profile.access === "Admin") {
+    // Collaboration menus are opt-in even for existing admins. Honour the
+    // server-provided grant and fail closed when an older profile omits it.
+    if (menuId === "calendar" || menuId === "meeting-notes") {
+      return profile.menuPermissions[menuId] ?? "NONE";
+    }
     if (menuId === "kpis-overview" || menuId === "weekly-activities") return "OWN";
     return menuId === "forecast-actual" ? "READ" : "WRITE";
   }

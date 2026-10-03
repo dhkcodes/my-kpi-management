@@ -4,6 +4,8 @@ export type MenuPermission = "NONE" | "READ" | "WRITE";
 export const menuPermissionIds = [
   "kpis-overview",
   "weekly-activities",
+  "calendar",
+  "meeting-notes",
   "customers-overview",
   "accounts-workloads",
   "analysis",
@@ -16,6 +18,8 @@ export type MenuPermissionMap = Readonly<Record<MenuPermissionId, MenuPermission
 export const assignableMenuPermissionIds = [
   "kpis-overview",
   "weekly-activities",
+  "calendar",
+  "meeting-notes",
   "accounts-workloads",
   "analysis",
   "forecast-actual",

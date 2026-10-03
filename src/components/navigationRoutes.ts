@@ -5,6 +5,8 @@ export type NavigationRouteModule =
   | "accountManagementOverview"
   | "accountsWorkloads"
   | "weeklyActivities"
+  | "calendar"
+  | "meetingNotes"
   | "consumptionAnalysis"
   | "forecastActual"
   | "consumptionAttainment"
@@ -32,6 +34,8 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "account-management-overview", module: "accountManagementOverview", pageTitle: "Account Management Overview" },
   { id: "accounts-workloads", module: "accountsWorkloads", pageTitle: "Account & Workload" },
   { id: "weekly-activities", module: "weeklyActivities", pageTitle: "Weekly Activities" },
+  { id: "calendar", module: "calendar", pageTitle: "Calendar" },
+  { id: "meeting-notes", module: "meetingNotes", pageTitle: "Meeting Notes" },
   { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },
   { id: "forecast-actual", module: "forecastActual", pageTitle: "Forecast vs Actual", path: "/consumption/forecast-vs-actual" },
   { id: "attainment", module: "consumptionAttainment", pageTitle: "Consumption Attainment", path: "/consumption/attainment" },
