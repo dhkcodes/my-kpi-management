@@ -23,6 +23,9 @@ export type CalendarEvent = Readonly<{
   status: "SCHEDULED" | "CANCELLED";
   timezone: string;
   accountId?: number | null;
+  relatedItemType?: CalendarRelatedItemType | null;
+  relatedItemId?: number | null;
+  relatedItemLabel?: string | null;
   location?: string | null;
   description?: string | null;
   visibility: CalendarVisibility;
@@ -38,6 +41,16 @@ export type CalendarShare = Readonly<{
 }>;
 export type SharingUser = Readonly<{ userKey: string; displayName: string }>;
 export type CalendarAccountOption = Readonly<{ accountId: number; account: string }>;
+export type CalendarRelatedItemType = "ACCOUNT" | "WORKLOAD" | "OPPTY";
+export type CalendarRelatedItemOption = Readonly<{
+  type: CalendarRelatedItemType;
+  id: number;
+  accountId: number;
+  accountName: string;
+  workloadName?: string | null;
+  opptyName?: string | null;
+  label: string;
+}>;
 export type CalendarEventInput = Readonly<{
   title: string;
   startsAt: string;
@@ -47,6 +60,9 @@ export type CalendarEventInput = Readonly<{
   forcePrivate: boolean;
   timezone: string;
   accountId?: number | null;
+  relatedItemType?: CalendarRelatedItemType | null;
+  relatedItemId?: number | null;
+  relatedItemLabel?: string | null;
   location?: string | null;
   description?: string | null;
   visibility: CalendarVisibility;
@@ -60,7 +76,9 @@ export type KoreanHoliday = Readonly<{
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type EventDto = {
-  id: number; ownerUserKey?: string; ownerBadgeColor?: string | null; accountId?: number | null; title: string; description?: string | null; location?: string | null;
+  id: number; ownerUserKey?: string; ownerBadgeColor?: string | null; accountId?: number | null;
+  relatedItemType?: CalendarRelatedItemType | null; relatedItemId?: number | null; relatedItemLabel?: string | null;
+  title: string; description?: string | null; location?: string | null;
   startsAt: string; endsAt: string; allDay: boolean; hasEndTime?: boolean; timeUnknown?: boolean; forcePrivate?: boolean;
   status?: "SCHEDULED" | "CANCELLED"; timezone: string; visibility: CalendarVisibility;
   versionNo: number; effectiveAccess?: CalendarSharePermission; effectiveVisibility?: CalendarVisibility;
@@ -95,6 +113,9 @@ const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): 
   status: event.status ?? "SCHEDULED",
   timezone: event.timezone,
   accountId: event.accountId ?? null,
+  relatedItemType: event.relatedItemType ?? null,
+  relatedItemId: event.relatedItemId ?? null,
+  relatedItemLabel: event.relatedItemLabel ?? null,
   location: event.location ?? null,
   description: event.description ?? null,
   visibility: event.visibility,
@@ -123,6 +144,9 @@ const toOffsetDateTime = (value: string, timezone: string): string => {
 };
 const eventBody = (input: CalendarEventInput, versionNo?: number) => ({
   accountId: input.accountId ?? null,
+  relatedItemType: input.relatedItemType ?? null,
+  relatedItemId: input.relatedItemId ?? null,
+  relatedItemLabel: input.relatedItemLabel ?? null,
   title: input.title,
   description: input.description ?? null,
   location: input.location ?? null,
@@ -230,6 +254,11 @@ export async function listCalendarAccounts(fiscalYear: string, query = "", fetch
   const params = new URLSearchParams({ fiscalYear, search: query.trim() });
   return unwrap(await request<CalendarAccountOption[] | { items: CalendarAccountOption[] }>(
     `/collaboration/directory/accounts?${params.toString()}`, undefined, fetchImpl));
+}
+export async function listCalendarRelatedItems(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetch): Promise<CalendarRelatedItemOption[]> {
+  const params = new URLSearchParams({ fiscalYear, search: query.trim() });
+  return unwrap(await request<CalendarRelatedItemOption[] | { items: CalendarRelatedItemOption[] }>(
+    `/collaboration/directory/related-items?${params.toString()}`, undefined, fetchImpl));
 }
 export async function listKoreanHolidays(year: number, fetchImpl: FetchLike = apiFetch): Promise<KoreanHoliday[]> {
   const value = await request<KoreanHoliday[] | { items?: KoreanHoliday[]; holidays?: KoreanHoliday[] }>(

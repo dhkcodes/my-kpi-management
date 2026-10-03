@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { CalendarAccountOption, CalendarEvent, CalendarEventInput, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, listCalendarAccounts, listCalendarEvents, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
+import { CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
 import { eventCalendarDate, eventLocalParts, eventOccursOnDate, getEventBadgeText, normalizeEventRange, normalizeEventTimes } from "../../data/calendarUx";
 
@@ -10,13 +10,15 @@ const monthTitle = (date: Date) => new Intl.DateTimeFormat("ko-KR", { year: "num
 
 type Draft = {
   title: string; startDate: string; endDate: string; startTime: string; endTime: string;
-  timeUnknown: boolean; allDay: boolean; accountId: string; location: string; description: string;
+  timeUnknown: boolean; allDay: boolean; accountId: string; relatedItemType: CalendarRelatedItemType | "";
+  relatedItemId: string; relatedItemLabel: string; location: string; description: string;
   forcePrivate: boolean; timezone: string;
 };
 const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
 const blankDraft = (date: string): Draft => ({
   title: "", startDate: date, endDate: date, startTime: "", endTime: "", timeUnknown: true,
-  allDay: false, accountId: "", location: "", description: "", forcePrivate: false, timezone: browserTimezone()
+  allDay: false, accountId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "",
+  location: "", description: "", forcePrivate: false, timezone: browserTimezone()
 });
 const draftFromEvent = (event: CalendarEvent): Draft => {
   const start = eventLocalParts(event.startsAt, event.timezone);
@@ -30,6 +32,8 @@ const draftFromEvent = (event: CalendarEvent): Draft => {
     endTime: calendarOnly || !event.hasEndTime ? "" : end.time,
     timeUnknown: event.timeUnknown,
     allDay: event.allDay, accountId: event.accountId == null ? "" : String(event.accountId),
+    relatedItemType: event.relatedItemType ?? "", relatedItemId: event.relatedItemId == null ? "" : String(event.relatedItemId),
+    relatedItemLabel: event.relatedItemLabel ?? "",
     location: event.location ?? "", description: event.description ?? "", forcePrivate: event.forcePrivate,
     timezone: event.timezone
   };
@@ -42,7 +46,9 @@ const toInput = (draft: Draft, shares: CalendarEvent["shares"]): CalendarEventIn
     endsAt: draft.allDay || draft.timeUnknown || draft.endTime ? `${dates.endDate}T${endTime}` : null,
     allDay: draft.allDay, timeUnknown: draft.timeUnknown, forcePrivate: draft.forcePrivate,
     timezone: draft.timezone,
-    accountId: draft.accountId ? Number(draft.accountId) : null, location: draft.location.trim() || null,
+    accountId: draft.accountId ? Number(draft.accountId) : null,
+    relatedItemType: draft.relatedItemType || null, relatedItemId: draft.relatedItemId ? Number(draft.relatedItemId) : null,
+    relatedItemLabel: draft.relatedItemLabel || null, location: draft.location.trim() || null,
     description: draft.description.trim() || null, visibility: draft.forcePrivate ? "PRIVATE" : "DETAILS",
     shares
   };
@@ -65,7 +71,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [accountQuery, setAccountQuery] = useState("");
   const [accountSearchOpen, setAccountSearchOpen] = useState(false);
-  const [accountOptions, setAccountOptions] = useState<CalendarAccountOption[]>([]);
+  const [accountOptions, setAccountOptions] = useState<CalendarRelatedItemOption[]>([]);
   const [accountNames, setAccountNames] = useState<Map<number, string>>(new Map());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -103,12 +109,12 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const timer = window.setTimeout(() => {
       const lookupFiscalYear = fiscalYear ?? getFiscalYearForDate(
         `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`);
-      void listCalendarAccounts(lookupFiscalYear, accountQuery).then((items) => {
+      void listCalendarRelatedItems(lookupFiscalYear, accountQuery).then((items) => {
         if (active) {
           setAccountOptions(items);
           setAccountNames((current) => {
             const next = new Map(current);
-            items.forEach((account) => next.set(account.accountId, account.account));
+            items.forEach((item) => next.set(item.accountId, item.accountName));
             return next;
           });
         }
@@ -144,7 +150,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (!canWrite) { setError("Read-only access. Write permission is required."); return; }
     setEditing(null); setEventShares([]); setEventShareQuery(""); setDraft(blankDraft(date)); setAdvanced(false); setAccountQuery(""); setAccountSearchOpen(false); setError("");
   };
-  const openEdit = (event: CalendarEvent) => { setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setAdvanced(false); setAccountQuery(event.accountId ? accountById.get(event.accountId) ?? "" : ""); setError(""); };
+  const openEdit = (event: CalendarEvent) => { setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setAdvanced(false); setAccountQuery(event.relatedItemLabel ?? (event.accountId ? accountById.get(event.accountId) ?? "" : "")); setError(""); };
   const closeEditor = () => { setDraft(null); setEditing(null); setError(""); };
   const shift = (months: number) => setCursor((value) => new Date(value.getFullYear(), value.getMonth() + months, 1));
   const shiftYear = (years: number) => setCursor((value) => new Date(value.getFullYear() + years, value.getMonth(), 1));
@@ -255,7 +261,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         }}>
           <div class="calendar-day__heading"><time dateTime={cell.date}>{cell.day}</time>{holiday && <span class="calendar-day__kind">{holiday}</span>}</div>
           {dayEvents.map((event) => {
-            const accountName = event.accountId ? accountById.get(event.accountId) : undefined;
+            const accountName = event.relatedItemLabel ?? (event.accountId ? accountById.get(event.accountId) : undefined);
             const text = getEventBadgeText({ accountName, title: event.title, startTime: eventLocalParts(event.startsAt, event.timezone).time, timeUnknown: event.timeUnknown, allDay: event.allDay });
             const shared = !event.canEdit || event.shares.length > 0;
             const ownerColor = event.ownerBadgeColor ?? `hsl(${(event.id * 47) % 300} 55% 38%)`;
@@ -296,8 +302,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             <label class="kap-field">From *<input type="date" required value={draft.startDate} onInput={(e) => { const startDate = e.currentTarget.value; setDraft({ ...draft, startDate, endDate: draft.endDate && draft.endDate >= startDate ? draft.endDate : startDate }); }} /></label>
             <label class="kap-field">To<input type="date" min={draft.startDate} value={draft.endDate} placeholder={draft.startDate} onInput={(e) => setDraft({ ...draft, endDate: e.currentTarget.value })} /><small>비워 두면 시작 날짜와 같게 저장됩니다.</small></label>
           </div>
-          <label class="kap-field account-search-field" ref={accountSearchRef}>Account 검색<input type="search" value={accountQuery} placeholder="고객사 이름 검색" onFocus={() => setAccountSearchOpen(true)} onInput={(e) => { setAccountQuery(e.currentTarget.value); setAccountSearchOpen(true); setDraft((current) => current ? { ...current, accountId: "" } : current); }} aria-autocomplete="list" />
-            {accountSearchOpen && accountQuery && <div class="account-search-results" role="listbox">{accountOptions.map((account) => <button type="button" role="option" aria-selected={draft.accountId === String(account.accountId)} onClick={() => { setDraft({ ...draft, accountId: String(account.accountId) }); setAccountQuery(account.account); setAccountSearchOpen(false); }}>{account.account}</button>)}</div>}
+          <label class="kap-field account-search-field" ref={accountSearchRef}>Account / Workload / Oppty 선택 (선택 사항)<input type="search" value={accountQuery} placeholder="Account, Workload 또는 Oppty 검색" onFocus={() => setAccountSearchOpen(true)} onInput={(e) => { setAccountQuery(e.currentTarget.value); setAccountSearchOpen(true); setDraft((current) => current ? { ...current, accountId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" } : current); }} aria-autocomplete="list" />
+            {accountSearchOpen && accountQuery && <div class="account-search-results" role="listbox">{accountOptions.map((item) => <button type="button" role="option" aria-selected={draft.relatedItemType === item.type && draft.relatedItemId === String(item.id)} onClick={() => { setDraft({ ...draft, accountId: String(item.accountId), relatedItemType: item.type, relatedItemId: String(item.id), relatedItemLabel: item.label }); setAccountQuery(item.label); setAccountSearchOpen(false); }}><strong>{item.type === "ACCOUNT" ? "Account" : item.type === "WORKLOAD" ? "Workload" : "Oppty"}</strong><span>{item.label}</span></button>)}{!accountOptions.length && <span class="account-search-empty">검색 결과가 없습니다.</span>}</div>}
           </label>
           <button class="calendar-advanced-toggle" type="button" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>고급 설정 {advanced ? "접기" : "펼치기"}</button>
           {advanced && <div class="calendar-advanced-panel">

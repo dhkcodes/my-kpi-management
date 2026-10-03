@@ -16,7 +16,7 @@ export const unavailableCodexConnection: CodexConnectionStatus = {
   integrationAvailable: false,
   summarySupported: false,
   transcriptionSupported: false,
-  detail: "이 배포에는 공식 개인 Codex 연결이 구성되어 있지 않습니다.",
+  detail: "현재 개인별 Codex 연결은 지원되지 않습니다. 이 배포에는 공식 Codex 인증·실행 서비스가 구성되어 있지 않습니다.",
 };
 
 export const codexAuthenticationLabel = (state: CodexAuthenticationState): string => {

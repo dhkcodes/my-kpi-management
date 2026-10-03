@@ -3,6 +3,7 @@ import {
   createCalendarEvent,
   createCalendarEventEntity,
   listCalendarAccounts,
+  listCalendarRelatedItems,
   listCalendarEvents,
   listKoreanHolidays,
   updateCalendarEvent,
@@ -47,6 +48,10 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<
   if (url === "/api/v1/collaboration/directory/accounts?fiscalYear=FY27&search=Acme") {
     return response([{ accountId: 77, account: "Acme Virtual Account" }]);
   }
+  if (url === "/api/v1/collaboration/directory/related-items?fiscalYear=FY27&search=Acme") {
+    return response([{ type: "OPPTY", id: 99, accountId: 77, accountName: "Acme", workloadName: "OCI",
+      opptyName: "Expansion / OPP-99", label: "Acme · OCI · Expansion / OPP-99" }]);
+  }
   if (url === "/api/v1/calendar/events/41/shares" && method === "GET") return response([{ userKey: "user/one", access: "VIEW", visibility: "BUSY_ONLY" }]);
   if (url === "/api/v1/calendar/events" && method === "POST") return response({ ...eventDto, id: 42, versionNo: 1 }, 201);
   if (url === "/api/v1/calendar/events/41" && method === "PUT") return response({ ...eventDto, versionNo: 4 });
@@ -77,13 +82,15 @@ async function main() {
   assert.deepEqual(events[0], {
     id: 41, ownerUserKey: "owner", ownerBadgeColor: null, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
     allDay: false, hasEndTime: true, timeUnknown: false, forcePrivate: false, status: "SCHEDULED", timezone: "Asia/Seoul",
-    accountId: 7, location: "Seoul", description: "Pipeline", visibility: "DETAILS", effectiveVisibility: "DETAILS",
+    accountId: 7, relatedItemType: null, relatedItemId: null, relatedItemLabel: null,
+    location: "Seoul", description: "Pipeline", visibility: "DETAILS", effectiveVisibility: "DETAILS",
     shares: [{ userKey: "user/one", permission: "VIEW", visibility: "BUSY_ONLY" }], canEdit: true
   });
 
   const event: CalendarEventInput = {
     title: "Account review", startsAt: "2026-10-03T09:00", endsAt: "2026-10-03T10:00", allDay: false,
-    timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", accountId: 7, location: null,
+    timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", accountId: 7,
+    relatedItemType: "OPPTY", relatedItemId: 99, relatedItemLabel: "Acme · OCI · Expansion / OPP-99", location: null,
     description: null, visibility: "DETAILS",
     shares: [{ userKey: "user/two", permission: "EDIT", visibility: "DETAILS" }]
   };
@@ -91,7 +98,8 @@ async function main() {
   const createdEvent = await createCalendarEvent(event, fetchImpl);
   assert.equal(createdEvent.id, 42);
   assert.deepEqual(jsonBody(calls[0]), {
-    accountId: 7, title: "Account review", description: null, location: null,
+    accountId: 7, relatedItemType: "OPPTY", relatedItemId: 99,
+    relatedItemLabel: "Acme · OCI · Expansion / OPP-99", title: "Account review", description: null, location: null,
     startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
     allDay: false, timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", visibility: "DETAILS"
   });
@@ -118,6 +126,12 @@ async function main() {
   const accountOptions = await listCalendarAccounts("FY27", "Acme", fetchImpl);
   assert.equal(calls[0]?.url, "/api/v1/collaboration/directory/accounts?fiscalYear=FY27&search=Acme");
   assert.deepEqual(accountOptions, [{ accountId: 77, account: "Acme Virtual Account" }]);
+
+  calls.length = 0;
+  const relatedItems = await listCalendarRelatedItems("FY27", "Acme", fetchImpl);
+  assert.equal(calls[0]?.url, "/api/v1/collaboration/directory/related-items?fiscalYear=FY27&search=Acme");
+  assert.deepEqual(relatedItems, [{ type: "OPPTY", id: 99, accountId: 77, accountName: "Acme", workloadName: "OCI",
+    opptyName: "Expansion / OPP-99", label: "Acme · OCI · Expansion / OPP-99" }]);
 
   calls.length = 0;
   const notes = await listMeetingNotes("FY27", fetchImpl);
