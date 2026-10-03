@@ -76,8 +76,8 @@ export const kpiNavItems: NavigationItem[] = [
   { id: "activity-h", label: "Technical blogs", code: "H", codePlacement: "before" }
 ];
 export const activityNavItems: NavigationItem[] = [
-  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" },
   { id: "calendar", label: "Calendar", icon: "oj-ux-ico-calendar" },
+  { id: "weekly-activities", label: "Weekly Activities", icon: "oj-ux-ico-calendar-clock" },
   { id: "meeting-notes", label: "Meeting Notes", icon: "oj-ux-ico-notes" }
 ];
 export const accountManagementNavItems: NavigationItem[] = [

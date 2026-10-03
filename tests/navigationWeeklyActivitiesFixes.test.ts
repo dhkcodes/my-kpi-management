@@ -15,7 +15,7 @@ assert.deepEqual(
     {
       id: "my-activities",
       label: "My Activities",
-      childIds: ["weekly-activities", "calendar", "meeting-notes"]
+      childIds: ["calendar", "weekly-activities", "meeting-notes"]
     },
     {
       id: "account-management",

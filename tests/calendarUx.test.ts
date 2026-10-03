@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { eventCalendarDate, eventLocalParts, eventOccursOnDate, formatKoreanStartTime, getEventBadgeText, normalizeEventRange, normalizeEventTimes } from "../src/data/calendarUx";
+
+assert.deepEqual(normalizeEventRange({ startDate: "2026-10-03", endDate: "" }), { startDate: "2026-10-03", endDate: "2026-10-03" }, "a missing end date is normalized to the start date");
+assert.deepEqual(normalizeEventRange({ startDate: "2026-10-04", endDate: "2026-10-03" }), { startDate: "2026-10-04", endDate: "2026-10-03" }, "an explicit invalid end date remains visible for validation");
+assert.deepEqual(eventLocalParts("2026-10-05T00:15:00Z", "Asia/Seoul"), { date: "2026-10-05", time: "09:15" }, "server UTC values are restored in the event timezone");
+assert.deepEqual(eventLocalParts("2026-10-04T15:00:00Z", "Asia/Seoul"), { date: "2026-10-05", time: "00:00" }, "midnight preserves the event-local date");
+assert.equal(eventCalendarDate("2026-10-04T15:00:00Z", "Asia/Seoul"), "2026-10-05", "untimed/all-day calendar dates are independent of the browser timezone");
+assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-01"), true, "multi-day events cross month boundaries");
+assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-04"), false);
+assert.equal(formatKoreanStartTime("00:05"), "오전 12시 5분");
+assert.equal(formatKoreanStartTime("10:00"), "오전 10시");
+assert.equal(formatKoreanStartTime("12:30"), "오후 12시 30분");
+assert.equal(formatKoreanStartTime("15:07"), "오후 3시 7분");
+assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: false, allDay: false }), "[Acme] Review · 오후 3시 7분");
+assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: true, allDay: false }), "[Acme] Review");
+assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: false, allDay: true }), "[Acme] Review");
+assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: true, startTime: "", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "time-unknown values must satisfy the API midnight contract");
+assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "09:00", endTime: "" }), { startTime: "09:00", endTime: "09:00" }, "start-only timed events keep zero duration");
+assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "00:00", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "midnight is retained rather than treated as missing");
+console.log("calendar UX tests passed");

@@ -649,7 +649,7 @@ export function Content({
       ) : activeRoute.module === "calendar" ? (
         <CalendarPage key={fiscalYear} fiscalYear={fiscalYear} canWrite={canWrite} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "meetingNotes" ? (
-        <MeetingNotesPage key={`${profile.userKey}:${fiscalYear}`} fiscalYear={fiscalYear} canWrite={canWrite} recordingNamespace={profile.userKey} breadcrumb={pageNavigation} />
+        <MeetingNotesPage key={`${profile.userKey}:${fiscalYear}`} fiscalYear={fiscalYear} canWrite={canWrite} recordingNamespace={profile.userKey} accounts={accountsWorkloadsHierarchy?.accounts} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionAnalysis" ? (
         <ConsumptionAnalysisPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "forecastActual" ? (

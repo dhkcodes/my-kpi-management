@@ -10,11 +10,17 @@ export type CalendarEventShare = Readonly<{
 }>;
 export type CalendarEvent = Readonly<{
   id: number;
+  ownerUserKey?: string;
+  ownerBadgeColor?: string | null;
   versionNo: number;
   title: string;
   startsAt: string;
   endsAt: string;
   allDay: boolean;
+  hasEndTime: boolean;
+  timeUnknown: boolean;
+  forcePrivate: boolean;
+  status: "SCHEDULED" | "CANCELLED";
   timezone: string;
   accountId?: number | null;
   location?: string | null;
@@ -24,11 +30,20 @@ export type CalendarEvent = Readonly<{
   shares: readonly CalendarEventShare[];
   canEdit: boolean;
 }>;
+export type CalendarShare = Readonly<{
+  userKey: string;
+  visibility: Exclude<CalendarVisibility, "PRIVATE">;
+  ownerBadgeColor: string;
+}>;
+export type SharingUser = Readonly<{ userKey: string; displayName: string }>;
+export type CalendarAccountOption = Readonly<{ accountId: number; account: string }>;
 export type CalendarEventInput = Readonly<{
   title: string;
   startsAt: string;
-  endsAt: string;
+  endsAt: string | null;
   allDay: boolean;
+  timeUnknown: boolean;
+  forcePrivate: boolean;
   timezone: string;
   accountId?: number | null;
   location?: string | null;
@@ -44,11 +59,13 @@ export type KoreanHoliday = Readonly<{
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type EventDto = {
-  id: number; accountId?: number | null; title: string; description?: string | null; location?: string | null;
-  startsAt: string; endsAt: string; allDay: boolean; timezone: string; visibility: CalendarVisibility;
+  id: number; ownerUserKey?: string; ownerBadgeColor?: string | null; accountId?: number | null; title: string; description?: string | null; location?: string | null;
+  startsAt: string; endsAt: string; allDay: boolean; hasEndTime?: boolean; timeUnknown?: boolean; forcePrivate?: boolean;
+  status?: "SCHEDULED" | "CANCELLED"; timezone: string; visibility: CalendarVisibility;
   versionNo: number; effectiveAccess?: CalendarSharePermission; effectiveVisibility?: CalendarVisibility;
 };
 type ShareDto = { userKey: string; access: CalendarSharePermission; visibility: CalendarVisibility };
+type CalendarShareDto = { userKey: string; visibility: Exclude<CalendarVisibility, "PRIVATE">; ownerBadgeColor?: string | null };
 
 const request = async <T>(path: string, init?: RequestInit, fetchImpl: FetchLike = apiFetch): Promise<T> => {
   const response = await fetchImpl(`/api/v1${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -59,11 +76,17 @@ const unwrap = <T>(value: T[] | { items: T[] }): T[] => Array.isArray(value) ? v
 const mapShare = (share: ShareDto): CalendarEventShare => ({ userKey: share.userKey, permission: share.access, visibility: share.visibility });
 const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): CalendarEvent => ({
   id: event.id,
+  ownerUserKey: event.ownerUserKey ?? "",
+  ownerBadgeColor: event.ownerBadgeColor ?? null,
   versionNo: event.versionNo,
   title: event.title,
   startsAt: event.startsAt,
   endsAt: event.endsAt,
   allDay: event.allDay,
+  hasEndTime: event.hasEndTime ?? true,
+  timeUnknown: event.timeUnknown ?? false,
+  forcePrivate: event.forcePrivate ?? false,
+  status: event.status ?? "SCHEDULED",
   timezone: event.timezone,
   accountId: event.accountId ?? null,
   location: event.location ?? null,
@@ -98,8 +121,10 @@ const eventBody = (input: CalendarEventInput, versionNo?: number) => ({
   description: input.description ?? null,
   location: input.location ?? null,
   startsAt: toOffsetDateTime(input.startsAt, input.timezone),
-  endsAt: toOffsetDateTime(input.endsAt, input.timezone),
+  endsAt: input.endsAt ? toOffsetDateTime(input.endsAt, input.timezone) : null,
   allDay: input.allDay,
+  timeUnknown: input.timeUnknown,
+  forcePrivate: input.forcePrivate,
   timezone: input.timezone,
   visibility: input.visibility,
   ...(versionNo === undefined ? {} : { versionNo })
@@ -108,13 +133,13 @@ const normalizedShares = (shares: readonly CalendarEventShare[]): CalendarEventS
   const byUser = new Map<string, CalendarEventShare>();
   for (const share of shares) {
     const userKey = share.userKey.trim();
-    if (userKey) byUser.set(userKey, { ...share, userKey, visibility: share.permission === "EDIT" ? "DETAILS" : share.visibility });
+    if (userKey) byUser.set(userKey, { ...share, userKey, permission: "VIEW" });
   }
   return [...byUser.values()];
 };
 const putShare = (id: number, share: CalendarEventShare, fetchImpl: FetchLike) =>
   request<ShareDto>(`/calendar/events/${id}/shares/${encodeURIComponent(share.userKey)}`, {
-    method: "PUT", body: JSON.stringify({ userKey: share.userKey, access: share.permission, visibility: share.visibility })
+    method: "PUT", body: JSON.stringify({ userKey: share.userKey, access: "VIEW", visibility: share.visibility })
   }, fetchImpl);
 const deleteShare = async (id: number, userKey: string, fetchImpl: FetchLike): Promise<void> => {
   const response = await fetchImpl(`/api/v1/calendar/events/${id}/shares/${encodeURIComponent(userKey)}`, {
@@ -160,6 +185,34 @@ export async function updateCalendarEventEntity(event: CalendarEvent, input: Cal
 export async function syncCalendarEventShares(event: CalendarEvent, desired: readonly CalendarEventShare[], fetchImpl: FetchLike = apiFetch,
   previous: readonly CalendarEventShare[] = event.shares): Promise<CalendarEvent> {
   return { ...event, shares: await syncShares(event.id, previous, desired, fetchImpl) };
+}
+export async function cancelCalendarEvent(event: CalendarEvent, fetchImpl: FetchLike = apiFetch): Promise<CalendarEvent> {
+  return mapEvent(await request<EventDto>(`/calendar/events/${event.id}/cancel?versionNo=${event.versionNo}`, { method: "POST" }, fetchImpl), event.shares);
+}
+export async function reopenCalendarEvent(event: CalendarEvent, fetchImpl: FetchLike = apiFetch): Promise<CalendarEvent> {
+  return mapEvent(await request<EventDto>(`/calendar/events/${event.id}/reopen?versionNo=${event.versionNo}`, { method: "POST" }, fetchImpl), event.shares);
+}
+export async function listCalendarShares(fetchImpl: FetchLike = apiFetch): Promise<CalendarShare[]> {
+  const items = unwrap(await request<CalendarShareDto[] | { items: CalendarShareDto[] }>("/calendar/shares", undefined, fetchImpl));
+  return items.map((item) => ({ userKey: item.userKey, visibility: item.visibility, ownerBadgeColor: item.ownerBadgeColor ?? "#315fa8" }));
+}
+export async function saveCalendarShare(share: CalendarShare, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(share.userKey)}`, {
+    method: "PUT", body: JSON.stringify(share)
+  }, fetchImpl);
+  return { userKey: item.userKey, visibility: item.visibility, ownerBadgeColor: item.ownerBadgeColor ?? share.ownerBadgeColor };
+}
+export async function deleteCalendarShare(userKey: string, fetchImpl: FetchLike = apiFetch): Promise<void> {
+  await request<void>(`/calendar/shares/${encodeURIComponent(userKey)}`, { method: "DELETE" }, fetchImpl);
+}
+export async function listSharingUsers(query = "", fetchImpl: FetchLike = apiFetch): Promise<SharingUser[]> {
+  const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+  return unwrap(await request<SharingUser[] | { items: SharingUser[] }>(`/collaboration/directory/users${suffix}`, undefined, fetchImpl));
+}
+export async function listCalendarAccounts(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetch): Promise<CalendarAccountOption[]> {
+  const params = new URLSearchParams({ fiscalYear, search: query.trim() });
+  return unwrap(await request<CalendarAccountOption[] | { items: CalendarAccountOption[] }>(
+    `/collaboration/directory/accounts?${params.toString()}`, undefined, fetchImpl));
 }
 export async function listKoreanHolidays(year: number, fetchImpl: FetchLike = apiFetch): Promise<KoreanHoliday[]> {
   const value = await request<KoreanHoliday[] | { items?: KoreanHoliday[]; holidays?: KoreanHoliday[] }>(

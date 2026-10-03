@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   createCalendarEvent,
   createCalendarEventEntity,
+  listCalendarAccounts,
   listCalendarEvents,
   listKoreanHolidays,
   updateCalendarEvent,
@@ -27,7 +28,7 @@ const response = (value: unknown, status = 200) => status === 204 ? new Response
 const eventDto = {
   id: 41, ownerUserKey: "owner", accountId: 7, title: "Account review", description: "Pipeline",
   location: "Seoul", startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
-  allDay: false, timezone: "Asia/Seoul", visibility: "DETAILS", versionNo: 3,
+  allDay: false, hasEndTime: true, timezone: "Asia/Seoul", visibility: "DETAILS", versionNo: 3,
   effectiveAccess: "EDIT", effectiveVisibility: "DETAILS"
 };
 const noteDto = {
@@ -43,6 +44,9 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<
   calls.push({ url, init });
   const method = init?.method ?? "GET";
   if (url === "/api/v1/calendar/events?fy=FY27") return response([eventDto]);
+  if (url === "/api/v1/collaboration/directory/accounts?fiscalYear=FY27&search=Acme") {
+    return response([{ accountId: 77, account: "Acme Virtual Account" }]);
+  }
   if (url === "/api/v1/calendar/events/41/shares" && method === "GET") return response([{ userKey: "user/one", access: "VIEW", visibility: "BUSY_ONLY" }]);
   if (url === "/api/v1/calendar/events" && method === "POST") return response({ ...eventDto, id: 42, versionNo: 1 }, 201);
   if (url === "/api/v1/calendar/events/41" && method === "PUT") return response({ ...eventDto, versionNo: 4 });
@@ -71,14 +75,16 @@ async function main() {
   const events = await listCalendarEvents("FY27", fetchImpl);
   assert.equal(calls[0]?.url, "/api/v1/calendar/events?fy=FY27");
   assert.deepEqual(events[0], {
-    id: 41, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
-    allDay: false, timezone: "Asia/Seoul", accountId: 7, location: "Seoul", description: "Pipeline",
-    visibility: "DETAILS", effectiveVisibility: "DETAILS", shares: [{ userKey: "user/one", permission: "VIEW", visibility: "BUSY_ONLY" }], canEdit: true
+    id: 41, ownerUserKey: "owner", ownerBadgeColor: null, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
+    allDay: false, hasEndTime: true, timeUnknown: false, forcePrivate: false, status: "SCHEDULED", timezone: "Asia/Seoul",
+    accountId: 7, location: "Seoul", description: "Pipeline", visibility: "DETAILS", effectiveVisibility: "DETAILS",
+    shares: [{ userKey: "user/one", permission: "VIEW", visibility: "BUSY_ONLY" }], canEdit: true
   });
 
   const event: CalendarEventInput = {
     title: "Account review", startsAt: "2026-10-03T09:00", endsAt: "2026-10-03T10:00", allDay: false,
-    timezone: "Asia/Seoul", accountId: 7, location: null, description: null, visibility: "DETAILS",
+    timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", accountId: 7, location: null,
+    description: null, visibility: "DETAILS",
     shares: [{ userKey: "user/two", permission: "EDIT", visibility: "DETAILS" }]
   };
   calls.length = 0;
@@ -87,10 +93,14 @@ async function main() {
   assert.deepEqual(jsonBody(calls[0]), {
     accountId: 7, title: "Account review", description: null, location: null,
     startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
-    allDay: false, timezone: "Asia/Seoul", visibility: "DETAILS"
+    allDay: false, timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", visibility: "DETAILS"
   });
   assert.equal(calls[1]?.url, "/api/v1/calendar/events/42/shares/user%2Ftwo");
-  assert.deepEqual(jsonBody(calls[1]), { userKey: "user/two", access: "EDIT", visibility: "DETAILS" });
+  assert.deepEqual(jsonBody(calls[1]), { userKey: "user/two", access: "VIEW", visibility: "DETAILS" });
+
+  calls.length = 0;
+  await createCalendarEvent({ ...event, endsAt: null, shares: [] }, fetchImpl);
+  assert.equal(jsonBody(calls[0]).endsAt, null, "a start-only event keeps its absent end time in the request");
 
   calls.length = 0;
   await updateCalendarEvent(events[0]!, { ...event, shares: [{ userKey: "user/two", permission: "VIEW", visibility: "DETAILS" }] }, fetchImpl);
@@ -103,6 +113,11 @@ async function main() {
   const holidays = await listKoreanHolidays(2026, fetchImpl);
   assert.deepEqual(holidays, [{ date: "2026-10-03", name: "National Foundation Day", type: "PUBLIC_HOLIDAY" }]);
   assert.equal(calls[0]?.url, "/api/v1/calendar/holidays?year=2026");
+
+  calls.length = 0;
+  const accountOptions = await listCalendarAccounts("FY27", "Acme", fetchImpl);
+  assert.equal(calls[0]?.url, "/api/v1/collaboration/directory/accounts?fiscalYear=FY27&search=Acme");
+  assert.deepEqual(accountOptions, [{ accountId: 77, account: "Acme Virtual Account" }]);
 
   calls.length = 0;
   const notes = await listMeetingNotes("FY27", fetchImpl);
