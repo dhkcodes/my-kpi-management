@@ -55,14 +55,11 @@ const admin: AuthSession = { ...base, access: "Admin", menuPermissions: {}, stat
 for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
   assert.equal(canWriteRoute(admin, getNavigationRoute(routeId)), true, `Admin can write ${routeId}`);
 }
-assert.equal(getRoutePermission(admin, getNavigationRoute("calendar")), "NONE", "Calendar is opt-in for existing admins");
-assert.equal(getRoutePermission(admin, getNavigationRoute("meeting-notes")), "NONE", "Meeting Notes is opt-in for existing admins");
-const collaborationAdmin: AuthSession = {
-  ...admin,
-  menuPermissions: { ...allRead, calendar: "WRITE", "meeting-notes": "READ" }
-};
-assert.equal(canWriteRoute(collaborationAdmin, getNavigationRoute("calendar")), true);
-assert.equal(getRoutePermission(collaborationAdmin, getNavigationRoute("meeting-notes")), "READ");
+assert.equal(getRoutePermission(admin, getNavigationRoute("calendar")), "WRITE", "Admin can use Calendar without a stored grant");
+assert.equal(getRoutePermission(admin, getNavigationRoute("meeting-notes")), "WRITE", "Admin can use Meeting Notes without a stored grant");
+const adminVisibleIds = filterNavigationItems(navItems, admin).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
+assert.ok(adminVisibleIds.includes("calendar"), "Calendar is visible to Admin without a stored grant");
+assert.ok(adminVisibleIds.includes("meeting-notes"), "Meeting Notes is visible to Admin without a stored grant");
 assert.equal(getRoutePermission(admin, getNavigationRoute("forecast-actual")), "READ", "Forecast vs Actual stays read-only for Admin");
 assert.equal(canWriteRoute(admin, getNavigationRoute("forecast-actual")), false);
 assert.equal(canAccessRoute(admin, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,

@@ -26,11 +26,6 @@ export function getRoutePermission(profile: AuthSession, route: NavigationRouteD
   const menuId = getRouteMenuId(route);
   if (!menuId) return "NONE";
   if (profile.access === "Admin") {
-    // Collaboration menus are opt-in even for existing admins. Honour the
-    // server-provided grant and fail closed when an older profile omits it.
-    if (menuId === "calendar" || menuId === "meeting-notes") {
-      return profile.menuPermissions[menuId] ?? "NONE";
-    }
     if (menuId === "kpis-overview" || menuId === "weekly-activities") return "OWN";
     return menuId === "forecast-actual" ? "READ" : "WRITE";
   }
