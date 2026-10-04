@@ -72,7 +72,8 @@ assert.doesNotMatch(calendarSource, /title=\{text\}/, "event tooltip is not rend
 assert.match(calendarSource, /일정 다시 열기[\s\S]*일정 취소[\s\S]*일정 삭제/);
 assert.match(calendarSource, /timeUnknown: true/, "new events start without a designated time");
 assert.match(calendarSource, /applyRelatedSelection\("", item\)/, "related selection persists metadata without inserting it into the title");
-assert.match(calendarSource, /eventDisplayTitle\(event\)/, "saved Workload and Opportunity events display their parent account before the title");
+assert.match(calendarSource, /const eventDisplayTitle = \(event: CalendarEvent\) => event\.title;/, "the first line remains the pure saved title");
+assert.doesNotMatch(calendarSource, /titleWithAccountPrefix/, "legacy account prefixes cannot return to event titles");
 assert.match(calendarSource, /permission: "VIEW"[\s\S]*visibility: "DETAILS"/, "# selection stores a VIEW / DETAILS event share");
 assert.match(calendarSource, /calendar-event-relations[\s\S]*`@\$\{draftAccountName\}`/, "stored account relation renders as a separate @accountName mention");
 assert.match(calendarSource, /eventShares\.map[\s\S]*>#\{sharingUsers\.find/, "stored event shares render as separate #displayName mentions");
