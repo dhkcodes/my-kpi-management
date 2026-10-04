@@ -6,7 +6,7 @@ import { beginAppBusy } from "../../app/appBusy";
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, TIMELINE_END_MINUTES, TIMELINE_START_MINUTES, applyRelatedSelection, appendMentionToken, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, applyRelatedSelection, appendMentionToken, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
 import { fetchWeeklyActivities, WeeklyActivityRecord } from "../../data/weeklyActivitiesApi";
 import { sanitizeWeeklyActivityHtml } from "./weeklyActivityEditorSession";
 
@@ -152,6 +152,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const pendingCreateRef = useRef<PendingCreatePress | null>(null);
   const creationPreviewRef = useRef<CreationPreview | null>(null);
+  const existingGesturePointerIdRef = useRef<number | null>(null);
+  const suppressExistingClickUntilRef = useRef(0);
   const undatedCreateKindRef = useRef<CreateLaneKind>("UNKNOWN");
   const cells = useMemo(() => getMonthCells(cursor.getFullYear(), cursor.getMonth()), [cursor]);
   const accountById = accountNames;
@@ -579,7 +581,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const originY = pointer.clientY;
     const originStart = timeToMinutes(draft.startTime);
     const originEnd = timeToMinutes(draft.endTime || minutesToTime(originStart + 60));
-    const duration = Math.max(20, originEnd - originStart);
+    const duration = Math.max(TIMELINE_SNAP_MINUTES, originEnd - originStart);
     (pointer.currentTarget as HTMLElement).setPointerCapture?.(pointerId);
     const onMove = (move: PointerEvent) => {
       if (move.pointerId !== pointerId) return;
@@ -591,9 +593,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         startMinutes = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES - duration, originStart + delta));
         endMinutes = startMinutes + duration;
       } else if (mode === "start") {
-        startMinutes = Math.max(TIMELINE_START_MINUTES, Math.min(originEnd - 20, originStart + delta));
+        startMinutes = Math.max(TIMELINE_START_MINUTES, Math.min(originEnd - TIMELINE_SNAP_MINUTES, originStart + delta));
       } else {
-        endMinutes = Math.min(TIMELINE_END_MINUTES, Math.max(originStart + 20, originEnd + delta));
+        endMinutes = Math.min(TIMELINE_END_MINUTES, Math.max(originStart + TIMELINE_SNAP_MINUTES, originEnd + delta));
       }
       setDraft((current) => current ? { ...current, startTime: minutesToTime(startMinutes), endTime: minutesToTime(endMinutes) } : current);
     };
@@ -609,42 +611,92 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   };
 
   const beginResize = (pointer: PointerEvent, event: CalendarEvent, edge: "start" | "end" = "end") => {
-    if (!event.canEdit || !timelineRef.current) return;
-    pointer.preventDefault(); pointer.stopPropagation();
-    openEdit(event);
+    if (!event.canEdit || !timelineRef.current || existingGesturePointerIdRef.current !== null) return;
+    pointer.preventDefault();
+    pointer.stopPropagation();
+    const pointerId = pointer.pointerId;
+    existingGesturePointerIdRef.current = pointerId;
+    const captureTarget = document.documentElement;
+    try { captureTarget.setPointerCapture(pointerId); } catch { /* window listeners remain the fallback */ }
     const start = timeToMinutes(eventLocalParts(event.startsAt, event.timezone).time);
     const originalEnd = timeToMinutes(eventLocalParts(event.endsAt, event.timezone).time);
     const timeline = timelineRef.current;
+    openEdit(event);
     const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      if (next.cancelable) next.preventDefault();
       const rect = timeline.getBoundingClientRect();
       const snapped = snapTimelinePointer(next.clientY, rect.top, rect.height, TIMELINE_START_MINUTES, TIMELINE_END_MINUTES, true);
       const range = edge === "start"
-        ? { startMinutes: Math.min(originalEnd - 20, snapped), endMinutes: originalEnd }
+        ? { startMinutes: Math.min(originalEnd - TIMELINE_SNAP_MINUTES, snapped), endMinutes: originalEnd }
         : resizeTimelineRange(start, snapped);
       setDraft((current) => current ? { ...current, timeUnknown: false, allDay: false, startTime: minutesToTime(range.startMinutes), endTime: minutesToTime(range.endMinutes) } : current);
     };
-    const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", end, { once: true });
+    const cleanup = (finished: PointerEvent) => {
+      if (finished.pointerId !== pointerId) return;
+      suppressExistingClickUntilRef.current = performance.now() + 500;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", cancel);
+      try { if (captureTarget.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId); } catch { /* already released */ }
+      if (existingGesturePointerIdRef.current === pointerId) existingGesturePointerIdRef.current = null;
+    };
+    const end = (finished: PointerEvent) => { if (finished.pointerId !== pointerId) return; move(finished); cleanup(finished); };
+    const cancel = (finished: PointerEvent) => { if (finished.pointerId !== pointerId) return; cleanup(finished); closeEditor(); };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", cancel);
   };
 
   const beginMove = (pointer: PointerEvent, event: CalendarEvent) => {
-    if (!event.canEdit || !timelineRef.current || (pointer.target as HTMLElement).closest("button, input, textarea, select, [role=separator]")) return;
+    if (!event.canEdit || !timelineRef.current || existingGesturePointerIdRef.current !== null || (pointer.target as HTMLElement).closest("button, input, textarea, select, [role=separator], [role=option]")) return;
+    const pointerId = pointer.pointerId;
+    existingGesturePointerIdRef.current = pointerId;
+    const captureTarget = document.documentElement;
+    try { captureTarget.setPointerCapture(pointerId); } catch { /* window listeners remain the fallback */ }
     const timeline = timelineRef.current;
     const originalStart = timeToMinutes(eventLocalParts(event.startsAt, event.timezone).time);
     const originalEnd = timeToMinutes(eventLocalParts(event.endsAt, event.timezone).time);
-    const duration = Math.max(20, originalEnd - originalStart);
+    const duration = Math.max(TIMELINE_SNAP_MINUTES, originalEnd - originalStart);
     const initialBounds = timeline.getBoundingClientRect();
     const pointerStart = snapTimelinePointer(pointer.clientY, initialBounds.top, initialBounds.height);
     openEdit(event);
-    pointer.preventDefault();
+    let moved = false;
     const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      if (pointer.pointerType === "touch" && next.cancelable) next.preventDefault();
+      moved = true;
       const bounds = timeline.getBoundingClientRect();
       const current = snapTimelinePointer(next.clientY, bounds.top, bounds.height);
       const shifted = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES - duration, originalStart + current - pointerStart));
       setDraft((value) => value ? { ...value, startTime: minutesToTime(shifted), endTime: minutesToTime(shifted + duration), allDay: false, timeUnknown: false } : value);
     };
-    const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", end, { once: true });
+    const cleanup = (finished: PointerEvent) => {
+      if (finished.pointerId !== pointerId) return;
+      if (pointer.pointerType === "touch") suppressExistingClickUntilRef.current = performance.now() + 500;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", cancel);
+      try { if (captureTarget.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId); } catch { /* already released */ }
+      if (existingGesturePointerIdRef.current === pointerId) existingGesturePointerIdRef.current = null;
+    };
+    const end = (finished: PointerEvent) => { if (finished.pointerId !== pointerId) return; if (moved) move(finished); cleanup(finished); };
+    const cancel = (finished: PointerEvent) => { if (finished.pointerId !== pointerId) return; cleanup(finished); closeEditor(); };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", cancel);
+  };
+
+  const beginExistingEventGesture = (pointer: PointerEvent, event: CalendarEvent) => {
+    if (!event.canEdit) return;
+    if (pointer.pointerType !== "touch") { beginMove(pointer, event); return; }
+    const bounds = (pointer.currentTarget as HTMLElement).getBoundingClientRect();
+    const compactResizeRailStart = bounds.right - Math.min(44, Math.max(32, bounds.width * 0.28));
+    if (bounds.height <= 24 && pointer.clientX >= compactResizeRailStart) {
+      beginResize(pointer, event, pointer.clientY < bounds.top + bounds.height / 2 ? "start" : "end");
+      return;
+    }
+    beginMove(pointer, event);
   };
 
   const renderDraftEditor = (compact = false) => {
@@ -779,7 +831,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             {Array.from({ length: 10 }, (_, index) => 9 + index).map((hour) => <div class="calendar-day-hour" style={{ top: `${((hour * 60 - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><time>{String(hour).padStart(2, "0")}:00</time></div>)}
             {hoverMinutes !== null && !creationPreview && <div class="calendar-time-cursor" style={{ top: `${((hoverMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><span role="tooltip">{minutesToTime(hoverMinutes)}</span></div>}
             {creationPreview?.kind === "TIMED" && <div class="calendar-create-preview" aria-live="polite" style={{ top: `${((creationPreview.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((creationPreview.endMinutes - creationPreview.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><strong>새 일정</strong><span>{minutesToTime(creationPreview.startMinutes)}–{minutesToTime(creationPreview.endMinutes)}</span></div>}
-            {laidOut.map((layout) => { const entry = timed.find(({ event }) => event.id === layout.id)!; const event = entry.event; if (editing?.id === event.id) return null; return <div role="button" tabIndex={0} aria-label={`${event.title}, ${minutesToTime(layout.startMinutes)}–${minutesToTime(layout.endMinutes)}`} class={`calendar-timeline-event${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event), top: `${((layout.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((layout.endMinutes - layout.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, left: `calc(4.5rem + (100% - 5rem) * ${layout.column / layout.columnCount})`, width: `calc((100% - 5rem) / ${layout.columnCount} - 3px)` }} onPointerDown={(pointer) => beginMove(pointer, event)} onClick={() => openEdit(event)} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-hidden="true">{event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : event.canEdit ? "●" : "↗"}</span><strong class="calendar-event__title">{eventDisplayTitle(event)}</strong>{renderEventRelations(event)}<small>{minutesToTime(layout.startMinutes)}–{minutesToTime(layout.endMinutes)}</small>{event.canEdit && <><span class="calendar-resize-handle calendar-resize-handle--start" role="separator" aria-label="일정 시작 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "start")} /><span class="calendar-resize-handle calendar-resize-handle--end" role="separator" aria-label="일정 종료 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "end")} /></>}</div>; })}
+            {laidOut.map((layout) => { const entry = timed.find(({ event }) => event.id === layout.id)!; const event = entry.event; if (editing?.id === event.id) return null; return <div role="button" tabIndex={0} aria-label={`${event.title}, ${minutesToTime(layout.startMinutes)}–${minutesToTime(layout.endMinutes)}`} class={`calendar-timeline-event${event.canEdit ? " is-editable" : ""}${layout.endMinutes - layout.startMinutes <= 30 ? " is-touch-compact" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event), top: `${((layout.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((layout.endMinutes - layout.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, left: `calc(4.5rem + (100% - 5rem) * ${layout.column / layout.columnCount})`, width: `calc((100% - 5rem) / ${layout.columnCount} - 3px)` }} onPointerDown={(pointer) => beginExistingEventGesture(pointer, event)} onClick={(click) => { if (performance.now() < suppressExistingClickUntilRef.current) { click.preventDefault(); click.stopPropagation(); return; } openEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-hidden="true">{event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : event.canEdit ? "●" : "↗"}</span><strong class="calendar-event__title">{eventDisplayTitle(event)}</strong>{renderEventRelations(event)}<small>{minutesToTime(layout.startMinutes)}–{minutesToTime(layout.endMinutes)}</small>{event.canEdit && <><span class="calendar-resize-handle calendar-resize-handle--start" role="separator" aria-label="일정 시작 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "start")} /><span class="calendar-resize-handle calendar-resize-handle--end" role="separator" aria-label="일정 종료 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "end")} /></>}</div>; })}
             {draft && !draft.allDay && !draft.timeUnknown && <div class="calendar-timeline-editor" style={{ top: `${((timeToMinutes(draft.startTime) - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${Math.max(20, timeToMinutes(draft.endTime) - timeToMinutes(draft.startTime)) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES) * 100}%` }}>{renderDraftEditor(true)}</div>}
           </div>
           {creationPreview && creationPreview.pointerType === "touch" && <div class="calendar-create-touch-tooltip" role="tooltip" style={{ left: `${creationPreview.clientX}px`, top: `${creationPreview.clientY}px` }}>{creationPreview.kind === "TIMED" ? `${minutesToTime(creationPreview.startMinutes)}–${minutesToTime(creationPreview.endMinutes)}` : creationPreview.kind === "ALL_DAY" ? "하루종일" : "시간 미지정"}</div>}

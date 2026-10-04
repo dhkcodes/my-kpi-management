@@ -152,10 +152,10 @@ export const snapTimelinePointer = (
   return Math.max(startMinutes, Math.min(includeEnd ? endMinutes : endMinutes - TIMELINE_SNAP_MINUTES, snapMinutes(raw)));
 };
 
-/** Resize uses the same grid and intentionally permits compact 20/30/40 minute events. */
+/** Resize uses the same grid and permits one-slot compact events. */
 export const resizeTimelineRange = (startMinutes: number, pointerMinutes: number) => ({
   startMinutes,
-  endMinutes: Math.max(startMinutes + 20, snapMinutes(pointerMinutes))
+  endMinutes: Math.max(startMinutes + TIMELINE_SNAP_MINUTES, snapMinutes(pointerMinutes))
 });
 
 export type TimelineInterval<T extends string | number = string | number> = Readonly<{
