@@ -106,6 +106,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [eventShareQuery, setEventShareQuery] = useState("");
   const [eventShareSearchOpen, setEventShareSearchOpen] = useState(false);
   const [titleRelatedOptions, setTitleRelatedOptions] = useState<CalendarRelatedItemOption[]>([]);
+  const [titleSearchLoading, setTitleSearchLoading] = useState(false);
+  const [titleSearchError, setTitleSearchError] = useState("");
   const [accountNames, setAccountNames] = useState<Map<number, string>>(new Map());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -135,6 +137,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   const [mentionRelatedOptions, setMentionRelatedOptions] = useState<CalendarRelatedItemOption[]>([]);
   const [mentionUserOptions, setMentionUserOptions] = useState<SharingUser[]>([]);
+  const [mentionSearchLoading, setMentionSearchLoading] = useState(false);
+  const [mentionSearchError, setMentionSearchError] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const latestTitleSearchRef = useRef(0);
   const latestShareSearchRef = useRef(0);
@@ -185,8 +189,16 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   useEffect(() => {
     const trigger = draft ? extractTitleSearchTrigger(draft.title) : null;
-    if (!trigger) { setTitleSearchOpen(false); return; }
+    if (!trigger) {
+      latestTitleSearchRef.current += 1;
+      setTitleSearchOpen(false);
+      setTitleSearchLoading(false);
+      setTitleSearchError("");
+      return;
+    }
     setTitleSearchOpen(true);
+    setTitleSearchLoading(true);
+    setTitleSearchError("");
     setHighlightedSearchIndex(-1);
     const requestId = ++latestTitleSearchRef.current;
     if (trigger.kind === "related") {
@@ -195,32 +207,65 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       void listCalendarRelatedItems(lookupFiscalYear, trigger.query).then((items) => {
         if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
         setTitleRelatedOptions(items);
+        setTitleSearchLoading(false);
         setAccountNames((current) => { const next = new Map(current); items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
-      }).catch(() => undefined);
+      }).catch(() => {
+        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+        setTitleRelatedOptions([]);
+        setTitleSearchLoading(false);
+        setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+      });
     } else {
       setTitleUserOptions([]);
       void listSharingUsers(trigger.query).then((users) => {
         if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
         setTitleUserOptions(users);
-      }).catch(() => undefined);
+        setTitleSearchLoading(false);
+      }).catch(() => {
+        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+        setTitleUserOptions([]);
+        setTitleSearchLoading(false);
+        setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+      });
     }
   }, [draft?.title, draft?.startDate, fiscalYear]);
 
   useEffect(() => {
-    if (!mentionEditing) return;
+    if (!mentionEditing) {
+      latestMentionSearchRef.current += 1;
+      setMentionSearchLoading(false);
+      setMentionSearchError("");
+      return;
+    }
+    setMentionSearchLoading(true);
+    setMentionSearchError("");
     const requestId = ++latestMentionSearchRef.current;
     if (mentionEditing.kind === "related") {
+      setMentionRelatedOptions([]);
       const date = eventCalendarDate(mentionEditing.event.startsAt, mentionEditing.event.timezone);
       void listCalendarRelatedItems(fiscalYear ?? getFiscalYearForDate(date), mentionQuery).then((items) => {
         if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
         setMentionRelatedOptions(items);
+        setMentionSearchLoading(false);
         setAccountNames((current) => { const next = new Map(current); items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
-      }).catch(() => undefined);
+      }).catch(() => {
+        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+        setMentionRelatedOptions([]);
+        setMentionSearchLoading(false);
+        setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+      });
     } else {
+      setMentionUserOptions([]);
       void listSharingUsers(mentionQuery).then((users) => {
         if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
         setMentionUserOptions(users);
-      }).catch(() => undefined);
+        setMentionSearchLoading(false);
+      }).catch(() => {
+        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+        setMentionUserOptions([]);
+        setMentionSearchLoading(false);
+        setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+      });
     }
   }, [mentionEditing?.event.id, mentionEditing?.kind, mentionQuery, fiscalYear]);
 
@@ -463,7 +508,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       const item = titleRelatedOptions[index];
       if (!item) return;
       setAccountNames((current) => new Map(current).set(item.accountId, item.accountName));
-      setDraft({ ...draft, ...applyRelatedSelection("", item) });
+      setDraft({ ...draft, ...applyRelatedSelection(draft.title, item) });
     } else if (trigger?.kind === "user") {
       const user = matchingTitleUsers[index];
       if (!user) return;
@@ -551,7 +596,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     <header><h3 id="event-editor-title">{editing ? "일정 편집" : "새 일정"}</h3><div class="calendar-inline-editor__menu"><button id="calendar-editor-options-launcher" type="button" aria-label="일정 옵션" aria-haspopup="dialog" aria-expanded={editorMenuOpen} onClick={() => setEditorMenuOpen(!editorMenuOpen)}>•••</button><oj-c-popup opened={editorMenuOpen} launcher="#calendar-editor-options-launcher" anchor="#calendar-editor-options-launcher" placement="bottom-end" autoDismiss="focusLoss" initialFocus="none" onojClose={() => setEditorMenuOpen(false)}><div class="calendar-options-popover calendar-options-popover__jet-content" role="group" aria-label="일정 옵션"><label><input type="checkbox" checked={draft.forcePrivate} onChange={(event) => setDraft({ ...draft, forcePrivate: event.currentTarget.checked })} />비공개</label>{editing && <label><input type="checkbox" checked={editing.status === "CANCELLED"} onChange={() => void toggleCancelled()} />취소</label>}</div></oj-c-popup><button type="button" onClick={closeEditor} aria-label="닫기">×</button></div></header>
     <fieldset class="calendar-event-form" disabled={Boolean(editing && !editing.canEdit)}>
       <div class="calendar-inline-title"><div class="calendar-time-kind" aria-label="일정 시간 유형"><button type="button" class={draft.allDay ? "is-selected" : ""} onClick={() => setDraft({ ...draft, allDay: true, timeUnknown: false })}>하루종일</button><button type="button" class={draft.timeUnknown ? "is-selected" : ""} onClick={() => setDraft({ ...draft, allDay: false, timeUnknown: true })}>미지정</button><button type="button" class={!draft.allDay && !draft.timeUnknown ? "is-selected" : ""} onClick={() => setDraft({ ...draft, allDay: false, timeUnknown: false, startTime: draft.startTime || "09:00", endTime: draft.endTime || "10:00" })}>시간</button></div><label class="kap-field">제목 *<input ref={titleInputRef} autoFocus value={draft.title} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} onKeyDown={handleTitleKeyDown} onInput={(e) => setDraft({ ...draft, title: e.currentTarget.value })} aria-autocomplete="list" /></label>
-      {titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).slice(0, 10).map((item, index) => <button type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"type" in item ? <><strong>{item.type === "ACCOUNT" ? "Account" : item.type === "WORKLOAD" ? "Workload" : "Oppty"}</strong> {item.label}</> : item.displayName}</button>)}{!(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length && <span class="account-search-empty">검색 중…</span>}</div>}</div>
+      {titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).slice(0, 10).map((item, index) => <button type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"type" in item ? <><strong>{item.type === "ACCOUNT" ? "Account" : item.type === "WORKLOAD" ? "Workload" : "Oppty"}</strong> {item.label}</> : item.displayName}</button>)}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
       {(draftAccountName || eventShares.length > 0) && <div class="calendar-event-relations" aria-label="일정 관계"><span>{draftAccountName && `@${draftAccountName}`}</span>{eventShares.map((share) => <span key={share.userKey}>#{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey}</span>)}</div>}
       <div class="calendar-event-form__row"><label class="kap-field">From *<input type="date" required value={draft.startDate} onInput={(e) => { const startDate = e.currentTarget.value; setDraft({ ...draft, startDate, endDate: draft.endDate && draft.endDate >= startDate ? draft.endDate : startDate }); }} /></label><label class="kap-field">To<input type="date" min={draft.startDate} value={draft.endDate} onInput={(e) => setDraft({ ...draft, endDate: e.currentTarget.value })} /></label></div>
       {!draft.allDay && !draft.timeUnknown && <div class="calendar-event-form__row"><label class="kap-field">시작 시간<input type="time" step="600" value={draft.startTime} onInput={(e) => setDraft({ ...draft, startTime: e.currentTarget.value })} /></label><label class="kap-field">종료 시간<input type="time" step="600" value={draft.endTime} onInput={(e) => setDraft({ ...draft, endTime: e.currentTarget.value })} /></label></div>}
@@ -680,12 +725,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       <div class="calendar-mention-editor__results" role="listbox">
         {mentionEditing.kind === "related" ? <>
           {mentionEditing.event.accountId && <button type="button" onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), accountId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" }, mentionEditing.event.shares)}>관계 제거</button>}
-          {mentionRelatedOptions.map((item) => <button type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection("", item) }, mentionEditing.event.shares)}><strong>@{item.accountName}</strong><small>{item.label}</small></button>)}
+          {mentionRelatedOptions.map((item) => <button type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection(mentionEditing.event.title, item) }, mentionEditing.event.shares)}><strong>@{item.accountName}</strong><small>{item.label}</small></button>)}
         </> : mentionUserOptions.map((user) => {
           const existing = mentionEditing.event.shares.find((share) => share.userKey === user.userKey);
           const shares = existing ? mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey) : [...mentionEditing.event.shares, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW" as const, visibility: "DETAILS" as const }];
           return <button type="button" role="option" aria-selected={Boolean(existing)} onClick={() => void saveMentionUpdate(mentionEditing.event, draftFromEvent(mentionEditing.event), shares)}><strong>#{user.displayName}</strong><small>{existing ? "공유 제거" : "VIEW / DETAILS 공유 추가"}</small></button>;
         })}
+        {mentionSearchError ? <span class="calendar-inline-search__error" role="alert">{mentionSearchError}</span> : mentionSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : (mentionEditing.kind === "related" ? mentionRelatedOptions : mentionUserOptions).length === 0 ? <span class="account-search-empty">검색 결과 없음</span> : null}
       </div>
     </div>}
     </section>

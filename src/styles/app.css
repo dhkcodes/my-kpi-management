@@ -5754,6 +5754,7 @@ h4.weekly-activity-section-label--next-week,
 .account-search-results button strong { color: var(--kpi-brand); font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; }
 .account-search-results button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-search-empty { color: var(--kpi-muted); padding: .75rem; text-align: center; }
+.calendar-inline-search__error { color: var(--kpi-danger, #b42318); display: block; padding: .65rem .75rem; text-align: left; }
 .calendar-sharing-readonly { background: var(--kpi-soft); border-left: .25rem solid var(--kpi-muted); padding: .65rem; }
 .kap-modal > footer { border-top: 1px solid var(--kpi-border); gap: .5rem; justify-content: flex-end; }
 .kap-modal__body, .calendar-event-form { display: grid; gap: .75rem; padding: .75rem 1rem; }
