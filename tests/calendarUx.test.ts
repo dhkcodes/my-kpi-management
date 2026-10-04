@@ -39,6 +39,7 @@ assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded a
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
 assert.equal(snapTimelinePointer(540, 0, 540, 540, 1080, true), 1080, "a resize handle can snap to the timeline end");
 assert.equal(minutesToTime(850), "14:10");
+assert.deepEqual(resizeTimelineRange(780, 790), { startMinutes: 780, endMinutes: 790 }, "resize supports one ten-minute slot");
 assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 870 }, "resize rounds to ten minutes and allows a 20-minute event");
 assert.deepEqual(resizeTimelineRange(850, 881), { startMinutes: 850, endMinutes: 880 }, "resize supports 30-minute events");
 assert.deepEqual(resizeTimelineRange(850, 894), { startMinutes: 850, endMinutes: 890 }, "resize supports 40-minute events");
