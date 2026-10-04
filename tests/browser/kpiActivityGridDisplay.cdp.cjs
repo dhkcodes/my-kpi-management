@@ -150,9 +150,9 @@ const summaryFor = (fiscalYear) => ({
     });
     if (url.pathname.endsWith("/workload-options")) return fulfill(200, {
       items: [
-        { workloadId: 9101, accountName: "Keyboard Account A", workloadName: "Workload Alpha", opptyNo: "OPPTY-KB-001" },
-        { workloadId: 9102, accountName: "Keyboard Account B", workloadName: "Workload Beta", opptyNo: "OPPTY-KB-002" },
-        { workloadId: 9103, accountName: "Keyboard Account C", workloadName: "Workload Gamma", opptyNo: null }
+        { accountId: 501, workloadId: 9101, accountName: "Keyboard Account A", workloadName: "Workload Alpha", opptyNo: "OPPTY-KB-001" },
+        { accountId: 502, workloadId: 9102, accountName: "Keyboard Account B", workloadName: "Workload Beta", opptyNo: "OPPTY-KB-002" },
+        { accountId: 503, workloadId: 9103, accountName: "Keyboard Account C", workloadName: "Workload Gamma", opptyNo: null }
       ],
       total: 3,
       hasMore: false
