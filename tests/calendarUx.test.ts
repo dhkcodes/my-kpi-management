@@ -11,12 +11,12 @@ assert.deepEqual(eventLocalParts("2026-10-04T15:00:00Z", "Asia/Seoul"), { date: 
 assert.equal(eventCalendarDate("2026-10-04T15:00:00Z", "Asia/Seoul"), "2026-10-05", "untimed/all-day calendar dates are independent of the browser timezone");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-01"), true, "multi-day events cross month boundaries");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-04"), false);
-const koreanHolidays = new Set(["2026-10-05"]);
+const koreanHolidays = new Set(["2026-10-05", "2026-10-09"]);
 assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-02", koreanHolidays), true, "a five-working-day duration includes its Friday start");
 assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-03", koreanHolidays), false, "working-day duration excludes Saturday");
-assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-05", koreanHolidays), false, "working-day duration excludes a public holiday");
-assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-09", koreanHolidays), true, "the fifth displayed working day advances past weekend and holiday");
-assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-12", koreanHolidays), false, "the duration stops after its fifth working day");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-05", koreanHolidays), false, "working-day duration excludes the substitute holiday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-09", koreanHolidays), false, "working-day duration excludes Hangeul Day");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-12", koreanHolidays), true, "the fifth displayed working day advances past both holidays and weekends");
 assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-09", koreanHolidays), true, "weekly recurrence renders its later occurrence");
 assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-23", koreanHolidays), false, "recurrence does not start after its end date");
 assert.equal(formatKoreanStartTime("00:05"), "오전 12시 5분");

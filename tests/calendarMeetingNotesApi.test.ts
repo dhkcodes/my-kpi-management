@@ -64,7 +64,11 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     lastSupportedYear: 2027,
     supportedYears: [2025, 2026, 2027],
     source: { publisher: "KASA/KASI", title: "Almanac", url: "https://astro.kasi.re.kr/kor/life/post/almanac" },
-    holidays: [{ date: "2026-10-03", name: "National Foundation Day", type: "PUBLIC_HOLIDAY" }]
+    holidays: [
+      { date: "2026-10-03", name: "개천절", type: "PUBLIC_HOLIDAY" },
+      { date: "2026-10-05", name: "개천절 대체공휴일", type: "SUBSTITUTE_HOLIDAY" },
+      { date: "2026-10-09", name: "한글날", type: "PUBLIC_HOLIDAY" }
+    ]
   });
 
   if (url === "/api/v1/meeting-notes?fy=FY27") return response([noteDto]);
@@ -162,7 +166,11 @@ async function main() {
 
   calls.length = 0;
   const holidays = await listKoreanHolidays(2026, fetchImpl);
-  assert.deepEqual(holidays, [{ date: "2026-10-03", name: "National Foundation Day", type: "PUBLIC_HOLIDAY" }]);
+  assert.deepEqual(holidays, [
+    { date: "2026-10-03", name: "개천절", type: "PUBLIC_HOLIDAY" },
+    { date: "2026-10-05", name: "개천절 대체공휴일", type: "SUBSTITUTE_HOLIDAY" },
+    { date: "2026-10-09", name: "한글날", type: "PUBLIC_HOLIDAY" }
+  ]);
   assert.equal(calls[0]?.url, "/api/v1/calendar/holidays?year=2026");
 
   calls.length = 0;

@@ -41,6 +41,9 @@ def event_from_body(body: dict, event_id: int, version: int = 1) -> dict:
         "relatedItemType": body.get("relatedItemType"),
         "relatedItemId": body.get("relatedItemId"),
         "relatedItemLabel": body.get("relatedItemLabel"),
+        "recurrence": body.get("recurrence", "NONE"),
+        "recurrenceUntil": body.get("recurrenceUntil"),
+        "workingDays": body.get("workingDays", 1),
     }
 
 
@@ -78,7 +81,15 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/v1/calendar/shares/preferences":
             return self.json_response({"ownColor": "#245b83", "privateColor": "#7b61a8", "cancelledColor": "#77818c"})
         if path == "/api/v1/calendar/holidays":
-            return self.json_response({"items": []})
+            return self.json_response({
+                "year": 2026,
+                "supportedYears": [2025, 2026, 2027],
+                "holidays": [
+                    {"date": "2026-10-05", "name": "개천절 대체공휴일", "type": "SUBSTITUTE_HOLIDAY"},
+                    {"date": "2026-10-09", "name": "한글날", "type": "PUBLIC_HOLIDAY"},
+                ],
+                "source": {"publisher": "우주항공청·한국천문연구원", "document": "2026년 월력요항"},
+            })
         if path == "/api/v1/collaboration/directory/related-items":
             return self.json_response({"items": [{
                 "type": "ACCOUNT", "id": 101, "accountId": 101,
