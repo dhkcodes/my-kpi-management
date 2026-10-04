@@ -147,6 +147,11 @@ assert.match(beginMoveSource, /if \(next\.pointerId !== pointerId\) return;/, "m
 assert.match(beginMoveSource, /Math\.max\(MIN_CALENDAR_DURATION_MINUTES, originalEnd - originalStart\)/, "move preserves at least a sixty-minute event duration");
 assert.match(beginResizeSource, /originalEnd - MIN_CALENDAR_DURATION_MINUTES/, "start resize enforces the sixty-minute minimum");
 assert.match(calendarSource, /const beginDraftGesture[\s\S]*Math\.max\(MIN_CALENDAR_DURATION_MINUTES, originEnd - originStart\)[\s\S]*originEnd - MIN_CALENDAR_DURATION_MINUTES[\s\S]*originStart \+ MIN_CALENDAR_DURATION_MINUTES/, "open editor move and resize enforce the sixty-minute minimum");
+const beginDraftGestureSource = calendarSource.slice(calendarSource.indexOf("const beginDraftGesture"), calendarSource.indexOf("const persistTimelineRange"));
+assert.match(beginDraftGestureSource, /updateCalendarEvent\(editing, toInput\(latestDraft, eventShares\)\)/, "selected-editor move and resize persist their changed time without requiring title editing");
+assert.match(beginDraftGestureSource, /setEditing\(saved\)[\s\S]*setDraft\(draftFromEvent\(saved\)\)/, "selected-editor time persistence refreshes the event version and canonical draft");
+assert.match(calendarSource, /const lookupFiscalYear = getFiscalYearForDate\(draft!\.startDate\)/, "title related-item lookup follows the edited event fiscal year");
+assert.match(calendarSource, /listCalendarRelatedItems\(getFiscalYearForDate\(date\), mentionQuery\)/, "selected-event relation lookup follows that event fiscal year");
 assert.doesNotMatch(calendarSource, /currentTarget\.setPointerCapture/, "the event node removed by openEdit never owns pointer capture");
 assert.match(calendarSource, /const beginExistingEventGesture[\s\S]*pointerType !== "touch"[\s\S]*compactResizeRailStart[\s\S]*"start"[\s\S]*"end"/, "compact touch events reserve a side rail for resize while keeping a practical move surface");
 assert.match(calendarSource, /is-touch-compact/, "short events expose explicit compact touch geometry");

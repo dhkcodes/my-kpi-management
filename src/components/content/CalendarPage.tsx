@@ -250,7 +250,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setHighlightedSearchIndex(-1);
     const requestId = ++latestTitleSearchRef.current;
     if (trigger.kind === "related") {
-      const lookupFiscalYear = fiscalYear ?? getFiscalYearForDate(draft!.startDate);
+      const lookupFiscalYear = getFiscalYearForDate(draft!.startDate);
       setTitleRelatedOptions([]);
       void listCalendarRelatedItems(lookupFiscalYear, trigger.query).then((items) => {
         if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
@@ -291,7 +291,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (mentionEditing.kind === "related") {
       setMentionRelatedOptions([]);
       const date = eventCalendarDate(mentionEditing.event.startsAt, mentionEditing.event.timezone);
-      void listCalendarRelatedItems(fiscalYear ?? getFiscalYearForDate(date), mentionQuery).then((items) => {
+      void listCalendarRelatedItems(getFiscalYearForDate(date), mentionQuery).then((items) => {
         if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
         setMentionRelatedOptions(items);
         setMentionSearchLoading(false);
@@ -691,6 +691,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const originStart = timeToMinutes(draft.startTime);
     const originEnd = timeToMinutes(draft.endTime || minutesToTime(originStart + 60));
     const duration = Math.max(MIN_CALENDAR_DURATION_MINUTES, originEnd - originStart);
+    let latestDraft = draft;
+    let changed = false;
     (pointer.currentTarget as HTMLElement).setPointerCapture?.(pointerId);
     const onMove = (move: PointerEvent) => {
       if (move.pointerId !== pointerId) return;
@@ -706,17 +708,34 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       } else {
         endMinutes = Math.min(TIMELINE_END_MINUTES, Math.max(originStart + MIN_CALENDAR_DURATION_MINUTES, originEnd + delta));
       }
-      setDraft((current) => current ? { ...current, startTime: minutesToTime(startMinutes), endTime: minutesToTime(endMinutes) } : current);
+      latestDraft = { ...latestDraft, startTime: minutesToTime(startMinutes), endTime: minutesToTime(endMinutes) };
+      changed = latestDraft.startTime !== draft.startTime || latestDraft.endTime !== draft.endTime;
+      setDraft(latestDraft);
     };
-    const finish = (end: PointerEvent) => {
-      if (end.pointerId !== pointerId) return;
+    const cleanup = (finished: PointerEvent) => {
+      if (finished.pointerId !== pointerId) return;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
+      window.removeEventListener("pointercancel", cleanup);
     };
+    const persist = async () => {
+      if (!editing?.canEdit || !changed) return;
+      setSaving(true);
+      try {
+        const saved = await updateCalendarEvent(editing, toInput(latestDraft, eventShares));
+        setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+        setEditing(saved);
+        setDraft(draftFromEvent(saved));
+        setError("");
+      } catch (reason) {
+        setDraft(draftFromEvent(editing));
+        setError(reason instanceof Error ? `${reason.message} 변경을 되돌렸습니다.` : "일정 시간을 저장하지 못해 변경을 되돌렸습니다.");
+      } finally { setSaving(false); }
+    };
+    const finish = (end: PointerEvent) => { if (end.pointerId !== pointerId) return; onMove(end); cleanup(end); void persist(); };
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
+    window.addEventListener("pointercancel", cleanup);
   };
 
   const persistTimelineRange = async (event: CalendarEvent, startMinutes: number, endMinutes: number) => {
