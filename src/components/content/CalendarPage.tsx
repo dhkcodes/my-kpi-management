@@ -4,7 +4,7 @@ import "oj-c/dialog";
 import "oj-c/popup";
 import { beginAppBusy } from "../../app/appBusy";
 import { apiFetchQuiet } from "../../auth/apiFetch";
-import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
+import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEventEntity, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, syncCalendarEventShares, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
 import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, appendMentionToken, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnScheduleDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
 
@@ -402,8 +402,15 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     }).catch(() => undefined);
   }, [shareSearchOpen, shareUserQuery, eventShareSearchOpen, eventShareQuery]);
 
+  const hasUnsavedChanges = () => {
+    if (!draft) return false;
+    const baseline = editorBaselineRef.current;
+    if (!baseline) return true;
+    return JSON.stringify(toInput(draft, eventShares)) !== JSON.stringify(toInput(baseline.draft, baseline.shares));
+  };
   const openCreate = (date: string, startTime?: string) => {
     if (!canWrite) { setError("Read-only access. Write permission is required."); return; }
+    if (hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
     const next = blankDraft(date);
     if (startTime) { next.timeUnknown = false; next.startTime = startTime; next.endTime = minutesToTime(timeToMinutes(startTime) + 60); }
     editorBaselineRef.current = { draft: { ...next }, shares: [] };
@@ -425,6 +432,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     updateCreationPreview(null);
   };
   const openPreviewDraft = (preview: CreationPreview) => {
+    if (hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
     const next = blankDraft(selectedDate);
     if (preview.kind === "TIMED") {
       next.timeUnknown = false;
@@ -516,12 +524,16 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setError("");
   };
   const openEventSettings = (event: CalendarEvent) => {
+    if (draft && editing?.id !== event.id && hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
     const nextDraft = draftFromEvent(event);
     openEdit(event);
     setSettingsDraft(nextDraft);
     setEditorMenuOpen(true);
   };
-  const beginTitleEdit = (event: CalendarEvent) => { openEdit(event); setTitleEditing(true); requestAnimationFrame(() => titleInputRef.current?.focus()); };
+  const beginTitleEdit = (event: CalendarEvent) => {
+    if (draft && editing?.id !== event.id && hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
+    openEdit(event); setTitleEditing(true); requestAnimationFrame(() => titleInputRef.current?.focus());
+  };
   const handleEventTitleTouchTap = (event: CalendarEvent, pointer: PointerEvent) => {
     const now = Date.now();
     const previous = lastEventTitleTouchRef.current;
@@ -544,12 +556,6 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setEditorMenuOpen(true);
   };
   const closeEditor = () => { editorBaselineRef.current = null; setTitleEditing(false); closeSettings(); setDraft(null); setEditing(null); setError(""); };
-  const hasUnsavedChanges = () => {
-    if (!draft) return false;
-    const baseline = editorBaselineRef.current;
-    if (!baseline) return true;
-    return JSON.stringify(toInput(draft, eventShares)) !== JSON.stringify(toInput(baseline.draft, baseline.shares));
-  };
   const requestDayClose = () => {
     if (hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
     setDayOpen(false);
@@ -559,11 +565,23 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (pendingCreateRef.current || creationPreviewRef.current) { event.preventDefault(); clearCreateGesture(); return; }
-      if (draft && !editing) { event.preventDefault(); closeEditor(); }
+      if (draft) { event.preventDefault(); requestDayClose(); }
     };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, [draft, editing]);
+  }, [draft, editing, eventShares]);
+
+  useEffect(() => {
+    if (!dayOpen) return;
+    const onBackdropClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!String(target.className).includes('ModalStyles_backdropScrimStyle')) return;
+      requestDayClose();
+    };
+    document.addEventListener('click', onBackdropClick, true);
+    return () => document.removeEventListener('click', onBackdropClick, true);
+  }, [dayOpen, draft, editing, eventShares]);
   useEffect(() => () => {
     const pending = pendingCreateRef.current;
     if (pending) { window.clearTimeout(pending.timer); pending.removeListeners(); }
@@ -592,7 +610,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     try {
       const input = toInput(draft, eventShares);
       if (input.endsAt && input.endsAt < input.startsAt) { setError("종료 일시는 시작 일시보다 빠를 수 없습니다."); return false; }
-      const saved = editing ? await updateCalendarEvent(editing, input) : await createCalendarEvent(input);
+      const previousShares = editing?.shares ?? [];
+      const persisted = editing
+        ? await updateCalendarEventEntity(editing, input)
+        : await createCalendarEventEntity(input);
+      setEditing(persisted);
+      setEvents((current) => [...current.filter((event) => event.id !== persisted.id), persisted]);
+      const saved = await syncCalendarEventShares(persisted, eventShares, undefined, previousShares);
       setEvents((current) => [...current.filter((event) => event.id !== saved.id), saved]);
       setSelectedEventId(saved.id);
       setSelectedDate(eventCalendarDate(saved.startsAt, saved.timezone));
@@ -618,10 +642,20 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     }
     setSaving(true);
     try {
-      const saved = await updateCalendarEvent(editing, toInput(nextDraft, eventShares));
+      const previousShares = editing.shares ?? [];
+      const persisted = await updateCalendarEventEntity(editing, toInput(nextDraft, eventShares));
+      setEvents((current) => current.map((event) => event.id === persisted.id ? persisted : event));
+      const persistedDraft = draftFromEvent(persisted);
+      setEditing(persisted);
+      setDraft(persistedDraft);
+      editorBaselineRef.current = { draft: { ...persistedDraft }, shares: [...previousShares] };
+
+      const saved = await syncCalendarEventShares(persisted, eventShares, undefined, previousShares);
       setEvents((current) => current.map((event) => event.id === saved.id ? saved : event));
+      const savedDraft = draftFromEvent(saved);
       setEditing(saved);
-      setDraft(draftFromEvent(saved));
+      setDraft(savedDraft);
+      editorBaselineRef.current = { draft: { ...savedDraft }, shares: [...saved.shares] };
       closeSettings();
       setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "일정 설정을 적용하지 못했습니다."); }
@@ -669,7 +703,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 삭제하지 못했습니다."); }
     finally { setSaving(false); }
   };
-  const selectedActions = (event: CalendarEvent) => selectedEventId === event.id ? <div class="calendar-event-actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()}>
+  const selectedActions = (event: CalendarEvent) => selectedEventId === event.id ? <div class="calendar-event-actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()} onKeyDown={(key) => key.stopPropagation()}>
     {event.canEdit ? <><button type="button" onClick={() => openEventSettings(event)}>설정</button><button type="button" onClick={() => void toggleEventCancelled(event)}>{event.status === "CANCELLED" ? "일정재개" : "일정취소"}</button><button type="button" onClick={() => void removeSelectedEvent(event)}>일정삭제</button></> : <span class="calendar-event-actions__readonly">Read Only</span>}
   </div> : null;
   const openSharing = async () => {
@@ -879,8 +913,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       try {
         const saved = await updateCalendarEvent(editing, toInput(latestDraft, eventShares));
         setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+        const savedDraft = draftFromEvent(saved);
         setEditing(saved);
-        setDraft(draftFromEvent(saved));
+        setDraft(savedDraft);
+        editorBaselineRef.current = { draft: { ...savedDraft }, shares: [...eventShares] };
         setError("");
       } catch (reason) {
         setDraft(draftFromEvent(editing));
@@ -1129,8 +1165,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     </section>
     {dayOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="none" dialogTitle={selectedDate}
       width="90vw" maxWidth="72rem" maxHeight="90vh"
-      onPointerDown={(pointer) => { if (pointer.target === pointer.currentTarget) requestDayClose(); }}
-      onojClose={() => { setDayOpen(false); closeEditor(); }}>
+      onojClose={requestDayClose}>
       <div slot="body" class="calendar-day-dialog calendar-day-dialog__jet-body">
       <button type="button" class="calendar-day-dialog__close" aria-label="Close" onClick={requestDayClose}>닫기</button>
       <p class="calendar-day-dialog__hint">09:00–18:00 · 10분 단위</p>

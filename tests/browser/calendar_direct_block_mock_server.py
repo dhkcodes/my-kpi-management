@@ -8,12 +8,13 @@ import os
 import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
 PORT = int(os.environ.get("KAP_CALENDAR_TEST_PORT", "8124"))
 EVENTS: list[dict] = []
+REQUESTS: list[str] = []
 NEXT_ID = 1
 
 
@@ -64,9 +65,11 @@ class Handler(SimpleHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def do_GET(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        REQUESTS.append(self.path)
         if path == "/_test/state":
-            return self.json_response({"events": EVENTS})
+            return self.json_response({"events": EVENTS, "requests": REQUESTS})
         if path == "/api/v1/auth/session":
             return self.json_response({
                 "userKey": "browser-test-owner", "displayName": "Browser Test", "loginId": "browser.test",
@@ -95,6 +98,21 @@ class Handler(SimpleHTTPRequestHandler):
                 "type": "ACCOUNT", "id": 101, "accountId": 101,
                 "accountName": "Acme Cloud", "label": "Acme Cloud"
             }]})
+        if path.endswith("/workload-options"):
+            query = parse_qs(parsed.query)
+            offset = int(query.get("offset", ["0"])[0])
+            size = int(query.get("size", ["10"])[0])
+            all_items = [{
+                "accountId": 1000 + index,
+                "workloadId": 2000 + index,
+                "accountName": f"Search Account {index:02d}",
+                "workloadName": f"Workload {index:02d}",
+                "dealId": None,
+                "opptyName": None,
+                "opptyNo": None,
+            } for index in range(25)]
+            items = all_items[offset:offset + size]
+            return self.json_response({"items": items, "total": len(all_items), "hasMore": offset + size < len(all_items)})
         if path == "/api/v1/collaboration/directory/users":
             return self.json_response({"items": [{"userKey": "share-user", "displayName": "Share User"}]})
         if path.startswith("/api/v1/"):
@@ -104,6 +122,17 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         global NEXT_ID
         path = urlparse(self.path).path
+        REQUESTS.append(f"POST {self.path}")
+        status_match = re.fullmatch(r"/api/v1/calendar/events/(\d+)/(cancel|reopen)", path)
+        if status_match:
+            event_id = int(status_match.group(1))
+            status = "CANCELLED" if status_match.group(2) == "cancel" else "SCHEDULED"
+            for event in EVENTS:
+                if event["id"] == event_id:
+                    event["status"] = status
+                    event["versionNo"] += 1
+                    return self.json_response(event)
+            return self.json_response({"message": "not found"}, 404)
         if path == "/api/v1/calendar/events":
             body = self.read_json()
             event = event_from_body(body, NEXT_ID)
@@ -130,6 +159,12 @@ class Handler(SimpleHTTPRequestHandler):
         return self.json_response({}, 200)
 
     def do_DELETE(self) -> None:
+        path = urlparse(self.path).path
+        REQUESTS.append(f"DELETE {self.path}")
+        match = re.fullmatch(r"/api/v1/calendar/events/(\d+)", path)
+        if match:
+            event_id = int(match.group(1))
+            EVENTS[:] = [event for event in EVENTS if event["id"] != event_id]
         self.send_response(204)
         self.end_headers()
 

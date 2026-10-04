@@ -116,7 +116,7 @@ type EventDto = {
   status?: "SCHEDULED" | "CANCELLED"; timezone: string; visibility: CalendarVisibility;
   versionNo: number; effectiveAccess?: CalendarSharePermission; effectiveVisibility?: CalendarVisibility;
 };
-type ShareDto = { userKey: string; access: CalendarSharePermission; visibility: CalendarVisibility };
+type ShareDto = { userKey: string; displayName?: string | null; access: CalendarSharePermission; visibility: CalendarVisibility };
 type CalendarShareDto = {
   userKey: string;
   direction: CalendarShare["direction"];
@@ -130,7 +130,7 @@ const request = async <T>(path: string, init?: RequestInit, fetchImpl: FetchLike
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 };
 const unwrap = <T>(value: T[] | { items: T[] }): T[] => Array.isArray(value) ? value : value.items;
-const mapShare = (share: ShareDto): CalendarEventShare => ({ userKey: share.userKey, permission: share.access, visibility: share.visibility });
+const mapShare = (share: ShareDto): CalendarEventShare => ({ userKey: share.userKey, ...(share.displayName ? { displayName: share.displayName } : {}), permission: share.access, visibility: share.visibility });
 const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): CalendarEvent => ({
   id: event.id,
   ownerUserKey: event.ownerUserKey ?? "",
