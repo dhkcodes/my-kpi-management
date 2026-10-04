@@ -11,11 +11,11 @@ import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATIO
 import { fetchWeeklyActivities, WeeklyActivityRecord } from "../../data/weeklyActivitiesApi";
 import { sanitizeWeeklyActivityHtml } from "./weeklyActivityEditorSession";
 
-const EventTitle = ({ text, onEdit }: { text: string; onEdit?: () => void }) => {
+const EventTitle = ({ text, onEdit, onTouchTap }: { text: string; onEdit?: () => void; onTouchTap?: (event: PointerEvent) => boolean }) => {
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const lastTouchRef = useRef(0);
+
   useEffect(() => {
     const update = () => setOverflowing(Boolean(ref.current && ref.current.scrollWidth > ref.current.clientWidth));
     update();
@@ -29,15 +29,8 @@ const EventTitle = ({ text, onEdit }: { text: string; onEdit?: () => void }) => 
       onFocus={() => setExpanded(true)} onBlur={() => setExpanded(false)}
       onPointerUp={(event) => {
         if (event.pointerType !== "touch") return;
-        const now = Date.now();
-        if (now - lastTouchRef.current < 400) {
-          event.stopPropagation();
-          onEdit?.();
-          lastTouchRef.current = 0;
-        } else {
-          lastTouchRef.current = now;
-          setExpanded((value) => !value);
-        }
+        if (onTouchTap?.(event)) return;
+        setExpanded((value) => !value);
       }}>{text}</span>
     {overflowing && <span class="calendar-event__full-title" role="tooltip">{text}</span>}
   </span>;
@@ -136,6 +129,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [settingsDraft, setSettingsDraft] = useState<Draft | null>(null);
   const [eventShares, setEventShares] = useState<CalendarEvent["shares"]>([]);
   const [eventShareQuery, setEventShareQuery] = useState("");
   const [eventShareSearchOpen, setEventShareSearchOpen] = useState(false);
@@ -185,6 +179,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const initialCalendarLoadRef = useRef(true);
   const lastTouchTapRef = useRef<{ date: string; at: number } | null>(null);
   const lastTouchOpenAtRef = useRef(0);
+  const lastEventTitleTouchRef = useRef<{ eventId: number; at: number } | null>(null);
   const today = todayIso();
 
   const eventShareSearchRef = useRef<HTMLElement>(null);
@@ -336,13 +331,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   useEffect(() => {
     if (!editorMenuOpen) return;
-    const closeSettings = (event: PointerEvent) => {
+    const handleOutsideSettings = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
       if (target.closest("#calendar-editor-options-launcher, [aria-label='일정 설정']")) return;
-      setEditorMenuOpen(false);
+      closeSettings();
     };
-    document.addEventListener("pointerdown", closeSettings, true);
-    return () => document.removeEventListener("pointerdown", closeSettings, true);
+    document.addEventListener("pointerdown", handleOutsideSettings, true);
+    return () => document.removeEventListener("pointerdown", handleOutsideSettings, true);
   }, [editorMenuOpen]);
 
   useEffect(() => {
@@ -459,9 +454,30 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     mouse.preventDefault();
     openPreviewDraft({ kind: "TIMED", ...timelineCreationRange(anchorMinutes), clientX: mouse.clientX, clientY: mouse.clientY, pointerType: "mouse" });
   };
-  const openEdit = (event: CalendarEvent) => { setTitleEditing(false); setSelectedEventId(event.id); setSelectedDate(eventCalendarDate(event.startsAt, event.timezone)); setDayOpen(true); setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setError(""); };
+  const openEdit = (event: CalendarEvent) => { setTitleEditing(false); setEditorMenuOpen(false); setSettingsDraft(null); setSelectedEventId(event.id); setSelectedDate(eventCalendarDate(event.startsAt, event.timezone)); setDayOpen(true); setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setError(""); };
   const beginTitleEdit = (event: CalendarEvent) => { openEdit(event); setTitleEditing(true); requestAnimationFrame(() => titleInputRef.current?.focus()); };
-  const closeEditor = () => { setTitleEditing(false); setEditorMenuOpen(false); setDraft(null); setEditing(null); setError(""); };
+  const handleEventTitleTouchTap = (event: CalendarEvent, pointer: PointerEvent) => {
+    const now = Date.now();
+    const previous = lastEventTitleTouchRef.current;
+    if (previous?.eventId === event.id && now - previous.at < 400) {
+      pointer.preventDefault();
+      pointer.stopPropagation();
+      lastEventTitleTouchRef.current = null;
+      beginTitleEdit(event);
+      return true;
+    }
+    lastEventTitleTouchRef.current = { eventId: event.id, at: now };
+    return false;
+  };
+
+  const closeSettings = () => { setEditorMenuOpen(false); setSettingsDraft(null); };
+  const toggleSettings = () => {
+    if (editorMenuOpen) { closeSettings(); return; }
+    if (!draft) return;
+    setSettingsDraft({ ...draft });
+    setEditorMenuOpen(true);
+  };
+  const closeEditor = () => { setTitleEditing(false); closeSettings(); setDraft(null); setEditing(null); setError(""); };
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -506,14 +522,27 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     finally { setSaving(false); }
   };
   const applySettings = async () => {
-    if (!draft || !editing?.canEdit) return;
+    if (!draft || !settingsDraft || (editing && !editing.canEdit)) return;
+    const nextDraft = {
+      ...draft,
+      forcePrivate: settingsDraft.forcePrivate,
+      vacation: settingsDraft.vacation,
+      recurrence: settingsDraft.recurrence,
+      recurrenceUntil: settingsDraft.recurrenceUntil,
+      workingDays: settingsDraft.workingDays
+    };
+    if (!editing) {
+      setDraft(nextDraft);
+      closeSettings();
+      return;
+    }
     setSaving(true);
     try {
-      const saved = await updateCalendarEvent(editing, toInput(draft, eventShares));
+      const saved = await updateCalendarEvent(editing, toInput(nextDraft, eventShares));
       setEvents((current) => current.map((event) => event.id === saved.id ? saved : event));
       setEditing(saved);
       setDraft(draftFromEvent(saved));
-      setEditorMenuOpen(false);
+      closeSettings();
       setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "일정 설정을 적용하지 못했습니다."); }
     finally { setSaving(false); }
@@ -828,21 +857,21 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       <div class="calendar-block-editor__head">
         <span class="calendar-block-editor__time">{timed ? `${draft.startTime}–${draft.endTime}` : draft.allDay ? "종일" : "시간 미지정"}</span>
         <span class="calendar-block-editor__actions">
-          {editing?.canEdit && <>
-            <button id="calendar-editor-options-launcher" type="button" aria-label="설정" aria-haspopup="dialog" aria-expanded={editorMenuOpen} onClick={() => setEditorMenuOpen(!editorMenuOpen)}>설정</button>
-            <oj-c-popup opened={editorMenuOpen} launcher="#calendar-editor-options-launcher" anchor="#calendar-editor-options-launcher" placement="bottom-end" autoDismiss="none" initialFocus="none" onojClose={() => setEditorMenuOpen(false)}>
-              <div class="calendar-options-popover calendar-options-popover__jet-content" role="group" aria-label="일정 설정">
-                <label><input type="checkbox" checked={draft.forcePrivate} onChange={(event) => setDraft({ ...draft, forcePrivate: event.currentTarget.checked })} />비공개</label>
-                <label><input type="checkbox" checked={draft.vacation} onChange={(event) => setDraft({ ...draft, vacation: event.currentTarget.checked })} />휴가</label>
-                <label>반복<select aria-label="반복" value={draft.recurrence} onChange={(event) => { const recurrence = event.currentTarget.value as Draft["recurrence"]; setDraft({ ...draft, recurrence, recurrenceUntil: recurrence === "NONE" ? "" : draft.recurrenceUntil || draft.startDate }); }}><option value="NONE">반복 없음</option><option value="WEEKLY">매주</option><option value="MONTHLY">매월</option></select></label>
-                {draft.recurrence !== "NONE" && <label>반복 종료일<input aria-label="반복 종료일" type="date" min={draft.startDate} required value={draft.recurrenceUntil} onInput={(event) => setDraft({ ...draft, recurrenceUntil: event.currentTarget.value })} /></label>}
-                <label>근무일 수<input aria-label="근무일 수" type="number" min="1" max="366" required value={draft.workingDays} onInput={(event) => setDraft({ ...draft, workingDays: Math.max(1, Math.min(366, Number(event.currentTarget.value) || 1)) })} /></label>
+          {editable && <>
+            <button id="calendar-editor-options-launcher" type="button" aria-label="설정" aria-haspopup="dialog" aria-expanded={editorMenuOpen} onClick={toggleSettings}>설정</button>
+            <oj-c-popup opened={editorMenuOpen} launcher="#calendar-editor-options-launcher" anchor="#calendar-editor-options-launcher" placement="bottom-end" autoDismiss="none" initialFocus="none" onojClose={closeSettings}>
+              {settingsDraft && <div class="calendar-options-popover calendar-options-popover__jet-content" role="group" aria-label="일정 설정">
+                <label><input type="checkbox" checked={settingsDraft.forcePrivate} onChange={(event) => setSettingsDraft({ ...settingsDraft, forcePrivate: event.currentTarget.checked })} />비공개</label>
+                <label><input type="checkbox" checked={settingsDraft.vacation} onChange={(event) => setSettingsDraft({ ...settingsDraft, vacation: event.currentTarget.checked })} />휴가</label>
+                <label>반복<select aria-label="반복" value={settingsDraft.recurrence} onChange={(event) => { const recurrence = event.currentTarget.value as Draft["recurrence"]; setSettingsDraft({ ...settingsDraft, recurrence, recurrenceUntil: recurrence === "NONE" ? "" : settingsDraft.recurrenceUntil || settingsDraft.startDate }); }}><option value="NONE">반복 없음</option><option value="WEEKLY">매주</option><option value="MONTHLY">매월</option></select></label>
+                {settingsDraft.recurrence !== "NONE" && <label>반복 종료일<input aria-label="반복 종료일" type="date" min={settingsDraft.startDate} required value={settingsDraft.recurrenceUntil} onInput={(event) => setSettingsDraft({ ...settingsDraft, recurrenceUntil: event.currentTarget.value })} /></label>}
+                <label>근무일 수<input aria-label="근무일 수" type="number" min="1" max="366" required value={settingsDraft.workingDays} onInput={(event) => setSettingsDraft({ ...settingsDraft, workingDays: Math.max(1, Math.min(366, Number(event.currentTarget.value) || 1)) })} /></label>
                 <button type="button" class="primary" disabled={saving} onClick={() => void applySettings()}>적용</button>
-              </div>
+              </div>}
             </oj-c-popup>
           </>}
-          {titleEditing && editable && <button type="button" aria-label="저장" disabled={saving || !draft.title.trim()} onClick={() => void save()}>저장</button>}
-          {titleEditing && <button type="button" aria-label="편집 취소" onClick={() => { if (editing) { setDraft(draftFromEvent(editing)); setTitleEditing(false); } else closeEditor(); }}>취소</button>}
+          {(titleEditing || !editing) && editable && <button type="button" aria-label="저장" disabled={saving || !draft.title.trim()} onClick={() => void save()}>저장</button>}
+          {(titleEditing || !editing) && <button type="button" aria-label="편집 취소" onClick={() => { if (editing) { setDraft(draftFromEvent(editing)); setTitleEditing(false); } else closeEditor(); }}>취소</button>}
           {editing?.canEdit && <button type="button" disabled={saving} onClick={() => void toggleCancelled()}>{editing.status === "CANCELLED" ? "일정 다시 열기" : "일정 취소"}</button>}
           {editing?.canEdit && <button type="button" class="danger" disabled={saving} onClick={() => void removeEvent()}>일정 삭제</button>}
         </span>
@@ -860,7 +889,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         onCompositionEnd={() => setComposing(false)}
         onKeyDown={handleTitleKeyDown}
         onInput={(event) => setDraft({ ...draft, title: event.currentTarget.value })}
-      /> : <button type="button" class="calendar-block-editor__title calendar-block-editor__title--selected" aria-label="일정 제목, 두 번 눌러 편집" onDblClick={() => editing && beginTitleEdit(editing)}><EventTitle text={draft.title} onEdit={() => editing && beginTitleEdit(editing)} /></button>}
+      /> : <button type="button" class="calendar-block-editor__title calendar-block-editor__title--selected" aria-label="일정 제목, 두 번 눌러 편집" onClick={(event) => { if (event.detail >= 2 && editing) beginTitleEdit(editing); }} onDblClick={() => editing && beginTitleEdit(editing)}><EventTitle text={draft.title} onEdit={() => editing && beginTitleEdit(editing)} onTouchTap={(pointer) => editing ? handleEventTitleTouchTap(editing, pointer) : false} /></button>}
       {(draftAccountName || eventShares.length > 0) && <div class="calendar-event-relations" aria-label="일정 관계"><span>{draftAccountName && `@${draftAccountName}`}</span>{eventShares.map((share) => <span key={share.userKey}>#{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey}</span>)}</div>}
       <div class="calendar-block-editor__search">{titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).slice(0, 10).map((item, index) => <button type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"accountId" in item ? <><strong>{item.accountName}</strong><span>{item.label}</span></> : item.displayName}</button>)}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
       {editing && !editing.canEdit && <small class="calendar-sharing-readonly">공유 일정 · 읽기 전용</small>}
@@ -917,7 +946,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             const shared = !event.canEdit;
             const ownerColor = eventColor(event);
             const icon = event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : shared ? "↗" : "●";
-            return <div role="button" tabIndex={0} class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.allDay ? " is-all-day" : event.timeUnknown ? " is-time-unknown" : ""}${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": ownerColor }} onClick={(click) => { click.stopPropagation(); openEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-label={event.status === "CANCELLED" ? "취소 일정" : event.forcePrivate ? "비공개 일정" : shared ? "공유 일정" : "내 일정"}>{icon}</span>{(event.allDay || event.timeUnknown) && <span class="calendar-event__kind" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}>{event.allDay ? "▣" : "◷"}</span>}<EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} /><div class="calendar-event__meta">{time && <small class="calendar-event__time">{time}</small>}{renderEventRelations(event)}</div></div>;
+            return <div role="button" tabIndex={0} class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.allDay ? " is-all-day" : event.timeUnknown ? " is-time-unknown" : ""}${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": ownerColor }} onClick={(click) => { click.stopPropagation(); openEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-label={event.status === "CANCELLED" ? "취소 일정" : event.forcePrivate ? "비공개 일정" : shared ? "공유 일정" : "내 일정"}>{icon}</span>{(event.allDay || event.timeUnknown) && <span class="calendar-event__kind" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}>{event.allDay ? "▣" : "◷"}</span>}<EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{time && <small class="calendar-event__time">{time}</small>}{renderEventRelations(event)}</div></div>;
           })}
           {activities.map((activity) => <button type="button" class="calendar-weekly-activity" onClick={(click) => { click.stopPropagation(); setViewingActivity(activity); }}>Weekly Activities</button>)}
         </div>;
@@ -937,7 +966,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         return <div class="calendar-day-detail">
           <section class="calendar-day-undated" aria-label="종일 또는 시간 미지정 일정"><div class="calendar-day-undated__heading"><strong>종일 / 시간 미지정</strong><span>유형을 선택해 연속으로 입력할 수 있습니다.</span></div>
             {creationPreview && creationPreview.kind !== "TIMED" ? <div class="calendar-create-row-preview" aria-live="polite"><strong>{creationPreview.kind === "ALL_DAY" ? "하루종일" : "시간 미지정"}</strong><span>새 일정</span></div> : draft && (draft.allDay || draft.timeUnknown) ? renderDraftEditor(true) : <div class="calendar-day-blank-row"><select aria-label="새 일정 시간 유형" value={undatedCreateKind} onChange={(event) => { const kind = event.currentTarget.value as CreateLaneKind; undatedCreateKindRef.current = kind; setUndatedCreateKind(kind); openCreate(selectedDate); setDraft((current) => current ? { ...current, allDay: kind === "ALL_DAY", timeUnknown: kind === "UNKNOWN" } : current); }}><option value="ALL_DAY">하루종일</option><option value="UNKNOWN">시간 미지정</option></select><input aria-label="새 일정 제목" placeholder="새 일정 입력…" onFocus={() => openCreate(selectedDate)} onInput={(event) => { if (!draft) openCreate(selectedDate); setDraft((current) => current ? { ...current, title: event.currentTarget.value } : current); }} /></div>}
-            <div class="calendar-day-undated__events">{untimed.filter((event) => event.id !== editing?.id).map((event) => <div role="button" tabIndex={0} class={`calendar-detail-event${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event) }} onClick={() => openEdit(event)} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-undated-kind calendar-undated-type" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}><i aria-hidden="true" />{event.vacation ? "🏖 휴가" : event.allDay ? "▣ 하루종일" : "◷ 시간 미지정"}</span><EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} /><div class="calendar-event__meta">{renderEventRelations(event)}</div></div>)}</div>
+            <div class="calendar-day-undated__events">{untimed.filter((event) => event.id !== editing?.id).map((event) => <div role="button" tabIndex={0} class={`calendar-detail-event${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event) }} onClick={() => openEdit(event)} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-undated-kind calendar-undated-type" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}><i aria-hidden="true" />{event.vacation ? "🏖 휴가" : event.allDay ? "▣ 하루종일" : "◷ 시간 미지정"}</span><EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{renderEventRelations(event)}</div></div>)}</div>
           </section>
           <div class="calendar-day-timeline calendar-day-timeline--interactive" ref={timelineRef} onDblClick={handleTimelineDoubleClick} onPointerMove={(pointer) => { if (creationPreviewRef.current) return; const rect = pointer.currentTarget.getBoundingClientRect(); setHoverMinutes(snapTimelinePointer(pointer.clientY, rect.top, rect.height)); }} onPointerLeave={() => { if (!creationPreviewRef.current) setHoverMinutes(null); }} onContextMenu={(event) => { if (creationPreviewRef.current) event.preventDefault(); }} onPointerDown={beginTimelineCreate}>
             {Array.from({ length: 10 }, (_, index) => 9 + index).map((hour) => <div class="calendar-day-hour" style={{ top: `${((hour * 60 - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><time>{String(hour).padStart(2, "0")}:00</time></div>)}

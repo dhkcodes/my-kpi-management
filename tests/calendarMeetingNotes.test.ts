@@ -124,13 +124,16 @@ assert.match(beginResizeSource, /passive: false/, "existing-event resize capture
 assert.match(calendarSource, /calendar-resize-handle--start[\s\S]*calendar-resize-handle--end/, "both timeline edges expose resize handles");
 assert.match(calendarSource, /titleEditing \|\| !editing \? <input[\s\S]*<EventTitle text=\{draft\.title/, "new events use an input while single selection keeps an existing title in view state until explicit editing");
 assert.match(calendarSource, /onDblClick=\{\(click\)[\s\S]*beginTitleEdit\(event\)/, "desktop double-click enters title editing");
-assert.match(calendarSource, /now - lastTouchRef\.current < 400[\s\S]*onEdit\?\.\(\)/, "mobile double-tap enters title editing");
+assert.match(calendarSource, /lastEventTitleTouchRef[\s\S]*previous\?\.eventId === event\.id[\s\S]*beginTitleEdit\(event\)/, "mobile double-tap survives the event-to-editor remount and enters title editing");
 const editorActions = calendarSource.slice(calendarSource.indexOf('id="calendar-editor-options-launcher"'), calendarSource.indexOf('</span>', calendarSource.indexOf('id="calendar-editor-options-launcher"')));
 const actionPositions = ['aria-label="설정"', 'aria-label="저장"', 'aria-label="편집 취소"', '"일정 취소"', '>일정 삭제</button>'].map((token) => editorActions.indexOf(token));
 assert.ok(actionPositions.every((position) => position >= 0) && actionPositions.every((position, index) => index === 0 || actionPositions[index - 1] < position), "selection and edit action order distinguishes edit cancel from event cancel");
-assert.match(calendarSource, /autoDismiss="none"[\s\S]*onojClose=\{\(\) => setEditorMenuOpen\(false\)\}/, "settings owns its close state instead of racing the launcher click");
-assert.match(calendarSource, /if \(!editorMenuOpen\) return;[\s\S]*#calendar-editor-options-launcher, \[aria-label='일정 설정'\][\s\S]*document\.addEventListener\("pointerdown", closeSettings, true\)/, "settings closes on outside pointer interaction but not on launcher or popup interaction");
+assert.match(calendarSource, /autoDismiss="none"[\s\S]*onojClose=\{closeSettings\}/, "settings owns its close state instead of racing the launcher click");
+assert.match(calendarSource, /if \(!editorMenuOpen\) return;[\s\S]*#calendar-editor-options-launcher, \[aria-label='일정 설정'\][\s\S]*closeSettings\(\)[\s\S]*document\.addEventListener\("pointerdown", handleOutsideSettings, true\)/, "settings closes on outside pointer interaction but not on launcher or popup interaction");
 assert.match(calendarSource, /비공개[\s\S]*반복[\s\S]*void applySettings\(\)[\s\S]*>적용</, "settings includes privacy, recurrence, and immediate apply");
+assert.match(calendarSource, /const \[settingsDraft, setSettingsDraft\][\s\S]*const closeSettings = \(\) => \{ setEditorMenuOpen\(false\); setSettingsDraft\(null\); \}/, "dismissed settings are discarded independently of the main event draft");
+assert.match(calendarSource, /if \(!editing\) \{[\s\S]*setDraft\(nextDraft\)[\s\S]*closeSettings\(\)/, "new-event settings commit locally without requiring an existing event version");
+assert.match(calendarSource, /\(titleEditing \|\| !editing\) && editable[\s\S]*aria-label="저장"[\s\S]*\(titleEditing \|\| !editing\)[\s\S]*aria-label="편집 취소"/, "new events expose visible Save and Cancel actions");
 assert.doesNotMatch(calendarSource, /추가 설명 없음/, "empty-description placeholder is not duplicated above the event editor");
 assert.match(calendarSource, /is-all-day[\s\S]*is-time-unknown[\s\S]*calendar-event__kind/, "month events distinguish all-day and unspecified-time while preserving status markers");
 assert.match(calendarSource, /beginMove[\s\S]*onPointerDown=\{\(pointer\) => beginExistingEventGesture/, "timeline blocks support direct pointer movement through touch-aware hit testing");
@@ -158,7 +161,7 @@ assert.match(calendarSource, /calendar-event__full-title[\s\S]*role="tooltip"/, 
 assert.match(calendarSource, /ownerDisplayName/, "shared calendar source owner is rendered separately from recipients");
 assert.match(calendarSource, /vacation[\s\S]*recurrence[\s\S]*workingDays/, "vacation and recurrence fields are available in the direct editor");
 assert.match(calendarSource, /반복 종료일[\s\S]*type="date"[\s\S]*<label>근무일 수[\s\S]*type="number"/, "recurring events collect the required end date and every event can collect a numeric working-day duration");
-assert.match(calendarSource, /draft\.recurrence !== "NONE"[\s\S]*반복 종료일[\s\S]*<label>근무일 수/, "working-day duration remains available when recurrence is NONE");
+assert.match(calendarSource, /settingsDraft\.recurrence !== "NONE"[\s\S]*반복 종료일[\s\S]*<label>근무일 수/, "working-day duration remains available when recurrence is NONE");
 assert.match(calendarSource, /calendar-undated-kind/, "all-day and unspecified events expose differentiated type marks");
 assert.match(calendarSource, /setDraftColor[\s\S]*>적용</, "legend color changes remain draft-only until Apply");
 assert.match(calendarSource, /calendar-weekly-popup__box[\s\S]*This Week[\s\S]*calendar-weekly-popup__box[\s\S]*Next Week/, "weekly activities use separate boxes");
