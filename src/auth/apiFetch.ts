@@ -42,3 +42,17 @@ export async function apiFetch(
     finishBusy();
   }
 }
+
+/** Authenticated fetch for background suggestions and batched page data.
+ * It preserves auth handling without toggling the global blocking busy overlay.
+ */
+export async function apiFetchQuiet(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  fetchImpl: FetchLike = fetch,
+  notifyAuthRequired = true
+): Promise<Response> {
+  const response = await fetchImpl(input, { ...init, credentials: "include" });
+  if (notifyAuthRequired && response.status === 401) emitAuthRequired();
+  return response;
+}
