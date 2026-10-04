@@ -196,8 +196,10 @@ export type RelatedSelection = Readonly<{
 }>;
 
 /** Mentions are relational metadata and remain visible in the title as their parent account. */
-export const applyRelatedSelection = (title: string, item: RelatedSelection) => ({
-  title: replaceActiveTitleTrigger(title, "related", item.accountName),
+export const applyRelatedSelection = (title: string, item: RelatedSelection, previousAccountName = "") => ({
+  title: previousAccountName
+    ? replaceExistingRelatedMention(title, previousAccountName, item.accountName)
+    : replaceActiveTitleTrigger(title, "related", item.accountName),
   accountId: String(item.accountId),
   workloadId: String(item.workloadId),
   opportunityDealId: item.opportunityDealId == null ? "" : String(item.opportunityDealId),

@@ -52,6 +52,7 @@ assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD
 assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, workloadId: 72, opportunityDealId: 81, opportunityId: "OPP-81", accountName: "Acme", label: "Acme - Cloud (FY27 Renewal/OPP-81)" }), {
   title: "Review @Acme", accountId: "9", workloadId: "72", opportunityDealId: "81", opportunityId: "OPP-81", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · Acme - Cloud (FY27 Renewal/OPP-81)"
 }, "an opportunity persists its parent account label and its own child relation id");
+assert.equal(applyRelatedSelection("Before @Acme after", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Beta", label: "Beta - Cloud migration" }, "Acme").title, "Before @Beta after", "a reloaded relation replaces only its persisted account mention");
 assert.equal(relatedAccountName(9, "Acme · Cloud migration"), "Acme");
 assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded account-title prefix helper stays removed");
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
