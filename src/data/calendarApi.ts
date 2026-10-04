@@ -130,23 +130,28 @@ const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): 
   canEdit: event.effectiveAccess === "EDIT"
 });
 
-const offsetFor = (localDateTime: string, timezone: string): string => {
-  try {
-    const instant = new Date(`${localDateTime.slice(0, 16)}:00Z`);
-    const name = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "longOffset" })
-      .formatToParts(instant).find((part) => part.type === "timeZoneName")?.value;
-    if (name === "GMT" || name === "UTC") return "+00:00";
-    const match = name?.match(/GMT([+-])(\d{2}):(\d{2})/);
-    if (match) return `${match[1]}${match[2]}:${match[3]}`;
-  } catch { /* The backend will report an invalid IANA timezone. */ }
-  const offset = -new Date(localDateTime).getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const absolute = Math.abs(offset);
-  return `${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
-};
 const toOffsetDateTime = (value: string, timezone: string): string => {
   if (/Z$|[+-]\d{2}:\d{2}$/.test(value)) return value;
-  return `${value.slice(0, 16)}:00${offsetFor(value, timezone)}`;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  });
+  const requested = new Date(`${value.slice(0, 16)}:00Z`).getTime();
+  for (let gapMinutes = 0; gapMinutes <= 180; gapMinutes += 1) {
+    const localMillis = requested + gapMinutes * 60000;
+    const local = new Date(localMillis).toISOString().slice(0, 16);
+    for (let offsetMinutes = -14 * 60; offsetMinutes <= 14 * 60; offsetMinutes += 15) {
+      const candidate = new Date(localMillis - offsetMinutes * 60000);
+      const parts = formatter.formatToParts(candidate);
+      const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+      if (`${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}` !== local) continue;
+      const sign = offsetMinutes < 0 ? "-" : "+";
+      const absolute = Math.abs(offsetMinutes);
+      const offset = `${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+      return `${local}:00${offset}`;
+    }
+  }
+  throw new RangeError(`Could not resolve ${value} in ${timezone}`);
 };
 const eventBody = (input: CalendarEventInput, versionNo?: number) => ({
   accountId: input.accountId ?? null,

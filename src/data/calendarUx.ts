@@ -131,19 +131,11 @@ export const minutesToTime = (minutes: number): string =>
 const snapMinutes = (minutes: number): number =>
   Math.round(minutes / TIMELINE_SNAP_MINUTES) * TIMELINE_SNAP_MINUTES;
 
-/** Produces the live create rectangle; an untouched hold defaults to one hour. */
+/** Produces the live create rectangle; creation always keeps the default one-hour duration. */
 export const timelineCreationRange = (anchorMinutes: number, targetMinutes?: number) => {
-  const anchor = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES - TIMELINE_SNAP_MINUTES, snapMinutes(anchorMinutes)));
-  if (targetMinutes === undefined) {
-    const endMinutes = Math.min(TIMELINE_END_MINUTES, anchor + 60);
-    return { startMinutes: endMinutes - 60, endMinutes };
-  }
-  const target = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES, snapMinutes(targetMinutes)));
-  if (target < anchor) return { startMinutes: target, endMinutes: anchor };
-  return {
-    startMinutes: anchor,
-    endMinutes: Math.max(anchor + TIMELINE_SNAP_MINUTES, target)
-  };
+  const requestedStart = snapMinutes(targetMinutes ?? anchorMinutes);
+  const startMinutes = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES - 60, requestedStart));
+  return { startMinutes, endMinutes: startMinutes + 60 };
 };
 
 /** Maps mouse, pen, and touch client coordinates onto one exact ten-minute slot. */

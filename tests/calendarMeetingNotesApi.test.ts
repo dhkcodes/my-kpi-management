@@ -111,6 +111,45 @@ async function main() {
   assert.equal(jsonBody(calls[0]).endsAt, null, "a start-only event keeps its absent end time in the request");
 
   calls.length = 0;
+  await createCalendarEvent({
+    ...event,
+    startsAt: "2026-03-08T00:00",
+    endsAt: "2026-03-08T23:59",
+    allDay: true,
+    timezone: "America/Los_Angeles",
+    shares: []
+  }, fetchImpl);
+  const springAllDay = jsonBody(calls[0]);
+  assert.equal(springAllDay.startsAt, "2026-03-08T00:00:00-08:00", "all-day start keeps the selected Calendar date before the DST transition");
+  assert.equal(springAllDay.endsAt, "2026-03-08T23:59:00-07:00", "all-day end keeps the selected Calendar date after the DST transition");
+
+  calls.length = 0;
+  await createCalendarEvent({
+    ...event,
+    startsAt: "2026-10-04T00:00",
+    endsAt: "2026-10-04T23:59",
+    allDay: true,
+    timezone: "Asia/Seoul",
+    shares: []
+  }, fetchImpl);
+  const seoulAllDay = jsonBody(calls[0]);
+  assert.equal(seoulAllDay.startsAt, "2026-10-04T00:00:00+09:00", "all-day start keeps the selected Seoul Calendar date");
+  assert.equal(seoulAllDay.endsAt, "2026-10-04T23:59:00+09:00", "all-day end keeps the selected Seoul Calendar date");
+
+  calls.length = 0;
+  await createCalendarEvent({
+    ...event,
+    startsAt: "2026-04-24T00:00",
+    endsAt: "2026-04-24T23:59",
+    allDay: true,
+    timezone: "Africa/Cairo",
+    shares: []
+  }, fetchImpl);
+  const midnightGapAllDay = jsonBody(calls[0]);
+  assert.equal(midnightGapAllDay.startsAt, "2026-04-24T01:00:00+03:00", "a midnight DST gap advances to the first valid minute of the selected date");
+  assert.equal(midnightGapAllDay.endsAt, "2026-04-24T23:59:00+03:00", "the all-day end remains on the selected date after the transition");
+
+  calls.length = 0;
   await updateCalendarEvent(events[0]!, { ...event, shares: [{ userKey: "user/two", permission: "VIEW", visibility: "DETAILS" }] }, fetchImpl);
   const eventUpdate = calls.find((call) => call.url === "/api/v1/calendar/events/41" && call.init?.method === "PUT")!;
   assert.equal(jsonBody(eventUpdate).versionNo, 3, "calendar updates carry the last server version");
