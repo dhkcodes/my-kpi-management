@@ -44,9 +44,11 @@ assert.doesNotMatch(calendarSource, /BUSY_ONLY/, "Calendar sharing no longer off
 assert.match(calendarSource, /const finishBusy = beginAppBusy\(\)[\s\S]*Promise\.all\([\s\S]*apiFetchQuiet[\s\S]*\.catch\(\(reason\)[\s\S]*setError[\s\S]*\.finally\(finishBusy\)/, "initial Calendar loading owns one busy scope and closes it after success or failure");
 assert.equal((calendarSource.match(/beginAppBusy\(\)/g) ?? []).length, 1, "Calendar initial loading has no duplicate busy scope");
 assert.match(calendarSource, /onDblClick=\{\(\) => \{[\s\S]*openDay/, "desktop double click opens the selected day");
+assert.match(calendarSource, /onDblClick=\{handleTimelineDoubleClick\}/, "desktop timeline double click creates a direct block draft");
 assert.match(calendarSource, /lastTouchTapRef[\s\S]*setDayOpen\(true\)/, "mobile double tap opens the selected day");
 assert.match(calendarSource, /const beginTimelineCreate[\s\S]*setTimeout[\s\S]*LONG_PRESS_CREATE_DELAY_MS/, "empty timeline creation uses the 500ms long-press contract");
 assert.match(calendarSource, /longPressMovementCancels[\s\S]*preventDefault/, "movement cancels before activation and active dragging suppresses scrolling");
+assert.match(calendarSource, /preventActivatedTouchScroll[\s\S]*creationPreviewRef\.current[\s\S]*touchmove[\s\S]*passive: false/, "activated mobile long-press uses a non-passive touch guard without blocking pre-activation scroll");
 assert.match(calendarSource, /calendar-day-undated[\s\S]*calendar-create-row-preview/, "dragging into the shared top lane renders its row preview");
 assert.match(calendarSource, /dayOpen && <oj-c-dialog[\s\S]*dialogTitle=\{selectedDate\}[\s\S]*calendar-day-dialog[\s\S]*calendar-day-detail/, "the selected-day timeline is contained by one JET modal dialog");
 assert.match(calendarSource, /import "oj-c\/dialog"/);
@@ -55,6 +57,14 @@ assert.match(calendarSource, /calendar-editor-options-launcher[\s\S]*<oj-c-popup
 assert.match(calendarSource, /calendar-color-[\s\S]*<oj-c-popup[\s\S]*calendar-legend__palette/, "legend colors use a JET popup");
 assert.match(calendarSource, /calendar-day-timeline--interactive/);
 assert.match(calendarSource, /calendar-timeline-editor[\s\S]*renderDraftEditor/, "timed editing is rendered inside its timeline block");
+assert.match(calendarSource, /class="calendar-block-editor__title"/, "the blue event block itself owns the direct title input");
+const blockEditorStart = calendarSource.indexOf("const renderDraftEditor");
+const blockEditorEnd = calendarSource.indexOf("const eventColor", blockEditorStart);
+const blockEditorSource = calendarSource.slice(blockEditorStart, blockEditorEnd);
+assert.ok(blockEditorStart >= 0 && blockEditorEnd > blockEditorStart, "block editor source is discoverable");
+assert.doesNotMatch(blockEditorSource, /class="calendar-event-form"/, "no create or edit path may render the legacy multi-field event form");
+assert.doesNotMatch(blockEditorSource, />From</, "the block editor has no separate From field");
+assert.doesNotMatch(blockEditorSource, />To</, "the block editor has no separate To field");
 assert.match(calendarSource, /calendar-day-blank-row/, "the combined all-day and unspecified lane retains a consecutive-entry row");
 assert.doesNotMatch(calendarSource, /<section class="calendar-inline-editor"/, "there is no separate editor below the calendar");
 assert.match(calendarSource, /onCompositionStart[\s\S]*onCompositionEnd/, "inline title save is IME-safe");

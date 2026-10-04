@@ -49,8 +49,8 @@ assert.equal(longPressCanActivate(1_000, 1_600, 9), false, "a moved pointer cann
 assert.equal(longPressMovementCancels(0, 0, 7, 4), false, "small pointer jitter does not steal native scrolling");
 assert.equal(longPressMovementCancels(0, 0, 9, 0), true, "movement beyond tolerance cancels the pending hold");
 assert.deepEqual(timelineCreationRange(850), { startMinutes: 850, endMinutes: 910 }, "activation previews a one-hour event");
-assert.deepEqual(timelineCreationRange(850, 880), { startMinutes: 850, endMinutes: 880 }, "dragging updates the snapped end");
-assert.deepEqual(timelineCreationRange(850, 800), { startMinutes: 800, endMinutes: 850 }, "dragging upward updates both live bounds");
+assert.deepEqual(timelineCreationRange(850, 880), { startMinutes: 880, endMinutes: 940 }, "dragging creation moves the default one-hour block without resizing it");
+assert.deepEqual(timelineCreationRange(850, 800), { startMinutes: 800, endMinutes: 860 }, "dragging upward also preserves the default one-hour duration");
 assert.deepEqual(timelineCreationRange(1070), { startMinutes: 1020, endMinutes: 1080 }, "the default hour remains in timeline bounds");
 assert.deepEqual(layoutTimelineEvents([
   { id: 1, startMinutes: 540, endMinutes: 600 },
