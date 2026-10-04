@@ -5681,7 +5681,9 @@ h4.weekly-activity-section-label--next-week,
 .calendar-timeline-editor { left: 4.5rem; position: absolute; right: .5rem; z-index: 12; }
 .calendar-timeline-event.is-cancelled { filter: grayscale(.65); text-decoration: line-through; }
 .calendar-timeline-event__time { display: block; font-size: .65rem; font-weight: 400; }
-.calendar-resize-handle { bottom: -4px; cursor: ns-resize; height: 12px; left: 0; position: absolute; right: 0; touch-action: none; }
+.calendar-resize-handle { cursor: ns-resize; height: 12px; left: 0; position: absolute; right: 0; touch-action: none; }
+.calendar-resize-handle--start { top: -4px; }
+.calendar-resize-handle--end { bottom: -4px; }
 .calendar-inline-editor--block { background: #fff; border: 1px solid #9da9b2; border-radius: .65rem; box-shadow: 0 .75rem 2.2rem rgb(20 26 33 / 22%); color: var(--kpi-ink); min-width: min(34rem, calc(100vw - 4rem)); padding: .65rem; position: relative; text-decoration: none; z-index: 10; }
 .calendar-timeline-event--editor { height: auto !important; min-height: 9rem; overflow: visible; width: min(36rem, calc(100% - 4.5rem)); z-index: 10; }
 .calendar-inline-editor--block > header, .calendar-inline-editor--block > footer { align-items: center; display: flex; gap: .4rem; justify-content: space-between; }
@@ -5725,8 +5727,14 @@ h4.weekly-activity-section-label--next-week,
 .calendar-legend { display: flex; flex-wrap: wrap; gap: .35rem; grid-column: 1 / -1; justify-content: flex-end; position: relative; }
 .calendar-legend span { border-radius: 999px; font-size: .68rem; padding: .2rem .45rem; }
 .calendar-legend__palette { align-items: center; background: #fff; border: 1px solid var(--kpi-border); border-radius: .55rem; box-shadow: 0 .4rem 1rem rgb(0 0 0 / 14%); display: flex; flex-wrap: wrap; gap: .35rem; max-width: 18rem; padding: .55rem; position: absolute; right: 0; top: calc(100% + .3rem); z-index: 8; }
+.calendar-options-popover__jet-content, .calendar-legend__palette--jet-content { box-shadow: none; position: static; }
+.calendar-day-dialog__jet-body, .calendar-event-editor__jet-body, .calendar-weekly-popup__jet-body { background: transparent; border: 0; border-radius: 0; box-shadow: none; max-height: none; width: 100%; }
 .calendar-legend__palette > button { border: 2px solid transparent; border-radius: .25rem; cursor: pointer; height: 1.45rem; min-height: 0; padding: 0; width: 1.45rem; }
 .calendar-legend__palette label { align-items: center; display: inline-flex; font-size: .72rem; gap: .25rem; }
+.calendar-legend__palette-actions { display: flex; gap: .35rem; margin-left: auto; width: 100%; }
+.calendar-legend__palette-actions button { flex: 1; }
+.calendar-weekly-popup--vertical { display: grid; gap: .75rem; }
+.calendar-weekly-popup__arrow { color: var(--kpi-brand); font-size: 1.5rem; line-height: 1; text-align: center; }
 .kap-modal-backdrop { align-items: center; background: rgb(20 24 28 / 45%); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 1000; }
 .kap-modal { background: #fff; border-radius: var(--oj-core-border-radius-md); box-shadow: 0 1rem 3rem rgb(0 0 0 / 25%); max-height: calc(100dvh - 2rem); overflow: auto; width: min(38rem, 100%); }
 .kap-modal > header, .kap-modal > footer { align-items: center; display: flex; justify-content: space-between; padding: .75rem 1rem; }

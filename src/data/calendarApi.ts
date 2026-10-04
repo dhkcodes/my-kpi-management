@@ -1,4 +1,4 @@
-import { apiFetch } from "../auth/apiFetch";
+import { apiFetch, apiFetchQuiet } from "../auth/apiFetch";
 
 export type CalendarVisibility = "PRIVATE" | "BUSY_ONLY" | "DETAILS";
 export type CalendarSharePermission = "VIEW" | "EDIT";
@@ -260,16 +260,16 @@ export async function deleteCalendarShare(share: CalendarShare, fetchImpl: Fetch
   const path = pendingOutgoing ? `/calendar/shares/requests/${encodeURIComponent(share.userKey)}` : `/calendar/shares/${encodeURIComponent(share.userKey)}`;
   await request<void>(path, { method: "DELETE" }, fetchImpl);
 }
-export async function listSharingUsers(query = "", fetchImpl: FetchLike = apiFetch): Promise<SharingUser[]> {
+export async function listSharingUsers(query = "", fetchImpl: FetchLike = apiFetchQuiet): Promise<SharingUser[]> {
   const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
   return unwrap(await request<SharingUser[] | { items: SharingUser[] }>(`/collaboration/directory/users${suffix}`, undefined, fetchImpl));
 }
-export async function listCalendarAccounts(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetch): Promise<CalendarAccountOption[]> {
+export async function listCalendarAccounts(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetchQuiet): Promise<CalendarAccountOption[]> {
   const params = new URLSearchParams({ fiscalYear, search: query.trim() });
   return unwrap(await request<CalendarAccountOption[] | { items: CalendarAccountOption[] }>(
     `/collaboration/directory/accounts?${params.toString()}`, undefined, fetchImpl));
 }
-export async function listCalendarRelatedItems(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetch): Promise<CalendarRelatedItemOption[]> {
+export async function listCalendarRelatedItems(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetchQuiet): Promise<CalendarRelatedItemOption[]> {
   const params = new URLSearchParams({ fiscalYear, search: query.trim() });
   return unwrap(await request<CalendarRelatedItemOption[] | { items: CalendarRelatedItemOption[] }>(
     `/collaboration/directory/related-items?${params.toString()}`, undefined, fetchImpl));
