@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beginAppBusy, getAppBusyCount, subscribeAppBusy } from "../src/app/appBusy";
-import { apiFetch } from "../src/auth/apiFetch";
+import {
+  apiFetch,
+  apiFetchQuiet,
+  resetAuthRequiredNotification,
+  subscribeAuthRequired
+} from "../src/auth/apiFetch";
 
 async function run(): Promise<void> {
   assert.equal(getAppBusyCount(), 0);
@@ -25,6 +30,24 @@ async function run(): Promise<void> {
   };
   await assert.rejects(apiFetch("/test", undefined, failedFetch), /network failure/u);
   assert.equal(getAppBusyCount(), 0, "a rejected API request releases the shared loading state in finally");
+
+  let quietCredentials = "";
+  const quietSuccess = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    quietCredentials = String(init?.credentials ?? "");
+    return new Response("[]", { status: 200 });
+  };
+  await apiFetchQuiet("/suggestions", undefined, quietSuccess);
+  assert.equal(quietCredentials, "include", "quiet requests preserve authenticated cookie delivery");
+  assert.equal(getAppBusyCount(), 0, "quiet requests never toggle the blocking global busy state");
+  await assert.rejects(apiFetchQuiet("/suggestions", undefined, failedFetch), /network failure/u);
+  assert.equal(getAppBusyCount(), 0, "quiet request failures propagate without leaking busy state");
+
+  resetAuthRequiredNotification();
+  let authRequiredCount = 0;
+  const unsubscribeAuth = subscribeAuthRequired(() => { authRequiredCount += 1; });
+  await apiFetchQuiet("/suggestions", undefined, async () => new Response("", { status: 401 }));
+  unsubscribeAuth();
+  assert.equal(authRequiredCount, 1, "quiet requests preserve the shared 401 authentication flow");
 
   const busySource = readFileSync(join(process.cwd(), "src/app/appBusy.ts"), "utf8");
   const overlaySource = readFileSync(join(process.cwd(), "src/components/AppBusyOverlay.tsx"), "utf8");
