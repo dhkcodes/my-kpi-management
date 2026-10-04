@@ -5676,6 +5676,7 @@ h4.weekly-activity-section-label--next-week,
 .calendar-timeline-hour { color: var(--kpi-muted); font-size: .68rem; left: .4rem; position: absolute; transform: translateY(-.45rem); }
 .calendar-timeline-hover { background: #245b83; color: #fff; font-size: .68rem; left: 4rem; padding: .12rem .35rem; pointer-events: none; position: absolute; transform: translateY(-50%); z-index: 8; }
 .calendar-timeline-event { background: color-mix(in srgb, var(--owner-color) 16%, white); border: 1px solid color-mix(in srgb, var(--owner-color) 40%, white); border-left: .22rem solid var(--owner-color); border-radius: .42rem; color: color-mix(in srgb, var(--owner-color) 78%, black); cursor: pointer; left: calc(4.1rem + (100% - 4.5rem) * var(--column) / var(--columns)); min-height: 20px; overflow: visible; padding: .18rem .4rem; position: absolute; text-align: left; top: var(--top); width: calc((100% - 4.5rem) / var(--columns) - .2rem); z-index: 2; }
+.calendar-timeline-event.is-editable { touch-action: none; }
 .calendar-timeline-event:hover, .calendar-timeline-event:focus-within { z-index: 6; }
 .calendar-timeline-event.is-editable { touch-action: none; }
 .calendar-timeline-event > strong, .calendar-timeline-event > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5689,6 +5690,10 @@ h4.weekly-activity-section-label--next-week,
 .calendar-resize-handle--start::after { top: 2px; }
 .calendar-resize-handle--end { bottom: 0; }
 .calendar-resize-handle--end::after { bottom: 2px; }
+.calendar-timeline-event.is-touch-compact { padding-right: 48px; }
+.calendar-timeline-event.is-touch-compact .calendar-resize-handle { height: 50%; left: auto; right: 0; width: 44px; }
+.calendar-timeline-event.is-touch-compact .calendar-resize-handle--start { bottom: auto; top: 0; }
+.calendar-timeline-event.is-touch-compact .calendar-resize-handle--end { bottom: 0; top: auto; }
 .calendar-inline-editor--block.calendar-block-editor { background: color-mix(in srgb, #245b83 14%, white); border: 2px solid #245b83; border-left-width: .28rem; border-radius: .45rem; box-shadow: 0 .35rem 1rem rgb(20 26 33 / 18%); color: #173b55; cursor: grab; height: 100%; min-height: 20px; min-width: 0; overflow: visible; padding: .18rem .35rem; position: relative; text-decoration: none; touch-action: none; width: 100%; z-index: 10; }
 .calendar-block-editor:active { cursor: grabbing; }
 .calendar-block-editor__head { align-items: center; display: flex; gap: .25rem; justify-content: space-between; min-height: 1.15rem; }
