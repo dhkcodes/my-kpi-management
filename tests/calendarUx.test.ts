@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
 
 const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
@@ -30,6 +30,10 @@ assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: true, startTime: "", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "time-unknown values must satisfy the API midnight contract");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "09:00", endTime: "" }), { startTime: "09:00", endTime: "09:00" }, "start-only timed events keep zero duration");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "00:00", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "midnight is retained rather than treated as missing");
+assert.equal(MIN_CALENDAR_DURATION_MINUTES, 60, "timed events use a one-hour minimum");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: false, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "13:10", endTime: "13:30" }), { startDate: "2026-10-04", startTime: "13:10", endDate: "2026-10-04", endTime: "14:10" }, "a short timed save is extended to exactly one hour");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: false, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "23:30", endTime: "" }), { startDate: "2026-10-04", startTime: "23:30", endDate: "2026-10-05", endTime: "00:30" }, "minimum duration carries into the next day");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: true, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "", endTime: "" }), { startDate: "2026-10-04", startTime: "", endDate: "2026-10-04", endTime: "" });
 assert.deepEqual(extractTitleSearchTrigger("Prepare @Acme"), { kind: "related", query: "Acme" });
 assert.deepEqual(extractTitleSearchTrigger("Review #Jane"), { kind: "user", query: "Jane" });
 assert.equal(extractTitleSearchTrigger("Prepare *Cloud migration"), null, "asterisk is literal title text, not a search trigger");
@@ -47,10 +51,9 @@ assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded a
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
 assert.equal(snapTimelinePointer(540, 0, 540, 540, 1080, true), 1080, "a resize handle can snap to the timeline end");
 assert.equal(minutesToTime(850), "14:10");
-assert.deepEqual(resizeTimelineRange(850, 851), { startMinutes: 850, endMinutes: 860 }, "resize permits one ten-minute snap interval");
-assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 870 }, "resize rounds to ten minutes and allows a 20-minute event");
-assert.deepEqual(resizeTimelineRange(850, 881), { startMinutes: 850, endMinutes: 880 }, "resize supports 30-minute events");
-assert.deepEqual(resizeTimelineRange(850, 894), { startMinutes: 850, endMinutes: 890 }, "resize supports 40-minute events");
+assert.deepEqual(resizeTimelineRange(600, 600), { startMinutes: 600, endMinutes: 660 }, "resize enforces the one-hour minimum");
+assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 910 }, "a 20-minute pointer range is clamped to one hour");
+assert.deepEqual(resizeTimelineRange(850, 921), { startMinutes: 850, endMinutes: 920 }, "ranges longer than one hour retain ten-minute snapping");
 assert.equal(LONG_PRESS_CREATE_DELAY_MS, 500, "creation waits for an intentional 500ms hold");
 assert.equal(longPressCanActivate(1_000, 1_499, 0), false, "the press is still pending before 500ms");
 assert.equal(longPressCanActivate(1_000, 1_500, 0), true, "the press activates at the 500ms boundary");

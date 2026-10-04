@@ -95,6 +95,31 @@ export const normalizeEventTimes = (draft: Readonly<{
   return { startTime, endTime: draft.endTime || startTime };
 };
 
+export const MIN_CALENDAR_DURATION_MINUTES = 60;
+
+/** Existing short events stay untouched until saved; a timed save is normalized to one hour or longer. */
+export const ensureMinimumTimedDuration = (draft: Readonly<{
+  allDay: boolean;
+  timeUnknown: boolean;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+}>): Readonly<{ startDate: string; startTime: string; endDate: string; endTime: string }> => {
+  if (draft.allDay || draft.timeUnknown || !draft.startDate || !draft.startTime) {
+    return { startDate: draft.startDate, startTime: draft.startTime, endDate: draft.endDate || draft.startDate, endTime: draft.endTime };
+  }
+  const start = new Date(`${draft.startDate}T${draft.startTime}:00`);
+  const endDate = draft.endDate || draft.startDate;
+  const end = draft.endTime ? new Date(`${endDate}T${draft.endTime}:00`) : new Date(Number.NaN);
+  if (Number.isNaN(start.getTime())) return { startDate: draft.startDate, startTime: draft.startTime, endDate, endTime: draft.endTime };
+  const minimumEnd = new Date(start.getTime() + MIN_CALENDAR_DURATION_MINUTES * 60_000);
+  const normalized = Number.isNaN(end.getTime()) || end < minimumEnd ? minimumEnd : end;
+  const date = `${normalized.getFullYear()}-${String(normalized.getMonth() + 1).padStart(2, "0")}-${String(normalized.getDate()).padStart(2, "0")}`;
+  const time = `${String(normalized.getHours()).padStart(2, "0")}:${String(normalized.getMinutes()).padStart(2, "0")}`;
+  return { startDate: draft.startDate, startTime: draft.startTime, endDate: date, endTime: time };
+};
+
 export const formatKoreanStartTime = (value: string): string => {
   const [rawHour, rawMinute] = value.split(":");
   const hour = Number(rawHour);
@@ -213,10 +238,10 @@ export const snapTimelinePointer = (
   return Math.max(startMinutes, Math.min(includeEnd ? endMinutes : endMinutes - TIMELINE_SNAP_MINUTES, snapMinutes(raw)));
 };
 
-/** Resize uses the same grid and permits a single ten-minute snap interval. */
+/** Resize uses the same grid and never permits a timed event shorter than one hour. */
 export const resizeTimelineRange = (startMinutes: number, pointerMinutes: number) => ({
   startMinutes,
-  endMinutes: Math.max(startMinutes + TIMELINE_SNAP_MINUTES, snapMinutes(pointerMinutes))
+  endMinutes: Math.max(startMinutes + MIN_CALENDAR_DURATION_MINUTES, snapMinutes(pointerMinutes))
 });
 
 export type TimelineInterval<T extends string | number = string | number> = Readonly<{
