@@ -233,9 +233,9 @@ export async function requestCalendarShare(ownerUserKey: string, fetchImpl: Fetc
   const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(ownerUserKey)}`, { method: "POST" }, fetchImpl);
   return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? null };
 }
-export async function acceptCalendarShare(requesterUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
-  const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(requesterUserKey)}/accept`, { method: "PUT", body: JSON.stringify({ color }) }, fetchImpl);
-  return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? color };
+export async function acceptCalendarShare(requesterUserKey: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(requesterUserKey)}/accept`, { method: "PUT" }, fetchImpl);
+  return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? "#245b83" };
 }
 export async function changeCalendarShareColor(requesterUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
   const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(requesterUserKey)}/color`, { method: "PATCH", body: JSON.stringify({ color }) }, fetchImpl);

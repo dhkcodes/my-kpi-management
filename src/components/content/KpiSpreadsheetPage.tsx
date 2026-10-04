@@ -388,7 +388,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
           setWorkloadError("Unable to load workloads.");
         }
       }).finally(() => { if (active && requestGenerationRef.current === requestGeneration) setLoading(false); });
-    }, 180);
+    }, 1000);
     return () => { active = false; requestGenerationRef.current += 1; window.clearTimeout(timer); };
   }, [field.type, fiscalYear, query, workloadActive, workloadRetryVersion]);
 

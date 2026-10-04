@@ -44,6 +44,15 @@ assert.doesNotMatch(calendarSource, /BUSY_ONLY/, "Calendar sharing no longer off
 assert.match(calendarSource, /모든 공유는 보기 전용/);
 assert.match(calendarSource, /onDblClick/);
 assert.match(calendarSource, /onTouchEnd[\s\S]*lastTouchRef/, "mobile uses a real two-tap creation path");
+assert.match(calendarSource, /calendar-day-detail/);
+assert.match(calendarSource, /calendar-day-timeline/);
+assert.match(calendarSource, /calendar-inline-editor/);
+assert.match(calendarSource, /onCompositionStart[\s\S]*onCompositionEnd/, "inline title save is IME-safe");
+assert.match(calendarSource, /setTimeout[\s\S]*1000/, "directory searches use a one second debounce");
+assert.match(calendarSource, /Weekly Activities/);
+assert.match(calendarSource, /fetchWeeklyActivities/);
+assert.match(calendarSource, /calendar-event__text/);
+assert.doesNotMatch(calendarSource, /title=\{text\}/, "event tooltip is not rendered unconditionally");
 assert.match(calendarSource, /일정 다시 열기[\s\S]*일정 취소[\s\S]*일정 삭제/);
 assert.match(calendarSource, /timeUnknown: true/, "new events start without a designated time");
 assert.match(calendarSource, /Account \/ Workload \/ Oppty 선택/);
@@ -66,8 +75,9 @@ assert.match(notesSource, /Share settings were not fully synchronized/);
 assert.match(notesSource, /Retry sharing/);
 assert.match(notesSource, /canAccessLocalRecording/);
 const calendarCss = readFileSync("src/styles/app.css", "utf8");
-assert.match(calendarCss, /\.calendar-event-editor\s*\{[\s\S]*?border-radius:\s*1\.25rem;/,
-  "the calendar editor uses the approved rounded modal treatment");
+assert.match(calendarCss, /\.calendar-page-card\s*\{/);
+assert.match(calendarCss, /\.calendar-event__text\s*\{[^}]*text-overflow:\s*ellipsis/);
+assert.match(calendarCss, /\.calendar-day-timeline\s*\{/);
 const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
 assert.match(contentSource, /recordingNamespace=\{profile\.userKey\}/);
 
