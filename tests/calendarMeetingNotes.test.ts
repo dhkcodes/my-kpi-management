@@ -58,6 +58,10 @@ assert.match(calendarSource, /timeUnknown: true/, "new events start without a de
 assert.match(calendarSource, /Account \/ Workload \/ Oppty 선택/);
 assert.match(calendarSource, /검색 결과가 없습니다/);
 assert.match(calendarSource, /relatedItemType: item\.type[\s\S]*relatedItemId: String\(item\.id\)/);
+assert.match(calendarSource, /내 일정 색상 변경[\s\S]*비공개 색상 변경[\s\S]*취소됨 색상 변경/, "all fixed legend entries expose color buttons");
+assert.match(calendarSource, /direction === "OUTGOING"[\s\S]*status === "ACCEPTED"/, "accepted shared owners are colored by the viewing requester");
+assert.match(calendarSource, /getCalendarDisplayPreferences[\s\S]*changeCalendarDisplayPreference/, "viewer colors are persisted through authenticated APIs");
+assert.match(calendarSource, /CALENDAR_SHARE_COLORS\.map[\s\S]*Custom 색상/, "legend palette exposes Redwood colors and custom input");
 assert.doesNotMatch(calendarSource, /calendar-day__add/);
 const notesSource = readFileSync("src/components/content/MeetingNotesPage.tsx", "utf8");
 assert.match(notesSource, /Raw audio stays on this device and browser only/);

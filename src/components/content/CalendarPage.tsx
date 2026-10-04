@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
+import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
 import { CALENDAR_SHARE_COLORS, appendMentionToken, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, getEventBadgeText, normalizeEventRange, normalizeEventTimes, prependRelatedToken, requestIsLatest } from "../../data/calendarUx";
 import { fetchWeeklyActivities, WeeklyActivityRecord } from "../../data/weeklyActivitiesApi";
@@ -89,12 +89,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [error, setError] = useState("");
   const [sharingOpen, setSharingOpen] = useState(false);
   const [calendarShares, setCalendarShares] = useState<CalendarShare[]>([]);
+  const [displayPreferences, setDisplayPreferences] = useState<CalendarDisplayPreferences>({ ownColor: "#245B83", privateColor: "#704895", cancelledColor: "#6F6F6F" });
+  const [colorTarget, setColorTarget] = useState<CalendarColorScope | `SHARED:${string}` | null>(null);
   const [sharingUsers, setSharingUsers] = useState<SharingUser[]>([]);
   const [titleUserOptions, setTitleUserOptions] = useState<SharingUser[]>([]);
   const [shareUserQuery, setShareUserQuery] = useState("");
   const [shareSearchOpen, setShareSearchOpen] = useState(false);
   const [shareUserKey, setShareUserKey] = useState("");
-  const [shareColor, setShareColor] = useState(CALENDAR_SHARE_COLORS[0]);
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [weeklyActivities, setWeeklyActivities] = useState<WeeklyActivityRecord[]>([]);
   const [viewingActivity, setViewingActivity] = useState<WeeklyActivityRecord | null>(null);
@@ -127,13 +128,15 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       listCalendarEvents(fiscalYear),
       listKoreanHolidays(cursor.getFullYear()),
       listCalendarShares(),
+      getCalendarDisplayPreferences(),
       fetchWeeklyActivities({ fromDate, toDate, size: 100 }).catch(() => ({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })),
       listSharingUsers().catch(() => [])
-    ]).then(([items, days, shares, activities, users]) => {
+    ]).then(([items, days, shares, preferences, activities, users]) => {
       if (!active) return;
       setEvents(items);
       setHolidays(new Map(days.map((day) => [day.date, day.name])));
       setCalendarShares(shares);
+      setDisplayPreferences(preferences);
       setWeeklyActivities(activities.items);
       setSharingUsers(users);
       setError("");
@@ -274,8 +277,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   };
   const updateShareColor = async (share: CalendarShare, color: string) => {
     setSaving(true);
-    try { const saved = await changeCalendarShareColor(share.userKey, color); setCalendarShares((current) => current.map((item) => item.userKey === saved.userKey ? saved : item)); setError(""); }
+    try { const saved = await changeCalendarShareColor(share.userKey, color); setCalendarShares((current) => current.map((item) => item.userKey === saved.userKey ? saved : item)); setColorTarget(null); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "공유 색상을 변경하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const updateDisplayColor = async (scope: CalendarColorScope, color: string) => {
+    setSaving(true);
+    try { setDisplayPreferences(await changeCalendarDisplayPreference(scope, color)); setColorTarget(null); setError(""); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "표시 색상을 변경하지 못했습니다."); }
     finally { setSaving(false); }
   };
   const removeCalendarShare = async (share: CalendarShare) => {
@@ -310,6 +319,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     else void save();
   };
 
+  const eventColor = (event: CalendarEvent) => event.status === "CANCELLED"
+    ? displayPreferences.cancelledColor
+    : event.forcePrivate
+      ? displayPreferences.privateColor
+      : event.canEdit
+        ? displayPreferences.ownColor
+        : event.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0];
+
   return <section class="calendar-page" aria-labelledby="calendar-heading">
     {breadcrumb}
     <section class="calendar-page-card">
@@ -324,7 +341,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         <button type="button" onClick={() => { const now = new Date(); setCursor(new Date(now.getFullYear(), now.getMonth(), 1)); }}>Today</button>
         {canWrite && <button type="button" disabled={saving} onClick={() => void openSharing()}>전체 공유 관리</button>}
       </div>
-      <div class="calendar-legend" aria-label="일정 범례"><span class="is-own"><i />내 일정</span>{calendarShares.filter((share) => share.direction === "INCOMING" && share.status === "ACCEPTED").map((share) => <span><i style={{ backgroundColor: share.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0] }} />{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "공유 사용자"}</span>)}<span class="is-private"><i />비공개</span><span class="is-cancelled"><i />취소됨</span></div>
+      <div class="calendar-legend" aria-label="일정 범례">
+        <span><button type="button" class="calendar-legend__swatch" aria-label="내 일정 색상 변경" style={{ backgroundColor: displayPreferences.ownColor }} onClick={() => setColorTarget(colorTarget === "OWN" ? null : "OWN")} />내 일정</span>
+        {calendarShares.filter((share) => share.direction === "OUTGOING" && share.status === "ACCEPTED").map((share) => <span key={share.userKey}><button type="button" class="calendar-legend__swatch" aria-label={`${sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "공유 사용자"} 색상 변경`} style={{ backgroundColor: share.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0] }} onClick={() => setColorTarget(colorTarget === `SHARED:${share.userKey}` ? null : `SHARED:${share.userKey}`)} />{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "공유 사용자"}</span>)}
+        <span><button type="button" class="calendar-legend__swatch" aria-label="비공개 색상 변경" style={{ backgroundColor: displayPreferences.privateColor }} onClick={() => setColorTarget(colorTarget === "PRIVATE" ? null : "PRIVATE")} />비공개</span>
+        <span><button type="button" class="calendar-legend__swatch" aria-label="취소됨 색상 변경" style={{ backgroundColor: displayPreferences.cancelledColor }} onClick={() => setColorTarget(colorTarget === "CANCELLED" ? null : "CANCELLED")} />취소됨</span>
+        {colorTarget && <div class="calendar-legend__palette" role="dialog" aria-label="일정 표시 색상 선택">{CALENDAR_SHARE_COLORS.map((color) => <button type="button" aria-label={`색상 ${color}`} style={{ backgroundColor: color }} onClick={() => colorTarget.startsWith("SHARED:") ? void updateShareColor(calendarShares.find((share) => share.userKey === colorTarget.slice(7))!, color) : void updateDisplayColor(colorTarget as CalendarColorScope, color)} />)}<label>Custom<input aria-label="Custom 색상" type="color" value={colorTarget.startsWith("SHARED:") ? calendarShares.find((share) => share.userKey === colorTarget.slice(7))?.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0] : colorTarget === "OWN" ? displayPreferences.ownColor : colorTarget === "PRIVATE" ? displayPreferences.privateColor : displayPreferences.cancelledColor} onInput={(event) => colorTarget.startsWith("SHARED:") ? void updateShareColor(calendarShares.find((share) => share.userKey === colorTarget.slice(7))!, event.currentTarget.value) : void updateDisplayColor(colorTarget as CalendarColorScope, event.currentTarget.value)} /></label></div>}
+      </div>
     </header>
     {!canWrite && <div class="app-message">Read-only access. Write permission is required.</div>}
     {error && !draft && !sharingOpen && <div class="app-message app-message--error" role="alert">{error}</div>}
@@ -352,8 +375,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
           {dayEvents.map((event) => {
             const accountName = event.relatedItemLabel ?? (event.accountId ? accountById.get(event.accountId) : undefined);
             const text = getEventBadgeText({ accountName, title: event.title, startTime: eventLocalParts(event.startsAt, event.timezone).time, timeUnknown: event.timeUnknown, allDay: event.allDay });
-            const shared = !event.canEdit || event.shares.length > 0;
-            const ownerColor = event.ownerBadgeColor ?? `hsl(${(event.id * 47) % 300} 55% 38%)`;
+            const shared = !event.canEdit;
+            const ownerColor = eventColor(event);
             return <button type="button" class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": ownerColor }} onClick={(click) => { click.stopPropagation(); openEdit(event); }}><EventTitle text={text} /></button>;
           })}
           {activities.map((activity) => <button type="button" class="calendar-weekly-activity" onClick={(click) => { click.stopPropagation(); setViewingActivity(activity); }}>Weekly Activities</button>)}
@@ -368,14 +391,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
           const key = `${selectedDate}-${area.label}`; const now = Date.now(); const previous = lastTouchRef.current;
           if (previous?.date === key && now - previous.at < 400) { lastTouchRef.current = null; openCreate(selectedDate); setDraft((current) => current ? { ...current, allDay: area.allDay, timeUnknown: !area.allDay } : current); }
           else lastTouchRef.current = { date: key, at: now };
-        }}><span>{area.label}</span>{events.filter((event) => eventOccursOnDate(eventCalendarDate(event.startsAt, event.timezone), eventCalendarDate(event.endsAt, event.timezone), selectedDate) && (area.allDay ? event.allDay : event.timeUnknown)).map((event) => <button type="button" onClick={() => openEdit(event)}><EventTitle text={event.title} /></button>)}</div>)}
+        }}><span>{area.label}</span>{events.filter((event) => eventOccursOnDate(eventCalendarDate(event.startsAt, event.timezone), eventCalendarDate(event.endsAt, event.timezone), selectedDate) && (area.allDay ? event.allDay : event.timeUnknown)).map((event) => <button type="button" class="calendar-detail-event" style={{ "--owner-color": eventColor(event) }} onClick={() => openEdit(event)}><EventTitle text={event.title} /></button>)}</div>)}
       </div>
       <div class="calendar-day-timeline">
         {Array.from({ length: 10 }, (_, index) => 9 + index).map((hour) => {
           const time = `${String(hour).padStart(2, "0")}:00`;
           const key = `${selectedDate}-${time}`;
           const timed = events.filter((event) => !event.allDay && !event.timeUnknown && eventLocalParts(event.startsAt, event.timezone).date === selectedDate && eventLocalParts(event.startsAt, event.timezone).time.slice(0, 2) === time.slice(0, 2));
-          return <div class="calendar-day-slot" onDblClick={() => openCreate(selectedDate, time)} onTouchEnd={() => { const now = Date.now(); const previous = lastTouchRef.current; if (previous?.date === key && now - previous.at < 400) { lastTouchRef.current = null; openCreate(selectedDate, time); } else lastTouchRef.current = { date: key, at: now }; }}><time>{time}</time><div>{timed.map((event) => <button type="button" onClick={() => openEdit(event)}><EventTitle text={event.title} /></button>)}</div></div>;
+          return <div class="calendar-day-slot" onDblClick={() => openCreate(selectedDate, time)} onTouchEnd={() => { const now = Date.now(); const previous = lastTouchRef.current; if (previous?.date === key && now - previous.at < 400) { lastTouchRef.current = null; openCreate(selectedDate, time); } else lastTouchRef.current = { date: key, at: now }; }}><time>{time}</time><div>{timed.map((event) => <button type="button" class="calendar-detail-event" style={{ "--owner-color": eventColor(event) }} onClick={() => openEdit(event)}><EventTitle text={event.title} /></button>)}</div></div>;
         })}
       </div>
     </section>
@@ -388,7 +411,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             {calendarShares.map((share) => <div class="calendar-sharing__row" key={`${share.direction}-${share.userKey}`}>
               <span>{share.ownerBadgeColor && <span class="calendar-share-color" style={{ backgroundColor: share.ownerBadgeColor }} />}{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "사용자"} · {share.direction === "INCOMING" ? "받은 요청" : "보낸 요청"} · {share.status === "PENDING" ? "대기 중" : "공유 중"}</span>
               {share.direction === "INCOMING" && share.status === "PENDING" && <button type="button" disabled={saving} onClick={() => void acceptShare(share)}>수락</button>}
-              {share.direction === "INCOMING" && share.status === "ACCEPTED" && <><span class="calendar-color-palette" aria-label="공유 일정 표시 색상">{CALENDAR_SHARE_COLORS.map((color) => <button type="button" aria-label={`색상 ${color}`} class={share.ownerBadgeColor === color ? "is-selected" : ""} style={{ backgroundColor: color }} onClick={() => void updateShareColor(share, color)} />)}<label>Custom<input aria-label="Custom 색상" type="color" value={share.ownerBadgeColor ?? shareColor} onInput={(event) => void updateShareColor(share, event.currentTarget.value)} /></label></span><button type="button" disabled={saving} onClick={() => void removeCalendarShare(share)}>공유 취소</button></>}
+              {share.direction === "INCOMING" && share.status === "ACCEPTED" && <button type="button" disabled={saving} onClick={() => void removeCalendarShare(share)}>공유 취소</button>}
               {share.direction === "OUTGOING" && share.status === "PENDING" && <button type="button" disabled={saving} onClick={() => void removeCalendarShare(share)}>요청 취소</button>}
             </div>)}
             {!calendarShares.length && <span>공유 요청 또는 연결이 없습니다.</span>}
