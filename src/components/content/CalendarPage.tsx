@@ -172,6 +172,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [shareUserKey, setShareUserKey] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [dayOpen, setDayOpen] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [hoverMinutes, setHoverMinutes] = useState<number | null>(null);
   const [creationPreview, setCreationPreview] = useState<CreationPreview | null>(null);
   const [undatedCreateKind, setUndatedCreateKind] = useState<CreateLaneKind>("UNKNOWN");
@@ -198,7 +199,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const latestTitleSearchRef = useRef(0);
   const latestShareSearchRef = useRef(0);
   const latestMentionSearchRef = useRef(0);
+  const titleLoadMoreInFlightRef = useRef(false);
+  const mentionLoadMoreInFlightRef = useRef(false);
   const initialCalendarLoadRef = useRef(true);
+  const editorBaselineRef = useRef<{ draft: Draft; shares: CalendarEvent["shares"] } | null>(null);
   const lastTouchTapRef = useRef<{ date: string; at: number } | null>(null);
   const lastTouchOpenAtRef = useRef(0);
   const lastEventTitleTouchRef = useRef<{ eventId: number; at: number } | null>(null);
@@ -231,8 +235,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   useEffect(() => {
     let active = true;
-    const finishBusy = initialCalendarLoadRef.current ? beginAppBusy() : () => undefined;
-    setCalendarLoading(true);
+    const isInitialLoad = initialCalendarLoadRef.current;
+    const finishBusy = isInitialLoad ? beginAppBusy() : () => undefined;
+    if (isInitialLoad) setCalendarLoading(true);
     const fiscalYear = getFiscalYearForDate(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`);
     const fromDate = cells[0]?.date ?? `${cursor.getFullYear()}-01-01`;
     const toDate = cells[cells.length - 1]?.date ?? `${cursor.getFullYear()}-12-31`;
@@ -253,7 +258,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       setSharingUsers(users);
       setError("");
     }).catch((reason) => active && setError(reason instanceof Error ? reason.message : "Calendar could not be loaded."))
-      .finally(() => { if (active) setCalendarLoading(false); finishBusy(); initialCalendarLoadRef.current = false; });
+      .finally(() => {
+        finishBusy();
+        if (active && isInitialLoad) {
+          setCalendarLoading(false);
+          initialCalendarLoadRef.current = false;
+        }
+      });
     return () => { active = false; };
   }, [cursor.getFullYear(), cursor.getMonth()]);
 
@@ -290,20 +301,23 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
           setTitleSearchLoading(false);
           setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
         });
-      }, 1000);
+      }, 250);
       return () => window.clearTimeout(timer);
     } else {
       setTitleUserOptions([]);
-      void listSharingUsers(trigger.query).then((users) => {
-        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-        setTitleUserOptions(users);
-        setTitleSearchLoading(false);
-      }).catch(() => {
-        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-        setTitleUserOptions([]);
-        setTitleSearchLoading(false);
-        setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
-      });
+      const timer = window.setTimeout(() => {
+        void listSharingUsers(trigger.query).then((users) => {
+          if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+          setTitleUserOptions(users);
+          setTitleSearchLoading(false);
+        }).catch(() => {
+          if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+          setTitleUserOptions([]);
+          setTitleSearchLoading(false);
+          setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+        });
+      }, 250);
+      return () => window.clearTimeout(timer);
     }
   }, [draft?.title, draft?.startDate, fiscalYear]);
 
@@ -336,20 +350,23 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
           setMentionSearchLoading(false);
           setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
         });
-      }, 1000);
+      }, 250);
       return () => window.clearTimeout(timer);
     } else {
       setMentionUserOptions([]);
-      void listSharingUsers(mentionQuery).then((users) => {
-        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-        setMentionUserOptions(users);
-        setMentionSearchLoading(false);
-      }).catch(() => {
-        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-        setMentionUserOptions([]);
-        setMentionSearchLoading(false);
-        setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
-      });
+      const timer = window.setTimeout(() => {
+        void listSharingUsers(mentionQuery).then((users) => {
+          if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+          setMentionUserOptions(users);
+          setMentionSearchLoading(false);
+        }).catch(() => {
+          if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+          setMentionUserOptions([]);
+          setMentionSearchLoading(false);
+          setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+        });
+      }, 250);
+      return () => window.clearTimeout(timer);
     }
   }, [mentionEditing?.event.id, mentionEditing?.kind, mentionQuery, fiscalYear]);
 
@@ -389,6 +406,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (!canWrite) { setError("Read-only access. Write permission is required."); return; }
     const next = blankDraft(date);
     if (startTime) { next.timeUnknown = false; next.startTime = startTime; next.endTime = minutesToTime(timeToMinutes(startTime) + 60); }
+    editorBaselineRef.current = { draft: { ...next }, shares: [] };
     setTitleEditing(true); setSelectedDate(date); setEditing(null); setEventShares([]); setEventShareQuery(""); setDraft(next); setError("");
   };
   const updateCreationPreview = (next: CreationPreview | null) => {
@@ -416,6 +434,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       next.timeUnknown = false;
       next.allDay = true;
     }
+    editorBaselineRef.current = { draft: { ...next }, shares: [] };
     setTitleEditing(true); setEditing(null); setEventShares([]); setEventShareQuery(""); setDraft(next); setError("");
     requestAnimationFrame(() => titleInputRef.current?.focus());
   };
@@ -490,7 +509,18 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     mouse.preventDefault();
     openPreviewDraft({ kind: "TIMED", ...timelineCreationRange(anchorMinutes), clientX: mouse.clientX, clientY: mouse.clientY, pointerType: "mouse" });
   };
-  const openEdit = (event: CalendarEvent) => { setTitleEditing(false); setEditorMenuOpen(false); setSettingsDraft(null); setSelectedEventId(event.id); setSelectedDate(eventCalendarDate(event.startsAt, event.timezone)); setDayOpen(true); setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(draftFromEvent(event)); setError(""); };
+  const openEdit = (event: CalendarEvent) => { const eventDraft = draftFromEvent(event); editorBaselineRef.current = { draft: eventDraft, shares: event.shares }; setTitleEditing(false); setEditorMenuOpen(false); setSettingsDraft(null); setSelectedEventId(event.id); setSelectedDate(eventCalendarDate(event.startsAt, event.timezone)); setDayOpen(true); setEditing(event); setEventShares(event.shares); setEventShareQuery(""); setDraft(eventDraft); setError(""); };
+  const selectEvent = (event: CalendarEvent) => {
+    setSelectedEventId(event.id);
+    setSelectedDate(eventCalendarDate(event.startsAt, event.timezone));
+    setError("");
+  };
+  const openEventSettings = (event: CalendarEvent) => {
+    const nextDraft = draftFromEvent(event);
+    openEdit(event);
+    setSettingsDraft(nextDraft);
+    setEditorMenuOpen(true);
+  };
   const beginTitleEdit = (event: CalendarEvent) => { openEdit(event); setTitleEditing(true); requestAnimationFrame(() => titleInputRef.current?.focus()); };
   const handleEventTitleTouchTap = (event: CalendarEvent, pointer: PointerEvent) => {
     const now = Date.now();
@@ -513,7 +543,18 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSettingsDraft({ ...draft });
     setEditorMenuOpen(true);
   };
-  const closeEditor = () => { setTitleEditing(false); closeSettings(); setDraft(null); setEditing(null); setError(""); };
+  const closeEditor = () => { editorBaselineRef.current = null; setTitleEditing(false); closeSettings(); setDraft(null); setEditing(null); setError(""); };
+  const hasUnsavedChanges = () => {
+    if (!draft) return false;
+    const baseline = editorBaselineRef.current;
+    if (!baseline) return true;
+    return JSON.stringify(toInput(draft, eventShares)) !== JSON.stringify(toInput(baseline.draft, baseline.shares));
+  };
+  const requestDayClose = () => {
+    if (hasUnsavedChanges()) { setCloseConfirmOpen(true); return; }
+    setDayOpen(false);
+    closeEditor();
+  };
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -546,15 +587,18 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     lastTouchTapRef.current = { date, at: now };
   };
   const save = async () => {
-    if (!draft?.startDate || !draft.title.trim()) { setError("제목과 시작 날짜는 필수입니다."); return; }
+    if (!draft?.startDate || !draft.title.trim()) { setError("제목과 시작 날짜는 필수입니다."); return false; }
     setSaving(true);
     try {
       const input = toInput(draft, eventShares);
-      if (input.endsAt && input.endsAt < input.startsAt) { setError("종료 일시는 시작 일시보다 빠를 수 없습니다."); return; }
+      if (input.endsAt && input.endsAt < input.startsAt) { setError("종료 일시는 시작 일시보다 빠를 수 없습니다."); return false; }
       const saved = editing ? await updateCalendarEvent(editing, input) : await createCalendarEvent(input);
       setEvents((current) => [...current.filter((event) => event.id !== saved.id), saved]);
+      setSelectedEventId(saved.id);
+      setSelectedDate(eventCalendarDate(saved.startsAt, saved.timezone));
       closeEditor();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 저장하지 못했습니다."); }
+      return true;
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 저장하지 못했습니다."); return false; }
     finally { setSaving(false); }
   };
   const applySettings = async () => {
@@ -603,6 +647,31 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 삭제하지 못했습니다."); }
     finally { setSaving(false); }
   };
+  const toggleEventCancelled = async (event: CalendarEvent) => {
+    if (!event.canEdit) return;
+    setSaving(true);
+    try {
+      const saved = event.status === "CANCELLED" ? await reopenCalendarEvent(event) : await cancelCalendarEvent(event);
+      setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setSelectedEventId(saved.id);
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "일정 상태를 변경하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const removeSelectedEvent = async (event: CalendarEvent) => {
+    if (!event.canEdit) return;
+    setSaving(true);
+    try {
+      await deleteCalendarEvent(event);
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setSelectedEventId(null);
+      setError("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "일정을 삭제하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+  const selectedActions = (event: CalendarEvent) => selectedEventId === event.id ? <div class="calendar-event-actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()}>
+    {event.canEdit ? <><button type="button" onClick={() => openEventSettings(event)}>설정</button><button type="button" onClick={() => void toggleEventCancelled(event)}>{event.status === "CANCELLED" ? "일정재개" : "일정취소"}</button><button type="button" onClick={() => void removeSelectedEvent(event)}>일정삭제</button></> : <span class="calendar-event-actions__readonly">Read Only</span>}
+  </div> : null;
   const openSharing = async () => {
     setSaving(true);
     try {
@@ -663,40 +732,52 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   const loadMoreTitleRelations = () => {
     const trigger = draft ? extractTitleSearchTrigger(draft.title) : null;
-    if (!draft || trigger?.kind !== "related" || titleSearchLoading || !titleRelatedHasMore) return;
+    if (!draft || trigger?.kind !== "related" || titleSearchLoading || titleLoadMoreInFlightRef.current || !titleRelatedHasMore) return;
     const requestId = latestTitleSearchRef.current;
+    titleLoadMoreInFlightRef.current = true;
     setTitleSearchLoading(true);
     void listCalendarRelatedItems(getFiscalYearForDate(draft.startDate), trigger.query, titleRelatedOffset).then((page) => {
       if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-      setTitleRelatedOptions((current) => [...current, ...page.items]);
+      setTitleRelatedOptions((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.type === item.type && existing.id === item.id))]);
       setTitleRelatedOffset((current) => current + 10);
       setTitleRelatedHasMore(page.hasMore);
-      setTitleSearchLoading(false);
       setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
     }).catch(() => {
       if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-      setTitleSearchLoading(false);
       setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+    }).finally(() => {
+      titleLoadMoreInFlightRef.current = false;
+      if (requestIsLatest(requestId, latestTitleSearchRef.current)) setTitleSearchLoading(false);
     });
+  };
+  const handleTitleSearchScroll = (event: Event) => {
+    const target = event.currentTarget as HTMLDivElement;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight <= 48) loadMoreTitleRelations();
   };
 
   const loadMoreMentionRelations = () => {
-    if (!mentionEditing || mentionEditing.kind !== "related" || mentionSearchLoading || !mentionRelatedHasMore) return;
+    if (!mentionEditing || mentionEditing.kind !== "related" || mentionSearchLoading || mentionLoadMoreInFlightRef.current || !mentionRelatedHasMore) return;
     const requestId = latestMentionSearchRef.current;
     const date = eventCalendarDate(mentionEditing.event.startsAt, mentionEditing.event.timezone);
+    mentionLoadMoreInFlightRef.current = true;
     setMentionSearchLoading(true);
     void listCalendarRelatedItems(getFiscalYearForDate(date), mentionQuery, mentionRelatedOffset).then((page) => {
       if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-      setMentionRelatedOptions((current) => [...current, ...page.items]);
+      setMentionRelatedOptions((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.type === item.type && existing.id === item.id))]);
       setMentionRelatedOffset((current) => current + 10);
       setMentionRelatedHasMore(page.hasMore);
-      setMentionSearchLoading(false);
       setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
     }).catch(() => {
       if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-      setMentionSearchLoading(false);
       setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+    }).finally(() => {
+      mentionLoadMoreInFlightRef.current = false;
+      if (requestIsLatest(requestId, latestMentionSearchRef.current)) setMentionSearchLoading(false);
     });
+  };
+  const handleMentionSearchScroll = (event: Event) => {
+    const target = event.currentTarget as HTMLDivElement;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight <= 48) loadMoreMentionRelations();
   };
 
   const chooseTitleSearchResult = (index: number) => {
@@ -741,13 +822,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   const renderEventRelations = (event: CalendarEvent) => {
     const accountName = event.accountId == null ? "" : (accountNames.get(event.accountId) ?? relatedAccountName(event.accountId, event.relatedItemLabel));
-    const ownerDisplayName = !event.canEdit ? (event.ownerDisplayName ?? event.ownerUserKey ?? "") : "";
+    const ownerDisplayName = !event.canEdit ? (event.ownerDisplayName ?? "사용자 정보 없음") : "";
     if (!ownerDisplayName && !accountName && !event.shares.length) return null;
     return <div class="calendar-event-relations" aria-label="일정 관계">
       {ownerDisplayName && <span class="calendar-event__shared-source" title={`공유자 ${ownerDisplayName}`}>↗ 공유자 {ownerDisplayName}</span>}
       {accountName && (event.canEdit ? <button type="button" onClick={(click) => { click.stopPropagation(); setMentionEditing({ event, kind: "related" }); setMentionQuery(""); }}>@{accountName}</button> : <span>@{accountName}</span>)}
       {event.shares.map((share) => {
-        const label = `#${sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey}`;
+        const label = `#${sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? "참여자 정보 없음"}`;
         return event.canEdit ? <button type="button" key={share.userKey} onClick={(click) => { click.stopPropagation(); setMentionEditing({ event, kind: "user" }); setMentionQuery(""); }}>{label}</button> : <span key={share.userKey}>{label}</span>;
       })}
     </div>;
@@ -977,14 +1058,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         autoFocus={editable}
         disabled={!editable}
         value={draft.title}
-        placeholder="제목 입력 · @어카운트 · #공유 사용자"
+        placeholder="제목 입력 · @어카운트 · #미팅 참여자"
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={() => setComposing(false)}
         onKeyDown={handleTitleKeyDown}
         onInput={(event) => setDraft({ ...draft, title: event.currentTarget.value })}
       /> : <button type="button" class="calendar-block-editor__title calendar-block-editor__title--selected" aria-label="일정 제목, 두 번 눌러 편집" onClick={(event) => { if (event.detail >= 2 && editing) beginTitleEdit(editing); }} onDblClick={() => editing && beginTitleEdit(editing)}><EventTitle text={draft.title} onEdit={() => editing && beginTitleEdit(editing)} onTouchTap={(pointer) => editing ? handleEventTitleTouchTap(editing, pointer) : false} /></button>}
-      {(draftAccountName || eventShares.length > 0) && <div class="calendar-event-relations" aria-label="일정 관계"><span>{draftAccountName && `@${draftAccountName}`}</span>{eventShares.map((share) => <span key={share.userKey}>#{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey}</span>)}</div>}
-      <div class="calendar-block-editor__search">{titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).map((item, index) => <button key={"accountId" in item ? `${item.type}:${item.id}` : item.userKey} type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"accountId" in item ? <strong>{item.label}</strong> : item.displayName}</button>)}{extractTitleSearchTrigger(draft.title)?.kind === "related" && titleRelatedHasMore && <button type="button" onClick={loadMoreTitleRelations} disabled={titleSearchLoading}>10개 더 보기</button>}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
+      {(draftAccountName || eventShares.length > 0) && <div class="calendar-event-relations" aria-label="일정 관계"><span>{draftAccountName && `@${draftAccountName}`}</span>{eventShares.map((share) => <span key={share.userKey}>#{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? "참여자 정보 없음"}</span>)}</div>}
+      <div class="calendar-block-editor__search">{titleSearchOpen && <div class="calendar-title-search" role="listbox" onScroll={handleTitleSearchScroll}>{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).map((item, index) => <button key={"accountId" in item ? `${item.type}:${item.id}` : item.userKey} type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"accountId" in item ? <strong>{item.label}</strong> : item.displayName}</button>)}{extractTitleSearchTrigger(draft.title)?.kind === "related" && titleRelatedHasMore && <button type="button" onClick={loadMoreTitleRelations} disabled={titleSearchLoading}>아래로 스크롤해 더 보기</button>}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
       {editing && !editing.canEdit && <small class="calendar-sharing-readonly">공유 일정 · 읽기 전용</small>}
       {error && <div class="app-message app-message--error" role="alert">{error}</div>}
       {editable && timed && <button type="button" class="calendar-resize-handle calendar-resize-handle--end" aria-label="종료 시간 조절" />}
@@ -1038,18 +1119,20 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
             const time = !event.allDay && !event.timeUnknown ? eventLocalParts(event.startsAt, event.timezone).time : "";
             const shared = !event.canEdit;
             const ownerColor = eventColor(event);
-            const icon = event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : shared ? "↗" : "●";
-            return <div role="button" tabIndex={0} class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.allDay ? " is-all-day" : event.timeUnknown ? " is-time-unknown" : ""}${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": ownerColor }} onClick={(click) => { click.stopPropagation(); openEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-label={event.status === "CANCELLED" ? "취소 일정" : event.forcePrivate ? "비공개 일정" : shared ? "공유 일정" : "내 일정"}>{icon}</span>{(event.allDay || event.timeUnknown) && <span class="calendar-event__kind" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}>{event.allDay ? "▣" : "◷"}</span>}<EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{time && <small class="calendar-event__time">{time}</small>}{renderEventRelations(event)}</div></div>;
+            const icon = event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : event.allDay ? "▣" : event.timeUnknown ? "◷" : shared ? "↗" : "";
+            return <div role="button" tabIndex={0} class={`calendar-event ${event.canEdit ? "is-own" : "is-shared-recipient"}${shared ? " is-shared" : ""}${event.forcePrivate ? " is-private" : ""}${event.allDay ? " is-all-day" : event.timeUnknown ? " is-time-unknown" : ""}${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}${selectedEventId === event.id ? " is-selected" : ""}`} style={{ "--owner-color": ownerColor }} onClick={(click) => { click.stopPropagation(); selectEvent(event); }} onDblClick={(click) => { click.preventDefault(); click.stopPropagation(); if (event.canEdit) beginTitleEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); selectEvent(event); } }}>{icon && <span class="calendar-event__status" aria-label={event.status === "CANCELLED" ? "취소 일정" : event.forcePrivate ? "비공개 일정" : event.allDay ? "하루종일 일정" : event.timeUnknown ? "시간 미지정 일정" : "공유 일정"}>{icon}</span>}<EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{time && <small class="calendar-event__time">{time}</small>}{renderEventRelations(event)}</div>{selectedActions(event)}</div>;
           })}
           {activities.map((activity) => <button type="button" class="calendar-weekly-activity" onClick={(click) => { click.stopPropagation(); setViewingActivity(activity); }}>Weekly Activities</button>)}
         </div>;
       })}
     </div>
     </section>
-    {dayOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle={selectedDate}
+    {dayOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="none" dialogTitle={selectedDate}
       width="90vw" maxWidth="72rem" maxHeight="90vh"
+      onPointerDown={(pointer) => { if (pointer.target === pointer.currentTarget) requestDayClose(); }}
       onojClose={() => { setDayOpen(false); closeEditor(); }}>
       <div slot="body" class="calendar-day-dialog calendar-day-dialog__jet-body">
+      <button type="button" class="calendar-day-dialog__close" aria-label="Close" onClick={requestDayClose}>닫기</button>
       <p class="calendar-day-dialog__hint">09:00–18:00 · 10분 단위</p>
       {(() => {
         const selectedEvents = events.filter((event) => eventOccursOnDisplayedDate(event, selectedDate));
@@ -1059,19 +1142,22 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         return <div class="calendar-day-detail">
           <section class="calendar-day-undated" aria-label="종일 또는 시간 미지정 일정"><div class="calendar-day-undated__heading"><strong>종일 / 시간 미지정</strong><span>유형을 선택해 연속으로 입력할 수 있습니다.</span></div>
             {creationPreview && creationPreview.kind !== "TIMED" ? <div class="calendar-create-row-preview" aria-live="polite"><strong>{creationPreview.kind === "ALL_DAY" ? "하루종일" : "시간 미지정"}</strong><span>새 일정</span></div> : draft && (draft.allDay || draft.timeUnknown) ? renderDraftEditor(true) : <div class="calendar-day-blank-row"><select aria-label="새 일정 시간 유형" value={undatedCreateKind} onChange={(event) => { const kind = event.currentTarget.value as CreateLaneKind; undatedCreateKindRef.current = kind; setUndatedCreateKind(kind); openCreate(selectedDate); setDraft((current) => current ? { ...current, allDay: kind === "ALL_DAY", timeUnknown: kind === "UNKNOWN" } : current); }}><option value="ALL_DAY">하루종일</option><option value="UNKNOWN">시간 미지정</option></select><input aria-label="새 일정 제목" placeholder="새 일정 입력…" onFocus={() => openCreate(selectedDate)} onInput={(event) => { if (!draft) openCreate(selectedDate); setDraft((current) => current ? { ...current, title: event.currentTarget.value } : current); }} /></div>}
-            <div class="calendar-day-undated__events">{untimed.filter((event) => event.id !== editing?.id).map((event) => <div role="button" tabIndex={0} class={`calendar-detail-event${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event) }} onClick={() => openEdit(event)} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-undated-kind calendar-undated-type" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}><i aria-hidden="true" />{event.vacation ? "🏖 휴가" : event.allDay ? "▣ 하루종일" : "◷ 시간 미지정"}</span><EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{renderEventRelations(event)}</div></div>)}</div>
+            <div class="calendar-day-undated__events">{untimed.filter((event) => event.id !== editing?.id).map((event) => <div role="button" tabIndex={0} class={`calendar-detail-event${event.vacation ? " is-vacation" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}${selectedEventId === event.id ? " is-selected" : ""}`} style={{ "--owner-color": eventColor(event) }} onClick={(click) => { click.stopPropagation(); selectEvent(event); }} onDblClick={(click) => { click.preventDefault(); click.stopPropagation(); if (event.canEdit) beginTitleEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); selectEvent(event); } }}><span class="calendar-undated-kind calendar-undated-type" aria-label={event.allDay ? "하루종일 일정" : "시간 미지정 일정"}>{event.vacation ? "🏖 휴가" : event.allDay ? "▣ 하루종일" : "◷ 시간 미지정"}</span><EventTitle text={eventDisplayTitle(event)} onEdit={event.canEdit ? () => beginTitleEdit(event) : undefined} onTouchTap={event.canEdit ? (pointer) => handleEventTitleTouchTap(event, pointer) : undefined} /><div class="calendar-event__meta">{renderEventRelations(event)}</div>{selectedActions(event)}</div>)}</div>
           </section>
           <div class="calendar-day-timeline calendar-day-timeline--interactive" ref={timelineRef} onDblClick={handleTimelineDoubleClick} onPointerMove={(pointer) => { if (creationPreviewRef.current) return; const rect = pointer.currentTarget.getBoundingClientRect(); setHoverMinutes(snapTimelinePointer(pointer.clientY, rect.top, rect.height)); }} onPointerLeave={() => { if (!creationPreviewRef.current) setHoverMinutes(null); }} onContextMenu={(event) => { if (creationPreviewRef.current) event.preventDefault(); }} onPointerDown={beginTimelineCreate}>
             {Array.from({ length: 10 }, (_, index) => 9 + index).map((hour) => <div class="calendar-day-hour" style={{ top: `${((hour * 60 - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><time>{String(hour).padStart(2, "0")}:00</time></div>)}
             {hoverMinutes !== null && !creationPreview && <div class="calendar-time-cursor" style={{ top: `${((hoverMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><span role="tooltip">{minutesToTime(hoverMinutes)}</span></div>}
             {creationPreview?.kind === "TIMED" && <div class="calendar-create-preview" aria-live="polite" style={{ top: `${((creationPreview.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((creationPreview.endMinutes - creationPreview.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%` }}><strong>새 일정</strong><span>{minutesToTime(creationPreview.startMinutes)}–{minutesToTime(creationPreview.endMinutes)}</span></div>}
-            {laidOut.map((layout) => { const entry = timed.find(({ event }) => event.id === layout.id)!; const event = entry.event; if (editing?.id === event.id) return null; return <div role="button" tabIndex={0} aria-label={`${event.title}, ${minutesToTime(layout.startMinutes)}–${minutesToTime(layout.endMinutes)}`} class={`calendar-timeline-event${event.canEdit ? " is-editable" : ""}${layout.endMinutes - layout.startMinutes <= 30 ? " is-touch-compact" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}`} style={{ "--owner-color": eventColor(event), top: `${((layout.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((layout.endMinutes - layout.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, left: `calc(4.5rem + (100% - 5rem) * ${layout.column / layout.columnCount})`, width: `calc((100% - 5rem) / ${layout.columnCount} - 3px)` }} onPointerDown={(pointer) => beginExistingEventGesture(pointer, event)} onClick={(click) => { if (performance.now() < suppressExistingClickUntilRef.current) { click.preventDefault(); click.stopPropagation(); return; } openEdit(event); }} onDblClick={(click) => { click.stopPropagation(); if (event.canEdit) beginTitleEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter") openEdit(event); }}><span class="calendar-event__status" aria-hidden="true">{event.status === "CANCELLED" ? "⊘" : event.forcePrivate ? "🔒" : event.canEdit ? "●" : "↗"}</span><strong class="calendar-event__title">{eventDisplayTitle(event)}</strong>{renderEventRelations(event)}<small>{minutesToTime(layout.startMinutes)}–{minutesToTime(layout.endMinutes)}</small>{event.canEdit && <><span class="calendar-resize-handle calendar-resize-handle--start" role="separator" aria-label="일정 시작 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "start")} /><span class="calendar-resize-handle calendar-resize-handle--end" role="separator" aria-label="일정 종료 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "end")} /></>}</div>; })}
+            {laidOut.map((layout) => { const entry = timed.find(({ event }) => event.id === layout.id)!; const event = entry.event; if (editing?.id === event.id) return null; return <div role="button" tabIndex={0} aria-label={`${event.title}, ${minutesToTime(layout.startMinutes)}–${minutesToTime(layout.endMinutes)}`} class={`calendar-timeline-event${event.canEdit ? " is-editable" : ""}${layout.endMinutes - layout.startMinutes <= 30 ? " is-touch-compact" : ""}${event.status === "CANCELLED" ? " is-cancelled" : ""}${selectedEventId === event.id ? " is-selected" : ""}`} style={{ "--owner-color": eventColor(event), top: `${((layout.startMinutes - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${((layout.endMinutes - layout.startMinutes) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, left: `calc(4.5rem + (100% - 5rem) * ${layout.column / layout.columnCount})`, width: `calc((100% - 5rem) / ${layout.columnCount} - 3px)` }} onPointerDown={(pointer) => beginExistingEventGesture(pointer, event)} onClick={(click) => { if (performance.now() < suppressExistingClickUntilRef.current) { click.preventDefault(); click.stopPropagation(); return; } click.stopPropagation(); selectEvent(event); }} onDblClick={(click) => { click.preventDefault(); click.stopPropagation(); if (event.canEdit) beginTitleEdit(event); }} onKeyDown={(key) => { if (key.key === "Enter" || key.key === " ") { key.preventDefault(); selectEvent(event); } }}><small class="calendar-timeline-event__time">{minutesToTime(layout.startMinutes)}–{minutesToTime(layout.endMinutes)}</small><strong class="calendar-event__title">{eventDisplayTitle(event)}</strong>{renderEventRelations(event)}{selectedActions(event)}{event.canEdit && <><span class="calendar-resize-handle calendar-resize-handle--start" role="separator" aria-label="일정 시작 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "start")} /><span class="calendar-resize-handle calendar-resize-handle--end" role="separator" aria-label="일정 종료 시간 조절" onPointerDown={(pointer) => beginResize(pointer, event, "end")} /></>}</div>; })}
             {draft && !draft.allDay && !draft.timeUnknown && <div class="calendar-timeline-editor" style={{ top: `${((timeToMinutes(draft.startTime) - TIMELINE_START_MINUTES) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES)) * 100}%`, height: `${Math.max(20, timeToMinutes(draft.endTime) - timeToMinutes(draft.startTime)) / (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES) * 100}%` }}>{renderDraftEditor(true)}</div>}
           </div>
           {creationPreview && creationPreview.pointerType === "touch" && <div class="calendar-create-touch-tooltip" role="tooltip" style={{ left: `${creationPreview.clientX}px`, top: `${creationPreview.clientY}px` }}>{creationPreview.kind === "TIMED" ? `${minutesToTime(creationPreview.startMinutes)}–${minutesToTime(creationPreview.endMinutes)}` : creationPreview.kind === "ALL_DAY" ? "하루종일" : "시간 미지정"}</div>}
         </div>;
       })()}
       </div>
+    </oj-c-dialog>}
+    {closeConfirmOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="none" dialogTitle="변경사항을 저장할까요?" width="90vw" maxWidth="30rem">
+      <div slot="body" class="calendar-close-confirm"><p>저장하지 않은 일정 변경사항이 있습니다.</p><div class="calendar-close-confirm__actions"><button type="button" onClick={() => setCloseConfirmOpen(false)}>계속 편집</button><button type="button" onClick={() => { setCloseConfirmOpen(false); closeEditor(); setDayOpen(false); }}>버리고 닫기</button><button type="button" class="primary" disabled={saving} onClick={() => void save().then((saved) => { if (saved) { setCloseConfirmOpen(false); setDayOpen(false); } })}>저장하고 닫기</button></div></div>
     </oj-c-dialog>}
     {sharingOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle="전체 Calendar 공유 관리"
       width="90vw" maxWidth="42rem" maxHeight="90vh" onojClose={() => setSharingOpen(false)}>
@@ -1095,11 +1181,11 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         <footer><span /><button type="button" onClick={() => setSharingOpen(false)}>닫기</button><button type="button" class="primary" disabled={saving || !shareUserKey} onClick={() => void addCalendarShare()}>공유 요청</button></footer>
       </div>
     </oj-c-dialog>}
-    {mentionEditing && <div class="calendar-mention-editor" role="dialog" aria-label={mentionEditing.kind === "related" ? "일정 관계 변경" : "일정 공유 변경"} onClick={(click) => click.stopPropagation()}>
-      <header><strong>{mentionEditing.kind === "related" ? "@ 관계" : "# 공유"}</strong><button type="button" aria-label="닫기" onClick={() => setMentionEditing(null)}>×</button></header>
-      <input autoFocus type="search" value={mentionQuery} placeholder={mentionEditing.kind === "related" ? "Account, Workload, Opportunity 검색" : "공유 사용자 검색"} onInput={(event) => setMentionQuery(event.currentTarget.value)} onKeyDown={(key) => { if (key.key === "Escape") { key.preventDefault(); setMentionEditing(null); } }} />
+    {mentionEditing && <div class="calendar-mention-editor" role="dialog" aria-label={mentionEditing.kind === "related" ? "일정 관계 변경" : "미팅 참여자 변경"} onClick={(click) => click.stopPropagation()}>
+      <header><strong>{mentionEditing.kind === "related" ? "@ 관계" : "# 미팅 참여자"}</strong><button type="button" aria-label="닫기" onClick={() => setMentionEditing(null)}>×</button></header>
+      <input autoFocus type="search" value={mentionQuery} placeholder={mentionEditing.kind === "related" ? "Account, Workload, Opportunity 검색" : "미팅 참여자 검색"} onInput={(event) => setMentionQuery(event.currentTarget.value)} onKeyDown={(key) => { if (key.key === "Escape") { key.preventDefault(); setMentionEditing(null); } }} />
 
-      <div class="calendar-mention-editor__results" role="listbox">
+      <div class="calendar-mention-editor__results" role="listbox" onScroll={handleMentionSearchScroll}>
         {mentionEditing.kind === "related" ? <>
           {mentionEditing.event.accountId && <button type="button" onClick={() => { const previousName = accountNames.get(mentionEditing.event.accountId!) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel); void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), title: replaceExistingRelatedMention(mentionEditing.event.title, previousName, ""), accountId: "", workloadId: "", opportunityDealId: "", opportunityId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" }, mentionEditing.event.shares); }}>관계 제거</button>}
           {mentionRelatedOptions.map((item) => <button key={`${item.type}:${item.id}`} type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection(mentionEditing.event.title, item, accountNames.get(mentionEditing.event.accountId ?? -1) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel)) }, mentionEditing.event.shares)}><strong>{item.label}</strong></button>)}
@@ -1107,7 +1193,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         </> : mentionUserOptions.map((user) => {
           const existing = mentionEditing.event.shares.find((share) => share.userKey === user.userKey);
           const shares = existing ? mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey) : [...mentionEditing.event.shares, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW" as const, visibility: "DETAILS" as const }];
-          return <button type="button" role="option" aria-selected={Boolean(existing)} onClick={() => void saveMentionUpdate(mentionEditing.event, draftFromEvent(mentionEditing.event), shares)}><strong>#{user.displayName}</strong><small>{existing ? "공유 제거" : "VIEW / DETAILS 공유 추가"}</small></button>;
+          return <button type="button" role="option" aria-selected={Boolean(existing)} onClick={() => void saveMentionUpdate(mentionEditing.event, draftFromEvent(mentionEditing.event), shares)}><strong>#{user.displayName}</strong><small>{existing ? "참여자 제거" : "Read Only 참여자 추가"}</small></button>;
         })}
         {mentionSearchError ? <span class="calendar-inline-search__error" role="alert">{mentionSearchError}</span> : mentionSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : (mentionEditing.kind === "related" ? mentionRelatedOptions : mentionUserOptions).length === 0 ? <span class="account-search-empty">검색 결과 없음</span> : null}
       </div>
