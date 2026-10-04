@@ -92,7 +92,7 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     : String(input).includes("/overview")
     ? overviewPayload
     : String(input).includes("workload-options")
-      ? { items: [{ workloadId: 17, accountName: "Account A", workloadName: "Workload A", opptyNo: "D100" }], total: 1, hasMore: false }
+      ? { items: [{ accountId: 7, workloadId: 17, accountName: "Account A", workloadName: "Workload A", opptyNo: "D100" }], total: 1, hasMore: false }
       : null;
   return new Response(JSON.stringify(init?.method === "DELETE" ? undefined : responseBody ?? (init?.method ? d1Response : { items: [backend] })), {
     status: init?.method === "DELETE" ? 204 : init?.method === "POST" ? 201 : 200,

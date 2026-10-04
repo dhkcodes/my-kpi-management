@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
 
 const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
@@ -11,6 +11,14 @@ assert.deepEqual(eventLocalParts("2026-10-04T15:00:00Z", "Asia/Seoul"), { date: 
 assert.equal(eventCalendarDate("2026-10-04T15:00:00Z", "Asia/Seoul"), "2026-10-05", "untimed/all-day calendar dates are independent of the browser timezone");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-01"), true, "multi-day events cross month boundaries");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-04"), false);
+const koreanHolidays = new Set(["2026-10-05", "2026-10-09"]);
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-02", koreanHolidays), true, "a five-working-day duration includes its Friday start");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-03", koreanHolidays), false, "working-day duration excludes Saturday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-05", koreanHolidays), false, "working-day duration excludes the substitute holiday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-09", koreanHolidays), false, "working-day duration excludes Hangeul Day");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-12", koreanHolidays), true, "the fifth displayed working day advances past both holidays and weekends");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-09", koreanHolidays), true, "weekly recurrence renders its later occurrence");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-23", koreanHolidays), false, "recurrence does not start after its end date");
 assert.equal(formatKoreanStartTime("00:05"), "오전 12시 5분");
 assert.equal(formatKoreanStartTime("10:00"), "오전 10시");
 assert.equal(formatKoreanStartTime("12:30"), "오후 12시 30분");
@@ -22,27 +30,37 @@ assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: true, startTime: "", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "time-unknown values must satisfy the API midnight contract");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "09:00", endTime: "" }), { startTime: "09:00", endTime: "09:00" }, "start-only timed events keep zero duration");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "00:00", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "midnight is retained rather than treated as missing");
+assert.equal(MIN_CALENDAR_DURATION_MINUTES, 60, "timed events use a one-hour minimum");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: false, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "13:10", endTime: "13:30" }), { startDate: "2026-10-04", startTime: "13:10", endDate: "2026-10-04", endTime: "14:10" }, "a short timed save is extended to exactly one hour");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: false, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "23:30", endTime: "" }), { startDate: "2026-10-04", startTime: "23:30", endDate: "2026-10-05", endTime: "00:30" }, "minimum duration carries into the next day");
+assert.deepEqual(ensureMinimumTimedDuration({ allDay: true, timeUnknown: false, startDate: "2026-10-04", endDate: "2026-10-04", startTime: "", endTime: "" }), { startDate: "2026-10-04", startTime: "", endDate: "2026-10-04", endTime: "" });
 assert.deepEqual(extractTitleSearchTrigger("Prepare @Acme"), { kind: "related", query: "Acme" });
 assert.deepEqual(extractTitleSearchTrigger("Review #Jane"), { kind: "user", query: "Jane" });
 assert.equal(extractTitleSearchTrigger("Prepare *Cloud migration"), null, "asterisk is literal title text, not a search trigger");
 assert.deepEqual(extractTitleSearchTrigger("@  Acme"), { kind: "related", query: "Acme" }, "mention search preserves the active suffix while trimming its leading spacing");
 assert.equal(extractTitleSearchTrigger("literal [Acme] text"), null, "typed brackets are not relationship tokens");
-assert.equal(prependRelatedToken("Discuss renewal @Ac", "Acme"), "Discuss renewal");
-assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD", id: 72, accountId: 9, accountName: "Acme", label: "Cloud migration" }), {
-  title: "Discuss renewal", accountId: "9", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Cloud migration"
-}, "a child relation keeps the title pure while retaining its parent account and child relation metadata");
-assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, accountName: "Acme", label: "FY27 Renewal" }), {
-  title: "Review", accountId: "9", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · FY27 Renewal"
+assert.deepEqual(extractTitleSearchTrigger("@"), { kind: "related", query: "" }, "an empty relation query remains a valid search");
+assert.equal(replaceActiveTitleTrigger("Keep this text @Ac", "related", "Acme Corp"), "Keep this text @Acme Corp", "selection replaces only the active mention range");
+assert.equal(replaceActiveTitleTrigger("Keep @old and #Ja", "user", "Jane Doe"), "Keep @old and #Jane Doe", "user selection preserves unrelated title text");
+assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", "Beta"), "Before @Beta after", "existing relation replacement is range-safe");
+assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", ""), "Before after", "relation removal does not remove other title text");
+assert.equal(replaceExistingRelatedMention("Contact @Acme Corpse", "Acme Corp", "Beta"), "Contact @Acme Corpse", "partial account-name matches are not replaced");
+assert.equal(prependRelatedToken("Discuss renewal @Ac", "Acme"), "Discuss renewal @Acme");
+assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Acme", label: "Acme - Cloud migration" }), {
+  title: "Discuss renewal @Acme", accountId: "9", workloadId: "72", opportunityDealId: "", opportunityId: "", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Acme - Cloud migration"
+}, "a child relation replaces only the active query and retains its metadata");
+assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, workloadId: 72, opportunityDealId: 81, opportunityId: "OPP-81", accountName: "Acme", label: "Acme - Cloud (FY27 Renewal/OPP-81)" }), {
+  title: "Review @Acme", accountId: "9", workloadId: "72", opportunityDealId: "81", opportunityId: "OPP-81", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · Acme - Cloud (FY27 Renewal/OPP-81)"
 }, "an opportunity persists its parent account label and its own child relation id");
+assert.equal(applyRelatedSelection("Before @Acme after", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Beta", label: "Beta - Cloud migration" }, "Acme").title, "Before @Beta after", "a reloaded relation replaces only its persisted account mention");
 assert.equal(relatedAccountName(9, "Acme · Cloud migration"), "Acme");
 assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded account-title prefix helper stays removed");
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
 assert.equal(snapTimelinePointer(540, 0, 540, 540, 1080, true), 1080, "a resize handle can snap to the timeline end");
 assert.equal(minutesToTime(850), "14:10");
-assert.deepEqual(resizeTimelineRange(780, 790), { startMinutes: 780, endMinutes: 790 }, "resize supports one ten-minute slot");
-assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 870 }, "resize rounds to ten minutes and allows a 20-minute event");
-assert.deepEqual(resizeTimelineRange(850, 881), { startMinutes: 850, endMinutes: 880 }, "resize supports 30-minute events");
-assert.deepEqual(resizeTimelineRange(850, 894), { startMinutes: 850, endMinutes: 890 }, "resize supports 40-minute events");
+assert.deepEqual(resizeTimelineRange(600, 600), { startMinutes: 600, endMinutes: 660 }, "resize enforces the one-hour minimum");
+assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 910 }, "a 20-minute pointer range is clamped to one hour");
+assert.deepEqual(resizeTimelineRange(850, 921), { startMinutes: 850, endMinutes: 920 }, "ranges longer than one hour retain ten-minute snapping");
 assert.equal(LONG_PRESS_CREATE_DELAY_MS, 500, "creation waits for an intentional 500ms hold");
 assert.equal(longPressCanActivate(1_000, 1_499, 0), false, "the press is still pending before 500ms");
 assert.equal(longPressCanActivate(1_000, 1_500, 0), true, "the press activates at the 500ms boundary");
@@ -62,7 +80,7 @@ assert.deepEqual(layoutTimelineEvents([
   { id: 2, startMinutes: 570, endMinutes: 630, column: 1, columnCount: 2 },
   { id: 3, startMinutes: 630, endMinutes: 650, column: 0, columnCount: 1 }
 ], "overlaps are assigned selectable side-by-side columns; touching edges do not overlap");
-assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal");
+assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal #Jane Doe");
 assert.equal(CALENDAR_SHARE_COLORS.length, 10, "the standard palette exposes ten Redwood-friendly colors");
 assert.equal(requestIsLatest(4, 4), true);
 assert.equal(requestIsLatest(3, 4), false, "stale directory responses are rejected");
