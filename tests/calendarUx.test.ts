@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
 
 const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
@@ -39,12 +39,18 @@ assert.deepEqual(extractTitleSearchTrigger("Review #Jane"), { kind: "user", quer
 assert.equal(extractTitleSearchTrigger("Prepare *Cloud migration"), null, "asterisk is literal title text, not a search trigger");
 assert.deepEqual(extractTitleSearchTrigger("@  Acme"), { kind: "related", query: "Acme" }, "mention search preserves the active suffix while trimming its leading spacing");
 assert.equal(extractTitleSearchTrigger("literal [Acme] text"), null, "typed brackets are not relationship tokens");
-assert.equal(prependRelatedToken("Discuss renewal @Ac", "Acme"), "Discuss renewal");
-assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD", id: 72, accountId: 9, accountName: "Acme", label: "Cloud migration" }), {
-  title: "Discuss renewal", accountId: "9", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Cloud migration"
-}, "a child relation keeps the title pure while retaining its parent account and child relation metadata");
-assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, accountName: "Acme", label: "FY27 Renewal" }), {
-  title: "Review", accountId: "9", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · FY27 Renewal"
+assert.deepEqual(extractTitleSearchTrigger("@"), { kind: "related", query: "" }, "an empty relation query remains a valid search");
+assert.equal(replaceActiveTitleTrigger("Keep this text @Ac", "related", "Acme Corp"), "Keep this text @Acme Corp", "selection replaces only the active mention range");
+assert.equal(replaceActiveTitleTrigger("Keep @old and #Ja", "user", "Jane Doe"), "Keep @old and #Jane Doe", "user selection preserves unrelated title text");
+assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", "Beta"), "Before @Beta after", "existing relation replacement is range-safe");
+assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", ""), "Before after", "relation removal does not remove other title text");
+assert.equal(replaceExistingRelatedMention("Contact @Acme Corpse", "Acme Corp", "Beta"), "Contact @Acme Corpse", "partial account-name matches are not replaced");
+assert.equal(prependRelatedToken("Discuss renewal @Ac", "Acme"), "Discuss renewal @Acme");
+assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Acme", label: "Acme - Cloud migration" }), {
+  title: "Discuss renewal @Acme", accountId: "9", workloadId: "72", opportunityDealId: "", opportunityId: "", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Acme - Cloud migration"
+}, "a child relation replaces only the active query and retains its metadata");
+assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, workloadId: 72, opportunityDealId: 81, opportunityId: "OPP-81", accountName: "Acme", label: "Acme - Cloud (FY27 Renewal/OPP-81)" }), {
+  title: "Review @Acme", accountId: "9", workloadId: "72", opportunityDealId: "81", opportunityId: "OPP-81", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · Acme - Cloud (FY27 Renewal/OPP-81)"
 }, "an opportunity persists its parent account label and its own child relation id");
 assert.equal(relatedAccountName(9, "Acme · Cloud migration"), "Acme");
 assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded account-title prefix helper stays removed");
@@ -73,7 +79,7 @@ assert.deepEqual(layoutTimelineEvents([
   { id: 2, startMinutes: 570, endMinutes: 630, column: 1, columnCount: 2 },
   { id: 3, startMinutes: 630, endMinutes: 650, column: 0, columnCount: 1 }
 ], "overlaps are assigned selectable side-by-side columns; touching edges do not overlap");
-assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal");
+assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal #Jane Doe");
 assert.equal(CALENDAR_SHARE_COLORS.length, 10, "the standard palette exposes ten Redwood-friendly colors");
 assert.equal(requestIsLatest(4, 4), true);
 assert.equal(requestIsLatest(3, 4), false, "stale directory responses are rejected");

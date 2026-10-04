@@ -76,11 +76,11 @@ assert.match(calendarSource, /event\.isComposing/, "Enter is ignored while the b
 const titleMentionEffectStart = calendarSource.indexOf("const trigger = draft ? extractTitleSearchTrigger");
 const titleMentionEffectEnd = calendarSource.indexOf("\n  useEffect(() => {\n    if (!mentionEditing)", titleMentionEffectStart);
 const titleMentionEffect = calendarSource.slice(titleMentionEffectStart, titleMentionEffectEnd);
-assert.match(titleMentionEffect, /setTitleSearchOpen\(true\)/, "the mention result area opens immediately");
-assert.doesNotMatch(titleMentionEffect, /setTimeout/, "mention search is immediate rather than artificially delayed");
-assert.match(titleMentionEffect, /listCalendarRelatedItems\(lookupFiscalYear, trigger\.query\)/, "@ search uses the Calendar directory that preserves account scope and applies FY only to opportunity search");
-assert.match(titleMentionEffect, /listSharingUsers\(trigger\.query\)/, "# sharing-user search calls the directory immediately");
-assert.match(titleMentionEffect, /requestIsLatest/, "stale mention search responses are discarded");
+assert.match(titleMentionEffect, /setTitleSearchOpen\(true\)/, "the mention result area opens while the debounced search is pending");
+assert.match(titleMentionEffect, /setTimeout\([\s\S]*1000\)/, "related-item search uses the same one-second debounce as KPI Activities");
+assert.match(titleMentionEffect, /listCalendarRelatedItems\(lookupFiscalYear, trigger\.query, 0\)/, "@ search reuses KPI workload-options without a Calendar-only FY filter");
+assert.match(titleMentionEffect, /requestIsLatest/, "stale related mention search responses are discarded");
+assert.match(titleMentionEffect, /listSharingUsers\(trigger\.query\)/, "# sharing-user search remains immediate");
 assert.match(calendarSource, /setTitleSearchError\("검색 결과를 불러오지 못했습니다\. 다시 시도해 주세요\."\)/, "title search failures are visible inside the inline search region");
 assert.match(calendarSource, /setMentionSearchError\("검색 결과를 불러오지 못했습니다\. 다시 시도해 주세요\."\)/, "editable mention search failures are visible inside the mention search region");
 assert.match(calendarSource, /class="calendar-inline-search__error" role="alert"/, "inline search errors use an accessible local alert rather than the global busy overlay");
@@ -151,7 +151,7 @@ const beginDraftGestureSource = calendarSource.slice(calendarSource.indexOf("con
 assert.match(beginDraftGestureSource, /updateCalendarEvent\(editing, toInput\(latestDraft, eventShares\)\)/, "selected-editor move and resize persist their changed time without requiring title editing");
 assert.match(beginDraftGestureSource, /setEditing\(saved\)[\s\S]*setDraft\(draftFromEvent\(saved\)\)/, "selected-editor time persistence refreshes the event version and canonical draft");
 assert.match(calendarSource, /const lookupFiscalYear = getFiscalYearForDate\(draft!\.startDate\)/, "title related-item lookup follows the edited event fiscal year");
-assert.match(calendarSource, /listCalendarRelatedItems\(getFiscalYearForDate\(date\), mentionQuery\)/, "selected-event relation lookup follows that event fiscal year");
+assert.match(calendarSource, /listCalendarRelatedItems\(getFiscalYearForDate\(date\), mentionQuery, 0\)/, "selected-event relation lookup sends the event fiscal year through the shared KPI contract");
 assert.doesNotMatch(calendarSource, /currentTarget\.setPointerCapture/, "the event node removed by openEdit never owns pointer capture");
 assert.match(calendarSource, /const beginExistingEventGesture[\s\S]*pointerType !== "touch"[\s\S]*compactResizeRailStart[\s\S]*"start"[\s\S]*"end"/, "compact touch events reserve a side rail for resize while keeping a practical move surface");
 assert.match(calendarSource, /is-touch-compact/, "short events expose explicit compact touch geometry");

@@ -1,4 +1,6 @@
 import { apiFetch, apiFetchQuiet } from "../auth/apiFetch";
+import { listKpiWorkloadOptions } from "./kpiSpreadsheetApi";
+import { formatKpiWorkloadOption } from "./kpiSpreadsheet";
 
 export type CalendarVisibility = "PRIVATE" | "BUSY_ONLY" | "DETAILS";
 export type CalendarSharePermission = "VIEW" | "EDIT";
@@ -28,6 +30,9 @@ export type CalendarEvent = Readonly<{
   status: "SCHEDULED" | "CANCELLED";
   timezone: string;
   accountId?: number | null;
+  workloadId?: number | null;
+  opportunityDealId?: number | null;
+  opportunityId?: string | null;
   relatedItemType?: CalendarRelatedItemType | null;
   relatedItemId?: number | null;
   relatedItemLabel?: string | null;
@@ -54,13 +59,21 @@ export type SharingUser = Readonly<{ userKey: string; displayName: string }>;
 export type CalendarAccountOption = Readonly<{ accountId: number; account: string }>;
 export type CalendarRelatedItemType = "ACCOUNT" | "WORKLOAD" | "OPPTY";
 export type CalendarRelatedItemOption = Readonly<{
-  type: CalendarRelatedItemType;
+  type: "WORKLOAD" | "OPPTY";
   id: number;
   accountId: number;
+  workloadId: number;
+  opportunityDealId: number | null;
+  opportunityId: string | null;
   accountName: string;
-  workloadName?: string | null;
-  opptyName?: string | null;
+  workloadName: string;
+  opptyName: string | null;
   label: string;
+}>;
+export type CalendarRelatedItemPage = Readonly<{
+  items: CalendarRelatedItemOption[];
+  total: number;
+  hasMore: boolean;
 }>;
 export type CalendarEventInput = Readonly<{
   title: string;
@@ -75,6 +88,9 @@ export type CalendarEventInput = Readonly<{
   workingDays: number;
   timezone: string;
   accountId?: number | null;
+  workloadId?: number | null;
+  opportunityDealId?: number | null;
+  opportunityId?: string | null;
   relatedItemType?: CalendarRelatedItemType | null;
   relatedItemId?: number | null;
   relatedItemLabel?: string | null;
@@ -92,6 +108,7 @@ export type KoreanHoliday = Readonly<{
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type EventDto = {
   id: number; ownerUserKey?: string; ownerDisplayName?: string | null; ownerBadgeColor?: string | null; accountId?: number | null;
+  workloadId?: number | null; opportunityDealId?: number | null; opportunityId?: string | null;
   relatedItemType?: CalendarRelatedItemType | null; relatedItemId?: number | null; relatedItemLabel?: string | null;
   title: string; description?: string | null; location?: string | null;
   startsAt: string; endsAt: string; allDay: boolean; hasEndTime?: boolean; timeUnknown?: boolean; forcePrivate?: boolean;
@@ -134,6 +151,9 @@ const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): 
   status: event.status ?? "SCHEDULED",
   timezone: event.timezone,
   accountId: event.accountId ?? null,
+  workloadId: event.workloadId ?? null,
+  opportunityDealId: event.opportunityDealId ?? null,
+  opportunityId: event.opportunityId ?? null,
   relatedItemType: event.relatedItemType ?? null,
   relatedItemId: event.relatedItemId ?? null,
   relatedItemLabel: event.relatedItemLabel ?? null,
@@ -170,6 +190,9 @@ const toOffsetDateTime = (value: string, timezone: string): string => {
 };
 const eventBody = (input: CalendarEventInput, versionNo?: number) => ({
   accountId: input.accountId ?? null,
+  workloadId: input.workloadId ?? null,
+  opportunityDealId: input.opportunityDealId ?? null,
+  opportunityId: input.opportunityId ?? null,
   relatedItemType: input.relatedItemType ?? null,
   relatedItemId: input.relatedItemId ?? null,
   relatedItemLabel: input.relatedItemLabel ?? null,
@@ -293,10 +316,29 @@ export async function listCalendarAccounts(fiscalYear: string, query = "", fetch
   return unwrap(await request<CalendarAccountOption[] | { items: CalendarAccountOption[] }>(
     `/collaboration/directory/accounts?${params.toString()}`, undefined, fetchImpl));
 }
-export async function listCalendarRelatedItems(fiscalYear: string, query = "", fetchImpl: FetchLike = apiFetchQuiet): Promise<CalendarRelatedItemOption[]> {
-  const params = new URLSearchParams({ fiscalYear, search: query.trim() });
-  return unwrap(await request<CalendarRelatedItemOption[] | { items: CalendarRelatedItemOption[] }>(
-    `/collaboration/directory/related-items?${params.toString()}`, undefined, fetchImpl));
+export async function listCalendarRelatedItems(
+  fiscalYear: string,
+  query = "",
+  offset = 0,
+  fetchImpl: FetchLike = apiFetchQuiet
+): Promise<CalendarRelatedItemPage> {
+  const page = await listKpiWorkloadOptions(fiscalYear as Parameters<typeof listKpiWorkloadOptions>[0], query, offset, fetchImpl);
+  return {
+    items: page.items.map((item) => ({
+      type: item.dealId == null ? "WORKLOAD" as const : "OPPTY" as const,
+      id: item.dealId ?? item.workloadId,
+      accountId: item.accountId,
+      workloadId: item.workloadId,
+      opportunityDealId: item.dealId,
+      opportunityId: item.opptyNo,
+      accountName: item.accountName,
+      workloadName: item.workloadName,
+      opptyName: item.opptyName,
+      label: formatKpiWorkloadOption(item)
+    })),
+    total: page.total,
+    hasMore: page.hasMore
+  };
 }
 export async function listKoreanHolidays(year: number, fetchImpl: FetchLike = apiFetch): Promise<KoreanHoliday[]> {
   const value = await request<KoreanHoliday[] | { items?: KoreanHoliday[]; holidays?: KoreanHoliday[] }>(

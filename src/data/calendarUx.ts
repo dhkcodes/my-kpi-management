@@ -156,37 +156,63 @@ export const extractTitleSearchTrigger = (title: string): TitleSearchTrigger | n
   return { kind: match[1] === "@" ? "related" : "user", query: match[2].trimStart() };
 };
 
-const stripActiveTrigger = (title: string, trigger: "related" | "user") =>
-  title.replace(trigger === "related" ? /(?:^|\s)@[^@#]*$/ : /(?:^|\s)#[^@#]*$/, "").trim();
+/** Replaces only the active suffix trigger, preserving every character outside its mention range. */
+export const replaceActiveTitleTrigger = (title: string, trigger: "related" | "user", label: string): string => {
+  const pattern = trigger === "related" ? /(^|\s)@[^@#]*$/ : /(^|\s)#[^@#]*$/;
+  return title.replace(pattern, (_match, boundary: string) => `${boundary}${trigger === "related" ? "@" : "#"}${label}`);
+};
 
-export const prependRelatedToken = (title: string, _label: string): string =>
-  stripActiveTrigger(title, "related");
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Replaces/removes one exact existing account mention without touching similarly named title text. */
+export const replaceExistingRelatedMention = (title: string, accountName: string, nextAccountName: string): string => {
+  if (!accountName) return title;
+  const pattern = new RegExp(`(^|\\s)@${escapeRegExp(accountName)}(?=\\s|$)`);
+  const match = pattern.exec(title);
+  if (!match) return title;
+  const mentionStart = match.index + match[1].length;
+  const mentionEnd = match.index + match[0].length;
+  if (nextAccountName) return `${title.slice(0, mentionStart)}@${nextAccountName}${title.slice(mentionEnd)}`;
+  let before = title.slice(0, mentionStart);
+  let after = title.slice(mentionEnd);
+  if (!before) after = after.replace(/^\s/, "");
+  else if (!after) before = before.replace(/\s$/, "");
+  else if (/\s$/.test(before) && /^\s/.test(after)) after = after.slice(1);
+  return before + after;
+};
+
+export const prependRelatedToken = (title: string, label: string): string =>
+  replaceActiveTitleTrigger(title, "related", label);
 
 export type RelatedSelection = Readonly<{
-  type: "ACCOUNT" | "WORKLOAD" | "OPPTY";
+  type: "WORKLOAD" | "OPPTY";
   id: number;
   accountId: number;
+  workloadId: number;
+  opportunityDealId: number | null;
+  opportunityId: string | null;
   accountName: string;
   label: string;
 }>;
 
-/** Mentions are relational metadata: selection removes the active query and keeps the title pure. */
+/** Mentions are relational metadata and remain visible in the title as their parent account. */
 export const applyRelatedSelection = (title: string, item: RelatedSelection) => ({
-  title: stripActiveTrigger(title, "related"),
+  title: replaceActiveTitleTrigger(title, "related", item.accountName),
   accountId: String(item.accountId),
+  workloadId: String(item.workloadId),
+  opportunityDealId: item.opportunityDealId == null ? "" : String(item.opportunityDealId),
+  opportunityId: item.opportunityId ?? "",
   relatedItemType: item.type,
   relatedItemId: String(item.id),
-  relatedItemLabel: item.type === "ACCOUNT" || item.label === item.accountName
-    ? item.accountName
-    : `${item.accountName} · ${item.label}`
+  relatedItemLabel: `${item.accountName} · ${item.label}`
 });
 
 export const relatedAccountName = (accountId: number | string | null | undefined, relatedItemLabel: string | null | undefined): string =>
   accountId == null || accountId === "" ? "" : (relatedItemLabel?.split(" · ")[0]?.trim() || String(accountId));
 
 
-export const appendMentionToken = (title: string, _displayName: string): string =>
-  stripActiveTrigger(title, "user");
+export const appendMentionToken = (title: string, displayName: string): string =>
+  replaceActiveTitleTrigger(title, "user", displayName);
 
 /** Small pure predicate used by debounced searches to reject stale responses. */
 export const requestIsLatest = (responseRequestId: number, latestRequestId: number): boolean =>

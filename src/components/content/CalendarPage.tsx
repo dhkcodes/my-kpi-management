@@ -6,7 +6,7 @@ import { beginAppBusy } from "../../app/appBusy";
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEvent, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, appendMentionToken, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnScheduleDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, appendMentionToken, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnScheduleDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
 
 import { fetchWeeklyActivities, WeeklyActivityRecord } from "../../data/weeklyActivitiesApi";
 import { sanitizeWeeklyActivityHtml } from "./weeklyActivityEditorSession";
@@ -41,7 +41,7 @@ const monthTitle = (date: Date) => new Intl.DateTimeFormat("ko-KR", { year: "num
 
 type Draft = {
   title: string; startDate: string; endDate: string; startTime: string; endTime: string;
-  timeUnknown: boolean; allDay: boolean; accountId: string; relatedItemType: "" | CalendarRelatedItemType;
+  timeUnknown: boolean; allDay: boolean; accountId: string; workloadId: string; opportunityDealId: string; opportunityId: string; relatedItemType: "" | CalendarRelatedItemType;
   relatedItemId: string; relatedItemLabel: string; location: string; description: string;
   forcePrivate: boolean; vacation: boolean; recurrence: "NONE" | "WEEKLY" | "MONTHLY"; recurrenceUntil: string; workingDays: number; timezone: string;
 };
@@ -68,7 +68,7 @@ type PendingCreatePress = {
 const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
 const blankDraft = (date: string): Draft => ({
   title: "", startDate: date, endDate: date, startTime: "", endTime: "", timeUnknown: true,
-  allDay: false, accountId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "",
+  allDay: false, accountId: "", workloadId: "", opportunityDealId: "", opportunityId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "",
   location: "", description: "", forcePrivate: false, vacation: false, recurrence: "NONE", recurrenceUntil: "", workingDays: 1, timezone: browserTimezone()
 });
 const draftFromEvent = (event: CalendarEvent): Draft => {
@@ -83,6 +83,9 @@ const draftFromEvent = (event: CalendarEvent): Draft => {
     endTime: calendarOnly || !event.hasEndTime ? "" : end.time,
     timeUnknown: event.timeUnknown,
     allDay: event.allDay, accountId: event.accountId == null ? "" : String(event.accountId),
+    workloadId: event.workloadId == null ? "" : String(event.workloadId),
+    opportunityDealId: event.opportunityDealId == null ? "" : String(event.opportunityDealId),
+    opportunityId: event.opportunityId ?? "",
     relatedItemType: event.relatedItemType ?? "",
     relatedItemId: event.relatedItemId == null ? "" : String(event.relatedItemId),
     relatedItemLabel: event.relatedItemLabel ?? "",
@@ -104,19 +107,34 @@ const toInput = (draft: Draft, shares: CalendarEvent["shares"]): CalendarEventIn
     workingDays: draft.workingDays,
     timezone: draft.timezone,
     accountId: draft.accountId ? Number(draft.accountId) : null,
+    workloadId: draft.workloadId ? Number(draft.workloadId) : null,
+    opportunityDealId: draft.opportunityDealId ? Number(draft.opportunityDealId) : null,
+    opportunityId: draft.opportunityId || null,
     relatedItemType: draft.relatedItemType || null, relatedItemId: draft.relatedItemId ? Number(draft.relatedItemId) : null,
     relatedItemLabel: draft.relatedItemLabel || null, location: draft.location.trim() || null,
     description: draft.description.trim() || null, visibility: draft.forcePrivate ? "PRIVATE" : "DETAILS",
     shares
   };
 };
-const applyRelatedSelection = (title: string, item: CalendarRelatedItemOption): Partial<Draft> => ({
-  title: prependRelatedToken(title, item.label),
-  accountId: String(item.accountId),
-  relatedItemType: item.type,
-  relatedItemId: String(item.id),
-  relatedItemLabel: item.label
-});
+const applyRelatedSelection = (title: string, item: CalendarRelatedItemOption, previousAccountName = ""): Partial<Draft> => {
+  const hasActiveTrigger = extractTitleSearchTrigger(title)?.kind === "related";
+  const replacedExisting = hasActiveTrigger ? title : replaceExistingRelatedMention(title, previousAccountName, item.accountName);
+  const nextTitle = hasActiveTrigger
+    ? replaceActiveTitleTrigger(title, "related", item.accountName)
+    : replacedExisting !== title
+      ? replacedExisting
+      : `${title}${title && !/\s$/.test(title) ? " " : ""}@${item.accountName}`;
+  return {
+    title: nextTitle,
+    accountId: String(item.accountId),
+    workloadId: String(item.workloadId),
+    opportunityDealId: item.opportunityDealId == null ? "" : String(item.opportunityDealId),
+    opportunityId: item.opportunityId ?? "",
+    relatedItemType: item.type,
+    relatedItemId: String(item.id),
+    relatedItemLabel: `${item.accountName} · ${item.label}`
+  };
+};
 
 type Props = Readonly<{
   fiscalYear?: string;
@@ -134,6 +152,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [eventShareQuery, setEventShareQuery] = useState("");
   const [eventShareSearchOpen, setEventShareSearchOpen] = useState(false);
   const [titleRelatedOptions, setTitleRelatedOptions] = useState<CalendarRelatedItemOption[]>([]);
+  const [titleRelatedOffset, setTitleRelatedOffset] = useState(0);
+  const [titleRelatedHasMore, setTitleRelatedHasMore] = useState(false);
   const [titleSearchLoading, setTitleSearchLoading] = useState(false);
   const [titleSearchError, setTitleSearchError] = useState("");
   const [accountNames, setAccountNames] = useState<Map<number, string>>(new Map());
@@ -167,6 +187,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [mentionQuery, setMentionQuery] = useState("");
 
   const [mentionRelatedOptions, setMentionRelatedOptions] = useState<CalendarRelatedItemOption[]>([]);
+  const [mentionRelatedOffset, setMentionRelatedOffset] = useState(0);
+  const [mentionRelatedHasMore, setMentionRelatedHasMore] = useState(false);
   const [mentionUserOptions, setMentionUserOptions] = useState<SharingUser[]>([]);
   const [mentionSearchLoading, setMentionSearchLoading] = useState(false);
   const [mentionSearchError, setMentionSearchError] = useState("");
@@ -252,17 +274,24 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (trigger.kind === "related") {
       const lookupFiscalYear = getFiscalYearForDate(draft!.startDate);
       setTitleRelatedOptions([]);
-      void listCalendarRelatedItems(lookupFiscalYear, trigger.query).then((items) => {
-        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-        setTitleRelatedOptions(items);
-        setTitleSearchLoading(false);
-        setAccountNames((current) => { const next = new Map(current); items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
-      }).catch(() => {
-        if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
-        setTitleRelatedOptions([]);
-        setTitleSearchLoading(false);
-        setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
-      });
+      setTitleRelatedOffset(0);
+      setTitleRelatedHasMore(false);
+      const timer = window.setTimeout(() => {
+        void listCalendarRelatedItems(lookupFiscalYear, trigger.query, 0).then((page) => {
+          if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+          setTitleRelatedOptions(page.items);
+          setTitleRelatedOffset(10);
+          setTitleRelatedHasMore(page.hasMore);
+          setTitleSearchLoading(false);
+          setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
+        }).catch(() => {
+          if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+          setTitleRelatedOptions([]);
+          setTitleSearchLoading(false);
+          setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+        });
+      }, 1000);
+      return () => window.clearTimeout(timer);
     } else {
       setTitleUserOptions([]);
       void listSharingUsers(trigger.query).then((users) => {
@@ -290,18 +319,25 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const requestId = ++latestMentionSearchRef.current;
     if (mentionEditing.kind === "related") {
       setMentionRelatedOptions([]);
+      setMentionRelatedOffset(0);
+      setMentionRelatedHasMore(false);
       const date = eventCalendarDate(mentionEditing.event.startsAt, mentionEditing.event.timezone);
-      void listCalendarRelatedItems(getFiscalYearForDate(date), mentionQuery).then((items) => {
-        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-        setMentionRelatedOptions(items);
-        setMentionSearchLoading(false);
-        setAccountNames((current) => { const next = new Map(current); items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
-      }).catch(() => {
-        if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
-        setMentionRelatedOptions([]);
-        setMentionSearchLoading(false);
-        setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
-      });
+      const timer = window.setTimeout(() => {
+        void listCalendarRelatedItems(getFiscalYearForDate(date), mentionQuery, 0).then((page) => {
+          if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+          setMentionRelatedOptions(page.items);
+          setMentionRelatedOffset(10);
+          setMentionRelatedHasMore(page.hasMore);
+          setMentionSearchLoading(false);
+          setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
+        }).catch(() => {
+          if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+          setMentionRelatedOptions([]);
+          setMentionSearchLoading(false);
+          setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+        });
+      }, 1000);
+      return () => window.clearTimeout(timer);
     } else {
       setMentionUserOptions([]);
       void listSharingUsers(mentionQuery).then((users) => {
@@ -625,6 +661,44 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     finally { setSaving(false); }
   };
 
+  const loadMoreTitleRelations = () => {
+    const trigger = draft ? extractTitleSearchTrigger(draft.title) : null;
+    if (!draft || trigger?.kind !== "related" || titleSearchLoading || !titleRelatedHasMore) return;
+    const requestId = latestTitleSearchRef.current;
+    setTitleSearchLoading(true);
+    void listCalendarRelatedItems(getFiscalYearForDate(draft.startDate), trigger.query, titleRelatedOffset).then((page) => {
+      if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+      setTitleRelatedOptions((current) => [...current, ...page.items]);
+      setTitleRelatedOffset((current) => current + 10);
+      setTitleRelatedHasMore(page.hasMore);
+      setTitleSearchLoading(false);
+      setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
+    }).catch(() => {
+      if (!requestIsLatest(requestId, latestTitleSearchRef.current)) return;
+      setTitleSearchLoading(false);
+      setTitleSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+    });
+  };
+
+  const loadMoreMentionRelations = () => {
+    if (!mentionEditing || mentionEditing.kind !== "related" || mentionSearchLoading || !mentionRelatedHasMore) return;
+    const requestId = latestMentionSearchRef.current;
+    const date = eventCalendarDate(mentionEditing.event.startsAt, mentionEditing.event.timezone);
+    setMentionSearchLoading(true);
+    void listCalendarRelatedItems(getFiscalYearForDate(date), mentionQuery, mentionRelatedOffset).then((page) => {
+      if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+      setMentionRelatedOptions((current) => [...current, ...page.items]);
+      setMentionRelatedOffset((current) => current + 10);
+      setMentionRelatedHasMore(page.hasMore);
+      setMentionSearchLoading(false);
+      setAccountNames((current) => { const next = new Map(current); page.items.forEach((item) => next.set(item.accountId, item.accountName)); return next; });
+    }).catch(() => {
+      if (!requestIsLatest(requestId, latestMentionSearchRef.current)) return;
+      setMentionSearchLoading(false);
+      setMentionSearchError("검색 결과를 불러오지 못했습니다. 다시 시도해 주세요.");
+    });
+  };
+
   const chooseTitleSearchResult = (index: number) => {
     if (!draft) return;
     const trigger = extractTitleSearchTrigger(draft.title);
@@ -910,7 +984,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         onInput={(event) => setDraft({ ...draft, title: event.currentTarget.value })}
       /> : <button type="button" class="calendar-block-editor__title calendar-block-editor__title--selected" aria-label="일정 제목, 두 번 눌러 편집" onClick={(event) => { if (event.detail >= 2 && editing) beginTitleEdit(editing); }} onDblClick={() => editing && beginTitleEdit(editing)}><EventTitle text={draft.title} onEdit={() => editing && beginTitleEdit(editing)} onTouchTap={(pointer) => editing ? handleEventTitleTouchTap(editing, pointer) : false} /></button>}
       {(draftAccountName || eventShares.length > 0) && <div class="calendar-event-relations" aria-label="일정 관계"><span>{draftAccountName && `@${draftAccountName}`}</span>{eventShares.map((share) => <span key={share.userKey}>#{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? share.displayName ?? share.userKey}</span>)}</div>}
-      <div class="calendar-block-editor__search">{titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).slice(0, 10).map((item, index) => <button type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"accountId" in item ? <><strong>{item.accountName}</strong><span>{item.label}</span></> : item.displayName}</button>)}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
+      <div class="calendar-block-editor__search">{titleSearchOpen && <div class="calendar-title-search" role="listbox">{(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).map((item, index) => <button key={"accountId" in item ? `${item.type}:${item.id}` : item.userKey} type="button" role="option" aria-selected={index === highlightedSearchIndex} onClick={() => chooseTitleSearchResult(index)}>{"accountId" in item ? <strong>{item.label}</strong> : item.displayName}</button>)}{extractTitleSearchTrigger(draft.title)?.kind === "related" && titleRelatedHasMore && <button type="button" onClick={loadMoreTitleRelations} disabled={titleSearchLoading}>10개 더 보기</button>}{titleSearchError ? <span class="calendar-inline-search__error" role="alert">{titleSearchError}</span> : titleSearchLoading ? <span class="account-search-empty" role="status">검색 중…</span> : !(extractTitleSearchTrigger(draft.title)?.kind === "related" ? titleRelatedOptions : matchingTitleUsers).length ? <span class="account-search-empty">검색 결과 없음</span> : null}</div>}</div>
       {editing && !editing.canEdit && <small class="calendar-sharing-readonly">공유 일정 · 읽기 전용</small>}
       {error && <div class="app-message app-message--error" role="alert">{error}</div>}
       {editable && timed && <button type="button" class="calendar-resize-handle calendar-resize-handle--end" aria-label="종료 시간 조절" />}
@@ -1027,8 +1101,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
       <div class="calendar-mention-editor__results" role="listbox">
         {mentionEditing.kind === "related" ? <>
-          {mentionEditing.event.accountId && <button type="button" onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), accountId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" }, mentionEditing.event.shares)}>관계 제거</button>}
-          {mentionRelatedOptions.map((item) => <button type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection(mentionEditing.event.title, item) }, mentionEditing.event.shares)}><strong>@{item.accountName}</strong><small>{item.label}</small></button>)}
+          {mentionEditing.event.accountId && <button type="button" onClick={() => { const previousName = accountNames.get(mentionEditing.event.accountId!) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel); void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), title: replaceExistingRelatedMention(mentionEditing.event.title, previousName, ""), accountId: "", workloadId: "", opportunityDealId: "", opportunityId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" }, mentionEditing.event.shares); }}>관계 제거</button>}
+          {mentionRelatedOptions.map((item) => <button key={`${item.type}:${item.id}`} type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection(mentionEditing.event.title, item, accountNames.get(mentionEditing.event.accountId ?? -1) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel)) }, mentionEditing.event.shares)}><strong>{item.label}</strong></button>)}
+          {mentionRelatedHasMore && <button type="button" onClick={loadMoreMentionRelations} disabled={mentionSearchLoading}>10개 더 보기</button>}
         </> : mentionUserOptions.map((user) => {
           const existing = mentionEditing.event.shares.find((share) => share.userKey === user.userKey);
           const shares = existing ? mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey) : [...mentionEditing.event.shares, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW" as const, visibility: "DETAILS" as const }];

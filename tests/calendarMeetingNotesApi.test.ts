@@ -49,9 +49,13 @@ const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<
   if (url === "/api/v1/collaboration/directory/accounts?fiscalYear=FY27&search=Acme") {
     return response([{ accountId: 77, account: "Acme Virtual Account" }]);
   }
-  if (url === "/api/v1/collaboration/directory/related-items?fiscalYear=FY27&search=Acme") {
-    return response([{ type: "OPPTY", id: 99, accountId: 77, accountName: "Acme", workloadName: "OCI",
-      opptyName: "Expansion / OPP-99", label: "Acme · OCI · Expansion / OPP-99" }]);
+  if (url === "/api/v1/kpi-activities/workload-options?fiscalYear=FY27&search=Acme&offset=0&size=10") {
+    return response({ items: [
+      { accountId: 77, workloadId: 72, accountName: "Acme", workloadName: "OCI", dealId: 99, opptyName: "Expansion", opptyNo: "OPP-99" },
+      { accountId: 77, workloadId: 73, accountName: "Acme", workloadName: "Analytics", dealId: 100, opptyName: "Data Lake", opptyNo: null },
+      { accountId: 77, workloadId: 74, accountName: "Acme", workloadName: "Database", dealId: 101, opptyName: null, opptyNo: "OPP-101" },
+      { accountId: 77, workloadId: 75, accountName: "Acme", workloadName: "Security", dealId: null, opptyName: null, opptyNo: null }
+    ], total: 14, hasMore: true });
   }
   if (url === "/api/v1/calendar/events/41/shares" && method === "GET") return response([{ userKey: "user/one", access: "VIEW", visibility: "BUSY_ONLY" }]);
   if (url === "/api/v1/calendar/events" && method === "POST") return response({ ...eventDto, id: 42, versionNo: 1 }, 201);
@@ -88,7 +92,8 @@ async function main() {
     id: 41, ownerUserKey: "owner", ownerDisplayName: "Calendar Owner", ownerBadgeColor: null, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
     allDay: false, hasEndTime: true, timeUnknown: false, forcePrivate: false, vacation: true, recurrence: "WEEKLY", recurrenceUntil: "2026-12-31", workingDays: 3,
     status: "SCHEDULED", timezone: "Asia/Seoul",
-    accountId: 7, relatedItemType: null, relatedItemId: null, relatedItemLabel: null,
+    accountId: 7, workloadId: null, opportunityDealId: null, opportunityId: null,
+    relatedItemType: null, relatedItemId: null, relatedItemLabel: null,
     location: "Seoul", description: "Pipeline", visibility: "DETAILS", effectiveVisibility: "DETAILS",
     shares: [{ userKey: "user/one", permission: "VIEW", visibility: "BUSY_ONLY" }], canEdit: true
   });
@@ -96,7 +101,7 @@ async function main() {
   const event: CalendarEventInput = {
     title: "Account review", startsAt: "2026-10-03T09:00", endsAt: "2026-10-03T10:00", allDay: false,
     timeUnknown: false, forcePrivate: false, vacation: false, recurrence: "MONTHLY", recurrenceUntil: "2027-05-31", workingDays: 2,
-    timezone: "Asia/Seoul", accountId: 7,
+    timezone: "Asia/Seoul", accountId: 7, workloadId: 72, opportunityDealId: 99, opportunityId: "OPP-99",
     relatedItemType: "OPPTY", relatedItemId: 99, relatedItemLabel: "Acme · OCI · Expansion / OPP-99", location: null,
     description: null, visibility: "DETAILS",
     shares: [{ userKey: "user/two", permission: "EDIT", visibility: "DETAILS" }]
@@ -105,7 +110,7 @@ async function main() {
   const createdEvent = await createCalendarEvent(event, fetchImpl);
   assert.equal(createdEvent.id, 42);
   assert.deepEqual(jsonBody(calls[0]), {
-    accountId: 7, relatedItemType: "OPPTY", relatedItemId: 99,
+    accountId: 7, workloadId: 72, opportunityDealId: 99, opportunityId: "OPP-99", relatedItemType: "OPPTY", relatedItemId: 99,
     relatedItemLabel: "Acme · OCI · Expansion / OPP-99", title: "Account review", description: null, location: null,
     startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
     allDay: false, timeUnknown: false, forcePrivate: false, vacation: false, recurrence: "MONTHLY", recurrenceUntil: "2027-05-31", workingDays: 2,
@@ -179,10 +184,20 @@ async function main() {
   assert.deepEqual(accountOptions, [{ accountId: 77, account: "Acme Virtual Account" }]);
 
   calls.length = 0;
-  const relatedItems = await listCalendarRelatedItems("FY27", "Acme", fetchImpl);
-  assert.equal(calls[0]?.url, "/api/v1/collaboration/directory/related-items?fiscalYear=FY27&search=Acme");
-  assert.deepEqual(relatedItems, [{ type: "OPPTY", id: 99, accountId: 77, accountName: "Acme", workloadName: "OCI",
-    opptyName: "Expansion / OPP-99", label: "Acme · OCI · Expansion / OPP-99" }]);
+  const relatedItems = await listCalendarRelatedItems("FY27", "Acme", 0, fetchImpl);
+  assert.equal(calls[0]?.url, "/api/v1/kpi-activities/workload-options?fiscalYear=FY27&search=Acme&offset=0&size=10");
+  assert.equal(relatedItems.total, 14);
+  assert.equal(relatedItems.hasMore, true);
+  assert.deepEqual(relatedItems.items.map((item) => item.label), [
+    "Acme - OCI (Expansion/OPP-99)",
+    "Acme - Analytics (Data Lake)",
+    "Acme - Database (OPP-101)",
+    "Acme - Security"
+  ], "Calendar uses the KPI formatter for all opportunity name/id combinations without empty punctuation");
+  assert.deepEqual(relatedItems.items[0], {
+    type: "OPPTY", id: 99, accountId: 77, workloadId: 72, opportunityDealId: 99, opportunityId: "OPP-99",
+    accountName: "Acme", workloadName: "OCI", opptyName: "Expansion", label: "Acme - OCI (Expansion/OPP-99)"
+  });
 
   calls.length = 0;
   const notes = await listMeetingNotes("FY27", fetchImpl);
