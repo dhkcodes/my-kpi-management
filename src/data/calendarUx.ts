@@ -20,7 +20,68 @@ export const eventCalendarDate = (value: string, timezone: string): string =>
   eventLocalParts(value, timezone).date;
 
 export const eventOccursOnDate = (startDate: string, endDate: string, date: string): boolean =>
-  startDate <= date && date <= (endDate || startDate);
+  startDate <= date && date <= endDate;
+
+type CalendarSchedule = {
+  startDate: string;
+  endDate: string;
+  recurrence: "NONE" | "WEEKLY" | "MONTHLY";
+  recurrenceUntil?: string | null;
+  workingDays: number;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dateToEpochDay = (value: string): number => Math.floor(Date.parse(`${value}T00:00:00Z`) / DAY_MS);
+const epochDayToDate = (value: number): string => new Date(value * DAY_MS).toISOString().slice(0, 10);
+const isWorkingDate = (date: string, holidays: ReadonlySet<string>): boolean => {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return weekday !== 0 && weekday !== 6 && !holidays.has(date);
+};
+const monthlyOccurrenceDate = (anchorDate: string, monthOffset: number): string => {
+  const anchor = new Date(`${anchorDate}T00:00:00Z`);
+  const year = anchor.getUTCFullYear();
+  const month = anchor.getUTCMonth() + monthOffset;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(anchor.getUTCDate(), lastDay))).toISOString().slice(0, 10);
+};
+
+export const eventOccursOnScheduleDate = (schedule: CalendarSchedule, date: string, holidays: ReadonlySet<string>): boolean => {
+  if (date < schedule.startDate) return false;
+  const baseStartDay = dateToEpochDay(schedule.startDate);
+  const targetDay = dateToEpochDay(date);
+  const calendarSpanDays = Math.max(0, dateToEpochDay(schedule.endDate) - baseStartDay);
+  const workingDays = Math.max(1, Math.trunc(schedule.workingDays || 1));
+
+  const occursForStart = (occurrenceStart: string): boolean => {
+    const occurrenceStartDay = dateToEpochDay(occurrenceStart);
+    if (workingDays === 1) return occurrenceStartDay <= targetDay && targetDay <= occurrenceStartDay + calendarSpanDays;
+    if (!isWorkingDate(date, holidays)) return false;
+    let counted = 0;
+    for (let day = occurrenceStartDay; day <= targetDay; day += 1) {
+      if (isWorkingDate(epochDayToDate(day), holidays)) counted += 1;
+      if (counted > workingDays) return false;
+    }
+    return counted >= 1 && counted <= workingDays;
+  };
+
+  const recurrenceUntil = schedule.recurrence === "NONE" ? schedule.startDate : schedule.recurrenceUntil;
+  if (!recurrenceUntil) return false;
+  if (schedule.recurrence === "NONE") return occursForStart(schedule.startDate);
+
+  if (schedule.recurrence === "WEEKLY") {
+    for (let startDay = baseStartDay; startDay <= targetDay && epochDayToDate(startDay) <= recurrenceUntil; startDay += 7) {
+      if (occursForStart(epochDayToDate(startDay))) return true;
+    }
+    return false;
+  }
+
+  for (let monthOffset = 0; monthOffset < 2400; monthOffset += 1) {
+    const occurrenceStart = monthlyOccurrenceDate(schedule.startDate, monthOffset);
+    if (occurrenceStart > date || occurrenceStart > recurrenceUntil) break;
+    if (occursForStart(occurrenceStart)) return true;
+  }
+  return false;
+};
 
 export const normalizeEventTimes = (draft: Readonly<{
   allDay: boolean;
@@ -152,10 +213,10 @@ export const snapTimelinePointer = (
   return Math.max(startMinutes, Math.min(includeEnd ? endMinutes : endMinutes - TIMELINE_SNAP_MINUTES, snapMinutes(raw)));
 };
 
-/** Resize uses the same grid and intentionally permits compact 20/30/40 minute events. */
+/** Resize uses the same grid and permits a single ten-minute snap interval. */
 export const resizeTimelineRange = (startMinutes: number, pointerMinutes: number) => ({
   startMinutes,
-  endMinutes: Math.max(startMinutes + 20, snapMinutes(pointerMinutes))
+  endMinutes: Math.max(startMinutes + TIMELINE_SNAP_MINUTES, snapMinutes(pointerMinutes))
 });
 
 export type TimelineInterval<T extends string | number = string | number> = Readonly<{

@@ -11,6 +11,7 @@ export type CalendarEventShare = Readonly<{
 export type CalendarEvent = Readonly<{
   id: number;
   ownerUserKey?: string;
+  ownerDisplayName?: string | null;
   ownerBadgeColor?: string | null;
   versionNo: number;
   title: string;
@@ -20,6 +21,10 @@ export type CalendarEvent = Readonly<{
   hasEndTime: boolean;
   timeUnknown: boolean;
   forcePrivate: boolean;
+  vacation: boolean;
+  recurrence: "NONE" | "WEEKLY" | "MONTHLY";
+  recurrenceUntil: string | null;
+  workingDays: number;
   status: "SCHEDULED" | "CANCELLED";
   timezone: string;
   accountId?: number | null;
@@ -64,6 +69,10 @@ export type CalendarEventInput = Readonly<{
   allDay: boolean;
   timeUnknown: boolean;
   forcePrivate: boolean;
+  vacation: boolean;
+  recurrence: "NONE" | "WEEKLY" | "MONTHLY";
+  recurrenceUntil: string | null;
+  workingDays: number;
   timezone: string;
   accountId?: number | null;
   relatedItemType?: CalendarRelatedItemType | null;
@@ -82,10 +91,11 @@ export type KoreanHoliday = Readonly<{
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type EventDto = {
-  id: number; ownerUserKey?: string; ownerBadgeColor?: string | null; accountId?: number | null;
+  id: number; ownerUserKey?: string; ownerDisplayName?: string | null; ownerBadgeColor?: string | null; accountId?: number | null;
   relatedItemType?: CalendarRelatedItemType | null; relatedItemId?: number | null; relatedItemLabel?: string | null;
   title: string; description?: string | null; location?: string | null;
   startsAt: string; endsAt: string; allDay: boolean; hasEndTime?: boolean; timeUnknown?: boolean; forcePrivate?: boolean;
+  vacation?: boolean; recurrence?: "NONE" | "WEEKLY" | "MONTHLY"; recurrenceUntil?: string | null; workingDays?: number;
   status?: "SCHEDULED" | "CANCELLED"; timezone: string; visibility: CalendarVisibility;
   versionNo: number; effectiveAccess?: CalendarSharePermission; effectiveVisibility?: CalendarVisibility;
 };
@@ -107,6 +117,7 @@ const mapShare = (share: ShareDto): CalendarEventShare => ({ userKey: share.user
 const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): CalendarEvent => ({
   id: event.id,
   ownerUserKey: event.ownerUserKey ?? "",
+  ownerDisplayName: event.ownerDisplayName ?? null,
   ownerBadgeColor: event.ownerBadgeColor ?? null,
   versionNo: event.versionNo,
   title: event.title,
@@ -116,6 +127,10 @@ const mapEvent = (event: EventDto, shares: readonly CalendarEventShare[] = []): 
   hasEndTime: event.hasEndTime ?? true,
   timeUnknown: event.timeUnknown ?? false,
   forcePrivate: event.forcePrivate ?? false,
+  vacation: event.vacation ?? false,
+  recurrence: event.recurrence ?? "NONE",
+  recurrenceUntil: event.recurrenceUntil ?? null,
+  workingDays: event.workingDays ?? 1,
   status: event.status ?? "SCHEDULED",
   timezone: event.timezone,
   accountId: event.accountId ?? null,
@@ -166,6 +181,10 @@ const eventBody = (input: CalendarEventInput, versionNo?: number) => ({
   allDay: input.allDay,
   timeUnknown: input.timeUnknown,
   forcePrivate: input.forcePrivate,
+  vacation: input.vacation,
+  recurrence: input.recurrence,
+  recurrenceUntil: input.recurrenceUntil,
+  workingDays: input.workingDays,
   timezone: input.timezone,
   visibility: input.visibility,
   ...(versionNo === undefined ? {} : { versionNo })

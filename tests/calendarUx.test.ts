@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
 
 const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
@@ -11,6 +11,14 @@ assert.deepEqual(eventLocalParts("2026-10-04T15:00:00Z", "Asia/Seoul"), { date: 
 assert.equal(eventCalendarDate("2026-10-04T15:00:00Z", "Asia/Seoul"), "2026-10-05", "untimed/all-day calendar dates are independent of the browser timezone");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-01"), true, "multi-day events cross month boundaries");
 assert.equal(eventOccursOnDate("2026-09-29", "2026-10-03", "2026-10-04"), false);
+const koreanHolidays = new Set(["2026-10-05"]);
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-02", koreanHolidays), true, "a five-working-day duration includes its Friday start");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-03", koreanHolidays), false, "working-day duration excludes Saturday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-05", koreanHolidays), false, "working-day duration excludes a public holiday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-09", koreanHolidays), true, "the fifth displayed working day advances past weekend and holiday");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "NONE", recurrenceUntil: null, workingDays: 5 }, "2026-10-12", koreanHolidays), false, "the duration stops after its fifth working day");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-09", koreanHolidays), true, "weekly recurrence renders its later occurrence");
+assert.equal(eventOccursOnScheduleDate({ startDate: "2026-10-02", endDate: "2026-10-02", recurrence: "WEEKLY", recurrenceUntil: "2026-10-16", workingDays: 1 }, "2026-10-23", koreanHolidays), false, "recurrence does not start after its end date");
 assert.equal(formatKoreanStartTime("00:05"), "오전 12시 5분");
 assert.equal(formatKoreanStartTime("10:00"), "오전 10시");
 assert.equal(formatKoreanStartTime("12:30"), "오후 12시 30분");
@@ -39,6 +47,7 @@ assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded a
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
 assert.equal(snapTimelinePointer(540, 0, 540, 540, 1080, true), 1080, "a resize handle can snap to the timeline end");
 assert.equal(minutesToTime(850), "14:10");
+assert.deepEqual(resizeTimelineRange(850, 851), { startMinutes: 850, endMinutes: 860 }, "resize permits one ten-minute snap interval");
 assert.deepEqual(resizeTimelineRange(850, 869), { startMinutes: 850, endMinutes: 870 }, "resize rounds to ten minutes and allows a 20-minute event");
 assert.deepEqual(resizeTimelineRange(850, 881), { startMinutes: 850, endMinutes: 880 }, "resize supports 30-minute events");
 assert.deepEqual(resizeTimelineRange(850, 894), { startMinutes: 850, endMinutes: 890 }, "resize supports 40-minute events");

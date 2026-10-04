@@ -27,9 +27,10 @@ const jsonBody = (call: Call) => JSON.parse(String(call.init?.body)) as Record<s
 const response = (value: unknown, status = 200) => status === 204 ? new Response(null, { status }) : Response.json(value, { status });
 
 const eventDto = {
-  id: 41, ownerUserKey: "owner", accountId: 7, title: "Account review", description: "Pipeline",
+  id: 41, ownerUserKey: "owner", ownerDisplayName: "Calendar Owner", accountId: 7, title: "Account review", description: "Pipeline",
   location: "Seoul", startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
-  allDay: false, hasEndTime: true, timezone: "Asia/Seoul", visibility: "DETAILS", versionNo: 3,
+  allDay: false, hasEndTime: true, vacation: true, recurrence: "WEEKLY", recurrenceUntil: "2026-12-31", workingDays: 3,
+  timezone: "Asia/Seoul", visibility: "DETAILS", versionNo: 3,
   effectiveAccess: "EDIT", effectiveVisibility: "DETAILS"
 };
 const noteDto = {
@@ -80,8 +81,9 @@ async function main() {
   const events = await listCalendarEvents("FY27", fetchImpl);
   assert.equal(calls[0]?.url, "/api/v1/calendar/events?fy=FY27");
   assert.deepEqual(events[0], {
-    id: 41, ownerUserKey: "owner", ownerBadgeColor: null, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
-    allDay: false, hasEndTime: true, timeUnknown: false, forcePrivate: false, status: "SCHEDULED", timezone: "Asia/Seoul",
+    id: 41, ownerUserKey: "owner", ownerDisplayName: "Calendar Owner", ownerBadgeColor: null, versionNo: 3, title: "Account review", startsAt: eventDto.startsAt, endsAt: eventDto.endsAt,
+    allDay: false, hasEndTime: true, timeUnknown: false, forcePrivate: false, vacation: true, recurrence: "WEEKLY", recurrenceUntil: "2026-12-31", workingDays: 3,
+    status: "SCHEDULED", timezone: "Asia/Seoul",
     accountId: 7, relatedItemType: null, relatedItemId: null, relatedItemLabel: null,
     location: "Seoul", description: "Pipeline", visibility: "DETAILS", effectiveVisibility: "DETAILS",
     shares: [{ userKey: "user/one", permission: "VIEW", visibility: "BUSY_ONLY" }], canEdit: true
@@ -89,7 +91,8 @@ async function main() {
 
   const event: CalendarEventInput = {
     title: "Account review", startsAt: "2026-10-03T09:00", endsAt: "2026-10-03T10:00", allDay: false,
-    timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", accountId: 7,
+    timeUnknown: false, forcePrivate: false, vacation: false, recurrence: "MONTHLY", recurrenceUntil: "2027-05-31", workingDays: 2,
+    timezone: "Asia/Seoul", accountId: 7,
     relatedItemType: "OPPTY", relatedItemId: 99, relatedItemLabel: "Acme · OCI · Expansion / OPP-99", location: null,
     description: null, visibility: "DETAILS",
     shares: [{ userKey: "user/two", permission: "EDIT", visibility: "DETAILS" }]
@@ -101,7 +104,8 @@ async function main() {
     accountId: 7, relatedItemType: "OPPTY", relatedItemId: 99,
     relatedItemLabel: "Acme · OCI · Expansion / OPP-99", title: "Account review", description: null, location: null,
     startsAt: "2026-10-03T09:00:00+09:00", endsAt: "2026-10-03T10:00:00+09:00",
-    allDay: false, timeUnknown: false, forcePrivate: false, timezone: "Asia/Seoul", visibility: "DETAILS"
+    allDay: false, timeUnknown: false, forcePrivate: false, vacation: false, recurrence: "MONTHLY", recurrenceUntil: "2027-05-31", workingDays: 2,
+    timezone: "Asia/Seoul", visibility: "DETAILS"
   });
   assert.equal(calls[1]?.url, "/api/v1/calendar/events/42/shares/user%2Ftwo");
   assert.deepEqual(jsonBody(calls[1]), { userKey: "user/two", access: "VIEW", visibility: "DETAILS" });
