@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { eventCalendarDate, eventLocalParts, eventOccursOnDate, formatKoreanStartTime, getEventBadgeText, normalizeEventRange, normalizeEventTimes } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, appendMentionToken, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, normalizeEventRange, normalizeEventTimes, prependRelatedToken, requestIsLatest } from "../src/data/calendarUx";
 
 assert.deepEqual(normalizeEventRange({ startDate: "2026-10-03", endDate: "" }), { startDate: "2026-10-03", endDate: "2026-10-03" }, "a missing end date is normalized to the start date");
 assert.deepEqual(normalizeEventRange({ startDate: "2026-10-04", endDate: "2026-10-03" }), { startDate: "2026-10-04", endDate: "2026-10-03" }, "an explicit invalid end date remains visible for validation");
@@ -13,9 +13,19 @@ assert.equal(formatKoreanStartTime("10:00"), "오전 10시");
 assert.equal(formatKoreanStartTime("12:30"), "오후 12시 30분");
 assert.equal(formatKoreanStartTime("15:07"), "오후 3시 7분");
 assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: false, allDay: false }), "[Acme] Review · 오후 3시 7분");
+assert.equal(getEventBadgeText({ accountName: "Acme", title: "[Acme] Review", startTime: "15:07", timeUnknown: false, allDay: false }), "[Acme] Review · 오후 3시 7분", "a relation token persisted in the title is not duplicated");
 assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: true, allDay: false }), "[Acme] Review");
 assert.equal(getEventBadgeText({ accountName: "Acme", title: "Review", startTime: "15:07", timeUnknown: false, allDay: true }), "[Acme] Review");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: true, startTime: "", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "time-unknown values must satisfy the API midnight contract");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "09:00", endTime: "" }), { startTime: "09:00", endTime: "09:00" }, "start-only timed events keep zero duration");
 assert.deepEqual(normalizeEventTimes({ allDay: false, timeUnknown: false, startTime: "00:00", endTime: "" }), { startTime: "00:00", endTime: "00:00" }, "midnight is retained rather than treated as missing");
+assert.deepEqual(extractTitleSearchTrigger("Prepare #Acme"), { kind: "related", query: "Acme" });
+assert.deepEqual(extractTitleSearchTrigger("Prepare *Cloud migration"), { kind: "related", query: "Cloud migration" });
+assert.deepEqual(extractTitleSearchTrigger("Review @Jane"), { kind: "user", query: "Jane" });
+assert.equal(extractTitleSearchTrigger("literal [Acme] text"), null, "typed brackets are not relationship tokens");
+assert.equal(prependRelatedToken("Discuss renewal #Ac", "Acme"), "[Acme] Discuss renewal");
+assert.equal(appendMentionToken("Discuss renewal @Ja", "Jane Doe"), "Discuss renewal @Jane Doe");
+assert.equal(CALENDAR_SHARE_COLORS.length, 10, "the standard palette exposes ten Redwood-friendly colors");
+assert.equal(requestIsLatest(4, 4), true);
+assert.equal(requestIsLatest(3, 4), false, "stale directory responses are rejected");
 console.log("calendar UX tests passed");
