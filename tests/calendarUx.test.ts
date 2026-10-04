@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, titleWithAccountPrefix } from "../src/data/calendarUx";
+import { readFileSync } from "node:fs";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, appendMentionToken, applyRelatedSelection, eventCalendarDate, eventLocalParts, eventOccursOnDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+
+const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
 assert.deepEqual(normalizeEventRange({ startDate: "2026-10-03", endDate: "" }), { startDate: "2026-10-03", endDate: "2026-10-03" }, "a missing end date is normalized to the start date");
 assert.deepEqual(normalizeEventRange({ startDate: "2026-10-04", endDate: "2026-10-03" }), { startDate: "2026-10-04", endDate: "2026-10-03" }, "an explicit invalid end date remains visible for validation");
@@ -32,7 +35,7 @@ assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, 
   title: "Review", accountId: "9", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · FY27 Renewal"
 }, "an opportunity persists its parent account label and its own child relation id");
 assert.equal(relatedAccountName(9, "Acme · Cloud migration"), "Acme");
-assert.equal(titleWithAccountPrefix("Discuss renewal", "Acme"), "[Acme] Discuss renewal");
+assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded account-title prefix helper stays removed");
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
 assert.equal(snapTimelinePointer(540, 0, 540, 540, 1080, true), 1080, "a resize handle can snap to the timeline end");
 assert.equal(minutesToTime(850), "14:10");

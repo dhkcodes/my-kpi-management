@@ -98,9 +98,6 @@ export const applyRelatedSelection = (title: string, item: RelatedSelection) => 
 export const relatedAccountName = (accountId: number | string | null | undefined, relatedItemLabel: string | null | undefined): string =>
   accountId == null || accountId === "" ? "" : (relatedItemLabel?.split(" · ")[0]?.trim() || String(accountId));
 
-/** Account decoration is view-only; relation type/id remain the authoritative child relation. */
-export const titleWithAccountPrefix = (title: string, accountName: string): string =>
-  accountName ? `[${accountName}] ${title}` : title;
 
 export const appendMentionToken = (title: string, _displayName: string): string =>
   stripActiveTrigger(title, "user");
