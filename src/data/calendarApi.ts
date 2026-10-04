@@ -39,6 +39,12 @@ export type CalendarShare = Readonly<{
   status: "PENDING" | "ACCEPTED";
   ownerBadgeColor: string | null;
 }>;
+export type CalendarColorScope = "OWN" | "PRIVATE" | "CANCELLED";
+export type CalendarDisplayPreferences = Readonly<{
+  ownColor: string;
+  privateColor: string;
+  cancelledColor: string;
+}>;
 export type SharingUser = Readonly<{ userKey: string; displayName: string }>;
 export type CalendarAccountOption = Readonly<{ accountId: number; account: string }>;
 export type CalendarRelatedItemType = "ACCOUNT" | "WORKLOAD" | "OPPTY";
@@ -237,9 +243,17 @@ export async function acceptCalendarShare(requesterUserKey: string, fetchImpl: F
   const item = await request<CalendarShareDto>(`/calendar/shares/requests/${encodeURIComponent(requesterUserKey)}/accept`, { method: "PUT" }, fetchImpl);
   return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? "#245b83" };
 }
-export async function changeCalendarShareColor(requesterUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
-  const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(requesterUserKey)}/color`, { method: "PATCH", body: JSON.stringify({ color }) }, fetchImpl);
+export async function changeCalendarShareColor(ownerUserKey: string, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarShare> {
+  const item = await request<CalendarShareDto>(`/calendar/shares/${encodeURIComponent(ownerUserKey)}/color`, { method: "PATCH", body: JSON.stringify({ color }) }, fetchImpl);
   return { userKey: item.userKey, direction: item.direction, status: item.status, ownerBadgeColor: item.ownerBadgeColor ?? color };
+}
+export async function getCalendarDisplayPreferences(fetchImpl: FetchLike = apiFetch): Promise<CalendarDisplayPreferences> {
+  return request<CalendarDisplayPreferences>("/calendar/shares/preferences", undefined, fetchImpl);
+}
+export async function changeCalendarDisplayPreference(scope: CalendarColorScope, color: string, fetchImpl: FetchLike = apiFetch): Promise<CalendarDisplayPreferences> {
+  return request<CalendarDisplayPreferences>(`/calendar/shares/preferences/${scope}`, {
+    method: "PATCH", body: JSON.stringify({ color })
+  }, fetchImpl);
 }
 export async function deleteCalendarShare(share: CalendarShare, fetchImpl: FetchLike = apiFetch): Promise<void> {
   const pendingOutgoing = share.direction === "OUTGOING" && share.status === "PENDING";
