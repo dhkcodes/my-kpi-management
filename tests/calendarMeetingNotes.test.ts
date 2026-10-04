@@ -79,7 +79,7 @@ assert.match(calendarSource, /class="calendar-event-relations"/, "relationship m
 assert.match(calendarSource, /event\.canEdit \? <button[\s\S]*setMentionEditing/, "owners can edit relation mentions directly from view state");
 assert.match(calendarSource, /updateCalendarEvent\(event, toInput\(nextDraft, shares\)\)/, "direct mention edits persist relation and exact replacement/removal shares");
 assert.match(calendarSource, /내 일정 색상 변경[\s\S]*비공개 색상 변경[\s\S]*취소됨 색상 변경/, "all fixed legend entries expose color buttons");
-assert.match(calendarSource, /direction === "INCOMING"[\s\S]*status === "ACCEPTED"/, "accepted incoming shared owners are colored by the viewing requester");
+assert.match(calendarSource, /direction === "OUTGOING"[\s\S]*status === "ACCEPTED"/, "accepted outgoing requests expose the shared owner to the viewing requester");
 assert.match(calendarSource, /getCalendarDisplayPreferences[\s\S]*changeCalendarDisplayPreference/, "viewer colors are persisted through authenticated APIs");
 assert.match(calendarSource, /CALENDAR_SHARE_COLORS\.map[\s\S]*Custom 색상/, "legend palette exposes Redwood colors and custom input");
 assert.match(calendarSource, /dangerouslySetInnerHTML=\{\{ __html: sanitizeWeeklyActivityHtml/, "weekly popup HTML passes through the shared allow-list sanitizer");
