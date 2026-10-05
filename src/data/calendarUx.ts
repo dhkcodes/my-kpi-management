@@ -226,6 +226,13 @@ export const appendMentionToken = (title: string, _displayName: string): string 
 export const requestIsLatest = (responseRequestId: number, latestRequestId: number): boolean =>
   responseRequestId === latestRequestId;
 
+/**
+ * A failed optimistic flag write must return to the last server-confirmed value.
+ * A queued click's previous value may itself be optimistic when every write fails.
+ */
+export const failedCalendarFlagValue = (serverValue: boolean | undefined, fallbackValue: boolean): boolean =>
+  serverValue ?? fallbackValue;
+
 export const TIMELINE_START_MINUTES = 9 * 60;
 export const TIMELINE_END_MINUTES = 18 * 60;
 export const TIMELINE_SNAP_MINUTES = 10;

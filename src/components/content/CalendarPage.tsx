@@ -6,7 +6,7 @@ import { beginAppBusy } from "../../app/appBusy";
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEventEntity, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, syncCalendarEventShares, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, appendMentionToken, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnScheduleDate, extractTitleSearchTrigger, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, TIMELINE_END_MINUTES, TIMELINE_SNAP_MINUTES, TIMELINE_START_MINUTES, appendMentionToken, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnScheduleDate, extractTitleSearchTrigger, failedCalendarFlagValue, layoutTimelineEvents, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange, timeToMinutes } from "../../data/calendarUx";
 
 import { fetchWeeklyActivities, WeeklyActivityRecord } from "../../data/weeklyActivitiesApi";
 import { sanitizeWeeklyActivityHtml } from "./weeklyActivityEditorSession";
@@ -765,10 +765,12 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       return null;
     } catch (reason) {
       if (isLatestEventMutation(event.id, flag, sequence)) {
-        setEvents((current) => current.map((item) => item.id === event.id ? { ...item, [flag]: previousValue } : item));
+        const confirmedValue = eventServerStateRef.current.get(event.id)?.[flag];
+        const rollbackValue = failedCalendarFlagValue(confirmedValue, previousValue);
+        setEvents((current) => current.map((item) => item.id === event.id ? { ...item, [flag]: rollbackValue } : item));
         if (editing?.id === event.id) {
-          setEditing((current) => current ? { ...current, [flag]: previousValue } : current);
-          setDraft((current) => current ? { ...current, [flag]: previousValue } : current);
+          setEditing((current) => current ? { ...current, [flag]: rollbackValue } : current);
+          setDraft((current) => current ? { ...current, [flag]: rollbackValue } : current);
         }
         const label = flag === "forcePrivate" ? "Private" : "Time Off";
         setError(reason instanceof Error ? `${reason.message} ${label} change reverted.` : `Could not update ${label}. Change reverted.`);
