@@ -110,7 +110,7 @@ assert.match(calendarSource, /selectedCalendarActions[\s\S]*label="Recurrence"[\
 assert.match(calendarSource, /display="icons"[\s\S]*slot="startIcon"[\s\S]*oj-ux-ico-/, "event actions use the Oracle JET icon-button contract and Oracle icon gallery classes");
 assert.doesNotMatch(calendarSource, />🔒<|>🏖<|>↻<|>⌫<|>⊘</, "event actions do not use emoji or text glyph icons");
 assert.doesNotMatch(calendarSource, /calendar-event-actions__readonly/, "shared events do not render a Read Only label");
-assert.match(calendarSource, /onDblClick=\{\(click\)[\s\S]*openEdit\(event\)/, "calendar double-click opens the timeline for owned and shared events");
+assert.match(calendarSource, /onDblClick=\{\(click\)[\s\S]*setSelectedEventId\(event\.id\); openDayTimeline\(cell\.date\)/, "calendar double-click opens the timeline without entering edit mode for owned and shared events");
 assert.match(calendarSource, /class="calendar-event__title" onDblClick=[\s\S]*beginTitleEdit\(event\)/, "timeline title double-click alone enters title editing");
 assert.match(calendarSource, /cancelBehavior="icon"/, "JET day dialog renders its close X in the date header");
 assert.doesNotMatch(calendarSource, /calendar-day-dialog__hint/, "timeline guidance and interval copy are removed");
