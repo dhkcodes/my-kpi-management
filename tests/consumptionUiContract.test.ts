@@ -17,6 +17,7 @@ const styles = readFileSync("src/styles/app.css", "utf8");
 const mtdDate = readFileSync("src/data/mtdDate.ts", "utf8");
 const pageShell = readFileSync("src/components/common/PageShell.tsx", "utf8");
 const doubleActivation = readFileSync("src/components/common/doubleActivation.ts", "utf8");
+const appBusyOverlay = readFileSync("src/components/AppBusyOverlay.tsx", "utf8");
 
 assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
 assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
@@ -25,6 +26,11 @@ assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*dist
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
 assert.doesNotMatch(pageShell, /consumption|records/i, "the common shell contains no Consumption Records customization");
+assert.match(styles, /\.kap-page-shell__inner\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/, "the common shell keeps breadcrumb, heading, and filters top-aligned instead of stretching grid rows");
+assert.match(styles, /\.kap-page-shell__body\s*\{[^}]*flex:\s*1 0 auto/, "unused shell height is assigned to the page body");
+assert.match(appBusyOverlay, /data-app-busy-surface[\s\S]*MutationObserver/, "the fallback loader reacts when an inline page loading surface mounts during route entry");
+assert.match(appBusyOverlay, /oj-progress-circle[\s\S]*Loading/, "the route-entry fallback uses the shared Oracle JET loading treatment");
+assert.doesNotMatch(appBusyOverlay, /Processing|role="dialog"|aria-modal/, "the legacy full-screen Processing dialog is removed");
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
