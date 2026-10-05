@@ -28,6 +28,7 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   resolveConsumptionControlTotal,
+  resolveConsumptionRecordsViewState,
   sortConsumptionMonths,
   sortConsumptionMonthsNewestFirst
 } from "../../data/consumptionData";
@@ -426,10 +427,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [showMtd, setShowMtd] = useState(false);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
-  const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("idle");
+  const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
+  const [recordsQueryError, setRecordsQueryError] = useState("");
   const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
   const blockingRecordsLoading = recordsLoadingPhase === "initial";
+  const recordsReplacementLoading = recordsLoadingPhase === "initial" || recordsLoadingPhase === "query";
   const [recordAccountNames, setRecordAccountNames] = useState<string[]>([]);
   const [pulseExpanded, setPulseExpanded] = useState(true);
 
@@ -723,6 +726,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     }));
   }, [visiblePlans, recordAccountNames, draftControlTotals, serverAccountActualTotals]);
   const renderedRecordAccounts = accounts;
+  const recordsViewState = resolveConsumptionRecordsViewState(
+    recordsReplacementLoading, dataMode, recordsQueryError, renderedRecordAccounts.length);
   const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
@@ -906,6 +911,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     if (activeRecordsQueryRef.current?.key === requestKey) return;
     const actionGeneration = ++recordsQueryActionGeneration.current;
     activeRecordsQueryRef.current = { key: requestKey, generation: actionGeneration, search: requestQuery.search };
+    setRecordsQueryError("");
     setRangeLoading(true);
     setImportError("");
     try {
@@ -917,7 +923,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setSelectedSeriesId("__all__");
     } catch (error) {
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
-      setImportError(error instanceof Error ? error.message : "Consumption records could not be loaded.");
+      const message = error instanceof Error ? error.message : "Consumption Records could not be loaded.";
+      setRecordsQueryError(message);
+      setImportError(message);
     } finally {
       if (activeRecordsQueryRef.current?.generation === actionGeneration) activeRecordsQueryRef.current = null;
       if (actionGeneration === recordsQueryActionGeneration.current) setRangeLoading(false);
@@ -1737,7 +1745,15 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </section>
       )}
 
-      <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle" aria-busy={recordsLoadingPhase === "query" ? "true" : undefined}>
+      {recordsViewState === "loading" ? null : recordsViewState === "error" ? (
+        <section class="kpi-panel consumption-table-panel consumption-table-panel--error" aria-live="assertive">
+          <div class="consumption-empty-state" role="alert">
+            <strong>Unable to load Consumption Records.</strong>
+            <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
+          </div>
+        </section>
+      ) : (
+      <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
 
         <div class="consumption-section-heading consumption-table-heading">
           <div>
@@ -1835,7 +1851,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                   </>
                 );
               })}
-              {renderedRecordAccounts.length === 0 && <tr><td class="consumption-empty-state" colSpan={1 + quarters.length * 5}>No Consumption Records match the selected range and filters.</td></tr>}
+              {recordsViewState === "empty" && <tr><td class="consumption-empty-state" colSpan={1 + quarters.length * 5}>No Consumption Records match the selected range and filters.</td></tr>}
             </tbody>
           </table>
           <div ref={recordsSentinelRef} class="consumption-records-sentinel" data-records-sentinel aria-hidden="true"></div>
@@ -1847,6 +1863,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </div>
         </div>
       </section>
+      )}
     </section>
   );
 }

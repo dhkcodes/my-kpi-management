@@ -20,6 +20,7 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   restoreForecastEntry,
+  resolveConsumptionRecordsViewState,
   seedForecastMonths,
   sortConsumptionMonthsNewestFirst
 } from "../src/data/consumptionData";
@@ -52,6 +53,14 @@ assert.deepEqual(getNextQuarterMonths("FY27-MAY"), ["FY28-JUN", "FY28-JUL", "FY2
 assert.equal(initialConsumptionRecordsBatchSize(768), 10, "the initial Consumption Records request fills a compact viewport");
 assert.equal(initialConsumptionRecordsBatchSize(1240), 20, "the initial Consumption Records request expands for a taller viewport");
 assert.equal(initialConsumptionRecordsBatchSize(10000), 100, "the initial server page remains bounded");
+assert.equal(resolveConsumptionRecordsViewState(true, "backend", "", 20), "loading",
+  "a slow replacement request remains loading even while prior rows still exist");
+assert.equal(resolveConsumptionRecordsViewState(false, "backend", "", 20), "ready",
+  "a completed request with rows renders the table and counts");
+assert.equal(resolveConsumptionRecordsViewState(false, "backend", "", 0), "empty",
+  "the no-records copy appears only after a successful empty response");
+assert.equal(resolveConsumptionRecordsViewState(false, "backend", "network failed", 0), "error",
+  "request failure is distinct from a successful empty response");
 const mtdSource: ConsumptionPlan = {
   id: "mtd-exact",
   customer: "Exact Account",

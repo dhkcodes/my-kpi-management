@@ -1,6 +1,19 @@
 import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, subtractExactDecimals } from "./exactDecimal";
 
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
+export type ConsumptionRecordsViewState = "loading" | "error" | "empty" | "ready";
+export const resolveConsumptionRecordsViewState = (
+  replacementLoading: boolean,
+  dataMode: "loading" | "backend" | "fallback" | "error",
+  queryError: string,
+  accountCount: number
+): ConsumptionRecordsViewState => replacementLoading || dataMode === "loading"
+  ? "loading"
+  : queryError || dataMode === "error"
+    ? "error"
+    : accountCount === 0
+      ? "empty"
+      : "ready";
 export type ConsumptionPillar = "ALL" | "DP" | "OCI";
 export const consumptionPillarOptions: ReadonlyArray<Readonly<{ label: string; value: ConsumptionPillar }>> = [
   { label: "All", value: "ALL" },
