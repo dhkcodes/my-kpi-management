@@ -314,7 +314,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       Promise.all(Array.from(new Set(cells.map((cell) => Number(cell.date.slice(0, 4))))).map((year) => listKoreanHolidays(year, apiFetchQuiet))).then((years) => years.flat()),
       listCalendarShares(apiFetchQuiet),
       getCalendarDisplayPreferences(apiFetchQuiet),
-      fetchWeeklyActivities({ fromDate, toDate, size: 100 }).catch(() => ({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })),
+      fetchWeeklyActivities({ fromDate, toDate, size: 100 }, apiFetchQuiet).catch(() => ({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })),
       listSharingUsers().catch(() => [])
     ]).then(([items, days, shares, preferences, activities, users]) => {
       if (!active) return;

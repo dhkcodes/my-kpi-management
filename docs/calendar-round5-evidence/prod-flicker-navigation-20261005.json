@@ -1,6 +1,6 @@
 {
   "target": "https://hermes-one-server.tail57dd1d.ts.net:8443",
-  "startedAt": "2026-10-05T14:54:21.924Z",
+  "startedAt": "2026-10-05T15:09:01.083Z",
   "checks": [],
   "metrics": {
     "main": true,
@@ -11,6 +11,6 @@
   },
   "ok": false,
   "error": "Error: navigation remount/full processing\n    at /home/opc/tmp/calendar_flicker_nav.cjs:3:1174",
-  "completedAt": "2026-10-05T14:54:55.861Z",
-  "video": "/tmp/r5-nav-video/3b63845cd16475a8932c0c602da8e5f0.webm"
+  "completedAt": "2026-10-05T15:09:36.629Z",
+  "video": "/tmp/r5-nav-video/b3acc2bf4b7520c9a7c88778f54aa4c9.webm"
 }
