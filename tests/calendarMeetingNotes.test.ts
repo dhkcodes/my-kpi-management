@@ -4,6 +4,7 @@ import { getNavigationRoute, getNavigationRouteFromPath } from "../src/component
 import { getFiscalYearForDate, getFiscalYearRange, getMonthCells, getDayKind } from "../src/data/calendarDateUtils";
 import { getLocalRecordingKey, getRecordingCapability } from "../src/data/localRecordingStore";
 import { canAccessLocalRecording } from "../src/data/meetingNotesApi";
+import { failedCalendarFlagValue } from "../src/data/calendarUx";
 
 assert.equal(getNavigationRoute("calendar").module, "calendar");
 assert.equal(getNavigationRoute("meeting-notes").module, "meetingNotes");
@@ -229,6 +230,10 @@ assert.match(calendarCss, /\.kpi-shell:has\(\.calendar-page\) \.kpi-footer\s*\{[
 assert.match(calendarSource, /eventMutationQueueRef[\s\S]*previousRequest[\s\S]*eventServerStateRef[\s\S]*isLatestEventMutation/, "rapid saved-event flag mutations are serialized and stale responses cannot overwrite the latest UI state");
 assert.match(calendarSource, /eventMutationKey = \(eventId: number, field: "forcePrivate" \| "vacation"\)/, "Private and Time Off keep independent latest-request identities");
 assert.match(calendarSource, /nextEventMutationSeq\(event\.id, flag\)[\s\S]*isLatestEventMutation\(event\.id, flag, sequence\)/, "each flag retains its own rollback sequence while same-event writes remain serialized");
+assert.match(calendarSource, /confirmedValue = eventServerStateRef\.current\.get\(event\.id\)\?\.\[flag\][\s\S]*failedCalendarFlagValue\(confirmedValue, previousValue\)/, "the latest failure rolls back to server-confirmed state rather than another optimistic value");
+assert.equal(failedCalendarFlagValue(false, true), false, "both writes failing returns UI to the original server value");
+assert.equal(failedCalendarFlagValue(true, false), true, "first success followed by second failure returns UI to the first confirmed server value");
+assert.equal(failedCalendarFlagValue(false, true), false, "first failure followed by second success leaves UI at the second confirmed server value");
 assert.match(calendarSource, /change reverted/, "failed optimistic flag changes visibly roll back");
 assert.match(calendarCss, /\.calendar-day\.is-selected\s*\{\s*background:/, "selection is a subtle background, not a red border");
 assert.match(calendarCss, /\.calendar-day:focus-visible/, "keyboard focus remains independently visible");
