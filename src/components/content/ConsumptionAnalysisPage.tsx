@@ -181,6 +181,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
                 return;
         }
         setAnalysis(value);
+        if (includeMtd && !value.currentMtdAvailable) setIncludeMtd(false);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
         setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
       })
@@ -417,7 +418,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small>
             : null}
           <span class="kpi-section-label">MTD</span>
-          <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd} class="consumption-mtd-switch"
+          <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd}
+            disabled={loading || !analysis?.currentMtdAvailable} class="consumption-mtd-switch"
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
             <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>

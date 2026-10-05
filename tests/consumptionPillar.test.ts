@@ -26,6 +26,7 @@ const workspace = {
 
 const analysis = {
 selectedPillar: "OCI", fiscalYear: "FY27", priorFiscalYear: "FY26", selectedAccount: null, selectedSalesRep: null,
+  currentMtdAvailable: false,
   salesRepOptions: [], salesRepOverview: [],
   periodCoverage: { actualPeriods: [], forecastPeriods: [], includedPeriods: [], priorComparisonPeriods: [], comparisonStatus: "PRIOR_PERIOD_NOT_PROVIDED", comparisonUnavailableReason: "No prior-period Actual is available." },
   portfolio: { actualAmount: 0, forecastAmount: 0, totalAmount: 0, forecastOverlapAmount: 0, status: "INCOMPLETE", coveragePercent: 0,

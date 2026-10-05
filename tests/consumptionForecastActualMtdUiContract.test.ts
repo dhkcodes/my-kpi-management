@@ -11,6 +11,7 @@ assert.match(page, /class="consumption-insights-page forecast-actual-page"/u,
 assert.doesNotMatch(page, /class="consumption-page forecast-actual-page"/u);
 assert.match(page, /role="switch"/u);
 assert.match(page, /aria-checked=\{actualMode === "MTD"\}/u);
+assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\}/u);
 assert.match(page, /setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\)/u);
 assert.equal((page.match(/role="switch"/gu) ?? []).length, 1);
 

@@ -484,6 +484,7 @@ void (async () => {
   const mtdComparisonPayload = {
     fiscalYear: "FY27", quarter: "Q2", selectedPillar: "ALL", selectedSalesRep: "", selectedAccount: "",
     salesRepOptions: ["SE Choi"], accountOptions: ["SuperConnect"], actualMode: "MTD",
+    currentMtdAvailable: true,
     comparisonPeriods: [], fullForecastPeriods: ["FY27-SEP", "FY27-OCT", "FY27-NOV"],
     projectionFormula: "MTD 입력 기준일 미확인",
     summary: { confirmedForecastAmount: "0.00", fullPeriodForecastAmount: "2000.00", attentionAccountCount: 0, accountCount: 1 },

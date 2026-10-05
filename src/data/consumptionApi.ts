@@ -160,6 +160,7 @@ export type ConsumptionAnalysis = Readonly<{
   }>;
   mtdSummary: Readonly<{ periodKey: string; amountExact: string; asOf: string | null }> | null;
   mtdAsOf: string | null;
+  currentMtdAvailable: boolean;
   quarters: readonly ConsumptionAnalysisQuarter[];
   accountCandidates: readonly ConsumptionAnalysisAccountCandidate[];
   contextActualTrend: readonly ConsumptionActualTrendPoint[];
@@ -356,7 +357,7 @@ const decodeSalesRepChanges = (value: unknown, malformedMessage: string): readon
       || !(raw.beforeSalesRep === null || isNonEmptyString(raw.beforeSalesRep))
       || !isNonEmptyString(raw.afterSalesRep) || typeof raw.changed !== "boolean") throw new Error(malformedMessage);
     return { normalizedAccount: raw.normalizedAccount, account: raw.account,
-      beforeSalesRep: raw.beforeSalesRep, afterSalesRep: raw.afterSalesRep, changed: raw.changed };
+      beforeSalesRep: raw.beforeSalesRep as string | null, afterSalesRep: raw.afterSalesRep, changed: raw.changed };
   });
 };
 const consumptionPillars = new Set<ConsumptionPillar>(["ALL", "DP", "OCI"]);
@@ -580,7 +581,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !Array.isArray(raw.salesRepOptions) || !raw.salesRepOptions.every(isNonEmptyString)
     || !Array.isArray(raw.salesRepOverview) || typeof raw.periodCoverage !== "object" || raw.periodCoverage === null
     || (raw.accountCandidates !== undefined && !Array.isArray(raw.accountCandidates))
-    || !Array.isArray(raw.contextActualTrend)
+    || !Array.isArray(raw.contextActualTrend) || typeof raw.currentMtdAvailable !== "boolean"
     || !Array.isArray(raw.alerts) || !Array.isArray(raw.accounts)) return malformedAnalysis();
   const coverageRaw = raw.periodCoverage as Record<string, unknown>;
   const periodLists = [coverageRaw.actualPeriods, coverageRaw.forecastPeriods, coverageRaw.includedPeriods, coverageRaw.priorComparisonPeriods];
@@ -743,7 +744,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     portfolio: { ...portfolioSplit, priorActualAmountExact: priorActual.exact,
       priorForecastAmountExact: priorForecast.exact, priorTotalAmountExact: priorTotal.exact,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
-      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, mtdAsOf, quarters, accountCandidates, contextActualTrend, alerts, accounts,
+      priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, mtdAsOf,
+    currentMtdAvailable: raw.currentMtdAvailable, quarters, accountCandidates, contextActualTrend, alerts, accounts,
     organicConsumptionGrowthProxy, movementBridge };
 };
 
@@ -1535,6 +1537,7 @@ export type ForecastActualComparison = Readonly<{
   salesRepOptions: string[];
   accountOptions: string[];
   actualMode: ForecastActualMode;
+  currentMtdAvailable: boolean;
   comparisonPeriods: string[];
   partialActualPeriods: string[];
   fullForecastPeriods: string[];
@@ -1598,7 +1601,7 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
     || typeof raw.quarter !== "string" || !FORECAST_QUARTER_PATTERN.test(raw.quarter) || !isPillar(raw.selectedPillar)
     || !raw.comparisonPeriods.every(isForecastPeriod) || !partialActualPeriods.every(isForecastPeriod)
     || !raw.fullForecastPeriods.every(isForecastPeriod)
-    || !isActualMode(raw.actualMode)
+    || !isActualMode(raw.actualMode) || typeof raw.currentMtdAvailable !== "boolean"
     || (raw.selectedSalesRep !== null && raw.selectedSalesRep !== undefined && typeof raw.selectedSalesRep !== "string")
     || (raw.selectedAccount !== null && raw.selectedAccount !== undefined && typeof raw.selectedAccount !== "string")
     || (raw.projectionFormula !== null && raw.projectionFormula !== undefined && typeof raw.projectionFormula !== "string")
@@ -1608,8 +1611,9 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
     fiscalYear: raw.fiscalYear as string, quarter: raw.quarter as string, selectedPillar: raw.selectedPillar,
     selectedSalesRep: (raw.selectedSalesRep ?? "") as string, selectedAccount: (raw.selectedAccount ?? "") as string,
     salesRepOptions: raw.salesRepOptions, accountOptions: raw.accountOptions,
-    actualMode: raw.actualMode, comparisonPeriods: raw.comparisonPeriods, partialActualPeriods,
-    fullForecastPeriods: raw.fullForecastPeriods, projectionFormula: raw.projectionFormula ?? "",
+    actualMode: raw.actualMode, currentMtdAvailable: raw.currentMtdAvailable,
+    comparisonPeriods: raw.comparisonPeriods, partialActualPeriods,
+    fullForecastPeriods: raw.fullForecastPeriods as string[], projectionFormula: (raw.projectionFormula ?? "") as string,
     summary: decodeForecastSummary(raw.summary as Record<string, unknown>),
     fiscalYearSummary: decodeForecastSummary(raw.fiscalYearSummary as Record<string, unknown>),
     rows: raw.rows.map((value) => {

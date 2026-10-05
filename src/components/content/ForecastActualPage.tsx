@@ -108,6 +108,10 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     if (!account) setAccountOptionCache(data.accountOptions);
   }, [account, data]);
 
+  useEffect(() => {
+    if (data && !data.currentMtdAvailable && actualMode === "MTD") setActualMode("FINAL");
+  }, [actualMode, data]);
+
   // Preserve the previous result while the next filtered request is in flight.
   // The effect cleanup guards against stale responses replacing newer ones.
   const currentData = data;
@@ -181,7 +185,8 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           <span>MTD</span>
           <div class="forecast-actual-mtd-row">
             {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">As of {mtdAppliedDate}</span>}
-            <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"} class="consumption-mtd-switch"
+            <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
+              disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
               onClick={() => { setProblemFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
               <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
             </button>

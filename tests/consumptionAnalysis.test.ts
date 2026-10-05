@@ -16,6 +16,7 @@ const analysis = {
   priorFiscalYear: "FY26",
   selectedAccount: null,
   selectedSalesRep: null,
+  currentMtdAvailable: false,
   salesRepOptions: ["Rep A", "Unassigned"],
   periodCoverage: {
     actualPeriods: ["FY27-JUN", "FY27-JUL", "FY27-AUG"],
