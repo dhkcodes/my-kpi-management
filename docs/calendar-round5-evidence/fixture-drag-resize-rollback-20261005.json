@@ -1,0 +1,20 @@
+{
+  "fixtureOnly": true,
+  "checks": [
+    {
+      "name": "pointer move persists",
+      "ok": true
+    },
+    {
+      "name": "pointer resize persists",
+      "ok": true
+    },
+    {
+      "name": "rejected pointer update preserves fixture and reports rollback",
+      "ok": true
+    }
+  ],
+  "startedAt": "2026-10-05T16:12:00.695Z",
+  "ok": true,
+  "completedAt": "2026-10-05T16:12:04.095Z"
+}

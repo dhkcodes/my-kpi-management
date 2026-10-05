@@ -1,0 +1,45 @@
+{
+  "fixtureOnly": true,
+  "checks": [
+    {
+      "name": "Calendar legend aligned above surface and forbidden label absent",
+      "ok": true
+    },
+    {
+      "name": "Calendar and Weekly Activities headers align",
+      "ok": true
+    }
+  ],
+  "rects": {
+    "legend": {
+      "x": 44,
+      "y": 263.0625,
+      "width": 1352,
+      "height": 22.359375
+    },
+    "surface": {
+      "x": 24,
+      "y": 297.421875,
+      "width": 1392,
+      "height": 881.4375
+    },
+    "justify": "flex-end"
+  },
+  "headers": {
+    "calendar": {
+      "x": 44,
+      "y": 221.78125,
+      "width": 873.53125,
+      "height": 31.6875
+    },
+    "weekly": {
+      "x": 49,
+      "y": 222.78125,
+      "width": 390.453125,
+      "height": 31.6875
+    },
+    "calendarFont": "26.4px",
+    "weeklyFont": "26.4px"
+  },
+  "ok": true
+}

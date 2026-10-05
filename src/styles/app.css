@@ -5852,7 +5852,7 @@ h4.weekly-activity-section-label--next-week,
 .calendar-breadcrumb { margin-bottom: 0; }
 .calendar-toolbar { margin: 0; padding-block: .15rem .35rem; row-gap: .35rem; }
 .calendar-toolbar { align-items: center; display: grid; grid-template-columns: minmax(12rem, 1fr) auto; }
-.calendar-toolbar h2 { margin: .25rem 0; }
+.calendar-toolbar h2 { font-size: 1.65rem; line-height: 1.2; margin: .25rem 0; }
 .calendar-legend { justify-content: flex-end; margin: 0; padding-top: .15rem; }
 .calendar-surface { margin-top: 0; }
 .calendar-card-summary { display: grid; gap: .08rem; grid-column: 2 / -1; min-width: 0; position: relative; }
