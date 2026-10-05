@@ -8,7 +8,7 @@ import "ojs/ojinputnumber";
 import "ojs/ojinputtext";
 import "ojs/ojselectsingle";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
-import { beginAppBusy } from "../../app/appBusy";
+
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEventEntity, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, syncCalendarEventShares, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
@@ -304,7 +304,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   useEffect(() => {
     let active = true;
     const isInitialLoad = initialCalendarLoadRef.current;
-    const finishBusy = isInitialLoad ? beginAppBusy() : () => undefined;
+    const finishBusy = () => undefined;
     if (isInitialLoad) setCalendarLoading(true);
     const fiscalYear = getFiscalYearForDate(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`);
     const fromDate = cells[0]?.date ?? `${cursor.getFullYear()}-01-01`;

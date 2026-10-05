@@ -45,10 +45,10 @@ assert.match(calendarStyles, /\.calendar-timeline-event\.is-editable\s*\{[\s\S]*
 assert.match(calendarSource, /holidays\.get/);
 assert.match(calendarSource, /PRIVATE[\s\S]*DETAILS/);
 assert.doesNotMatch(calendarSource, /BUSY_ONLY/, "Calendar sharing no longer offers a busy-only scope");
-assert.match(calendarSource, /const isInitialLoad = initialCalendarLoadRef\.current;[\s\S]*const finishBusy = isInitialLoad \? beginAppBusy\(\) : \(\) => undefined/, "only initial Calendar loading owns the global busy scope");
+assert.match(calendarSource, /const isInitialLoad = initialCalendarLoadRef\.current;[\s\S]*const finishBusy = \(\) => undefined/, "Calendar data loading never owns the global blocking busy scope");
 assert.match(calendarSource, /if \(isInitialLoad\) setCalendarLoading\(true\)[\s\S]*Promise\.all\(/, "only initial Calendar entry renders the loading state");
 assert.match(calendarSource, /\.finally\(\(\) => \{[\s\S]*finishBusy\(\);[\s\S]*if \(active && isInitialLoad\)[\s\S]*setCalendarLoading\(false\);[\s\S]*initialCalendarLoadRef\.current = false;/, "only the active initial request closes initial local and global loading scopes");
-assert.equal((calendarSource.match(/beginAppBusy\(\)/g) ?? []).length, 1, "Calendar initial loading has no duplicate busy scope");
+assert.equal((calendarSource.match(/beginAppBusy\(\)/g) ?? []).length, 0, "Calendar updates never create a full-screen busy overlay");
 assert.match(calendarSource, /onDblClick=\{\(\) => \{[\s\S]*openDay/, "desktop double click opens the selected day");
 assert.match(calendarSource, /onDblClick=\{handleTimelineDoubleClick\}/, "desktop timeline double click creates a direct block draft");
 assert.match(calendarSource, /lastTouchTapRef[\s\S]*setDayOpen\(true\)/, "mobile double tap opens the selected day");

@@ -1,0 +1,16 @@
+{
+  "target": "https://hermes-one-server.tail57dd1d.ts.net:8443",
+  "startedAt": "2026-10-05T14:54:21.924Z",
+  "checks": [],
+  "metrics": {
+    "main": true,
+    "surface": true,
+    "full": 2,
+    "local": 0,
+    "focus": "Previous month"
+  },
+  "ok": false,
+  "error": "Error: navigation remount/full processing\n    at /home/opc/tmp/calendar_flicker_nav.cjs:3:1174",
+  "completedAt": "2026-10-05T14:54:55.861Z",
+  "video": "/tmp/r5-nav-video/3b63845cd16475a8932c0c602da8e5f0.webm"
+}
