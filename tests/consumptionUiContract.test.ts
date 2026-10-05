@@ -66,7 +66,7 @@ assert.match(recordsPage, /error\.status === 403 && error\.code === "MENU_ACCESS
   "only MENU_ACCESS_DENIED is presented as an operation-specific write permission failure");
 assert.match(recordsPage, /if \(error\.status === 403\) return "요청이 거부되었습니다\. 다시 시도한 후 계속되면 관리자에게 문의해 주세요\."/,
   "non-menu 403 responses are not mislabeled as missing Records or Attainment WRITE permission");
-assert.match(recordsPage, /Actual CSV Import/, "Actual upload dialog uses an Actual-specific title");
+assert.match(recordsPage, /dialogTitle="Actual Import"/, "Actual upload dialog is not restricted to CSV wording");
 assert.match(recordsPage, /Forecast Workbook Import/, "Forecast upload dialog uses a Forecast-specific title");
 assert.doesNotMatch(recordsPage, /Consumption CSV import/, "the ambiguous shared import title is removed");
 assert.match(apiSource, /previewConsumptionForecastWide[\s\S]*"\/consumption\/forecast-imports\/preview"/,
@@ -288,8 +288,8 @@ assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|con
 assert.match(recordsPage, /<h1 id="consumptionTitle">Consumption Records<\/h1>/, "data-management leaf uses the approved name");
 assert.match(recordsPage, /<span class="kpi-eyebrow">Consumption \/ Attainment<\/span>[\s\S]*<h1 id="consumptionTitle">Consumption Records<\/h1>/, "Consumption Records uses the shared Consumption / Attainment eyebrow");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
-assert.match(recordsPage, /accept="\.csv,text\/csv"/, "CSV file input remains available");
-assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleCsvFiles/, "Import accepts multiple CSV files");
+assert.match(recordsPage, /accept="\.csv,\.xlsx,text\/csv,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/, "Actual Import accepts CSV and XLSX files");
+assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, "Actual Import accepts multiple CSV or XLSX files");
 assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
 assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files, preview/, "multipart preview retains the exact selected File objects and lets filenames own pillar detection");
 assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL", pendingImport\.preview\)/, "multipart apply reuses the retained files and validated preview mapping as one cross-pillar atomic set");
@@ -306,12 +306,14 @@ assert.match(recordsPage, /disabled=\{!canWrite \|\| pendingImport\.preview\.has
 assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinals\[0\]\}[\s\S]*formatConflictCurrency\(conflict\.values\[0\]\)/, "Hard Conflict rows preserve decimal strings and distinguish equal source filenames by upload ordinal");
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
 assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
-assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "CSV preview and atomic import remain wired");
+assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "Actual file preview and atomic import remain wired");
 assert.match(recordsPage, /renderSalesRepPreview\(pendingImport\.preview\.salesRepChanges/, "Actual preview renders Sales Rep changes before Apply");
 assert.match(recordsPage, /renderSalesRepPreview\(pendingForecastImport\.preview\.salesRepChanges/, "Forecast preview renders Sales Rep changes before Apply");
 assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Changed[\s\S]*Unchanged/, "Sales Rep preview exposes account, before-to-after, and changed/unchanged semantics");
 assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
 assert.match(recordsPage, /exportConsumptionForecastXlsx[\s\S]*exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
+assert.match(recordsPage, /\{isExporting \? "Exporting…" : "Actual Export"\}[\s\S]*title="Export ACTUAL data in Excel format"[\s\S]*\{isExporting \? "Exporting…" : "Actual Excel Export"\}/, "Actual CSV Export remains available with one adjacent Excel Export control");
+assert.match(recordsPage, /exportConsumptionActualXlsx\(\)/, "Actual Excel Export is wired to the XLSX API helper");
 assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompositionCategory \} \| null>/, "Forecast composition supports All and each classified drill category");
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");

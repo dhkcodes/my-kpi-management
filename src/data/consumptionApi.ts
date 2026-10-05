@@ -1108,8 +1108,12 @@ export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery):
   return decoded;
 };
 const multipartFiles = (files: readonly File[]) => {
-  if (files.length < 1 || files.length > 8 || files.some((file) => !(file instanceof File) || !file.name.toLowerCase().endsWith(".csv"))) {
-    throw new Error("Select 1 to 8 CSV files");
+  if (files.length < 1 || files.length > 8 || files.some((file) => {
+    if (!(file instanceof File)) return true;
+    const name = file.name.toLowerCase();
+    return !name.endsWith(".csv") && !name.endsWith(".xlsx");
+  })) {
+    throw new Error("Select 1 to 8 CSV or XLSX files");
   }
   const body = new FormData();
   files.forEach((file) => body.append("files", file, file.name));
@@ -1246,6 +1250,41 @@ export const exportConsumptionImportCompatibleCsv = async (
   const safeFileName = match ? match[1].split(/[\\/]/).pop() : undefined;
   return { blob, fileName: safeFileName ?? (normalizedContentType.startsWith("application/zip") ? "consumption-actuals-export.zip" : "consumption-actuals-export.csv") };
 };
+
+const xlsxAttachmentFileName = (disposition: string, fallback: string): string => {
+  const encoded = /filename\*=UTF-8''([^;\r\n]+)/i.exec(disposition)?.[1];
+  const quoted = /filename="([^"\r\n]+\.xlsx)"/i.exec(disposition)?.[1];
+  let candidate = quoted;
+  if (encoded) {
+    try { candidate = decodeURIComponent(encoded); } catch { /* use the quoted filename or fallback */ }
+  }
+  const safeFileName = candidate?.split(/[\\/]/).pop();
+  return safeFileName && safeFileName.toLowerCase().endsWith(".xlsx") ? safeFileName : fallback;
+};
+
+export const exportConsumptionActualXlsx = async (): Promise<ConsumptionCsvExport> => {
+  let response: Response;
+  try {
+    response = await apiFetch(`${apiBase()}/consumption/exports/actual-xlsx`, { method: "GET" });
+  } catch (cause) {
+    throw new ConsumptionNetworkError(cause);
+  }
+  if (!response.ok) {
+    let error: { code?: unknown; message?: unknown } = {};
+    try { error = await response.clone().json() as typeof error; } catch { /* sanitized below */ }
+    throw new ConsumptionApiError(response.status, typeof error.code === "string" ? error.code : "HTTP_ERROR",
+      typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const blob = await response.blob();
+  if (!contentType.toLowerCase().startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") || blob.size === 0)
+    throw new Error("Malformed Consumption Actual XLSX export response");
+  return {
+    blob,
+    fileName: xlsxAttachmentFileName(response.headers.get("Content-Disposition") ?? "", "OCI Consumption Actual.xlsx")
+  };
+};
+
 export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
   let response: Response;

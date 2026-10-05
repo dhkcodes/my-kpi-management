@@ -215,8 +215,8 @@ void (async () => {
     await assert.rejects(() => previewConsumptionImport(files, "ALL"), /Malformed Consumption import preview/);
   }
 
-  await assert.rejects(() => previewConsumptionImport([], "ALL"), /1 to 8 CSV files/);
-  await assert.rejects(() => previewConsumptionImport(Array.from({ length: 9 }, (_, index) => new File(["x"], `${index}.csv`)), "ALL"), /1 to 8 CSV files/);
+  await assert.rejects(() => previewConsumptionImport([], "ALL"), /1 to 8 CSV or XLSX files/);
+  await assert.rejects(() => previewConsumptionImport(Array.from({ length: 9 }, (_, index) => new File(["x"], `${index}.csv`)), "ALL"), /1 to 8 CSV or XLSX files/);
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/imports/apply?pillar=ALL");

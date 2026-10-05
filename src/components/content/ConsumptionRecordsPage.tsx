@@ -50,6 +50,7 @@ import {
   applyConsumptionImport,
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
+  exportConsumptionActualXlsx,
   exportConsumptionForecastXlsx,
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionRecords,
@@ -1246,14 +1247,14 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     }
   };
 
-  const handleCsvFiles = async (event: Event) => {
+  const handleActualFiles = async (event: Event) => {
     if (!canWrite) { setImportError("Write permission is required."); return; }
     const input = event.currentTarget as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = "";
     if (files.length < 1) return;
     if (files.length > 8) {
-      setImportError("Select 1 to 8 CSV files.");
+      setImportError("Select 1 to 8 CSV or XLSX files.");
       return;
     }
     if (hasDraftChanges || dataMode === "loading" || isSaving || exportingRef.current || importPhase !== "idle") return;
@@ -1331,6 +1332,32 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Consumption CSV could not be exported.");
+    } finally {
+      exportingRef.current = false;
+      setIsExporting(false);
+    }
+  };
+
+  const exportActualXlsx = async () => {
+    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    exportingRef.current = true;
+    setIsExporting(true);
+    setImportError("");
+    try {
+      const exported = await exportConsumptionActualXlsx();
+      const url = URL.createObjectURL(exported.blob);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = exported.fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Consumption Actual Excel file could not be exported.");
     } finally {
       exportingRef.current = false;
       setIsExporting(false);
@@ -1500,8 +1527,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           <h1 id="consumptionTitle">Consumption Records</h1>
         </div>
         <div class="consumption-import-actions">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,text/csv" multiple
-            disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleCsvFiles(event)} />
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
+            disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastWorkbookFile(event)} />
           <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
@@ -1523,6 +1550,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             onojAction={() => void exportImportCompatibleCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Export"}
+          </oj-button>
+          <oj-button chroming="outlined" title="Export ACTUAL data in Excel format"
+            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            onojAction={() => void exportActualXlsx()}>
+            <span slot="startIcon" class="oj-ux-ico-download"></span>
+            {isExporting ? "Exporting…" : "Actual Excel Export"}
           </oj-button>
         </div>
       </header>
@@ -1579,7 +1612,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       <oj-dialog
         id="consumptionImportDialog"
         ref={importDialogRef}
-        dialogTitle="Actual CSV Import"
+        dialogTitle="Actual Import"
         cancelBehavior={importPhase === "previewing" || importPhase === "applying" ? "none" : "icon"}
         onojClose={() => {
           if (importPhase === "previewing" || importPhase === "applying") return;
@@ -1591,7 +1624,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
           {importPhase === "preview" && pendingImport && (
             <div class="consumption-import-preview">
-              <p><strong>{pendingImport.files.length} CSV file{pendingImport.files.length === 1 ? "" : "s"}</strong> passed filename, pillar, range, and content validation.</p>
+              <p><strong>{pendingImport.files.length} file{pendingImport.files.length === 1 ? "" : "s"}</strong> passed filename, pillar, range, and content validation.</p>
               <div class="consumption-import-file-list" aria-label="Import file preview">
                 {pendingImport.preview.files.map((file) => <article key={file.fileName}>
                   <strong>{file.fileName}</strong>

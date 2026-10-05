@@ -3,6 +3,7 @@ import {
   canUseConsumptionFallback,
   ConsumptionConflictError,
   ConsumptionNetworkError,
+  exportConsumptionActualXlsx,
   exportConsumptionImportCompatibleCsv,
   exportConsumptionForecastCsv,
   fetchConsumptionRecords,
@@ -201,6 +202,21 @@ void (async () => {
   const exported = await exportConsumptionImportCompatibleCsv("ALL", "FY27-Q1", "FY27-Q4");
   assert.equal(exported.fileName, "OCI Consumption Actual - Jun-2026-May-2027.csv");
   assert.match(await exported.blob.text(), /^DP\r?\nPlan Type,Account[\s\S]*OCI\r?\nPlan Type,Account/);
+
+  runtime.fetch = async (input, init) => {
+    assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/actual-xlsx");
+    assert.equal(init?.method, "GET");
+    return new Response(new Uint8Array([80, 75, 3, 4]), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": 'attachment; filename="OCI Consumption Actual.xlsx"'
+      }
+    });
+  };
+  const actualExcelExported = await exportConsumptionActualXlsx();
+  assert.equal(actualExcelExported.fileName, "OCI Consumption Actual.xlsx");
+  assert.equal(actualExcelExported.blob.size, 4);
 
   runtime.fetch = async (input, init) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/exports/forecast?pillar=DP");
