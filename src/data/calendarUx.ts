@@ -162,6 +162,12 @@ export const replaceActiveTitleTrigger = (title: string, trigger: "related" | "u
   return title.replace(pattern, (_match, boundary: string) => `${boundary}${trigger === "related" ? "@" : "#"}${label}`);
 };
 
+/** Removes only the active @/# search suffix after selection; relations render below the title. */
+export const removeActiveTitleTrigger = (title: string, trigger: "related" | "user"): string => {
+  const pattern = trigger === "related" ? /(^|\s)@[^@#]*$/ : /(^|\s)#[^@#]*$/;
+  return title.replace(pattern, (_match, boundary: string) => boundary).trimEnd();
+};
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Replaces/removes one exact existing account mention without touching similarly named title text. */
@@ -195,11 +201,11 @@ export type RelatedSelection = Readonly<{
   label: string;
 }>;
 
-/** Mentions are relational metadata and remain visible in the title as their parent account. */
+/** Relations are metadata; selecting one removes the active title search token. */
 export const applyRelatedSelection = (title: string, item: RelatedSelection, previousAccountName = "") => ({
   title: previousAccountName
-    ? replaceExistingRelatedMention(title, previousAccountName, item.accountName)
-    : replaceActiveTitleTrigger(title, "related", item.accountName),
+    ? replaceExistingRelatedMention(title, previousAccountName, "")
+    : removeActiveTitleTrigger(title, "related"),
   accountId: String(item.accountId),
   workloadId: String(item.workloadId),
   opportunityDealId: item.opportunityDealId == null ? "" : String(item.opportunityDealId),
@@ -213,8 +219,8 @@ export const relatedAccountName = (accountId: number | string | null | undefined
   accountId == null || accountId === "" ? "" : (relatedItemLabel?.split(" · ")[0]?.trim() || String(accountId));
 
 
-export const appendMentionToken = (title: string, displayName: string): string =>
-  replaceActiveTitleTrigger(title, "user", displayName);
+export const appendMentionToken = (title: string, _displayName: string): string =>
+  removeActiveTitleTrigger(title, "user");
 
 /** Small pure predicate used by debounced searches to reject stale responses. */
 export const requestIsLatest = (responseRequestId: number, latestRequestId: number): boolean =>

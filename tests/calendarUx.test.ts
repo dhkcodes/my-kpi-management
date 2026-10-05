@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
+import { CALENDAR_SHARE_COLORS, LONG_PRESS_CREATE_DELAY_MS, MIN_CALENDAR_DURATION_MINUTES, appendMentionToken, applyRelatedSelection, ensureMinimumTimedDuration, eventCalendarDate, eventLocalParts, eventOccursOnDate, eventOccursOnScheduleDate, extractTitleSearchTrigger, formatKoreanStartTime, getEventBadgeText, layoutTimelineEvents, longPressCanActivate, longPressMovementCancels, minutesToTime, normalizeEventRange, normalizeEventTimes, prependRelatedToken, relatedAccountName, removeActiveTitleTrigger, replaceActiveTitleTrigger, replaceExistingRelatedMention, requestIsLatest, resizeTimelineRange, snapTimelinePointer, timelineCreationRange } from "../src/data/calendarUx";
 
 const calendarUxSource = readFileSync("src/data/calendarUx.ts", "utf8");
 
@@ -42,17 +42,19 @@ assert.equal(extractTitleSearchTrigger("literal [Acme] text"), null, "typed brac
 assert.deepEqual(extractTitleSearchTrigger("@"), { kind: "related", query: "" }, "an empty relation query remains a valid search");
 assert.equal(replaceActiveTitleTrigger("Keep this text @Ac", "related", "Acme Corp"), "Keep this text @Acme Corp", "selection replaces only the active mention range");
 assert.equal(replaceActiveTitleTrigger("Keep @old and #Ja", "user", "Jane Doe"), "Keep @old and #Jane Doe", "user selection preserves unrelated title text");
+assert.equal(removeActiveTitleTrigger("Keep this text @Ac", "related"), "Keep this text", "relation selection removes only the active search suffix");
+assert.equal(removeActiveTitleTrigger("고객 미팅 #조", "user"), "고객 미팅", "participant selection removes the search suffix during IME-safe local editing");
 assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", "Beta"), "Before @Beta after", "existing relation replacement is range-safe");
 assert.equal(replaceExistingRelatedMention("Before @Acme Corp after", "Acme Corp", ""), "Before after", "relation removal does not remove other title text");
 assert.equal(replaceExistingRelatedMention("Contact @Acme Corpse", "Acme Corp", "Beta"), "Contact @Acme Corpse", "partial account-name matches are not replaced");
 assert.equal(prependRelatedToken("Discuss renewal @Ac", "Acme"), "Discuss renewal @Acme");
 assert.deepEqual(applyRelatedSelection("Discuss renewal @mig", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Acme", label: "Acme - Cloud migration" }), {
-  title: "Discuss renewal @Acme", accountId: "9", workloadId: "72", opportunityDealId: "", opportunityId: "", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Acme - Cloud migration"
-}, "a child relation replaces only the active query and retains its metadata");
+  title: "Discuss renewal", accountId: "9", workloadId: "72", opportunityDealId: "", opportunityId: "", relatedItemType: "WORKLOAD", relatedItemId: "72", relatedItemLabel: "Acme · Acme - Cloud migration"
+}, "a child relation removes the active query and retains its metadata separately");
 assert.deepEqual(applyRelatedSelection("Review @deal", { type: "OPPTY", id: 81, accountId: 9, workloadId: 72, opportunityDealId: 81, opportunityId: "OPP-81", accountName: "Acme", label: "Acme - Cloud (FY27 Renewal/OPP-81)" }), {
-  title: "Review @Acme", accountId: "9", workloadId: "72", opportunityDealId: "81", opportunityId: "OPP-81", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · Acme - Cloud (FY27 Renewal/OPP-81)"
+  title: "Review", accountId: "9", workloadId: "72", opportunityDealId: "81", opportunityId: "OPP-81", relatedItemType: "OPPTY", relatedItemId: "81", relatedItemLabel: "Acme · Acme - Cloud (FY27 Renewal/OPP-81)"
 }, "an opportunity persists its parent account label and its own child relation id");
-assert.equal(applyRelatedSelection("Before @Acme after", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Beta", label: "Beta - Cloud migration" }, "Acme").title, "Before @Beta after", "a reloaded relation replaces only its persisted account mention");
+assert.equal(applyRelatedSelection("Before @Acme after", { type: "WORKLOAD", id: 72, accountId: 9, workloadId: 72, opportunityDealId: null, opportunityId: null, accountName: "Beta", label: "Beta - Cloud migration" }, "Acme").title, "Before after", "a reloaded relation removes its persisted account mention while updating metadata");
 assert.equal(relatedAccountName(9, "Acme · Cloud migration"), "Acme");
 assert.doesNotMatch(calendarUxSource, /titleWithAccountPrefix/, "the discarded account-title prefix helper stays removed");
 assert.equal(snapTimelinePointer(310, 0, 540, 540, 1080), 850, "a pointer at 14:10 snaps to the exact ten-minute location");
@@ -80,7 +82,7 @@ assert.deepEqual(layoutTimelineEvents([
   { id: 2, startMinutes: 570, endMinutes: 630, column: 1, columnCount: 2 },
   { id: 3, startMinutes: 630, endMinutes: 650, column: 0, columnCount: 1 }
 ], "overlaps are assigned selectable side-by-side columns; touching edges do not overlap");
-assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal #Jane Doe");
+assert.equal(appendMentionToken("Discuss renewal #Ja", "Jane Doe"), "Discuss renewal");
 assert.equal(CALENDAR_SHARE_COLORS.length, 10, "the standard palette exposes ten Redwood-friendly colors");
 assert.equal(requestIsLatest(4, 4), true);
 assert.equal(requestIsLatest(3, 4), false, "stale directory responses are rejected");
