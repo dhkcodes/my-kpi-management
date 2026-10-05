@@ -75,7 +75,8 @@ const koreaBusinessDate = (): string => new Intl.DateTimeFormat("en-CA", {
 export const consumptionRecordsOperationError = (error: unknown, fallback: string): string => {
   if (!(error instanceof ConsumptionApiError)) return error instanceof Error ? error.message : fallback;
   if (error.status === 401) return "로그인 세션이 만료되었습니다. 다시 로그인한 후 저장해 주세요.";
-  if (error.status === 403) return "Consumption Records 쓰기 권한이 없습니다. 관리자에게 Records WRITE 권한을 요청해 주세요.";
+  if (error.status === 403 && error.code === "MENU_ACCESS_DENIED") return "Consumption Records 쓰기 권한이 없습니다. 관리자에게 Records WRITE 권한을 요청해 주세요.";
+  if (error.status === 403) return "요청이 거부되었습니다. 다시 시도한 후 계속되면 관리자에게 문의해 주세요.";
   if (error.status === 400 || error.status === 422) return `저장할 데이터가 유효하지 않습니다. 입력값을 확인해 주세요. (${error.message})`;
   if (error.status >= 500) return "서버 오류로 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   return error.message || fallback;
@@ -87,7 +88,7 @@ const formatConsumptionImportError = (
   workspaceLabel: "Consumption Records" | "Consumption Attainment",
   permissionLabel: "Records" | "Attainment",
 ): string => {
-  if (error instanceof ConsumptionApiError && error.status === 403) {
+  if (error instanceof ConsumptionApiError && error.status === 403 && error.code === "MENU_ACCESS_DENIED") {
     return `${operation}에 실패했습니다. ${workspaceLabel} 쓰기 권한이 없습니다. 관리자에게 ${permissionLabel} WRITE 권한을 요청해 주세요.`;
   }
   return `${operation}에 실패했습니다. ${consumptionRecordsOperationError(error, `${operation} could not be completed.`)}`;

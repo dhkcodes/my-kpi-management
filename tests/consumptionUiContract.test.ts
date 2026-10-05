@@ -62,8 +62,10 @@ assert.match(recordsPage, /formatConsumptionImportError\(error, "Forecast previe
   "Forecast Preview maps denied writes to the Attainment permission context");
 assert.match(recordsPage, /formatConsumptionImportError\(error, "Forecast apply", "Consumption Attainment", "Attainment"\)/,
   "Forecast Apply maps denied writes to the Attainment permission context");
-assert.match(recordsPage, /return `\$\{operation\}에 실패했습니다\. \$\{workspaceLabel\} 쓰기 권한이 없습니다\. 관리자에게 \$\{permissionLabel\} WRITE 권한을 요청해 주세요\.`/,
-  "import authorization failures name the operation-specific workspace and grant");
+assert.match(recordsPage, /error\.status === 403 && error\.code === "MENU_ACCESS_DENIED"[\s\S]*return `\$\{operation\}에 실패했습니다\. \$\{workspaceLabel\} 쓰기 권한이 없습니다\. 관리자에게 \$\{permissionLabel\} WRITE 권한을 요청해 주세요\.`/,
+  "only MENU_ACCESS_DENIED is presented as an operation-specific write permission failure");
+assert.match(recordsPage, /if \(error\.status === 403\) return "요청이 거부되었습니다\. 다시 시도한 후 계속되면 관리자에게 문의해 주세요\."/,
+  "non-menu 403 responses are not mislabeled as missing Records or Attainment WRITE permission");
 assert.match(recordsPage, /Actual CSV Import/, "Actual upload dialog uses an Actual-specific title");
 assert.match(recordsPage, /Forecast Workbook Import/, "Forecast upload dialog uses a Forecast-specific title");
 assert.doesNotMatch(recordsPage, /Consumption CSV import/, "the ambiguous shared import title is removed");
