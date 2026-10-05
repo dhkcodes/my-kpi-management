@@ -5858,7 +5858,7 @@ h4.weekly-activity-section-label--next-week,
 .calendar-card-summary { display: grid; gap: .08rem; grid-column: 2 / -1; min-width: 0; position: relative; }
 .calendar-card-summary__line { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-card-summary__relations { color: color-mix(in srgb, var(--owner-color, var(--kpi-brand)) 78%, #172b3a); font-size: .64rem; font-weight: 700; }
-.calendar-card-summary__tooltip { background: #172b3a; border-radius: .35rem; box-shadow: 0 .4rem 1rem rgb(0 0 0 / 18%); color: #fff; display: none; gap: .12rem; left: 0; max-width: min(24rem, 80vw); padding: .35rem .45rem; position: absolute; top: calc(100% + .2rem); white-space: nowrap; z-index: 30; }
+.calendar-card-summary__tooltip { background: #172b3a; border-radius: .35rem; box-shadow: 0 .4rem 1rem rgb(0 0 0 / 18%); color: #fff; display: none; gap: .12rem; left: 0; max-width: min(24rem, 80vw); padding: .35rem .45rem; pointer-events: none; position: absolute; top: calc(100% + .2rem); white-space: nowrap; z-index: 30; }
 .calendar-card-summary__tooltip > span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .calendar-card-summary:hover .calendar-card-summary__tooltip,
 .calendar-card-summary:focus .calendar-card-summary__tooltip,
