@@ -433,6 +433,18 @@ const parseContributionAmountSplit = (value: unknown): ConsumptionAmountSplit =>
   return { ...split, totalAmountChartCoordinate: split.actualAmountChartCoordinate,
     totalAmountExact: split.actualAmountExact };
 };
+const hasValidForecastOverlapTotal = (split: ConsumptionAmountSplit): boolean => {
+  const actual = split.actualAmountExact!;
+  const forecast = split.forecastAmountExact!;
+  const total = split.totalAmountExact!;
+  const additive = addExactDecimals(actual, forecast);
+  if (compareExactDecimals(actual, "0") < 0 || compareExactDecimals(forecast, "0") < 0) {
+    return compareExactDecimals(total, additive) === 0;
+  }
+  return compareExactDecimals(total, actual) >= 0
+    && compareExactDecimals(total, forecast) >= 0
+    && compareExactDecimals(total, additive) <= 0;
+};
 const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>): ConsumptionActualTrendPoint[] => {
   if (!Array.isArray(value)) return malformedAnalysis();
   const actualTrend = value.map((point) => {
@@ -585,8 +597,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   }
   if (!(raw.mtdAsOf === null || raw.mtdAsOf === undefined || typeof raw.mtdAsOf === "string")) return malformedAnalysis();
   const mtdAsOf = (raw.mtdAsOf ?? mtdSummary?.asOf ?? null) as string | null;
-  // With MTD enabled, the API keeps the saved current-period Forecast visible while Total excludes
-  // the overlapping Forecast. Portfolio and that fiscal quarter are therefore intentionally non-additive.
+  // Current- and closed-period MTD can overlap a full-month Forecast. The overlap affects Outlook,
+  // not the Forecast display, and therefore is independent from the current-month MTD toggle.
   let mtdQuarter: string | null = null;
   if (mtdSummary !== null) {
     try {
@@ -596,7 +608,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     }
     if (!mtdQuarter.startsWith(`${raw.fiscalYear}-`)) return malformedAnalysis();
   }
-  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, mtdSummary === null);
+  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, false);
+  if (!hasValidForecastOverlapTotal(portfolioSplit)) return malformedAnalysis();
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
   const priorActual = decodeExactDecimal(portfolioRaw.priorActualAmount);
   const priorForecast = decodeExactDecimal(portfolioRaw.priorForecastAmount);
@@ -607,8 +620,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     || !isCoveragePercent(portfolioRaw.coveragePercent) || !isCoveragePercent(portfolioRaw.priorCoveragePercent)) return malformedAnalysis();
   const quarters = raw.quarters.map((value) => {
     const quarter = value as Record<string, unknown>;
-    const split = parseAmountSplit(value, quarterAmountStatuses,
-      mtdQuarter === null || `${raw.fiscalYear}-${String(quarter.quarter)}` !== mtdQuarter);
+    const split = parseAmountSplit(value, quarterAmountStatuses, false);
+    if (!hasValidForecastOverlapTotal(split)) return malformedAnalysis();
     const qoqChangeAmount = decodeNullableExactDecimal(quarter.qoqChangeAmount);
     const qoqChangePercent = decodeNullableExactDecimal(quarter.qoqChangePercent);
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)

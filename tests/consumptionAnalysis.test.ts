@@ -199,6 +199,25 @@ void (async () => {
   assert.equal(withMtd.portfolio.totalAmountExact, "2510");
   assert.equal(withMtd.quarters[1].totalAmountExact, "2360");
 
+  const closedMtdBaselineAnalysis = {
+    ...analysis,
+    portfolio: { ...analysis.portfolio, totalAmount: 900 },
+    quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
+      ? { ...quarter, totalAmount: 350 }
+      : quarter),
+    mtdSummary: null
+  };
+  runtime.fetch = async () => new Response(JSON.stringify(closedMtdBaselineAnalysis), {
+    status: 200, headers: { "Content-Type": "application/json" }
+  });
+  const withClosedMtdBaseline = await fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: ""
+  });
+  assert.equal(withClosedMtdBaseline.portfolio.totalAmountExact, "900",
+    "a closed-period MTD baseline may overlap a full-month Forecast even when current-month mtdSummary is absent");
+  assert.equal(withClosedMtdBaseline.quarters[1].totalAmountExact, "350",
+    "closed-period overlap is decoded independently from the current-month MTD display toggle");
+
   runtime.fetch = async () => new Response(JSON.stringify({ ...mtdAnalysis,
     quarters: mtdAnalysis.quarters.map((quarter) => quarter.quarter === "Q1"
       ? { ...quarter, totalAmount: quarter.totalAmount + 1 }
@@ -275,7 +294,7 @@ void (async () => {
 
   for (const malformed of [
     { ...analysis, fiscalYear: "2027" },
-    { ...analysis, portfolio: { ...analysis.portfolio, totalAmount: 999 } },
+    { ...analysis, portfolio: { ...analysis.portfolio, totalAmount: 1001 } },
     { ...analysis, portfolio: { ...analysis.portfolio, coveragePercent: 101 } },
     { ...analysis, quarters: analysis.quarters.slice(0, 3) },
     { ...analysis, quarters: analysis.quarters.map((quarter, index) => index === 0 ? { ...quarter, status: "UNKNOWN" } : quarter) },
