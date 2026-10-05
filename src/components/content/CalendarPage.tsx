@@ -2,6 +2,12 @@ import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "oj-c/dialog";
 import "oj-c/popup";
+import "ojs/ojbutton";
+import "ojs/ojdatetimepicker";
+import "ojs/ojinputnumber";
+import "ojs/ojinputtext";
+import "ojs/ojselectsingle";
+import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { beginAppBusy } from "../../app/appBusy";
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEventEntity, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, syncCalendarEventShares, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
@@ -52,11 +58,34 @@ const CalendarCardSummary = ({ primary, secondary }: { primary: string; secondar
     return () => observer.disconnect();
   }, [primary, secondary]);
   const tooltip = truncated ? `${primary}\n${secondary}` : undefined;
-  return <span class="calendar-card-summary" title={tooltip} aria-label={`${primary}. ${secondary}`}>
+  return <span class="calendar-card-summary" title={tooltip} aria-label={`${primary}. ${secondary}`} tabIndex={0}>
     <span ref={primaryRef} class="calendar-card-summary__line">{primary}</span>
     <span ref={secondaryRef} class="calendar-card-summary__line calendar-card-summary__relations">{secondary}</span>
+    {truncated && <span class="calendar-card-summary__tooltip" role="tooltip"><span>{primary}</span><span>{secondary}</span></span>}
   </span>;
 };
+
+type CalendarIconActionProps = Readonly<{
+  id?: string;
+  label: string;
+  icon: string;
+  active?: boolean;
+  disabled?: boolean;
+  onAction: () => void;
+}>;
+
+const CalendarIconAction = ({ id, label, icon, active, disabled, onAction }: CalendarIconActionProps) =>
+  <oj-button id={id} class={`calendar-icon-action${active ? " is-active" : ""}`} display="icons" chroming="borderless"
+    title={label} aria-label={label} aria-pressed={active} disabled={disabled} onojAction={onAction}>
+    <span slot="startIcon" class={icon} aria-hidden="true"></span>{label}
+  </oj-button>;
+
+const recurrenceOptions = [
+  { value: "NONE", label: "None" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "MONTHLY", label: "Monthly" }
+];
+const recurrenceProvider = new ArrayDataProvider(recurrenceOptions, { keyAttributes: "value" });
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const monthTitle = (date: Date) => new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long" }).format(date);
@@ -222,7 +251,13 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const eventServerStateRef = useRef(new Map<number, CalendarEvent>());
   const replaceEvent = (saved: CalendarEvent) => {
     eventServerStateRef.current.set(saved.id, saved);
-    setEvents((current) => current.map((event) => event.id === saved.id ? saved : event));
+    setEvents((current) => current.some((event) => event.id === saved.id)
+      ? current.map((event) => event.id === saved.id ? saved : event)
+      : [...current, saved]);
+  };
+  const removeEventLocally = (eventId: number) => {
+    eventServerStateRef.current.delete(eventId);
+    setEvents((current) => current.filter((event) => event.id !== eventId));
   };
   const eventMutationKey = (eventId: number, field: "forcePrivate" | "vacation") => `${eventId}:${field}`;
   const nextEventMutationSeq = (eventId: number, field: "forcePrivate" | "vacation") => {
@@ -237,7 +272,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const initialCalendarLoadRef = useRef(true);
   const editorBaselineRef = useRef<{ draft: Draft; shares: CalendarEvent["shares"] } | null>(null);
   const lastTouchTapRef = useRef<{ date: string; at: number } | null>(null);
-  const lastTouchOpenAtRef = useRef(0);
+  const lastTouchOpenAtRef = useRef<number | null>(null);
   const lastEventTitleTouchRef = useRef<{ eventId: number; at: number } | null>(null);
   const today = todayIso();
 
@@ -409,7 +444,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       const target = event.target as Node;
       if (!eventShareSearchRef.current?.contains(target)) setEventShareSearchOpen(false);
       if (!shareSearchRef.current?.contains(target)) setShareSearchOpen(false);
-      if (!(event.target as HTMLElement).closest(".calendar-inline-mention")) setMentionEditing(null);
+      if (!(event.target as HTMLElement).closest(".calendar-inline-mention, .calendar-mention-editor")) setMentionEditing(null);
       if (!(event.target as HTMLElement).closest(".calendar-block-editor")) setTitleSearchOpen(false);
     };
     document.addEventListener("pointerdown", closeSearches);
@@ -420,7 +455,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (!editorMenuOpen) return;
     const handleOutsideSettings = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
-      if (target.closest("#calendar-editor-options-launcher, [aria-label='Recurrence']")) return;
+      if (target.closest(".calendar-options-popover, #calendar-editor-recurrence-button, [aria-label='Recurrence'], .oj-listbox-drop-layer")) return;
       closeSettings();
     };
     document.addEventListener("pointerdown", handleOutsideSettings, true);
@@ -599,10 +634,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (pendingCreateRef.current || creationPreviewRef.current) { event.preventDefault(); clearCreateGesture(); return; }
-      if (draft) { event.preventDefault(); requestDayClose(); }
+      if (draft) { event.preventDefault(); event.stopImmediatePropagation(); requestDayClose(); }
     };
-    window.addEventListener("keydown", escape);
-    return () => window.removeEventListener("keydown", escape);
+    window.addEventListener("keydown", escape, true);
+    return () => window.removeEventListener("keydown", escape, true);
   }, [draft, editing, eventShares]);
 
   useEffect(() => {
@@ -649,9 +684,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         ? await updateCalendarEventEntity(editing, input)
         : await createCalendarEventEntity(input);
       setEditing(persisted);
-      setEvents((current) => [...current.filter((event) => event.id !== persisted.id), persisted]);
+      replaceEvent(persisted);
       const saved = await syncCalendarEventShares(persisted, eventShares, undefined, previousShares);
-      setEvents((current) => [...current.filter((event) => event.id !== saved.id), saved]);
+      replaceEvent(saved);
       setSelectedEventId(saved.id);
       setSelectedDate(eventCalendarDate(saved.startsAt, saved.timezone));
       closeEditor();
@@ -676,14 +711,14 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     try {
       const previousShares = editing.shares ?? [];
       const persisted = await updateCalendarEventEntity(editing, toInput(nextDraft, eventShares));
-      setEvents((current) => current.map((event) => event.id === persisted.id ? persisted : event));
+      replaceEvent(persisted);
       const persistedDraft = draftFromEvent(persisted);
       setEditing(persisted);
       setDraft(persistedDraft);
       editorBaselineRef.current = { draft: { ...persistedDraft }, shares: [...previousShares] };
 
       const saved = await syncCalendarEventShares(persisted, eventShares, undefined, previousShares);
-      setEvents((current) => current.map((event) => event.id === saved.id ? saved : event));
+      replaceEvent(saved);
       const savedDraft = draftFromEvent(saved);
       setEditing(saved);
       setDraft(savedDraft);
@@ -698,7 +733,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       const saved = editing.status === "CANCELLED" ? await reopenCalendarEvent(editing) : await cancelCalendarEvent(editing);
-      setEvents((current) => current.map((event) => event.id === saved.id ? saved : event));
+      replaceEvent(saved);
       closeEditor();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not change the event status."); }
     finally { setSaving(false); }
@@ -708,7 +743,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       await deleteCalendarEvent(editing);
-      setEvents((current) => current.filter((event) => event.id !== editing.id));
+      removeEventLocally(editing.id);
       closeEditor();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete the event."); }
     finally { setSaving(false); }
@@ -718,7 +753,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       const saved = event.status === "CANCELLED" ? await reopenCalendarEvent(event) : await cancelCalendarEvent(event);
-      setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+      replaceEvent(saved);
       setSelectedEventId(saved.id);
       setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not change the event status."); }
@@ -729,16 +764,16 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       await deleteCalendarEvent(event);
-      setEvents((current) => current.filter((item) => item.id !== event.id));
+      removeEventLocally(event.id);
       setSelectedEventId(null);
       setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete the event."); }
     finally { setSaving(false); }
   };
-  const toggleEventFlag = async (event: CalendarEvent, flag: "forcePrivate" | "vacation") => {
+  const toggleEventFlag = async (event: CalendarEvent, flag: "forcePrivate" | "vacation", requestedValue?: boolean) => {
     if (!event.canEdit) return null;
-    const previousValue = event[flag];
-    const nextValue = !previousValue;
+    const previousValue = eventServerStateRef.current.get(event.id)?.[flag] ?? event[flag];
+    const nextValue = requestedValue ?? !event[flag];
     const sequence = nextEventMutationSeq(event.id, flag);
     setEvents((current) => current.map((item) => item.id === event.id ? { ...item, [flag]: nextValue } : item));
     const previousRequest = eventMutationQueueRef.current.get(event.id) ?? Promise.resolve();
@@ -784,20 +819,21 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     if (!draft) return;
     const nextValue = !draft[flag];
     setDraft({ ...draft, [flag]: nextValue });
-    if (editing) void toggleEventFlag(editing, flag);
+    if (editing) void toggleEventFlag(editing, flag, nextValue);
   };
-  const selectedCalendarActions = (event: CalendarEvent) => selectedEventId === event.id && event.canEdit ? <div class="calendar-event-actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()} onKeyDown={(key) => key.stopPropagation()}>
-    <button type="button" class={`calendar-icon-action${event.forcePrivate ? " is-active" : ""}`} aria-pressed={event.forcePrivate} title={`Private: ${event.forcePrivate ? "On" : "Off"}`} aria-label={`Private: ${event.forcePrivate ? "On" : "Off"}`} onClick={() => void toggleEventFlag(event, "forcePrivate")}>🔒</button>
-    <button type="button" class={`calendar-icon-action${event.vacation ? " is-active" : ""}`} aria-pressed={event.vacation} title={`Time Off: ${event.vacation ? "On" : "Off"}`} aria-label={`Time Off: ${event.vacation ? "On" : "Off"}`} onClick={() => void toggleEventFlag(event, "vacation")}>🏖</button>
-    <button type="button" class="calendar-icon-action" title={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} aria-label={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} onClick={() => void toggleEventCancelled(event)}>⊘</button>
-    <button type="button" class="calendar-icon-action" title="Delete" aria-label="Delete" onClick={() => void removeSelectedEvent(event)}>⌫</button>
+  const selectedCalendarActions = (event: CalendarEvent) => selectedEventId === event.id && event.canEdit ? <div class="calendar-event-actions" aria-label="Selected event actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()} onKeyDown={(key) => key.stopPropagation()}>
+    <CalendarIconAction label="Recurrence" icon="oj-ux-ico-repeat" active={event.recurrence !== "NONE"} disabled={saving} onAction={() => openEventSettings(event)} />
+    <CalendarIconAction label="Private" icon="oj-ux-ico-lock" active={event.forcePrivate} disabled={saving} onAction={() => void toggleEventFlag(event, "forcePrivate")} />
+    <CalendarIconAction label="Time Off" icon="oj-ux-ico-time-off" active={event.vacation} disabled={saving} onAction={() => void toggleEventFlag(event, "vacation")} />
+    <CalendarIconAction label={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} icon={event.status === "CANCELLED" ? "oj-ux-ico-refresh" : "oj-ux-ico-cancel"} disabled={saving} onAction={() => void toggleEventCancelled(event)} />
+    <CalendarIconAction label="Delete" icon="oj-ux-ico-trash" disabled={saving} onAction={() => void removeSelectedEvent(event)} />
   </div> : null;
-  const selectedTimelineActions = (event: CalendarEvent) => selectedEventId === event.id && event.canEdit ? <div class="calendar-event-actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()} onKeyDown={(key) => key.stopPropagation()}>
-    <button type="button" class="calendar-icon-action" title="Recurrence" aria-label="Recurrence" onClick={() => openEventSettings(event)}>↻</button>
-    <button type="button" class={`calendar-icon-action${event.forcePrivate ? " is-active" : ""}`} aria-pressed={event.forcePrivate} title={`Private: ${event.forcePrivate ? "On" : "Off"}`} aria-label={`Private: ${event.forcePrivate ? "On" : "Off"}`} onClick={() => void toggleEventFlag(event, "forcePrivate")}>🔒</button>
-    <button type="button" class={`calendar-icon-action${event.vacation ? " is-active" : ""}`} aria-pressed={event.vacation} title={`Time Off: ${event.vacation ? "On" : "Off"}`} aria-label={`Time Off: ${event.vacation ? "On" : "Off"}`} onClick={() => void toggleEventFlag(event, "vacation")}>🏖</button>
-    <button type="button" class="calendar-icon-action" title={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} aria-label={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} onClick={() => void toggleEventCancelled(event)}>⊘</button>
-    <button type="button" class="calendar-icon-action" title="Delete" aria-label="Delete" onClick={() => void removeSelectedEvent(event)}>⌫</button>
+  const selectedTimelineActions = (event: CalendarEvent) => selectedEventId === event.id && event.canEdit ? <div class="calendar-event-actions" aria-label="Selected event actions" onPointerDown={(pointer) => pointer.stopPropagation()} onClick={(click) => click.stopPropagation()} onKeyDown={(key) => key.stopPropagation()}>
+    <CalendarIconAction label="Recurrence" icon="oj-ux-ico-repeat" active={event.recurrence !== "NONE"} disabled={saving} onAction={() => openEventSettings(event)} />
+    <CalendarIconAction label="Private" icon="oj-ux-ico-lock" active={event.forcePrivate} disabled={saving} onAction={() => void toggleEventFlag(event, "forcePrivate")} />
+    <CalendarIconAction label="Time Off" icon="oj-ux-ico-time-off" active={event.vacation} disabled={saving} onAction={() => void toggleEventFlag(event, "vacation")} />
+    <CalendarIconAction label={event.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} icon={event.status === "CANCELLED" ? "oj-ux-ico-refresh" : "oj-ux-ico-cancel"} disabled={saving} onAction={() => void toggleEventCancelled(event)} />
+    <CalendarIconAction label="Delete" icon="oj-ux-ico-trash" disabled={saving} onAction={() => void removeSelectedEvent(event)} />
   </div> : null;
   const openSharing = async () => {
     setSaving(true);
@@ -941,8 +977,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       const saved = await updateCalendarEvent(event, toInput(nextDraft, shares));
-      setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
-      setMentionEditing(null); setMentionQuery(""); setError("");
+      replaceEvent(saved);
+      setMentionEditing((current) => current?.kind === "user" ? { ...current, event: saved } : null);
+      setMentionQuery(""); setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save event relations."); }
     finally { setSaving(false); }
   };
@@ -1009,7 +1046,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       setSaving(true);
       try {
         const saved = await updateCalendarEvent(editing, toInput(latestDraft, eventShares));
-        setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+        replaceEvent(saved);
         const savedDraft = draftFromEvent(saved);
         setEditing(saved);
         setDraft(savedDraft);
@@ -1033,10 +1070,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     setSaving(true);
     try {
       const saved = await updateCalendarEventEntity(event, toInput(nextDraft, event.shares));
-      setEvents((current) => current.map((item) => item.id === saved.id ? saved : item));
+      replaceEvent(saved);
       setError("");
     } catch (reason) {
-      setEvents((current) => current.map((item) => item.id === previous.id ? previous : item));
+      replaceEvent(previous);
       setError(reason instanceof Error ? `${reason.message} The change was reverted.` : "Could not save the event time. The change was reverted.");
     } finally { setSaving(false); }
   };
@@ -1079,7 +1116,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   };
 
   const beginMove = (pointer: PointerEvent, event: CalendarEvent) => {
-    if (!event.canEdit || !timelineRef.current || (pointer.target as HTMLElement).closest("button, input, textarea, select, [role=separator], .calendar-event__text")) return;
+    if (!event.canEdit || !timelineRef.current || (pointer.target as HTMLElement).closest("button, input, textarea, select, [role=separator], .calendar-event__text, .calendar-event__title")) return;
     if (existingGesturePointerIdRef.current !== null) return;
     const timeline = timelineRef.current;
     const pointerId = pointer.pointerId;
@@ -1163,25 +1200,31 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       {editable && timed && <button type="button" class="calendar-resize-handle calendar-resize-handle--start" aria-label="Adjust start time" />}
       <div class="calendar-block-editor__head">
         <span class="calendar-block-editor__time">{timed ? `${draft.startTime}–${draft.endTime}` : draft.allDay ? "All day" : "Unscheduled"}</span>
-        <span class="calendar-block-editor__actions">
+        <span class="calendar-block-editor__actions" aria-label="Event actions">
           {editable && <>
-            <button id="calendar-editor-options-launcher" type="button" aria-label="Recurrence" title="Recurrence" aria-haspopup="dialog" aria-expanded={editorMenuOpen} onClick={toggleSettings}>↻</button>
-            <button type="button" class={draft.forcePrivate ? "is-active" : ""} aria-pressed={draft.forcePrivate} aria-label={`Private: ${draft.forcePrivate ? "On" : "Off"}`} title={`Private: ${draft.forcePrivate ? "On" : "Off"}`} onClick={() => void toggleDraftFlag("forcePrivate")}>🔒</button>
-            <button type="button" class={draft.vacation ? "is-active" : ""} aria-pressed={draft.vacation} aria-label={`Time Off: ${draft.vacation ? "On" : "Off"}`} title={`Time Off: ${draft.vacation ? "On" : "Off"}`} onClick={() => void toggleDraftFlag("vacation")}>🏖</button>
-            <oj-c-popup opened={editorMenuOpen} launcher="#calendar-editor-options-launcher" anchor="#calendar-editor-options-launcher" placement="bottom-end" autoDismiss="none" initialFocus="none" onojClose={closeSettings}>
+            <CalendarIconAction id="calendar-editor-recurrence-button" label="Recurrence" icon="oj-ux-ico-repeat" active={draft.recurrence !== "NONE"}
+              disabled={saving} onAction={toggleSettings} />
+            <CalendarIconAction label="Private" icon="oj-ux-ico-lock" active={draft.forcePrivate}
+              disabled={saving} onAction={() => void toggleDraftFlag("forcePrivate")} />
+            <CalendarIconAction label="Time Off" icon="oj-ux-ico-time-off" active={draft.vacation}
+              disabled={saving} onAction={() => void toggleDraftFlag("vacation")} />
+            <oj-c-popup opened={editorMenuOpen} launcher="#calendar-editor-recurrence-button" anchor="#calendar-editor-recurrence-button" placement="bottom-end" autoDismiss="none" initialFocus="firstFocusable" onojClose={closeSettings}>
               {settingsDraft && <div class="calendar-options-popover calendar-options-popover__jet-content" role="dialog" aria-label="Recurrence">
                 <strong class="calendar-options-popover__title">Recurrence</strong>
-                <label>Recurrence<select aria-label="Recurrence" value={settingsDraft.recurrence} onChange={(event) => { const recurrence = event.currentTarget.value as Draft["recurrence"]; setSettingsDraft({ ...settingsDraft, recurrence, recurrenceUntil: recurrence === "NONE" ? "" : settingsDraft.recurrenceUntil || settingsDraft.startDate }); }}><option value="NONE">Does not repeat</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option></select></label>
-                {settingsDraft.recurrence !== "NONE" && <label>Repeat until<input aria-label="Repeat until" type="date" min={settingsDraft.startDate} required value={settingsDraft.recurrenceUntil} onInput={(event) => setSettingsDraft({ ...settingsDraft, recurrenceUntil: event.currentTarget.value })} /></label>}
-                <label>Working days<input aria-label="Working days" type="number" min="1" max="366" required value={settingsDraft.workingDays} onInput={(event) => setSettingsDraft({ ...settingsDraft, workingDays: Math.max(1, Math.min(366, Number(event.currentTarget.value) || 1)) })} /></label>
-                <button type="button" class="primary" disabled={saving} onClick={() => void applySettings()}>Apply</button>
+                <oj-select-single label-hint="Repeat" data={recurrenceProvider} value={settingsDraft.recurrence}
+                  onvalueChanged={(event) => { const recurrence = String(event.detail.value ?? "NONE") as Draft["recurrence"]; setSettingsDraft({ ...settingsDraft, recurrence, recurrenceUntil: recurrence === "NONE" ? "" : settingsDraft.recurrenceUntil || settingsDraft.startDate }); }} />
+                {settingsDraft.recurrence !== "NONE" && <oj-input-date label-hint="Repeat until" min={settingsDraft.startDate} required value={settingsDraft.recurrenceUntil}
+                  onvalueChanged={(event) => setSettingsDraft({ ...settingsDraft, recurrenceUntil: String(event.detail.value ?? "") })} />}
+                <oj-input-number label-hint="Working days" min={1} max={366} required value={settingsDraft.workingDays}
+                  onvalueChanged={(event) => setSettingsDraft({ ...settingsDraft, workingDays: Math.max(1, Math.min(366, Number(event.detail.value) || 1)) })} />
+                <oj-button chroming="callToAction" disabled={saving} onojAction={() => void applySettings()}>Apply</oj-button>
               </div>}
             </oj-c-popup>
           </>}
-          {(titleEditing || !editing) && editable && <button type="button" aria-label="Save" disabled={saving || !draft.title.trim()} onClick={() => void save()}>Save</button>}
-          {(titleEditing || !editing) && <button type="button" aria-label="Cancel editing" onClick={() => { if (editing) { setDraft(draftFromEvent(editing)); setTitleEditing(false); } else closeEditor(); }}>Cancel</button>}
-          {editing?.canEdit && <button type="button" disabled={saving} onClick={() => void toggleCancelled()}>{editing.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"}</button>}
-          {editing?.canEdit && <button type="button" class="danger" disabled={saving} onClick={() => void removeEvent()}>Delete</button>}
+          {(titleEditing || !editing) && editable && <CalendarIconAction label="Save" icon="oj-ux-ico-save" disabled={saving || !draft.title.trim()} onAction={() => void save()} />}
+          {(titleEditing || !editing) && <CalendarIconAction label="Cancel editing" icon="oj-ux-ico-close" disabled={saving} onAction={() => { if (editing) { setDraft(draftFromEvent(editing)); setTitleEditing(false); } else closeEditor(); }} />}
+          {editing?.canEdit && <CalendarIconAction label={editing.status === "CANCELLED" ? "Reopen Event" : "Cancel Event"} icon={editing.status === "CANCELLED" ? "oj-ux-ico-refresh" : "oj-ux-ico-cancel"} active={editing.status === "CANCELLED"} disabled={saving} onAction={() => void toggleCancelled()} />}
+          {editing?.canEdit && <CalendarIconAction label="Delete" icon="oj-ux-ico-trash" disabled={saving} onAction={() => void removeEvent()} />}
         </span>
       </div>
       {titleEditing || !editing ? <input
@@ -1218,7 +1261,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     <section class="calendar-page-card">
     {breadcrumb && <div class="calendar-breadcrumb">{breadcrumb}</div>}
     <header class="page-section-header calendar-toolbar">
-      <div><span class="kpi-eyebrow">Activity planning</span><h2 id="calendar-heading">Calendar</h2></div>
+      <div><h2 id="calendar-heading">Calendar</h2></div>
       <div class="calendar-toolbar__month" aria-label="Calendar navigation">
         <button type="button" onClick={() => shiftYear(-1)} aria-label="Previous year">«</button>
         <button type="button" onClick={() => shift(-1)} aria-label="Previous month">‹</button>
@@ -1246,7 +1289,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         const dayEvents = events.filter((event) => eventOccursOnDisplayedDate(event, cell.date));
         const holiday = holidays.get(cell.date);
         const activities = weeklyActivities.filter((activity) => activity.createdAt.slice(0, 10) === cell.date);
-        return <div class={`calendar-day${cell.inMonth ? "" : " is-outside"}${cell.date === today ? " is-today" : ""}${cell.date === selectedDate ? " is-selected" : ""}${cellIndex % 7 === 0 ? " is-sunday" : cellIndex % 7 === 6 ? " is-saturday" : ""}${holiday ? " is-holiday" : ""}`} role="gridcell" tabIndex={0} aria-label={`${cell.date}${holiday ? `, ${holiday}` : ""}`} onClick={() => setSelectedDate(cell.date)} onDblClick={() => { if (performance.now() - lastTouchOpenAtRef.current > 500) openDayTimeline(cell.date); }} onPointerUp={(pointer) => handleDayTouchTap(cell.date, pointer)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDayTimeline(cell.date); } }}>
+        return <div class={`calendar-day${cell.inMonth ? "" : " is-outside"}${cell.date === today ? " is-today" : ""}${cell.date === selectedDate ? " is-selected" : ""}${cellIndex % 7 === 0 ? " is-sunday" : cellIndex % 7 === 6 ? " is-saturday" : ""}${holiday ? " is-holiday" : ""}`} role="gridcell" tabIndex={0} aria-label={`${cell.date}${holiday ? `, ${holiday}` : ""}`} onClick={() => { setSelectedDate(cell.date); setSelectedEventId(null); }} onDblClick={() => { const lastTouchOpenAt = lastTouchOpenAtRef.current; if (lastTouchOpenAt === null || performance.now() - lastTouchOpenAt > 500) openDayTimeline(cell.date); }} onPointerUp={(pointer) => handleDayTouchTap(cell.date, pointer)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedEventId(null); openDayTimeline(cell.date); } }}>
           <div class="calendar-day__heading"><time dateTime={cell.date}>{cell.day}</time>{holiday && <span class="calendar-day__kind">{holiday}</span>}</div>
           {dayEvents.map((event) => {
             const time = !event.allDay && !event.timeUnknown ? eventLocalParts(event.startsAt, event.timezone).time : "";
@@ -1289,7 +1332,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       </div>
     </oj-c-dialog>}
     {closeConfirmOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="none" dialogTitle="Save changes?" width="90vw" maxWidth="30rem">
-      <div slot="body" class="calendar-close-confirm"><p>You have unsaved event changes.</p><div class="calendar-close-confirm__actions"><button type="button" onClick={() => setCloseConfirmOpen(false)}>Keep editing</button><button type="button" onClick={() => { setCloseConfirmOpen(false); closeEditor(); setDayOpen(false); }}>Discard and close</button><button type="button" class="primary" disabled={saving} onClick={() => void save().then((saved) => { if (saved) { setCloseConfirmOpen(false); setDayOpen(false); } })}>Save and close</button></div></div>
+      <div slot="body" class="calendar-close-confirm"><p>You have unsaved event changes.</p><div class="calendar-close-confirm__actions"><oj-button chroming="outlined" onojAction={() => setCloseConfirmOpen(false)}>Keep editing</oj-button><oj-button chroming="borderless" onojAction={() => { setCloseConfirmOpen(false); closeEditor(); setDayOpen(false); }}>Discard and close</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void save().then((saved) => { if (saved) { setCloseConfirmOpen(false); setDayOpen(false); } })}>Save and close</oj-button></div></div>
     </oj-c-dialog>}
     {sharingOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle="Manage Calendar Sharing"
       width="90vw" maxWidth="42rem" maxHeight="90vh" onojClose={() => setSharingOpen(false)}>
@@ -1317,15 +1360,22 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       <header><strong>{mentionEditing.kind === "related" ? "@ Relation" : "# Participants"}</strong><button type="button" aria-label="Close" onClick={() => setMentionEditing(null)}>×</button></header>
       <input autoFocus type="search" value={mentionQuery} placeholder={mentionEditing.kind === "related" ? "Search Account, Workload, or Opportunity" : "Search participants"} onInput={(event) => setMentionQuery(event.currentTarget.value)} onKeyDown={(key) => { if (key.key === "Escape") { key.preventDefault(); setMentionEditing(null); } }} />
 
-      <div class="calendar-mention-editor__results" role="listbox" onScroll={handleMentionSearchScroll}>
+      <div class="calendar-mention-editor__results" role={mentionEditing.kind === "related" ? "listbox" : "group"} aria-label={mentionEditing.kind === "user" ? "Participants" : undefined} onScroll={handleMentionSearchScroll}>
         {mentionEditing.kind === "related" ? <>
           {mentionEditing.event.accountId && <button type="button" onClick={() => { const previousName = accountNames.get(mentionEditing.event.accountId!) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel); void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), title: replaceExistingRelatedMention(mentionEditing.event.title, previousName, ""), accountId: "", workloadId: "", opportunityDealId: "", opportunityId: "", relatedItemType: "", relatedItemId: "", relatedItemLabel: "" }, mentionEditing.event.shares); }}>Remove relation</button>}
           {mentionRelatedOptions.map((item) => <button key={`${item.type}:${item.id}`} type="button" role="option" aria-selected={mentionEditing.event.relatedItemType === item.type && mentionEditing.event.relatedItemId === item.id} onClick={() => void saveMentionUpdate(mentionEditing.event, { ...draftFromEvent(mentionEditing.event), ...applyRelatedSelection(mentionEditing.event.title, item, accountNames.get(mentionEditing.event.accountId ?? -1) ?? relatedAccountName(mentionEditing.event.accountId, mentionEditing.event.relatedItemLabel)) }, mentionEditing.event.shares)}><strong>{item.label}</strong></button>)}
           {mentionRelatedHasMore && <button type="button" onClick={loadMoreMentionRelations} disabled={mentionSearchLoading}>Load 10 more</button>}
         </> : mentionUserOptions.map((user) => {
           const existing = mentionEditing.event.shares.find((share) => share.userKey === user.userKey);
-          const shares = existing ? mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey) : [...mentionEditing.event.shares, { userKey: user.userKey, displayName: user.displayName, permission: "VIEW" as const, visibility: "DETAILS" as const }];
-          return <button type="button" role="option" aria-selected={Boolean(existing)} onClick={() => void saveMentionUpdate(mentionEditing.event, draftFromEvent(mentionEditing.event), shares)}><strong>#{user.displayName}</strong><small>{existing ? "Remove participant" : "Add participant"}</small></button>;
+          return <label class={`calendar-mention-editor__participant${existing ? " is-selected" : ""}`}>
+            <input type="checkbox" checked={Boolean(existing)} disabled={saving} aria-label={user.displayName} onChange={(change) => {
+              const shares = change.currentTarget.checked
+                ? [...mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey), { userKey: user.userKey, displayName: user.displayName, permission: "VIEW" as const, visibility: "DETAILS" as const }]
+                : mentionEditing.event.shares.filter((share) => share.userKey !== user.userKey);
+              void saveMentionUpdate(mentionEditing.event, draftFromEvent(mentionEditing.event), shares);
+            }} />
+            <span><strong>#{user.displayName}</strong><small>{existing ? "Selected participant" : "Add participant"}</small></span>
+          </label>;
         })}
         {mentionSearchError ? <span class="calendar-inline-search__error" role="alert">{mentionSearchError}</span> : mentionSearchLoading ? <span class="account-search-empty" role="status">Searching…</span> : (mentionEditing.kind === "related" ? mentionRelatedOptions : mentionUserOptions).length === 0 ? <span class="account-search-empty">No results</span> : null}
       </div>

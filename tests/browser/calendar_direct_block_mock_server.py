@@ -13,9 +13,82 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
 PORT = int(os.environ.get("KAP_CALENDAR_TEST_PORT", "8124"))
-EVENTS: list[dict] = []
+EVENTS: list[dict] = [{
+    "id": 4201,
+    "ownerUserKey": "fixture-user",
+    "ownerDisplayName": "Fixture User",
+    "ownerBadgeColor": "#245b83",
+    "versionNo": 1,
+    "title": "R5 FIXTURE",
+    "description": None,
+    "location": None,
+    "startsAt": "2026-10-20T11:00:00+09:00",
+    "endsAt": "2026-10-20T12:00:00+09:00",
+    "allDay": False,
+    "hasEndTime": True,
+    "timeUnknown": False,
+    "forcePrivate": False,
+    "vacation": False,
+    "status": "SCHEDULED",
+    "timezone": "Asia/Seoul",
+    "visibility": "DETAILS",
+    "effectiveVisibility": "DETAILS",
+    "effectiveAccess": "EDIT",
+    "accountId": None,
+    "relatedItemType": None,
+    "relatedItemId": None,
+    "relatedItemLabel": None,
+    "recurrence": "NONE",
+    "recurrenceUntil": None,
+    "workingDays": 1,
+}, {
+    "id": 4202,
+    "ownerUserKey": "fixture-user",
+    "ownerDisplayName": "Fixture User",
+    "ownerBadgeColor": "#245b83",
+    "versionNo": 1,
+    "title": "R5 SECOND",
+    "description": None,
+    "location": None,
+    "startsAt": "2026-10-20T14:00:00+09:00",
+    "endsAt": "2026-10-20T15:00:00+09:00",
+    "allDay": False,
+    "hasEndTime": True,
+    "timeUnknown": False,
+    "forcePrivate": False,
+    "vacation": False,
+    "status": "SCHEDULED",
+    "timezone": "Asia/Seoul",
+    "visibility": "DETAILS",
+    "effectiveVisibility": "DETAILS",
+    "effectiveAccess": "EDIT",
+    "accountId": None,
+    "relatedItemType": None,
+    "relatedItemId": None,
+    "relatedItemLabel": None,
+    "recurrence": "NONE",
+    "recurrenceUntil": None,
+    "workingDays": 1,
+}]
+EVENT_SHARES: dict[int, list[dict]] = {4201: [
+    {"userKey": "share-user", "displayName": "Share User", "access": "VIEW", "permission": "VIEW", "visibility": "DETAILS"},
+    {"userKey": "second-user", "displayName": "Second User", "access": "VIEW", "permission": "VIEW", "visibility": "DETAILS"},
+]}
 REQUESTS: list[str] = []
-NEXT_ID = 1
+MUTATIONS: list[dict] = []
+NEXT_ID = 4203
+INITIAL_EVENTS = json.loads(json.dumps(EVENTS))
+INITIAL_EVENT_SHARES = json.loads(json.dumps(EVENT_SHARES))
+
+
+def reset_fixture() -> None:
+    global NEXT_ID
+    EVENTS[:] = json.loads(json.dumps(INITIAL_EVENTS))
+    EVENT_SHARES.clear()
+    EVENT_SHARES.update({int(event_id): shares for event_id, shares in json.loads(json.dumps(INITIAL_EVENT_SHARES)).items()})
+    REQUESTS.clear()
+    MUTATIONS.clear()
+    NEXT_ID = 4203
 
 
 def event_from_body(body: dict, event_id: int, version: int = 1) -> dict:
@@ -32,6 +105,7 @@ def event_from_body(body: dict, event_id: int, version: int = 1) -> dict:
         "hasEndTime": body.get("endsAt") is not None,
         "timeUnknown": bool(body.get("timeUnknown")),
         "forcePrivate": bool(body.get("forcePrivate")),
+        "vacation": bool(body.get("vacation")),
         "status": "SCHEDULED",
         "timezone": body.get("timezone", "Asia/Seoul"),
         "visibility": body.get("visibility", "DETAILS"),
@@ -69,7 +143,7 @@ class Handler(SimpleHTTPRequestHandler):
         path = parsed.path
         REQUESTS.append(self.path)
         if path == "/_test/state":
-            return self.json_response({"events": EVENTS, "requests": REQUESTS})
+            return self.json_response({"events": EVENTS, "eventShares": EVENT_SHARES, "requests": REQUESTS, "mutations": MUTATIONS})
         if path == "/api/v1/auth/session":
             return self.json_response({
                 "userKey": "browser-test-owner", "displayName": "Browser Test", "loginId": "browser.test",
@@ -77,8 +151,9 @@ class Handler(SimpleHTTPRequestHandler):
             })
         if path == "/api/v1/calendar/events":
             return self.json_response({"items": EVENTS})
-        if re.fullmatch(r"/api/v1/calendar/events/\d+/shares", path):
-            return self.json_response({"items": []})
+        shares_match = re.fullmatch(r"/api/v1/calendar/events/(\d+)/shares", path)
+        if shares_match:
+            return self.json_response({"items": EVENT_SHARES.get(int(shares_match.group(1)), [])})
         if path == "/api/v1/calendar/shares":
             return self.json_response({"items": []})
         if path == "/api/v1/calendar/shares/preferences":
@@ -114,7 +189,10 @@ class Handler(SimpleHTTPRequestHandler):
             items = all_items[offset:offset + size]
             return self.json_response({"items": items, "total": len(all_items), "hasMore": offset + size < len(all_items)})
         if path == "/api/v1/collaboration/directory/users":
-            return self.json_response({"items": [{"userKey": "share-user", "displayName": "Share User"}]})
+            return self.json_response({"items": [
+                {"userKey": "share-user", "displayName": "Share User"},
+                {"userKey": "second-user", "displayName": "Second User"},
+            ]})
         if path.startswith("/api/v1/"):
             return self.json_response({"items": []})
         return self.serve_static(path)
@@ -122,10 +200,14 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         global NEXT_ID
         path = urlparse(self.path).path
+        if path == "/_test/reset":
+            reset_fixture()
+            return self.json_response({"reset": True})
         REQUESTS.append(f"POST {self.path}")
         status_match = re.fullmatch(r"/api/v1/calendar/events/(\d+)/(cancel|reopen)", path)
         if status_match:
             event_id = int(status_match.group(1))
+            MUTATIONS.append({"method": "POST", "path": self.path, "body": None})
             status = "CANCELLED" if status_match.group(2) == "cancel" else "SCHEDULED"
             for event in EVENTS:
                 if event["id"] == event_id:
@@ -135,7 +217,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.json_response({"message": "not found"}, 404)
         if path == "/api/v1/calendar/events":
             body = self.read_json()
+            MUTATIONS.append({"method": "POST", "path": self.path, "body": body})
             event = event_from_body(body, NEXT_ID)
+            EVENT_SHARES[NEXT_ID] = []
             NEXT_ID += 1
             EVENTS.append(event)
             return self.json_response(event, 201)
@@ -143,28 +227,46 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         path = urlparse(self.path).path
+        REQUESTS.append(f"PUT {self.path}")
         match = re.fullmatch(r"/api/v1/calendar/events/(\d+)", path)
         if match:
             event_id = int(match.group(1))
             body = self.read_json()
+            MUTATIONS.append({"method": "PUT", "path": self.path, "body": body})
             for index, current in enumerate(EVENTS):
                 if current["id"] == event_id:
                     event = event_from_body(body, event_id, current["versionNo"] + 1)
                     EVENTS[index] = event
                     return self.json_response(event)
             return self.json_response({"message": "not found"}, 404)
-        if re.fullmatch(r"/api/v1/calendar/events/\d+/shares/[^/]+", path):
+        share_match = re.fullmatch(r"/api/v1/calendar/events/(\d+)/shares/([^/]+)", path)
+        if share_match:
             body = self.read_json()
-            return self.json_response({"userKey": body.get("userKey", "share-user"), "access": "VIEW", "visibility": body.get("visibility", "DETAILS")})
+            MUTATIONS.append({"method": "PUT", "path": self.path, "body": body})
+            event_id = int(share_match.group(1))
+            share = {"userKey": body.get("userKey", share_match.group(2)), "displayName": "Second User" if share_match.group(2) == "second-user" else "Share User", "access": "VIEW", "permission": "VIEW", "visibility": body.get("visibility", "DETAILS")}
+            current = EVENT_SHARES.setdefault(event_id, [])
+            current[:] = [item for item in current if item["userKey"] != share["userKey"]]
+            current.append(share)
+            return self.json_response(share)
         return self.json_response({}, 200)
 
     def do_DELETE(self) -> None:
         path = urlparse(self.path).path
         REQUESTS.append(f"DELETE {self.path}")
+        MUTATIONS.append({"method": "DELETE", "path": self.path, "body": None})
+        share_match = re.fullmatch(r"/api/v1/calendar/events/(\d+)/shares/([^/]+)", path)
+        if share_match:
+            event_id = int(share_match.group(1))
+            EVENT_SHARES[event_id] = [item for item in EVENT_SHARES.get(event_id, []) if item["userKey"] != share_match.group(2)]
+            self.send_response(204)
+            self.end_headers()
+            return
         match = re.fullmatch(r"/api/v1/calendar/events/(\d+)", path)
         if match:
             event_id = int(match.group(1))
             EVENTS[:] = [event for event in EVENTS if event["id"] != event_id]
+            EVENT_SHARES.pop(event_id, None)
         self.send_response(204)
         self.end_headers()
 

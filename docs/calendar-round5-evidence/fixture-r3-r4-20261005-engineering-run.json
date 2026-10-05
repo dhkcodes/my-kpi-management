@@ -1,0 +1,279 @@
+{
+  "task": "Calendar Round 5 requirements 3 and 4",
+  "fixtureOnly": true,
+  "aclLimitation": "The fixture verifies browser/API synchronization only; it is not real two-account ACL verification.",
+  "startedAt": "2026-10-05T12:25:39.689Z",
+  "checks": [
+    {
+      "name": "first legitimate browser double-click opens the 09:00–18:00 day timeline",
+      "ok": true
+    },
+    {
+      "name": "event A → event B → blank region leaves no selection or action state",
+      "ok": true
+    },
+    {
+      "name": "two persisted participants render as native checked checkboxes",
+      "ok": true
+    },
+    {
+      "name": "every saved-event click immediately matches UI, exact request payloads, and fixture persistence",
+      "ok": true
+    },
+    {
+      "name": "reload, 09:00–18:00 reopen, and event reselection preserve participant state",
+      "ok": true
+    },
+    {
+      "name": "general typing stays focused, reflects within budget, and does not start relation search",
+      "ok": true
+    },
+    {
+      "name": "unsaved draft participant selection emits zero mutations before Save",
+      "ok": true
+    },
+    {
+      "name": "save confirmation popup exposes English Redwood actions and returns to editing",
+      "ok": true
+    },
+    {
+      "name": "final Save creates the draft once and synchronizes exactly two participants",
+      "ok": true
+    },
+    {
+      "name": "selected event actions stay in the upper-right and use English labels",
+      "ok": true
+    },
+    {
+      "name": "only the 09:00–18:00 timeline scrolls while the undated area stays fixed",
+      "ok": true
+    }
+  ],
+  "participantClicks": [
+    {
+      "label": "deselect Share User",
+      "uiChecked": {
+        "shareUser": false,
+        "secondUser": true
+      },
+      "mutations": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201",
+          "body": {
+            "accountId": null,
+            "workloadId": null,
+            "opportunityDealId": null,
+            "opportunityId": null,
+            "relatedItemType": null,
+            "relatedItemId": null,
+            "relatedItemLabel": null,
+            "title": "R5 FIXTURE",
+            "description": null,
+            "location": null,
+            "startsAt": "2026-10-20T11:00:00+09:00",
+            "endsAt": "2026-10-20T12:00:00+09:00",
+            "allDay": false,
+            "timeUnknown": false,
+            "forcePrivate": false,
+            "vacation": false,
+            "recurrence": "NONE",
+            "recurrenceUntil": null,
+            "workingDays": 1,
+            "timezone": "Asia/Seoul",
+            "visibility": "DETAILS",
+            "versionNo": 1
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/calendar/events/4201/shares/share-user",
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201/shares/second-user",
+          "body": {
+            "userKey": "second-user",
+            "access": "VIEW",
+            "visibility": "DETAILS"
+          }
+        }
+      ],
+      "fixturePersistedUserKeys": [
+        "second-user"
+      ]
+    },
+    {
+      "label": "reselect Share User",
+      "uiChecked": {
+        "shareUser": true,
+        "secondUser": true
+      },
+      "mutations": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201",
+          "body": {
+            "accountId": null,
+            "workloadId": null,
+            "opportunityDealId": null,
+            "opportunityId": null,
+            "relatedItemType": null,
+            "relatedItemId": null,
+            "relatedItemLabel": null,
+            "title": "R5 FIXTURE",
+            "description": null,
+            "location": null,
+            "startsAt": "2026-10-20T11:00:00+09:00",
+            "endsAt": "2026-10-20T12:00:00+09:00",
+            "allDay": false,
+            "timeUnknown": false,
+            "forcePrivate": false,
+            "vacation": false,
+            "recurrence": "NONE",
+            "recurrenceUntil": null,
+            "workingDays": 1,
+            "timezone": "Asia/Seoul",
+            "visibility": "DETAILS",
+            "versionNo": 2
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201/shares/second-user",
+          "body": {
+            "userKey": "second-user",
+            "access": "VIEW",
+            "visibility": "DETAILS"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201/shares/share-user",
+          "body": {
+            "userKey": "share-user",
+            "access": "VIEW",
+            "visibility": "DETAILS"
+          }
+        }
+      ],
+      "fixturePersistedUserKeys": [
+        "second-user",
+        "share-user"
+      ]
+    },
+    {
+      "label": "deselect Second User",
+      "uiChecked": {
+        "shareUser": true,
+        "secondUser": false
+      },
+      "mutations": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201",
+          "body": {
+            "accountId": null,
+            "workloadId": null,
+            "opportunityDealId": null,
+            "opportunityId": null,
+            "relatedItemType": null,
+            "relatedItemId": null,
+            "relatedItemLabel": null,
+            "title": "R5 FIXTURE",
+            "description": null,
+            "location": null,
+            "startsAt": "2026-10-20T11:00:00+09:00",
+            "endsAt": "2026-10-20T12:00:00+09:00",
+            "allDay": false,
+            "timeUnknown": false,
+            "forcePrivate": false,
+            "vacation": false,
+            "recurrence": "NONE",
+            "recurrenceUntil": null,
+            "workingDays": 1,
+            "timezone": "Asia/Seoul",
+            "visibility": "DETAILS",
+            "versionNo": 3
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/calendar/events/4201/shares/second-user",
+          "body": null
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v1/calendar/events/4201/shares/share-user",
+          "body": {
+            "userKey": "share-user",
+            "access": "VIEW",
+            "visibility": "DETAILS"
+          }
+        }
+      ],
+      "fixturePersistedUserKeys": [
+        "share-user"
+      ]
+    }
+  ],
+  "unsavedDraft": {
+    "mutationsBeforeSave": 0,
+    "mutationsAfterSave": [
+      {
+        "method": "POST",
+        "path": "/api/v1/calendar/events",
+        "body": {
+          "accountId": null,
+          "workloadId": null,
+          "opportunityDealId": null,
+          "opportunityId": null,
+          "relatedItemType": null,
+          "relatedItemId": null,
+          "relatedItemLabel": null,
+          "title": "R5 UNSAVED",
+          "description": null,
+          "location": null,
+          "startsAt": "2026-10-20T16:30:00+09:00",
+          "endsAt": "2026-10-20T17:30:00+09:00",
+          "allDay": false,
+          "timeUnknown": false,
+          "forcePrivate": false,
+          "vacation": false,
+          "recurrence": "NONE",
+          "recurrenceUntil": null,
+          "workingDays": 1,
+          "timezone": "Asia/Seoul",
+          "visibility": "DETAILS"
+        }
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/calendar/events/4203/shares/share-user",
+        "body": {
+          "userKey": "share-user",
+          "access": "VIEW",
+          "visibility": "DETAILS"
+        }
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/calendar/events/4203/shares/second-user",
+        "body": {
+          "userKey": "second-user",
+          "access": "VIEW",
+          "visibility": "DETAILS"
+        }
+      }
+    ],
+    "createdEventId": 4203,
+    "persistedUserKeys": [
+      "share-user",
+      "second-user"
+    ]
+  },
+  "screenshot": "/tmp/calendar-round5-r3-r4.png",
+  "ok": true,
+  "completedAt": "2026-10-05T12:25:45.788Z"
+}

@@ -1,0 +1,55 @@
+{
+  "task": "Calendar Round 5 requirements 3 and 4",
+  "fixtureOnly": true,
+  "ok": false,
+  "browserProofCompleted": false,
+  "failureCategory": "sandbox infrastructure",
+  "failedStage": "fixture server startup",
+  "attemptedCommand": "python3 tests/browser/calendar_direct_block_mock_server.py",
+  "error": "PermissionError: [Errno 1] Operation not permitted while ThreadingHTTPServer attempted to bind 127.0.0.1:8124",
+  "checks": [
+    {
+      "name": "calendar and meeting-notes regression suite",
+      "ok": true,
+      "command": "npm run test:calendar-meeting-notes"
+    },
+    {
+      "name": "TypeScript typecheck",
+      "ok": true,
+      "command": "npm run typecheck"
+    },
+    {
+      "name": "Oracle JET release build",
+      "ok": true,
+      "command": "npx ojet build --release"
+    },
+    {
+      "name": "browser proof script syntax",
+      "ok": true,
+      "command": "node --check tests/browser/calendarRound5Participants.playwright.cjs"
+    },
+    {
+      "name": "fixture server syntax",
+      "ok": true,
+      "command": "python3 -m py_compile tests/browser/calendar_direct_block_mock_server.py"
+    },
+    {
+      "name": "first desktop double-click, event A to B to blank, saved participant mutations, reload persistence, and unsaved draft deferral",
+      "ok": false,
+      "notRun": true,
+      "reason": "The managed sandbox denied the loopback listener before a browser could connect; no UI or request/persisted-state assertion from the browser script executed."
+    }
+  ],
+  "expectedBrowserScenario": {
+    "selection": "event A -> event B -> blank clears selection and actions",
+    "savedParticipants": "two selected -> deselect/reselect first -> deselect second; assert every checkbox state, exact mutation, and fixture-persisted share set",
+    "reload": "reload -> reopen 09:00-18:00 timeline -> reselect event -> persisted participant state",
+    "mutationBoundary": "saved event mutates immediately; unsaved draft emits zero mutations before Save and exactly create plus two share writes after Save"
+  },
+  "limitations": [
+    "This JSON is not browser-pass evidence.",
+    "The fixture is not real two-account ACL verification.",
+    "No server, browser, or child process remained after the denied bind."
+  ],
+  "completedAt": "2026-10-05T10:56:08Z"
+}

@@ -1,0 +1,23 @@
+{
+  "target": "http://127.0.0.1:18185",
+  "title": "R5 UI VERIFY 1791190201647",
+  "startedAt": "2026-10-05T08:50:01.647Z",
+  "checks": [
+    {
+      "name": "authenticated calendar load",
+      "ok": true
+    },
+    {
+      "name": "single click selection does not auto-edit",
+      "ok": true
+    },
+    {
+      "name": "stale test events removed before run",
+      "ok": true,
+      "cleaned": 1
+    }
+  ],
+  "limitations": [],
+  "completedAt": "2026-10-05T08:50:05.182Z",
+  "ok": true
+}
