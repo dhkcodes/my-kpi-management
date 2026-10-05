@@ -15,6 +15,16 @@ const pageNavigation = readFileSync("src/components/PageNavigationToolbar.tsx", 
 const homeConsumption = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 const mtdDate = readFileSync("src/data/mtdDate.ts", "utf8");
+const pageShell = readFileSync("src/components/common/PageShell.tsx", "utf8");
+const doubleActivation = readFileSync("src/components/common/doubleActivation.ts", "utf8");
+
+assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
+assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
+assert.match(pageShell, /oj-progress-circle[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"/, "the common activity control combines Oracle JET progress and an accessible refresh action");
+assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
+assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
+assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
+assert.doesNotMatch(pageShell, /consumption|records/i, "the common shell contains no Consumption Records customization");
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
@@ -285,8 +295,8 @@ assert.match(insightsPage, /Plan Contribution[\s\S]*Plan \{plan\.planId\} · <In
 assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|consumption-data-center__warning/, "Consumption Analysis omits DP + OCI breakdown and duplicate warnings");
 
 // Consumption Records remains the mutable Data workspace and excludes analysis duplication.
-assert.match(recordsPage, /<h1 id="consumptionTitle">Consumption Records<\/h1>/, "data-management leaf uses the approved name");
-assert.match(recordsPage, /<span class="kpi-eyebrow">Consumption \/ Attainment<\/span>[\s\S]*<h1 id="consumptionTitle">Consumption Records<\/h1>/, "Consumption Records uses the shared Consumption / Attainment eyebrow");
+assert.match(recordsPage, /ariaLabelledBy="consumptionTitle"[\s\S]*title="Consumption Records"/, "data-management leaf uses the approved name through the common shell");
+assert.match(recordsPage, /breadcrumb={breadcrumb}[\s\S]*eyebrow="Consumption \/ Attainment"[\s\S]*title="Consumption Records"/, "Consumption Records supplies its breadcrumb, eyebrow, and title through the shared shell");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,\.xlsx,text\/csv,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/, "Actual Import accepts CSV and XLSX files");
 assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, "Actual Import accepts multiple CSV or XLSX files");
@@ -421,9 +431,9 @@ assert.match(recordsPage, /new Map[\s\S]*page\.accountGroups[\s\S]*setSavedPlans
 assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{blockingRecordsLoading\}/, "search stays available for native clear during dirty or background-query states and blocks only initial replacement loading");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}[\s\S]*id="consumptionToQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}/, "From and To controls do not change enabled state during background append loading");
 assert.match(recordsPage, /consumption-record-search__submit[\s\S]*disabled=\{!isConsumptionQuarterRangeValid\(fromQuarter, toQuarter\) \|\| rangeLoading \|\| blockingRecordsLoading/, "search icon does not change enabled or opacity state during background append loading");
-assert.match(recordsPage, /useEffect\(\(\) => \{[\s\S]*new IntersectionObserver[\s\S]*\}, \{ root:[\s\S]*\}, \[recordsHasMore, hasDraftChanges\]\);/, "pagination observer is not recreated for offsets, loading transitions, ETags, or draft filter changes");
+assert.match(recordsPage, /useEffect\(\(\) => \{[\s\S]*const root = pageScrollRef\.current[\s\S]*new IntersectionObserver[\s\S]*\[recordsHasMore, hasDraftChanges\]\);/, "pagination observer is not recreated for offsets, loading transitions, ETags, or draft filter changes");
 assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-bottom scroll and Load More request the next server page");
-assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.current\(\)[\s\S]*root:\s*tableScrollRef\.current/, "the actual table scroll root observes a paging sentinel through the latest append callback");
+assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.current\(\)[\s\S]*\{ root, rootMargin/, "the common page scroll root observes a paging sentinel through the latest append callback");
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");

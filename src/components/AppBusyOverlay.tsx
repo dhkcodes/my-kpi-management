@@ -8,10 +8,13 @@ export function AppBusyOverlay() {
   const overlayRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const blockedSiblingsRef = useRef<Array<{ element: HTMLElement; inert: boolean; ariaHidden: string | null }>>([]);
+  const inlineBusySurface = busy && typeof document !== "undefined"
+    ? document.querySelector('[data-app-busy-surface="true"]')
+    : null;
 
   useEffect(() => subscribeAppBusy((count) => setBusy(count > 0)), []);
   useEffect(() => {
-    if (!busy) return;
+    if (!busy || inlineBusySurface) return;
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     overlayRef.current?.focus();
     const parent = overlayRef.current?.parentElement;
@@ -34,8 +37,8 @@ export function AppBusyOverlay() {
       previousFocusRef.current?.focus();
       previousFocusRef.current = null;
     };
-  }, [busy]);
-  if (!busy) return null;
+  }, [busy, inlineBusySurface]);
+  if (!busy || inlineBusySurface) return null;
 
   return (
     <div ref={overlayRef} class="kap-busy-overlay" role="dialog" aria-modal="true" aria-label="Processing" aria-busy="true" tabIndex={-1}>

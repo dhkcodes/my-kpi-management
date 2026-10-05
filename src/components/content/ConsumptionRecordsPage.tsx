@@ -62,6 +62,8 @@ import {
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
+import { PageFilterPanel, PageShell } from "../common/PageShell";
+import { createDoubleActivationTracker } from "../common/doubleActivation";
 import "ojs/ojbutton";
 import "ojs/ojchart";
 import "ojs/ojdialog";
@@ -462,8 +464,10 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const forecastImportDialogRef = useRef<ojDialog | null>(null);
   const forecastEditorPopoverRef = useRef<HTMLDivElement | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
+  const pageScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
+  const doubleActivationRef = useRef(createDoubleActivationTracker());
   const exportingRef = useRef(false);
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
@@ -810,8 +814,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     });
   };
 
-  const handleTableScroll = (event: Event) => {
+  const handleTableScroll = () => {
     updateTableScrollState();
+  };
+
+  const handlePageScroll = (event: Event) => {
     const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
     if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
       void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
@@ -819,7 +826,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   };
 
   useEffect(() => {
-    const root = tableScrollRef.current;
+    const root = pageScrollRef.current;
     const sentinel = recordsSentinelRef.current;
     if (!root || !sentinel || !recordsHasMore || hasDraftChanges) return undefined;
     const observer = new IntersectionObserver((entries) => {
@@ -827,7 +834,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         void loadMoreRecordsRef.current().catch((error) =>
           setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
       }
-    }, { root: tableScrollRef.current, rootMargin: "0px 0px 96px 0px", threshold: 0 });
+    }, { root, rootMargin: "0px 0px 96px 0px", threshold: 0 });
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [recordsHasMore, hasDraftChanges]);
@@ -1477,7 +1484,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
               class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
-              onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, valueExact)}>
+              onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, valueExact)}
+              onPointerDown={(event) => canEditControl && doubleActivationRef.current.onPointerDown(event, key)}
+              onPointerMove={(event) => canEditControl && doubleActivationRef.current.onPointerMove(event)}
+              onPointerUp={(event) => canEditControl && doubleActivationRef.current.onPointerUp(event, key,
+                () => beginControlEdit(event.currentTarget, series.customer, month, valueExact))}
+              onPointerCancel={() => doubleActivationRef.current.onPointerCancel()}>
               {displayedComposition ? <ForecastCompositionTooltip composition={displayedComposition}>
                 <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}
                   {variance && variance.actualAmountExact !== null && variance.forecastAmountExact !== null && <small title="Account Actual minus preserved Final Forecast">
@@ -1517,16 +1529,26 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const controlsRequiringConfirmation = actualControlTotals.filter((control) => control.matchStatus !== "MATCH");
   if (controlsRequiringConfirmation.length > 0) pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${controlsRequiringConfirmation.length}건의 과거 또는 불일치 Control이 있습니다. Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
+  const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
+    || importPhase === "previewing" || importPhase === "applying"
+    || forecastImportPhase === "previewing" || forecastImportPhase === "applying";
+  const pageBusyLabel = isSaving ? "Saving changes" : isExporting ? "Preparing export"
+    : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
+      : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
+        : dataMode === "loading" ? "Loading records" : "Refreshing records";
+  const refreshRecords = async () => {
+    setImportError("");
+    await runRecordsQuery({ fromQuarter, toQuarter, search: appliedSearchRef.current }, selectedPillar);
+  };
 
   return (
-    <section class="consumption-page" aria-labelledby="consumptionTitle" data-fiscal-year={fiscalYear}>
-      <header class="consumption-page__header">
-        <div>
-          {breadcrumb}
-          <span class="kpi-eyebrow">Consumption / Attainment</span>
-          <h1 id="consumptionTitle">Consumption Records</h1>
-        </div>
-        <div class="consumption-import-actions">
+    <PageShell className="consumption-page" ariaLabelledBy="consumptionTitle"
+      rootAttributes={{ "data-fiscal-year": fiscalYear }}
+      scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={handlePageScroll}
+      breadcrumb={breadcrumb} eyebrow="Consumption / Attainment" title="Consumption Records"
+      busy={pageBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
+      refreshDisabled={hasDraftChanges || !!forecastEditor || pageBusy || dataMode !== "backend" || !rangeValid}
+      actions={<div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
             disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1557,18 +1579,16 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Excel Export"}
           </oj-button>
-        </div>
-      </header>
-      <ConsumptionMessageBanner messages={visiblePageMessages}
+        </div>}
+      messages={<ConsumptionMessageBanner messages={visiblePageMessages}
         onClose={(messageId) => {
           if (messageId === "records-operation-error") {
             setImportError("");
             return;
           }
           setDismissedMessageIds((current) => new Set(current).add(messageId));
-        }} />
-
-      <section class="consumption-range-bar" aria-label="Consumption quarter range">
+        }} />}
+      filters={<PageFilterPanel className="consumption-range-bar" ariaLabel="Consumption quarter range">
         <div class="consumption-range-pillar">
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Records pillar">
@@ -1606,8 +1626,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <span class="oj-ux-ico-search" aria-hidden="true" />
           </button>
         </label>
-
-      </section>
+      </PageFilterPanel>}>
 
       <oj-dialog
         id="consumptionImportDialog"
@@ -1909,6 +1928,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </div>
       </section>
       )}
-    </section>
+    </PageShell>
   );
 }
