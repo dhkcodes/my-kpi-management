@@ -209,6 +209,9 @@ const sharePut = (userKey) => ({
     const beforeSave = await state();
     assert.equal(beforeSave.mutations.length, beforeDraft.mutations.length, 'unsaved participant selection emitted a mutation');
     check('unsaved draft participant selection emits zero mutations before Save');
+    await title.focus();
+    const keepScroll = await page.locator('.calendar-day-timeline-scroll').evaluate((element) => element.scrollTop);
+    await page.evaluate(() => { window.__r5EditorIdentity = document.querySelector('[data-calendar-editor="block"]'); });
     await page.keyboard.press('Escape');
     const saveConfirm = page.getByRole('dialog', { name: 'Save changes?' });
     await saveConfirm.waitFor();
@@ -216,7 +219,10 @@ const sharePut = (userKey) => ({
     assert.equal(await saveConfirm.getByRole('button', { name: 'Discard and close' }).isVisible(), true);
     assert.equal(await saveConfirm.getByRole('button', { name: 'Save and close' }).isVisible(), true);
     await saveConfirm.getByRole('button', { name: 'Keep editing' }).click();
-    check('save confirmation popup exposes English Redwood actions and returns to editing');
+    assert.equal(await page.evaluate(() => window.__r5EditorIdentity === document.querySelector('[data-calendar-editor="block"]')), true);
+    assert.equal(await title.evaluate((element) => element === document.activeElement), true);
+    assert.equal(await page.locator('.calendar-day-timeline-scroll').evaluate((element) => element.scrollTop), keepScroll);
+    check('Keep editing preserves editor DOM identity, input focus, and timeline scroll without remount');
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     const afterSave = await waitForMutationCount(beforeSave.mutations.length + 3);

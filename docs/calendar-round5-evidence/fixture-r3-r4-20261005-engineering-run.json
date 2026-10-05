@@ -2,7 +2,7 @@
   "task": "Calendar Round 5 requirements 3 and 4",
   "fixtureOnly": true,
   "aclLimitation": "The fixture verifies browser/API synchronization only; it is not real two-account ACL verification.",
-  "startedAt": "2026-10-05T12:25:39.689Z",
+  "startedAt": "2026-10-05T14:22:38.876Z",
   "checks": [
     {
       "name": "first legitimate browser double-click opens the 09:00–18:00 day timeline",
@@ -33,7 +33,7 @@
       "ok": true
     },
     {
-      "name": "save confirmation popup exposes English Redwood actions and returns to editing",
+      "name": "Keep editing preserves editor DOM identity, input focus, and timeline scroll without remount",
       "ok": true
     },
     {
@@ -275,5 +275,5 @@
   },
   "screenshot": "/tmp/calendar-round5-r3-r4.png",
   "ok": true,
-  "completedAt": "2026-10-05T12:25:45.788Z"
+  "completedAt": "2026-10-05T14:22:44.774Z"
 }

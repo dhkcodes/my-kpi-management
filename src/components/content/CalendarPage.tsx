@@ -1305,6 +1305,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
     </section>
     {dayOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle={selectedDate}
       width="90vw" maxWidth="72rem" maxHeight="90vh"
+      onojBeforeClose={(event) => { if (hasUnsavedChanges()) { event.preventDefault(); setCloseConfirmOpen(true); } }}
       onojClose={requestDayClose}>
       <div slot="body" class="calendar-day-dialog calendar-day-dialog__jet-body">
       {(() => {
@@ -1332,7 +1333,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       </div>
     </oj-c-dialog>}
     {closeConfirmOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="none" dialogTitle="Save changes?" width="90vw" maxWidth="30rem">
-      <div slot="body" class="calendar-close-confirm"><p>You have unsaved event changes.</p><div class="calendar-close-confirm__actions"><oj-button chroming="outlined" onojAction={() => { setCloseConfirmOpen(false); setDayOpen(false); requestAnimationFrame(() => setDayOpen(true)); }}>Keep editing</oj-button><oj-button chroming="borderless" onojAction={() => { setCloseConfirmOpen(false); closeEditor(); setDayOpen(false); }}>Discard and close</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void save().then((saved) => { if (saved) { setCloseConfirmOpen(false); setDayOpen(false); } })}>Save and close</oj-button></div></div>
+      <div slot="body" class="calendar-close-confirm"><p>You have unsaved event changes.</p><div class="calendar-close-confirm__actions"><oj-button chroming="outlined" onojAction={() => setCloseConfirmOpen(false)}>Keep editing</oj-button><oj-button chroming="borderless" onojAction={() => { setCloseConfirmOpen(false); closeEditor(); setDayOpen(false); }}>Discard and close</oj-button><oj-button chroming="callToAction" disabled={saving} onojAction={() => void save().then((saved) => { if (saved) { setCloseConfirmOpen(false); setDayOpen(false); } })}>Save and close</oj-button></div></div>
     </oj-c-dialog>}
     {sharingOpen && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle="Manage Calendar Sharing"
       width="90vw" maxWidth="42rem" maxHeight="90vh" onojClose={() => setSharingOpen(false)}>
