@@ -81,6 +81,18 @@ export const consumptionRecordsOperationError = (error: unknown, fallback: strin
   return error.message || fallback;
 };
 
+const formatConsumptionImportError = (
+  error: unknown,
+  operation: string,
+  workspaceLabel: "Consumption Records" | "Consumption Attainment",
+  permissionLabel: "Records" | "Attainment",
+): string => {
+  if (error instanceof ConsumptionApiError && error.status === 403) {
+    return `${operation}에 실패했습니다. ${workspaceLabel} 쓰기 권한이 없습니다. 관리자에게 ${permissionLabel} WRITE 권한을 요청해 주세요.`;
+  }
+  return `${operation}에 실패했습니다. ${consumptionRecordsOperationError(error, `${operation} could not be completed.`)}`;
+};
+
 
 const clonePlans = (plans: readonly ConsumptionPlan[]): ConsumptionPlan[] =>
   plans.map((plan) => ({
@@ -1197,7 +1209,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setPendingForecastImport({ file, preview });
       setForecastImportPhase("preview");
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Forecast Excel workbook could not be previewed.");
+      const message = formatConsumptionImportError(error, "Forecast preview", "Consumption Attainment", "Attainment");
       setImportError(message);
       setForecastImportResult(message);
       setForecastImportPhase("error");
@@ -1224,7 +1236,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         setImportError(`반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`);
       }
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Forecast CSV or Excel file could not be applied.");
+      const message = formatConsumptionImportError(error, "Forecast apply", "Consumption Attainment", "Attainment");
       setImportError(message);
       setForecastImportResult(`반영 실패: ${message}`);
       setForecastImportPhase("error");
@@ -1253,7 +1265,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setPendingImport({ files, preview });
       setImportPhase("preview");
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Consumption CSV files could not be previewed.");
+      const message = formatConsumptionImportError(error, "Actual Import", "Consumption Records", "Records");
       setImportError(message);
       setImportResult(message);
       setImportPhase("error");
@@ -1288,10 +1300,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
-      const message = consumptionRecordsOperationError(error, "Consumption CSV files could not be imported.");
       const confirmedRequestFailure = error instanceof ConsumptionApiError && error.status >= 400 && error.status < 500;
       const resultMessage = confirmedRequestFailure
-        ? `Actual Import에 실패했습니다. ${message}`
+        ? formatConsumptionImportError(error, "Actual Import", "Consumption Records", "Records")
         : "처리 결과를 확인하지 못했습니다. 반영 여부 확인이 필요합니다.";
       setImportError(resultMessage);
       setImportResult(resultMessage);
@@ -1567,7 +1578,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       <oj-dialog
         id="consumptionImportDialog"
         ref={importDialogRef}
-        dialogTitle="Consumption CSV import"
+        dialogTitle="Actual CSV Import"
         cancelBehavior={importPhase === "previewing" || importPhase === "applying" ? "none" : "icon"}
         onojClose={() => {
           if (importPhase === "previewing" || importPhase === "applying") return;
@@ -1648,7 +1659,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </div>
       </oj-dialog>
       <oj-dialog id="consumptionForecastImportDialog" ref={forecastImportDialogRef}
-        dialogTitle="Forecast Excel preview and apply"
+        dialogTitle="Forecast Workbook Import"
         cancelBehavior={forecastImportPhase === "previewing" || forecastImportPhase === "applying" ? "none" : "icon"}
         onojClose={() => {
           if (forecastImportPhase === "previewing" || forecastImportPhase === "applying") return;

@@ -56,8 +56,21 @@ assert.match(recordsPage, /if \(messageId === "records-operation-error"\) \{\s*s
   "closing an operation error clears only that current message so a later failure can be shown again");
 assert.doesNotMatch(recordsPage, /onClose=\{\(messageId\) => \{[\s\S]{0,260}set(?:DraftPlans|DraftControlTotals)/,
   "closing a Consumption notice does not discard draft edits");
-assert.match(recordsPage, /error\.status === 403[\s\S]*Consumption Records 쓰기 권한이 없습니다[\s\S]*Records WRITE 권한/,
-  "Consumption Records explains the exact permission required for a rejected save");
+assert.match(recordsPage, /formatConsumptionImportError\(error, "Actual Import", "Consumption Records", "Records"\)/,
+  "Actual Import maps denied writes to the Records permission context");
+assert.match(recordsPage, /formatConsumptionImportError\(error, "Forecast preview", "Consumption Attainment", "Attainment"\)/,
+  "Forecast Preview maps denied writes to the Attainment permission context");
+assert.match(recordsPage, /formatConsumptionImportError\(error, "Forecast apply", "Consumption Attainment", "Attainment"\)/,
+  "Forecast Apply maps denied writes to the Attainment permission context");
+assert.match(recordsPage, /return `\$\{operation\}에 실패했습니다\. \$\{workspaceLabel\} 쓰기 권한이 없습니다\. 관리자에게 \$\{permissionLabel\} WRITE 권한을 요청해 주세요\.`/,
+  "import authorization failures name the operation-specific workspace and grant");
+assert.match(recordsPage, /Actual CSV Import/, "Actual upload dialog uses an Actual-specific title");
+assert.match(recordsPage, /Forecast Workbook Import/, "Forecast upload dialog uses a Forecast-specific title");
+assert.doesNotMatch(recordsPage, /Consumption CSV import/, "the ambiguous shared import title is removed");
+assert.match(apiSource, /previewConsumptionForecastWide[\s\S]*"\/consumption\/forecast-imports\/preview"/,
+  "Forecast Preview calls only the Forecast Preview API");
+assert.match(apiSource, /applyConsumptionForecastWide[\s\S]*"\/consumption\/forecast-imports\/apply"/,
+  "Forecast Apply calls only the Forecast Apply API");
 assert.match(recordsPage, /error\.status === 400 \|\| error\.status === 422[\s\S]*입력값을 확인/,
   "Consumption Records separates invalid input from authorization failures");
 assert.match(recordsPage, /error\.status >= 500[\s\S]*서버 오류로 저장하지 못했습니다/,
