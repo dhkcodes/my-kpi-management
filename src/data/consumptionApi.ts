@@ -433,17 +433,20 @@ const parseContributionAmountSplit = (value: unknown): ConsumptionAmountSplit =>
   return { ...split, totalAmountChartCoordinate: split.actualAmountChartCoordinate,
     totalAmountExact: split.actualAmountExact };
 };
-const hasValidForecastOverlapTotal = (split: ConsumptionAmountSplit): boolean => {
+const hasValidForecastOverlapTotal = (value: Record<string, unknown>, split: ConsumptionAmountSplit): boolean => {
   const actual = split.actualAmountExact!;
   const forecast = split.forecastAmountExact!;
   const total = split.totalAmountExact!;
-  const additive = addExactDecimals(actual, forecast);
+  const decodedOverlap = decodeExactDecimal(value.forecastOverlapAmount);
+  if (!decodedOverlap) return false;
+  const overlap = decodedOverlap.exact;
+  if (compareExactDecimals(overlap, "0") < 0) return false;
   if (compareExactDecimals(actual, "0") < 0 || compareExactDecimals(forecast, "0") < 0) {
-    return compareExactDecimals(total, additive) === 0;
+    return compareExactDecimals(overlap, "0") === 0
+      && compareExactDecimals(total, addExactDecimals(actual, forecast)) === 0;
   }
-  return compareExactDecimals(total, actual) >= 0
-    && compareExactDecimals(total, forecast) >= 0
-    && compareExactDecimals(total, additive) <= 0;
+  if (compareExactDecimals(overlap, actual) > 0 || compareExactDecimals(overlap, forecast) > 0) return false;
+  return compareExactDecimals(total, subtractExactDecimals(addExactDecimals(actual, forecast), overlap)) === 0;
 };
 const parseActualTrend = (value: unknown, allowedTrendYears: ReadonlySet<string>): ConsumptionActualTrendPoint[] => {
   if (!Array.isArray(value)) return malformedAnalysis();
@@ -608,9 +611,9 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     }
     if (!mtdQuarter.startsWith(`${raw.fiscalYear}-`)) return malformedAnalysis();
   }
-  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, false);
-  if (!hasValidForecastOverlapTotal(portfolioSplit)) return malformedAnalysis();
   const portfolioRaw = raw.portfolio as Record<string, unknown>;
+  const portfolioSplit = parseAmountSplit(raw.portfolio, amountStatuses, false);
+  if (!hasValidForecastOverlapTotal(portfolioRaw, portfolioSplit)) return malformedAnalysis();
   const priorActual = decodeExactDecimal(portfolioRaw.priorActualAmount);
   const priorForecast = decodeExactDecimal(portfolioRaw.priorForecastAmount);
   const priorTotal = decodeExactDecimal(portfolioRaw.priorTotalAmount);
@@ -621,7 +624,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const quarters = raw.quarters.map((value) => {
     const quarter = value as Record<string, unknown>;
     const split = parseAmountSplit(value, quarterAmountStatuses, false);
-    if (!hasValidForecastOverlapTotal(split)) return malformedAnalysis();
+    if (!hasValidForecastOverlapTotal(quarter, split)) return malformedAnalysis();
     const qoqChangeAmount = decodeNullableExactDecimal(quarter.qoqChangeAmount);
     const qoqChangePercent = decodeNullableExactDecimal(quarter.qoqChangePercent);
     if (!["Q1", "Q2", "Q3", "Q4"].includes(String(quarter.quarter)) || !isCoveragePercent(quarter.coveragePercent)

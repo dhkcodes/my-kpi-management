@@ -30,14 +30,14 @@ const analysis = {
     forecastAmount: 400, fyExpectedAmount: 1000, accountCount: 1,
     topThreeConcentrationPercent: 100, attentionAccountCount: 1 }],
   portfolio: {
-    actualAmount: 600, forecastAmount: 400, totalAmount: 1000, status: "MIXED", coveragePercent: 75,
+    actualAmount: 600, forecastAmount: 400, totalAmount: 1000, forecastOverlapAmount: 0, status: "MIXED", coveragePercent: 75,
     priorActualAmount: 900, priorForecastAmount: 0, priorTotalAmount: 900, priorStatus: "ACTUAL", priorCoveragePercent: 100
   },
   quarters: [
-    { quarter: "Q1", actualAmount: 300, forecastAmount: 0, totalAmount: 300, status: "ACTUAL", coveragePercent: 100, qoqChangeAmount: null, qoqChangePercent: null },
-    { quarter: "Q2", actualAmount: 300, forecastAmount: 100, totalAmount: 400, status: "MIXED", coveragePercent: 100, qoqChangeAmount: 100, qoqChangePercent: 33.3333 },
-    { quarter: "Q3", actualAmount: 0, forecastAmount: 300, totalAmount: 300, status: "FORECAST", coveragePercent: 100, qoqChangeAmount: -100, qoqChangePercent: -25 },
-    { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
+    { quarter: "Q1", actualAmount: 300, forecastAmount: 0, totalAmount: 300, forecastOverlapAmount: 0, status: "ACTUAL", coveragePercent: 100, qoqChangeAmount: null, qoqChangePercent: null },
+    { quarter: "Q2", actualAmount: 300, forecastAmount: 100, totalAmount: 400, forecastOverlapAmount: 0, status: "MIXED", coveragePercent: 100, qoqChangeAmount: 100, qoqChangePercent: 33.3333 },
+    { quarter: "Q3", actualAmount: 0, forecastAmount: 300, totalAmount: 300, forecastOverlapAmount: 0, status: "FORECAST", coveragePercent: 100, qoqChangeAmount: -100, qoqChangePercent: -25 },
+    { quarter: "Q4", actualAmount: 0, forecastAmount: 0, totalAmount: 0, forecastOverlapAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: -300, qoqChangePercent: -100 }
   ],
   movementBridge: [
     { quarter: "Q1", totalForecastAmount: 100, newAmount: 25, expansionAmount: 15, reductionAmount: 10, netMovementAmount: 30,
@@ -179,9 +179,9 @@ void (async () => {
 
   const mtdAnalysis = { ...analysis,
     selectedPillar: "OCI",
-    portfolio: { ...analysis.portfolio, actualAmount: 1850, forecastAmount: 960, totalAmount: 2510 },
+    portfolio: { ...analysis.portfolio, actualAmount: 1850, forecastAmount: 960, totalAmount: 2510, forecastOverlapAmount: 300 },
     quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
-      ? { ...quarter, actualAmount: 1700, forecastAmount: 960, totalAmount: 2360 }
+      ? { ...quarter, actualAmount: 1700, forecastAmount: 960, totalAmount: 2360, forecastOverlapAmount: 300 }
       : quarter),
     mtdSummary: { periodKey: "FY27-SEP", amount: 1700, asOf: "2026-09-22T09:00:00+09:00" }
   };
@@ -199,11 +199,20 @@ void (async () => {
   assert.equal(withMtd.portfolio.totalAmountExact, "2510");
   assert.equal(withMtd.quarters[1].totalAmountExact, "2360");
 
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...mtdAnalysis,
+    portfolio: { ...mtdAnalysis.portfolio, totalAmount: 2810 }
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
+  }), /Malformed Consumption analysis/,
+  "the decoder rejects an Outlook that adds current-month MTD on top of its containing full-month Forecast");
+
   const closedMtdBaselineAnalysis = {
     ...analysis,
-    portfolio: { ...analysis.portfolio, totalAmount: 900 },
+    portfolio: { ...analysis.portfolio, totalAmount: 900, forecastOverlapAmount: 100 },
     quarters: analysis.quarters.map((quarter) => quarter.quarter === "Q2"
-      ? { ...quarter, totalAmount: 350 }
+      ? { ...quarter, totalAmount: 350, forecastOverlapAmount: 50 }
       : quarter),
     mtdSummary: null
   };

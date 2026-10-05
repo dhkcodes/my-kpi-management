@@ -28,10 +28,10 @@ const analysis = {
 selectedPillar: "OCI", fiscalYear: "FY27", priorFiscalYear: "FY26", selectedAccount: null, selectedSalesRep: null,
   salesRepOptions: [], salesRepOverview: [],
   periodCoverage: { actualPeriods: [], forecastPeriods: [], includedPeriods: [], priorComparisonPeriods: [], comparisonStatus: "PRIOR_PERIOD_NOT_PROVIDED", comparisonUnavailableReason: "No prior-period Actual is available." },
-  portfolio: { actualAmount: 0, forecastAmount: 0, totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0,
+  portfolio: { actualAmount: 0, forecastAmount: 0, totalAmount: 0, forecastOverlapAmount: 0, status: "INCOMPLETE", coveragePercent: 0,
     priorActualAmount: 0, priorForecastAmount: 0, priorTotalAmount: 0, priorStatus: "INCOMPLETE", priorCoveragePercent: 0 },
   quarters: ["Q1", "Q2", "Q3", "Q4"].map((quarter) => ({ quarter, actualAmount: 0, forecastAmount: 0,
-    totalAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: null, qoqChangePercent: null })),
+    totalAmount: 0, forecastOverlapAmount: 0, status: "INCOMPLETE", coveragePercent: 0, qoqChangeAmount: null, qoqChangePercent: null })),
   accountCandidates: [], contextActualTrend: [], alerts: [], accounts: []
 };
 
