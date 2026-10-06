@@ -75,20 +75,19 @@ export function PageActivity({
   }, [busy, onRefresh, refreshDisabled]);
   if (!busy && !onRefresh && !lastCompletedAt) return null;
   const refreshTitle = lastCompletedAt
-    ? `Last successful completion (KST): ${formatKstTimestamp(lastCompletedAt)}`
-    : "No successful completion recorded yet";
+    ? `Reload. Last successful completion (KST): ${formatKstTimestamp(lastCompletedAt)}`
+    : "Reload. No successful completion recorded yet";
   if (compactTimestampButton) {
     return (
       <div class={`kap-page-activity is-compact-timestamp${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
         <span ref={refreshSlotRef} class="kap-page-activity__control-slot">
-          <oj-button class="kap-page-activity__refresh" chroming="outlined" disabled={!onRefresh || refreshDisabled || busy}
-            aria-label={busy ? busyLabel : "Refresh"} title={refreshTitle}>
+          <oj-button class="kap-page-activity__refresh oj-button-sm" chroming="outlined" disabled={!onRefresh || refreshDisabled || busy}
+            aria-label={busy ? `${busyLabel}; Reload` : "Reload"} title={refreshTitle}>
             <span slot="startIcon" class="kap-page-activity__start-icon">
               {busy
                 ? <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
                 : <span class="oj-ux-ico-refresh" aria-hidden="true"></span>}
             </span>
-            <span class="kap-page-activity__reload-label">Reload</span>
             <span class="kap-page-activity__separator" aria-hidden="true">|</span>
             <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt?.toISOString()}>
               {lastCompletedAt ? formatKstTime(lastCompletedAt) : "--:--:--"}

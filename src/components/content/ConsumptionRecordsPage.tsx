@@ -1623,21 +1623,21 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             disabled={importActionsDisabled} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={forecastImportActionsDisabled} onChange={(event) => void handleForecastWorkbookFile(event)} />
-          <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={forecastImportActionsDisabled} onojAction={() => forecastFileInputRef.current?.click()}>
+          <oj-button class="oj-button-sm" chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={forecastImportActionsDisabled} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>
-          <oj-button chroming="outlined" title="Export FORECAST data in the Excel template format"
+          <oj-button class="oj-button-sm" chroming="outlined" title="Export FORECAST data in the Excel template format"
             disabled={exportActionsDisabled}
             onojAction={() => void exportForecastXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={importActionsDisabled} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button class="oj-button-sm" chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={importActionsDisabled} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
-          <oj-button chroming="outlined" title="Export ACTUAL data in Excel format"
+          <oj-button class="oj-button-sm" chroming="outlined" title="Export ACTUAL data in Excel format"
             disabled={exportActionsDisabled}
             onojAction={() => void exportActualXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
