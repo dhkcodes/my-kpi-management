@@ -77,6 +77,10 @@ assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*fle
   "the records table panel consumes remaining page height for short and empty results");
 assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:/s,
   "the table viewport, not synthetic rows, absorbs remaining height");
+assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kpi-shell:has\(\.kap-page-shell\)[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
+  "low landscape viewports release the fixed app shell so the document can scroll");
+assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__heading\s*\{[^}]*flex-direction:\s*column;/,
+  "low landscape viewports stack the page title above actions instead of overlapping them");
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
