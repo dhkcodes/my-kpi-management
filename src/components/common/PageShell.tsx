@@ -64,14 +64,15 @@ export function PageActivity({
         {lastCompletedAt && <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt.toISOString()}>
           {formatKstTimestamp(lastCompletedAt)}
         </time>}
-        <span class="kap-page-activity__control-slot">
+        <span class="kap-page-activity__control-slot"
+          onClick={busy || refreshDisabled || !onRefresh ? undefined : () => void onRefresh()}>
           {busy ? (
             <span class="kap-page-activity__status">
               <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
               <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
             </span>
           ) : <oj-button class="kap-page-activity__refresh" chroming="borderless" disabled={!onRefresh || refreshDisabled}
-              aria-label="Refresh" title="Refresh" onojAction={() => void onRefresh?.()}>
+              aria-label="Refresh" title="Refresh">
               <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
             </oj-button>}
         </span>
