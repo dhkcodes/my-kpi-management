@@ -29,6 +29,10 @@ assert.doesNotMatch(pageShell, /consumption|records/i, "the common shell contain
 assert.match(styles, /\.kap-page-shell__inner\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/, "the common shell keeps breadcrumb, heading, and filters top-aligned instead of stretching grid rows");
 assert.match(styles, /\.kap-page-shell__body\s*\{[^}]*flex:\s*1 0 auto/, "unused shell height is assigned to the page body");
 assert.match(appBusyOverlay, /data-app-busy-surface[\s\S]*MutationObserver/, "the fallback loader reacts when an inline page loading surface mounts during route entry");
+assert.match(pageShell, /kap-page-activity__status/, "loading status keeps a reserved slot so heading and filter positions stay stable after loading");
+assert.match(pageShell, /aria-hidden=\{busy \? "false" : "true"\}/, "the reserved loading slot is hidden from accessibility APIs when idle");
+assert.match(styles, /\.kap-page-activity__status\s*\{[^}]*visibility:\s*hidden/s);
+assert.match(styles, /\.kap-page-activity__status\.is-active\s*\{[^}]*visibility:\s*visible/s);
 assert.match(appBusyOverlay, /oj-progress-circle[\s\S]*Loading/, "the route-entry fallback uses the shared Oracle JET loading treatment");
 assert.doesNotMatch(appBusyOverlay, /Processing|role="dialog"|aria-modal/, "the legacy full-screen Processing dialog is removed");
 

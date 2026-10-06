@@ -37,7 +37,10 @@ export function PageActivity({ busy = false, busyLabel = "Loading", onRefresh, r
   if (!busy && !onRefresh) return null;
   return (
     <div class={`kap-page-activity${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
-      {busy && <><oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle><span>{busyLabel}</span></>}
+      <span class={`kap-page-activity__status${busy ? " is-active" : ""}`} aria-hidden={busy ? "false" : "true"}>
+        <oj-progress-circle class="kap-page-activity__progress" size="sm" value={busy ? -1 : 0} aria-label={busyLabel}></oj-progress-circle>
+        <span>{busyLabel}</span>
+      </span>
       {onRefresh && <oj-button class="kap-page-activity__refresh" display="icons" chroming="borderless" disabled={busy || refreshDisabled}
         aria-label="Refresh" title="Refresh" onojAction={() => void onRefresh()}>
         <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
