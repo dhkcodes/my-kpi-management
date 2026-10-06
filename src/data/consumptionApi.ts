@@ -11,7 +11,7 @@ import {
   getLatestActualMonth,
   getNextQuarterMonths
 } from "./consumptionData";
-import { apiFetch } from "../auth/apiFetch";
+import { apiFetch, apiFetchQuiet } from "../auth/apiFetch";
 import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, subtractExactDecimals } from "./exactDecimal";
 
 const apiBase = () => {
@@ -988,9 +988,9 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
 };
 
 const request = async (path: string, init?: RequestInit,
-  conflictPillar: ConsumptionPillar = "ALL"): Promise<{ response: Response; payload: unknown }> => {
+  conflictPillar: ConsumptionPillar = "ALL", quiet = false): Promise<{ response: Response; payload: unknown }> => {
   let response: Response;
-  try { response = await apiFetch(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
+  try { response = await (quiet ? apiFetchQuiet : apiFetch)(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
   let payload: unknown = null;
   try { payload = await response.json(); } catch { /* sanitized below */ }
   if (!response.ok) {
@@ -1069,7 +1069,7 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
     sort: query.sort, direction: query.direction, offset: String(query.offset), limit: String(query.limit)
   });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
-  const { response, payload } = await request(`/consumption/records?${parameters}`);
+  const { response, payload } = await request(`/consumption/records?${parameters}`, undefined, pillar, true);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption records response");
   const raw = payload as Record<string, unknown>;
   if (!Array.isArray(raw.accountGroups) || raw.accountGroups.length > query.limit || !isNonNegativeInteger(raw.totalAccounts)

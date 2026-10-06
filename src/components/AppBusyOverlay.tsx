@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { getAppBusyCount, subscribeAppBusy } from "../app/appBusy";
-import "ojs/ojprogress-circle";
+import "ojs/ojprogress-bar";
 
 function hasInlineBusySurface(): boolean {
   return typeof document !== "undefined" && document.querySelector('[data-app-busy-surface="true"]') !== null;
@@ -25,9 +25,8 @@ export function AppBusyOverlay() {
   if (!busy || inlineBusySurface) return null;
 
   return (
-    <div class="kap-app-loading kap-busy-overlay" role="status" aria-live="polite" aria-label="Loading" aria-busy="true">
-      <oj-progress-circle value={-1} size="sm" aria-label="Loading"></oj-progress-circle>
-      <span>Loading</span>
+    <div class="kap-app-loading kap-busy-overlay" role="progressbar" aria-label="Preparing application" aria-busy="true">
+      <oj-progress-bar value={-1} aria-label="Preparing application"></oj-progress-bar>
     </div>
   );
 }
