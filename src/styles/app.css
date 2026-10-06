@@ -2672,13 +2672,31 @@ h4.weekly-activity-section-label--next-week,
 .consumption-account-single { display: grid; gap: .2rem; min-width: 0; }
 .consumption-account-single strong, .consumption-account-single small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-account-single small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; }
-.consumption-import-dialog-body { min-width: min(30rem, 76vw); }
-.consumption-import-progress { align-items: center; display: flex; gap: 1rem; min-height: 6rem; }
+.consumption-import-dialog-body { background: var(--kpi-surface); box-sizing: border-box; max-block-size: calc(100dvh - 12rem); min-block-size: min(28rem, calc(100dvh - 12rem)); min-width: min(30rem, calc(100vw - 3rem)); overflow-y: auto; width: min(68rem, calc(100vw - 3rem)); }
+.consumption-import-progress { align-items: center; display: flex; gap: 1rem; min-height: min(28rem, calc(100dvh - 12rem)); padding-inline: clamp(.25rem, 6vw, 4rem); }
 .consumption-import-progress p, .consumption-import-preview > p, .consumption-import-result p { color: var(--kpi-muted); line-height: 1.45; margin: .35rem 0 0; }
 .consumption-import-preview dl { display: grid; gap: .5rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1rem 0; }
 .consumption-import-preview dl > div { background: #f7f5f2; border-radius: .25rem; padding: .7rem; }
 .consumption-import-preview dt { color: var(--kpi-muted); font-size: .72rem; }
 .consumption-import-preview dd { font-size: 1.1rem; font-weight: 800; margin: .2rem 0 0; }
+.consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(5, minmax(7.5rem, 1fr)); overflow-x: auto; padding-bottom: .25rem; }
+.consumption-import-decision-summary small { color: var(--kpi-muted); display: block; font-size: .68rem; margin-top: .18rem; white-space: nowrap; }
+.consumption-import-inline-error { background: var(--oj-core-danger-secondary-1, #fff4f2); border-left: .2rem solid var(--oj-core-danger-3, #b3261e); margin-bottom: .8rem; padding: .65rem .75rem; }
+.consumption-import-inline-error p { margin: .2rem 0 0; }
+.consumption-import-preview-scroll { max-block-size: min(20rem, 42dvh); overflow: auto; }
+.consumption-import-compare-table { border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 54rem; width: 100%; }
+.consumption-import-compare-table th, .consumption-import-compare-table td { border-bottom: 1px solid var(--kpi-border); padding: .55rem .65rem; text-align: right; vertical-align: top; white-space: nowrap; }
+.consumption-import-compare-table thead th { background: #f7f5f2; color: var(--kpi-muted); font-size: .72rem; position: sticky; top: 0; z-index: 1; }
+.consumption-import-compare-table th:nth-child(-n+2), .consumption-import-compare-table td:nth-child(-n+2) { text-align: left; }
+.consumption-import-compare-table tbody th { white-space: normal; }
+.consumption-import-compare-table tbody th strong, .consumption-import-compare-table tbody th small { display: block; }
+.consumption-import-compare-table tbody th small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; margin-top: .16rem; }
+.consumption-import-status { background: #f0efed; border-radius: 1rem; color: var(--kpi-muted); display: inline-block; font-size: .7rem; font-weight: 800; padding: .16rem .5rem; }
+.consumption-import-status.is-changed { background: #edf3f7; color: #255773; }
+.consumption-import-status.is-new { background: #edf5eb; color: #315c2d; }
+.consumption-import-update-details { border-top: 1px solid var(--kpi-border); margin-top: .8rem; padding-top: .7rem; }
+.consumption-import-update-details > summary { cursor: pointer; font-weight: 800; }
+.consumption-import-overwrites { margin-top: .65rem; }
 .consumption-sales-rep-preview { border-top: 1px solid var(--kpi-border); margin-top: .8rem; padding-top: .75rem; }
 .consumption-sales-rep-heading { align-items: baseline; display: flex; flex-wrap: wrap; gap: .4rem 1rem; justify-content: space-between; }
 .consumption-sales-rep-heading span { color: var(--kpi-muted); font-size: .75rem; font-weight: 700; }
@@ -2718,7 +2736,10 @@ h4.weekly-activity-section-label--next-week,
   .consumption-signal-change { grid-template-columns: auto auto; gap: .5rem; }
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
   .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
-  .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .consumption-import-dialog-body { min-block-size: min(24rem, calc(100dvh - 10rem)); min-width: 0; width: calc(100vw - 2rem); }
+  .consumption-import-progress { align-items: flex-start; flex-direction: column; justify-content: center; min-height: min(24rem, calc(100dvh - 10rem)); padding-inline: .25rem; }
+  .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: visible; }
+  .consumption-import-preview-scroll { max-block-size: 38dvh; }
 }
 
 /* Consumption Analysis and incremental Consumption Records. */

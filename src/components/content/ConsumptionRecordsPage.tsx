@@ -230,6 +230,14 @@ const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackAct
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const exactCurrency = (value: string | number): string => formatExactCurrency(String(value));
 const formatForecastK = (amount: string | null) => amount === null ? "" : exactDecimalToK(amount);
+const parseActualPreviewKey = (key: string) => {
+  const [pillar = "—", account = "—", endUser = "—", plan = "—", period = "—"] = key.split("::");
+  return { pillar, account, endUser, plan, period };
+};
+const formatForecastPreviewValue = (value: string | null) => value === null ? "Blank" : formatForecastK(value);
+const confirmedPreCommitImportStatuses = new Set([400, 401, 403, 404, 405, 409, 412, 413, 415, 422]);
+const isConfirmedPreCommitImportFailure = (error: unknown) =>
+  error instanceof ConsumptionApiError && confirmedPreCommitImportStatuses.has(error.status);
 const renderSalesRepPreview = (changes: readonly ConsumptionSalesRepChange[]) => (
   <section class="consumption-sales-rep-preview" aria-label="Sales Rep preview">
     <div class="consumption-sales-rep-heading">
@@ -474,6 +482,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
   const doubleActivationRef = useRef(createDoubleActivationTracker());
   const exportingRef = useRef(false);
+  const actualApplyingRef = useRef(false);
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const recordsQueryActionGeneration = useRef(0);
@@ -1268,6 +1277,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     setImportError("");
     setForecastImportResult("");
     setPendingForecastImport(null);
+    setForecastImportPhase("previewing");
     const validationError = await validateForecastWorkbookFile(file);
     if (validationError) {
       setImportError(validationError);
@@ -1275,7 +1285,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       setForecastImportPhase("error");
       return;
     }
-    setForecastImportPhase("previewing");
     try {
       const preview = await previewConsumptionForecastWide(file);
       setPendingForecastImport({ file, preview });
@@ -1294,6 +1303,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     forecastApplyingRef.current = true;
     setForecastImportPhase("applying");
     setImportError("");
+    setForecastImportResult("");
     try {
       const result = await applyConsumptionForecastWide(pendingForecastImport.file, pendingForecastImport.preview.etag);
       const hasNoChanges = result.status === "APPLIED_NO_CONTROL_CHANGE" || result.status === "EXACT_REPLAY";
@@ -1305,13 +1315,20 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         await loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch });
       } catch (refreshError) {
         const message = refreshError instanceof Error ? refreshError.message : "Forecast records could not be refreshed.";
-        setImportError(`반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`);
+        const refreshMessage = `반영은 완료됐지만 목록 새로고침에 실패했습니다: ${message}`;
+        setImportError(refreshMessage);
+        setForecastImportResult((current) => `${current} ${refreshMessage}`);
+        setForecastImportPhase("warning");
       }
     } catch (error) {
       const message = formatConsumptionImportError(error, "Forecast apply", "Consumption Attainment", "Attainment");
-      setImportError(message);
-      setForecastImportResult(`반영 실패: ${message}`);
-      setForecastImportPhase("error");
+      const confirmedRequestFailure = isConfirmedPreCommitImportFailure(error);
+      const resultMessage = confirmedRequestFailure
+        ? `반영 실패: ${message} Preview를 확인한 뒤 다시 시도할 수 있습니다.`
+        : "처리 결과를 확인하지 못했습니다. 중복 반영을 방지하기 위해 재적용하지 말고 현재 데이터를 먼저 확인해 주세요.";
+      setImportError(resultMessage);
+      setForecastImportResult(resultMessage);
+      setForecastImportPhase(confirmedRequestFailure ? "preview" : "error");
     } finally {
       forecastApplyingRef.current = false;
     }
@@ -1346,15 +1363,18 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
   const applyPendingImport = async () => {
     if (!canWrite) { setImportError("Write permission is required."); return; }
-    if (!pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts
+    if (actualApplyingRef.current || !pendingImport || importPhase !== "preview" || pendingImport.preview.hasConflicts
       || isExactReplayPreview(pendingImport.preview)) return;
+    actualApplyingRef.current = true;
     setImportPhase("applying");
     setImportError("");
+    setImportResult("");
     try {
       const viewPillar=selectedPillar;
       const result = await applyConsumptionImport(pendingImport.files, "ALL", pendingImport.preview);
       if(viewPillar==="ALL")adoptWorkspace(result.workspace);
       let refreshFailed=false;
+      let refreshMessage="";
       try {
         await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch }, viewPillar);
       } catch (refreshError) {
@@ -1365,20 +1385,23 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           setSavedPlans([]);setDraftPlans([]);setSavedControlTotals([]);setDraftControlTotals([]);setRecordAccountNames([]);
           setRecordsTotalAccounts(0);setRecordsNextOffset(0);setRecordsHasMore(false);setDataMode("error");
         }
-        setImportError(`Import succeeded, but Consumption Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`);
+        refreshMessage=`Import succeeded, but Consumption Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`;
+        setImportError(refreshMessage);
       }
       setSelectedSignalId("");
       setEditCell(null);
-      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}`);
+      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}${refreshMessage ? ` · ${refreshMessage}` : ""}`);
       setImportPhase(refreshFailed?"warning":"complete");
     } catch (error) {
-      const confirmedRequestFailure = error instanceof ConsumptionApiError && error.status >= 400 && error.status < 500;
+      const confirmedRequestFailure = isConfirmedPreCommitImportFailure(error);
       const resultMessage = confirmedRequestFailure
         ? formatConsumptionImportError(error, "Actual Import", "Consumption Records", "Records")
         : "처리 결과를 확인하지 못했습니다. 반영 여부 확인이 필요합니다.";
       setImportError(resultMessage);
       setImportResult(resultMessage);
-      setImportPhase("error");
+      setImportPhase(confirmedRequestFailure ? "preview" : "error");
+    } finally {
+      actualApplyingRef.current = false;
     }
   };
 
@@ -1709,10 +1732,14 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           setPendingImport(null);
           setImportResult("");
         }}>
-        <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
-
-          {importPhase === "preview" && pendingImport && (
+        <div slot="body" class="consumption-import-dialog-body" data-app-busy-surface={importPhase === "previewing" || importPhase === "applying" ? "true" : undefined} aria-live="polite">
+          {importPhase === "previewing" && <div class="consumption-import-progress" role="status">
+            <oj-progress-circle size="md" value={-1} aria-label="Preparing Actual preview" />
+            <div><strong>Preparing Actual preview…</strong><p>Validating the selected files and comparing them with the current workspace.</p></div>
+          </div>}
+          {(importPhase === "preview" || importPhase === "applying") && pendingImport && (
             <div class="consumption-import-preview">
+              {importResult && importPhase === "preview" && <div class="consumption-import-inline-error" role="alert"><strong>Apply was not completed</strong><p>{importResult}</p></div>}
               <p><strong>{pendingImport.files.length} file{pendingImport.files.length === 1 ? "" : "s"}</strong> passed filename, pillar, range, and content validation.</p>
               <div class="consumption-import-file-list" aria-label="Import file preview">
                 {pendingImport.preview.files.map((file) => <article key={file.fileName}>
@@ -1725,7 +1752,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               </div>
               <dl class="consumption-import-decision-summary">
                 <div><dt>New</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.insertFactCount}</dd></div>
-                <div><dt>Updates</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.overwriteCount}</dd></div>
+                <div><dt>Changed</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.overwriteCount + pendingImport.preview.deleteFactCount}</dd><small>{pendingImport.preview.overwriteCount} values · {pendingImport.preview.deleteFactCount} removed</small></div>
                 <div><dt>No change</dt><dd>{pendingImport.preview.hasConflicts ? "—" : pendingImport.preview.existingSameValueCount + pendingImport.preview.skippedFactCount + pendingImport.preview.sameValueDuplicateCount}</dd></div>
                 <div class={pendingImport.preview.hasConflicts ? "is-conflict" : ""}><dt>Errors</dt><dd>{pendingImport.preview.conflictCount}</dd></div>
               </dl>
@@ -1743,12 +1770,23 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                 </dl>
                 <p>Rolling files are partial upserts. Existing months omitted from a file are preserved, not deleted.</p>
               </details>
-              {pendingImport.preview.overwrites.length > 0 && <details class="consumption-import-update-details">
-                <summary>Updates detail ({pendingImport.preview.overwriteCount})</summary>
+              {pendingImport.preview.overwrites.length > 0 && <details class="consumption-import-update-details" open>
+                <summary>Changed values ({pendingImport.preview.overwriteCount})</summary>
                 <section class="consumption-import-overwrites" role="status" aria-labelledby="consumptionImportOverwriteTitle">
                   <strong id="consumptionImportOverwriteTitle">Existing Actuals to overwrite</strong>
                   <p>Scope is limited to the authenticated Owner, detected Pillar, and listed Plan/Period keys. Other Pillars and Forecasts are unchanged.</p>
-                  <ul>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => <li key={overwrite.key}><code>{overwrite.key}</code> · {currency.format(overwrite.existingValue)} → {currency.format(overwrite.newValue)}</li>)}</ul>
+                  <div class="consumption-import-preview-scroll"><table class="consumption-import-compare-table">
+                    <thead><tr><th>Status</th><th>Identity</th><th>Current value</th><th>Imported value</th><th>Difference</th></tr></thead>
+                    <tbody>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => {
+                      const identity = parseActualPreviewKey(overwrite.key);
+                      const difference = subtractExactDecimals(String(overwrite.newValue), String(overwrite.existingValue));
+                      return <tr key={overwrite.key}>
+                        <td><span class="consumption-import-status is-changed">Changed</span></td>
+                        <th scope="row"><strong>{identity.account}</strong><small>{identity.pillar} · {identity.endUser} · Plan {identity.plan} · {identity.period}</small></th>
+                        <td>{exactCurrency(overwrite.existingValue)}</td><td>{exactCurrency(overwrite.newValue)}</td><td>{signedExactCurrency(difference)}</td>
+                      </tr>;
+                    })}</tbody>
+                  </table></div>
                   {pendingImport.preview.overwrites.length > 20 && <p>Showing 20 of {pendingImport.preview.overwriteCount} overwrite rows.</p>}
                 </section>
               </details>}
@@ -1771,13 +1809,13 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           )}
         </div>
         <div slot="footer">
-          {importPhase === "preview" && pendingImport && <><oj-button chroming="outlined" onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={!canWrite || pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
+          {(importPhase === "preview" || importPhase === "applying") && pendingImport && <><oj-button chroming="outlined" disabled={importPhase === "applying"} onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
+            disabled={importPhase === "applying" || !canWrite || pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
             title={!canWrite ? "Write permission is required." : undefined}
-            onojAction={() => void applyPendingImport()}>{pendingImport.preview.hasConflicts ? "Resolve errors"
+            onojAction={() => void applyPendingImport()}>{importPhase === "applying" ? "Applying Actual Import…" : pendingImport.preview.hasConflicts ? "Resolve errors"
               : isExactReplayPreview(pendingImport.preview) ? "Already imported"
-                : pendingImport.preview.insertFactCount + pendingImport.preview.overwriteCount === 0 ? "Apply metadata refresh"
-                  : `Apply ${pendingImport.preview.insertFactCount} new · ${pendingImport.preview.overwriteCount} updates`}</oj-button></>}
+                : pendingImport.preview.insertFactCount + pendingImport.preview.overwriteCount + pendingImport.preview.deleteFactCount === 0 ? "Apply metadata refresh"
+                  : `Apply ${pendingImport.preview.insertFactCount} new · ${pendingImport.preview.overwriteCount} updates · ${pendingImport.preview.deleteFactCount} deletes`}</oj-button></>}
           {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
         </div>
       </oj-dialog>
@@ -1788,45 +1826,60 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           if (forecastImportPhase === "previewing" || forecastImportPhase === "applying") return;
           setForecastImportPhase("idle"); setPendingForecastImport(null); setForecastImportResult("");
         }}>
-        <div slot="body" class="consumption-import-dialog-body" aria-live="polite">
-
-          {forecastImportPhase === "preview" && pendingForecastImport && <div class="consumption-import-preview">
+        <div slot="body" class="consumption-import-dialog-body" data-app-busy-surface={forecastImportPhase === "previewing" || forecastImportPhase === "applying" ? "true" : undefined} aria-live="polite">
+          {forecastImportPhase === "previewing" && <div class="consumption-import-progress" role="status">
+            <oj-progress-circle size="md" value={-1} aria-label="Preparing Forecast preview" />
+            <div><strong>Preparing Forecast preview…</strong><p>Validating the workbook and comparing Forecast values with the current workspace.</p></div>
+          </div>}
+          {(forecastImportPhase === "preview" || forecastImportPhase === "applying") && pendingForecastImport && <div class="consumption-import-preview">
+            {forecastImportResult && forecastImportPhase === "preview" && <div class="consumption-import-inline-error" role="alert"><strong>Apply was not completed</strong><p>{forecastImportResult}</p></div>}
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>
             <p class="consumption-import-reference-note"><strong>K-unit contract:</strong> Forecast Total, New, and EXP accept at most 2 decimal places; persisted amounts equal the entered K value × 1,000. Existing data is not bulk-rounded by this Import.</p>
             <p class="consumption-import-reference-note"><strong>Actual reference only:</strong> Actual values are read-only and are never imported by Forecast Import. {pendingForecastImport.preview.referenceNotice ?? ""}</p>
+            <p class="consumption-import-reference-note"><strong>Comparison scope:</strong> This Preview contract supplies incoming Forecast cells, not current persisted Forecast values. It therefore does not label cells as New, Changed, or No change; Apply remains server-authoritative and atomic.</p>
             <dl class="consumption-import-decision-summary">
-              <div><dt>Forecast cells</dt><dd>{pendingForecastImport.preview.forecastCellCount}</dd></div>
-              <div><dt>Blank no-op</dt><dd>{pendingForecastImport.preview.blankNoOpCount}</dd></div>
+              <div><dt>Incoming cells</dt><dd>{pendingForecastImport.preview.forecastCellCount}</dd></div>
               <div><dt>Explicit zero</dt><dd>{pendingForecastImport.preview.explicitZeroCount}</dd></div>
-              <div class={pendingForecastImport.preview.hasBlockedErrors ? "is-conflict" : ""}><dt>Blocked</dt><dd>{pendingForecastImport.preview.blockedErrors.length}</dd></div>
+              <div><dt>Blank no-op</dt><dd>{pendingForecastImport.preview.blankNoOpCount}</dd></div>
+              <div class={pendingForecastImport.preview.hasBlockedErrors ? "is-conflict" : ""}><dt>Errors</dt><dd>{pendingForecastImport.preview.blockedErrors.length}</dd></div>
             </dl>
+            <p class="consumption-import-reference-note"><strong>Blank no-op:</strong> {pendingForecastImport.preview.blankNoOpCount} excluded without changing data · <strong>Explicit zero:</strong> {pendingForecastImport.preview.explicitZeroCount} imported as 0.</p>
             {renderSalesRepPreview(pendingForecastImport.preview.salesRepChanges)}
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
-            <p>{`Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount}`}</p>
-            {pendingForecastImport.preview.changes.length > 0 && <table class="consumption-import-preview-table">
+            <p>{`Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount} · Explicit zero ${pendingForecastImport.preview.explicitZeroCount}`}</p>
+            {pendingForecastImport.preview.changes.length > 0 && <div class="consumption-import-preview-scroll"><table class="consumption-import-preview-table consumption-import-compare-table">
+              <thead><tr><th>Classification</th><th>Identity</th><th>Imported (K)</th><th>Composition</th><th>Resolution</th></tr></thead>
+              <tbody>{pendingForecastImport.preview.changes.slice(0, 100).map((change) => {
+                  const explicitZero = compareExactDecimals(change.forecastAmount, "0") === 0;
+                  return <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
+                    <td><span class={`consumption-import-status ${explicitZero ? "is-unchanged" : "is-changed"}`}>{explicitZero ? "Explicit zero" : "Incoming"}</span></td>
+                    <th scope="row"><strong>{change.resolvedAccount}</strong><small>{change.endUser ?? "No End User"} · Plan {change.planCode ?? "UNASSIGNED"} · {change.periodKey}</small></th>
+                    <td>{formatForecastPreviewValue(change.forecastAmount)}</td>
+                    <td><small>T/N/E {[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastPreviewValue).join(" / ")}<br />Reduction {formatForecastPreviewValue(change.reductionAmount)} · Source {change.previousSource}</small></td>
+                    <td>{change.resolution}</td>
+                  </tr>;
+                })}</tbody>
+            </table></div>}
+            {pendingForecastImport.preview.changes.length > 0 && <details class="consumption-import-technical-details"><summary>Technical derivation details</summary><div class="consumption-import-preview-scroll"><table class="consumption-import-preview-table">
               <thead><tr><th>Account / Period</th><th>Raw</th><th>Canonical T | N | E</th><th>Reduction</th><th>Previous source</th><th>Status</th></tr></thead>
-              <tbody>{pendingForecastImport.preview.changes.slice(0, 20).map((change) => <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
-                <th>{change.account} · {change.periodKey}</th>
-                <td>{change.rawValue}</td>
-                <td>{[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastK).join(" | ")}</td>
-                <td>{change.reductionAmount === null ? "N/A" : formatForecastK(change.reductionAmount)}</td>
-                <td>{change.previousSource}</td>
-                <td>{change.compositionStatus}</td>
+              <tbody>{pendingForecastImport.preview.changes.slice(0, 20).map((change) => <tr key={`technical-${change.rowNumber}-${change.account}-${change.periodKey}`}>
+                <th>{change.account} · {change.periodKey}</th><td>{change.rawValue}</td><td>{[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastK).join(" | ")}</td>
+                <td>{change.reductionAmount === null ? "N/A" : formatForecastK(change.reductionAmount)}</td><td>{change.previousSource}</td><td>{change.compositionStatus}</td>
               </tr>)}</tbody>
-            </table>}
-            {pendingForecastImport.preview.changes.length > 20 && <p>Showing 20 of {pendingForecastImport.preview.changes.length} changed cells.</p>}
+            </table></div></details>}
+            {pendingForecastImport.preview.changes.length > 100 && <p>Showing the first 100 of {pendingForecastImport.preview.changes.length} incoming Forecast cells.</p>}
             {pendingForecastImport.preview.blockedErrors.length > 0 && <ul aria-label="Blocking import errors">{pendingForecastImport.preview.blockedErrors.map((error) => <li key={`${error.rowNumber}-${error.column}-${error.code}`}>Row {error.rowNumber}{error.column ? ` · ${error.column}` : ""} · {error.code}: {error.message}</li>)}</ul>}
           </div>}
-          {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <div class={forecastImportPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={forecastImportPhase === "complete" ? "status" : "alert"}>
-            <strong>{forecastImportPhase === "complete" ? "Forecast Import completed" : "Forecast Import failed"}</strong><p>{forecastImportResult}</p>
+          {(forecastImportPhase === "complete" || forecastImportPhase === "warning" || forecastImportPhase === "error") && <div class={forecastImportPhase === "complete" ? "consumption-import-result is-success" : "consumption-import-result is-error"} role={forecastImportPhase === "complete" ? "status" : "alert"}>
+            <strong>{forecastImportPhase === "complete" ? "Forecast Import completed" : forecastImportPhase === "warning" ? "Forecast Import applied; refresh required" : "Forecast Import failed"}</strong><p>{forecastImportResult}</p>
           </div>}
         </div>
         <div slot="footer">
-          {forecastImportPhase === "preview" && pendingForecastImport && <><oj-button chroming="outlined" onojAction={() => forecastImportDialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={!canWriteForecast || pendingForecastImport.preview.hasBlockedErrors}
+          {(forecastImportPhase === "preview" || forecastImportPhase === "applying") && pendingForecastImport && <><oj-button chroming="outlined" disabled={forecastImportPhase === "applying"} onojAction={() => forecastImportDialogRef.current?.close()}>Cancel</oj-button><oj-button chroming="callToAction"
+            disabled={forecastImportPhase === "applying" || !canWriteForecast || pendingForecastImport.preview.hasBlockedErrors}
             title={!canWriteForecast ? "Forecast write permission is required." : undefined}
-            onojAction={() => void applyPendingForecastImport()}>{`Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
-          {(forecastImportPhase === "complete" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
+            onojAction={() => void applyPendingForecastImport()}>{forecastImportPhase === "applying" ? "Applying Forecast Import…" : pendingForecastImport.preview.hasBlockedErrors ? "Resolve errors" : `Apply ${pendingForecastImport.preview.forecastCellCount} cells`}</oj-button></>}
+          {(forecastImportPhase === "complete" || forecastImportPhase === "warning" || forecastImportPhase === "error") && <oj-button chroming="callToAction" onojAction={() => forecastImportDialogRef.current?.close()}>Close</oj-button>}
         </div>
       </oj-dialog>
       {forecastEditor && createPortal(
