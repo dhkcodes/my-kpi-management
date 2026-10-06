@@ -2672,7 +2672,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-account-single { display: grid; gap: .2rem; min-width: 0; }
 .consumption-account-single strong, .consumption-account-single small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumption-account-single small { color: var(--kpi-muted); font-size: .68rem; font-weight: 600; }
-.consumption-import-dialog-body { background: var(--kpi-surface); box-sizing: border-box; max-block-size: calc(100dvh - 12rem); min-block-size: min(28rem, calc(100dvh - 12rem)); min-width: min(30rem, calc(100vw - 3rem)); overflow-y: auto; width: min(68rem, calc(100vw - 3rem)); }
+#consumptionImportDialog,
+#consumptionForecastImportDialog { box-sizing: border-box; max-width: calc(100vw - 3rem); width: min(68rem, calc(100vw - 3rem)); }
+.consumption-import-dialog-body { background: var(--kpi-surface); box-sizing: border-box; max-block-size: calc(100dvh - 12rem); min-block-size: min(28rem, calc(100dvh - 12rem)); min-width: 0; overflow-y: auto; width: 100%; }
 .consumption-import-progress { align-items: center; display: flex; gap: 1rem; min-height: min(28rem, calc(100dvh - 12rem)); padding-inline: clamp(.25rem, 6vw, 4rem); }
 .consumption-import-progress p, .consumption-import-preview > p, .consumption-import-result p { color: var(--kpi-muted); line-height: 1.45; margin: .35rem 0 0; }
 .consumption-import-preview dl { display: grid; gap: .5rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1rem 0; }
@@ -2736,7 +2738,9 @@ h4.weekly-activity-section-label--next-week,
   .consumption-signal-change { grid-template-columns: auto auto; gap: .5rem; }
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
   .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
-  .consumption-import-dialog-body { min-block-size: min(24rem, calc(100dvh - 10rem)); min-width: 0; width: calc(100vw - 2rem); }
+  #consumptionImportDialog,
+  #consumptionForecastImportDialog { max-width: calc(100vw - 2rem); width: calc(100vw - 2rem); }
+  .consumption-import-dialog-body { min-block-size: min(24rem, calc(100dvh - 10rem)); min-width: 0; width: 100%; }
   .consumption-import-progress { align-items: flex-start; flex-direction: column; justify-content: center; min-height: min(24rem, calc(100dvh - 10rem)); padding-inline: .25rem; }
   .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: visible; }
   .consumption-import-preview-scroll { max-block-size: 38dvh; }
