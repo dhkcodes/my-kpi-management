@@ -616,7 +616,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       });
       setApiEtag(page.etag);
       if (!append) {
-        recordsQueryRef.current = requestQuery;
+        recordsQueryRef.current = {
+          ...requestQuery,
+          fromQuarter: page.fromQuarter,
+          toQuarter: page.toQuarter,
+        };
         setFromQuarter(page.fromQuarter);
         setToQuarter(page.toQuarter);
         setRangeInitialized(true);
