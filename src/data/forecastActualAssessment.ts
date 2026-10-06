@@ -104,6 +104,26 @@ export const assessForecastActualQuarter = (
   const sourceRows: readonly ForecastActualRow[] = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
   const months = sourceRows.flatMap((row) => row.months)
     .filter((month) => forecastActualQuarterForPeriod(month.periodKey) === quarter);
+  const fiscalYearPrefix = sourceRows.flatMap((row) => row.months)
+    .map((month) => month.periodKey.split("-")[0])
+    .find((prefix) => /^FY(?:\d{2}|\d{4})$/u.test(prefix ?? "")) ?? null;
+  const expectedPeriodKeys = fiscalYearPrefix === null
+    ? months.map((month) => month.periodKey)
+    : QUARTER_MONTHS[quarter].map((monthCode) => `${fiscalYearPrefix}-${monthCode}`);
+  const currentPeriodStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+  // A future quarter is Not started even when Forecast has not been stored yet.
+  if (expectedPeriodKeys.length > 0 && expectedPeriodKeys.every((periodKey) => periodIsFuture(periodKey, now))) {
+    const futureForecastMonths = months.filter((month) => month.forecastAmount !== null);
+    const futureForecastAmount = futureForecastMonths.length
+      ? futureForecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0")
+      : null;
+    return {
+      quarter, status: "FUTURE", forecastAmount: futureForecastAmount, actualAmount: null,
+      differenceAmount: null, relevantAmount: null
+    };
+  }
+
   const forecastMonths = months.filter((month) => month.forecastAmount !== null);
   if (!forecastMonths.length) return {
     quarter, status: "NO_FORECAST", forecastAmount: null, actualAmount: null,
@@ -112,32 +132,30 @@ export const assessForecastActualQuarter = (
 
   // FINAL and MTD describe Actual provenance only: the target remains the full stored quarter Forecast.
   const forecastAmount = forecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0");
-  const availableActualMonths = months.filter((month) => month.actualAmount !== null && month.actualState !== null);
+  const availableActualMonths = months.filter((month) => {
+    if (month.actualAmount === null) return false;
+    if (month.actualState === "FINAL") return true;
+    if (actualMode !== "MTD" || month.actualState !== "MTD") return false;
+    return periodStart(month.periodKey) === currentPeriodStart
+      && effectiveMtdDate(month.periodKey, month.actualAsOf) !== null;
+  });
   const actualAmount = availableActualMonths.length
     ? availableActualMonths.reduce((total, month) => addExactDecimals(total, month.actualAmount as string), "0")
     : null;
-  const currentPeriodStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-
-  if (!availableActualMonths.length && months.length > 0 && months.every((month) => periodIsFuture(month.periodKey, now))) {
-    return { quarter, status: "FUTURE", forecastAmount, actualAmount: null, differenceAmount: null, relevantAmount: null };
-  }
   if (!availableActualMonths.length) {
     return { quarter, status: "MISSING_ACTUAL", forecastAmount, actualAmount: null, differenceAmount: null, relevantAmount: null };
   }
 
-  // A closed month must have Actual. In MTD mode the current month must also have its explicit MTD row.
-  // Future months are intentionally not treated as zero; the active quarter compares cumulative Actual
-  // with the full stored quarter Forecast.
-  const requiredActualMonths = months.filter((month) => {
-    const start = periodStart(month.periodKey);
-    return start !== null && (start < currentPeriodStart || (actualMode === "MTD" && start === currentPeriodStart));
-  });
-  const requiredActualMissing = requiredActualMonths.some((month) => month.actualAmount === null || month.actualState === null);
-  const quarterClosed = months.length > 0 && months.every((month) => {
-    const start = periodStart(month.periodKey);
-    return start !== null && start < currentPeriodStart;
-  });
-  if (requiredActualMissing || (quarterClosed && availableActualMonths.length < months.length)) {
+  // Every elapsed period requires FINAL. Current MTD is optional: if absent/invalid,
+  // preserve the cumulative FINAL-only Actual and Gap rather than converting it to zero.
+  const missingElapsedFinal = expectedPeriodKeys
+    .filter((periodKey) => {
+      const start = periodStart(periodKey);
+      return start !== null && start < currentPeriodStart;
+    })
+    .some((periodKey) => !months.some((month) =>
+      month.periodKey === periodKey && month.actualState === "FINAL" && month.actualAmount !== null));
+  if (missingElapsedFinal) {
     return { quarter, status: "PARTIAL_ACTUAL", forecastAmount, actualAmount, differenceAmount: null, relevantAmount: actualAmount };
   }
 

@@ -148,10 +148,10 @@ assert.deepEqual(assessForecastActualQuarter(q2Progressing, "Q2", new Date("2026
   quarter: "Q2", status: "SHORTFALL", forecastAmount: "200", actualAmount: "50",
   differenceAmount: "150", relevantAmount: "150"
 }, "a progressing quarter compares cumulative FINAL Actual with the complete stored quarter Forecast");
-assert.equal(
-  assessForecastActualQuarter(q2Progressing, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD").status,
-  "PARTIAL_ACTUAL",
-  "MTD ON never treats a missing current-month MTD row as zero or current Actual"
+assert.deepEqual(
+  assessForecastActualQuarter(q2Progressing, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD"),
+  { quarter: "Q2", status: "SHORTFALL", forecastAmount: "200", actualAmount: "50", differenceAmount: "150", relevantAmount: "150" },
+  "MTD ON preserves the FINAL-only Gap when the Account has no valid current-month MTD row"
 );
 const q2WithMtd = row("Quarter B", [
   month({ periodKey: "FY27-SEP", forecastAmount: "50", actualAmount: "50", actualState: "FINAL" }),
@@ -170,11 +170,31 @@ assert.equal(assessForecastActualQuarter(row("No forecast", [month({ forecastAmo
 assert.equal(assessForecastActualQuarter(row("Future", [
   month({ periodKey: "FY27-DEC", forecastAmount: "10" }), month({ periodKey: "FY27-JAN", forecastAmount: "10" }), month({ periodKey: "FY27-FEB", forecastAmount: "10" })
 ]), "Q3", new Date("2026-10-15T00:00:00Z")).status, "FUTURE");
+assert.equal(assessForecastActualQuarter(row("Future without forecast", [
+  month({ periodKey: "FY27-SEP", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" })
+]), "Q3", new Date("2026-10-15T00:00:00Z")).status, "FUTURE");
+const invalidMtdResult = assessForecastActualQuarter(row("Invalid MTD", [
+  month({ periodKey: "FY27-SEP", forecastAmount: "50", actualAmount: "50", actualState: "FINAL" }),
+  month({ periodKey: "FY27-OCT", forecastAmount: "50", actualAmount: "999", actualState: "MTD", actualAsOf: "2026-09-30T00:00:00Z" }),
+  month({ periodKey: "FY27-NOV", forecastAmount: "100" })
+]), "Q2", new Date("2026-10-15T00:00:00Z"), "MTD");
+assert.equal(invalidMtdResult.actualAmount, "50", "invalid or out-of-period MTD is excluded from quarter Actual");
+assert.equal(invalidMtdResult.differenceAmount, "150");
+assert.equal(
+  assessForecastActualQuarter(q2WithMtd, "Q2", new Date("2026-10-15T00:00:00Z"), "FINAL").actualAmount,
+  "50",
+  "FINAL mode excludes an otherwise valid MTD value"
+);
 assert.equal(assessForecastActualQuarter(row("Closed partial", [
   month({ periodKey: "FY27-JUN", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" }),
   month({ periodKey: "FY27-JUL", forecastAmount: "10", actualAmount: null, actualState: null }),
   month({ periodKey: "FY27-AUG", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" })
 ]), "Q1", new Date("2026-10-15T00:00:00Z")).status, "PARTIAL_ACTUAL");
+assert.equal(assessForecastActualQuarter(row("Closed omitted month", [
+  month({ periodKey: "FY27-JUN", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" }),
+  month({ periodKey: "FY27-AUG", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" })
+]), "Q1", new Date("2026-10-15T00:00:00Z")).status, "PARTIAL_ACTUAL",
+"an entirely omitted elapsed month cannot make a closed quarter comparable");
 
 const repeatedAccountResult = assessForecastActualQuarter([
   row("Shared", [month({ periodKey: "FY27-SEP", forecastAmount: "100", actualAmount: "80", actualState: "FINAL" })], "Rep A"),
