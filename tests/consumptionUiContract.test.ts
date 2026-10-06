@@ -113,8 +113,12 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
-assert.match(content, /\{!isKapPageShellRoute && !\[[^\]]+\]\.includes\(activeRoute\.module\) && <section class="kpi-fiscal-year-panel"/,
-  "PageShell pages do not receive the legacy outer Fiscal Year panel above their own filters");
+assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
+  "Analysis and Forecast preserve the existing outer Fiscal Year selector while Records remains exempt");
+assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
+  "PageShell routes that preserve the Fiscal Year selector expose the two-row layout modifier");
+assert.match(styles, /\.kpi-content\.is-kap-page-shell-route\.has-fiscal-year-panel\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s,
+  "the preserved Fiscal Year selector occupies its original row above the viewport-bound PageShell");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
   "shared KAP pages reserve the real footer row and keep the viewport itself from scrolling");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\) \.kpi-footer\s*\{[^}]*position:\s*static;[^}]*bottom:\s*auto;/s,

@@ -447,10 +447,11 @@ export function Content({
   };
   const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} profile={profile} onNavigate={onNavigate} />;
   const isKapPageShellRoute = ["consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
+  const showsFiscalYearPanel = !['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
 
   return (
-    <main id="cockpit" role="main" class={`oj-web-applayout-content kpi-content${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}`}>
-      {!isKapPageShellRoute && !['profile', 'users', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module) && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
+    <main id="cockpit" role="main" class={`oj-web-applayout-content kpi-content${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}${isKapPageShellRoute && showsFiscalYearPanel ? " has-fiscal-year-panel" : ""}`}>
+      {showsFiscalYearPanel && <section class="kpi-fiscal-year-panel" aria-label="Fiscal year and guide actions">
         <div class="kpi-fiscal-year-panel__start">
           <span class="kpi-section-label">Fiscal Year</span>
           <div class="kpi-fiscal-year-options">

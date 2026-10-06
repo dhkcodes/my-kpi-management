@@ -6051,6 +6051,9 @@ h4.weekly-activity-section-label--next-week,
 .kpi-shell__body:has(.kap-page-shell) { flex: 1 1 0; min-height: 0; overflow: hidden; }
 .kpi-content.is-kap-page-shell-route,
 .kpi-content:has(.kap-page-shell) { grid-template-rows: minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.kpi-content.is-kap-page-shell-route.has-fiscal-year-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
 .kap-page-shell {
   background: var(--oj-core-bg-color-content, #fff);
   border: 1px solid var(--kpi-border);
