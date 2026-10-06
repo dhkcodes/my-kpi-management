@@ -60,18 +60,21 @@ export function PageActivity({
   if (!busy && !onRefresh && !lastCompletedAt) return null;
   return (
     <div class={`kap-page-activity${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
-      {onRefresh && <oj-button class="kap-page-activity__refresh" display="icons" chroming="borderless" disabled={busy || refreshDisabled}
-        aria-label="Refresh" title="Refresh" onojAction={() => void onRefresh()}>
-        <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
-        Refresh
-      </oj-button>}
       <span class="kap-page-activity__loading-group">
         {lastCompletedAt && <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt.toISOString()}>
           {formatKstTimestamp(lastCompletedAt)}
         </time>}
-        <span class={`kap-page-activity__status${busy ? " is-active" : ""}`} aria-hidden={busy ? "false" : "true"}>
-          <oj-progress-circle class="kap-page-activity__progress" size="sm" value={busy ? -1 : 0} aria-label={busyLabel}></oj-progress-circle>
-          <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
+        <span class="kap-page-activity__control-slot">
+          {busy ? (
+            <span class="kap-page-activity__status">
+              <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
+              <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
+            </span>
+          ) : <oj-button class="kap-page-activity__refresh" display="icons" chroming="borderless" disabled={!onRefresh || refreshDisabled}
+              aria-label="Refresh" title="Refresh" onojAction={() => void onRefresh?.()}>
+              <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
+              Refresh
+            </oj-button>}
         </span>
       </span>
     </div>

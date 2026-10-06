@@ -41,19 +41,17 @@ assert.doesNotMatch(pageShell, /consumption|records/i, "the common shell contain
 assert.match(styles, /\.kap-page-shell__inner\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/, "the common shell keeps breadcrumb, heading, and filters top-aligned instead of stretching grid rows");
 assert.match(styles, /\.kap-page-shell__body\s*\{[^}]*flex:\s*1 0 auto/, "unused shell height is assigned to the page body");
 assert.match(appBusyOverlay, /data-app-busy-surface[\s\S]*MutationObserver/, "the fallback loader reacts when an inline page loading surface mounts during route entry");
-assert.match(pageShell, /kap-page-activity__status/, "loading status keeps a reserved slot so heading and filter positions stay stable after loading");
-assert.match(pageShell, /aria-hidden=\{busy \? "false" : "true"\}/, "the reserved loading slot is hidden from accessibility APIs when idle");
-assert.match(styles, /\.kap-page-activity__status\s*\{[^}]*visibility:\s*hidden/s);
-assert.match(styles, /\.kap-page-activity__status\.is-active\s*\{[^}]*visibility:\s*visible/s);
+assert.match(pageShell, /kap-page-activity__control-slot[\s\S]*busy \?[\s\S]*oj-progress-circle[\s\S]*:\s*<oj-button/s,
+  "one reserved control slot swaps the loading circle for the original Refresh button without layout movement");
+assert.match(styles, /\.kap-page-activity__control-slot\s*\{[^}]*min-width:[^}]*width:/s,
+  "the circle and Refresh control share a fixed-size slot");
 assert.match(appBusyOverlay, /oj-progress-bar[\s\S]*value=\{-1\}/, "route-entry fallback is a thin indeterminate JET bar rather than a floating Loading box");
 assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing|role="dialog"|aria-modal/, "route entry has no legacy or renamed full-screen loading box");
 assert.match(pageShell, /export function PageDataProgress/, "the shared shell exports the reusable data-area progress indicator");
 assert.match(pageShell, /activityPosition\?: "heading" \| "custom"/, "pages can choose a custom activity slot without Records-specific logic in the shared shell");
-assert.match(recordsPage, /activityPosition="custom"[\s\S]*consumption-records-toolbar-activity[\s\S]*<PageActivity busy=\{pageBusy\}/,
-  "Records places the shared circle activity beside its data toolbar instead of the title");
-assert.doesNotMatch(recordsPage, /consumption-records-toolbar-activity[\s\S]{0,400}<PageActivity[^>]*onRefresh=/,
-  "the Records data-toolbar right side contains only completion time and circular activity, not an extra refresh button");
-assert.match(recordsPage, /<PageDataProgress busy=\{pageBusy\}/,
+assert.match(recordsPage, /activityPosition="custom"[\s\S]*consumption-records-toolbar-activity[\s\S]*<PageActivity busy=\{recordsActivityBusy\}[\s\S]*onRefresh=\{refreshRecords\}/,
+  "Records places the loading-circle/Refresh swap beside its completion time in the data toolbar");
+assert.match(recordsPage, /<PageDataProgress busy=\{recordsActivityBusy\}/,
   "Records uses the same busy lifecycle for the non-blocking data-area progress bar");
 assert.match(pageShell, /export function formatKstTimestamp[\s\S]*getUTCFullYear[\s\S]*getUTCSeconds/,
   "the shared loading element formats completion timestamps independently of the host timezone");
@@ -63,20 +61,36 @@ assert.match(recordsPage, /const \[lastDataLoadedAt, setLastDataLoadedAt\] = use
   "Records shows no invented completion time before its first successful load");
 assert.match(recordsPage, /setLastDataLoadedAt\(new Date\(\)\)[\s\S]*return page/,
   "Records updates the completion time only on a successfully decoded data response");
-assert.match(recordsPage, /<PageActivity busy=\{pageBusy\}[\s\S]*lastCompletedAt=\{lastDataLoadedAt\}/,
+assert.match(recordsPage, /<PageActivity busy=\{recordsActivityBusy\}[\s\S]*lastCompletedAt=\{lastDataLoadedAt\}/,
   "the toolbar passes the last successful load time to the shared activity element");
 assert.match(apiSource, /apiFetchQuiet[\s\S]*fetchConsumptionRecords[\s\S]*request\([^;]+true\)/,
   "Records queries preserve auth handling without activating the global interaction blocker");
 assert.match(recordsPage, /const importActionsDisabled =[^;]+;/,
   "Import availability is derived independently from read-only search activity");
-assert.match(recordsPage, /const exportActionsDisabled =[^;]+recordsReplacementLoading[^;]+;/,
-  "result-dependent exports remain disabled while displayed records are being replaced");
+assert.match(recordsPage, /const exportActionsDisabled =[^;]+hasDraftChanges[^;]+;/,
+  "exports preserve edit-conflict protection independently of read-only search activity");
+assert.doesNotMatch(recordsPage, /const exportActionsDisabled =[^;]+(?:pageBusy|rangeLoading|recordsLoading|recordsReplacementLoading)[^;]+;/,
+  "Forecast Export, Actual Export, and Actual Excel Export stay enabled while a search is in flight");
+assert.match(recordsPage, /const requestQuery = \{ selectedPillar, fromQuarter, toQuarter \};[\s\S]*exportActualImportCompatibleCsv\(requestQuery\)/,
+  "an Export click snapshots its search criteria before asynchronous work begins");
 assert.doesNotMatch(recordsPage, /const importActionsDisabled =[^;]+rangeLoading[^;]+;/,
   "read-only search does not disable independent import file selection");
 assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 0 auto[^}]*flex-direction:\s*column/s,
   "the records table panel consumes remaining page height for short and empty results");
 assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:/s,
   "the table viewport, not synthetic rows, absorbs remaining height");
+assert.match(styles, /\.consumption-viewport-controls\s*\{[^}]*position:\s*fixed;[^}]*pointer-events:\s*none;/s,
+  "the progress and horizontal controls are fixed to the visible root content viewport without blocking the page");
+assert.match(recordsPage, /getBoundingClientRect\(\)[\s\S]*--consumption-viewport-center-y[\s\S]*data-visible/s,
+  "Records computes viewport-fixed coordinates and hides controls unless the table crosses the root viewport center");
+assert.match(styles, /\.consumption-scroll-controls button:first-child[\s\S]*--consumption-viewport-left[\s\S]*\.consumption-scroll-controls button:last-child[\s\S]*--consumption-viewport-right/s,
+  "horizontal controls share the progress bar vertical center at the clipped left and right table edges");
+assert.match(styles, /\.consumption-page__header h1,\s*\.kap-page-shell\.consumption-page \.kap-page-shell__heading-copy h1\s*\{[^}]*font-size:\s*clamp\(1\.8rem, 3vw, 2\.35rem\)/s,
+  "Analysis and Records use the same responsive Consumption page-title rule on desktop and mobile");
+assert.match(styles, /\.consumption-records-toolbar__left\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
+  "Show MTD keeps its switch but drops the surrounding rectangular box");
+assert.doesNotMatch(recordsPage, /Account \/ Plan Consumption|consumption-table-plan-count/,
+  "the old table title and plan-count summary stay removed");
 assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kpi-shell:has\(\.kap-page-shell\)[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
   "low landscape viewports release the fixed app shell so the document can scroll");
 assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__heading\s*\{[^}]*flex-direction:\s*column;/,
@@ -229,7 +243,6 @@ assert.match(styles,
 assert.match(styles,
   /\.consumption-table-scroll\s*\{[^}]*border:\s*1px solid var\(--kpi-border\);[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*auto;/,
   "Records preserves the table scroll boundary and both scroll axes");
-assert.match(recordsPage, /Account \/ Plan Consumption/, "Records uses the Account / Plan Consumption title");
 assert.doesNotMatch(recordsPage, /<span class="kpi-section-label">Actual \+ Forecast<\/span>/,
   "Records omits the redundant Actual + Forecast title prefix");
 assert.match(styles,
@@ -325,7 +338,8 @@ assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPe
 assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtdsExact[\s\S]*applyConsumptionMtdDisplayOverride\(\s*baseDisplaySeries,\s*currentMtdPeriod,\s*currentMtdExact,\s*showMtd\s*\)/,
   "account and plan MTD use the tested exact-decimal override without being stored or classified as Forecast");
 assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
-assert.match(recordsPage, /Account \/ Plan Consumption[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"/, "Records places Show MTD at the right side of the table heading");
+assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
+  "Records places Show MTD at the far left and the stable loading/Refresh slot at the far right");
 assert.doesNotMatch(recordsPage, /oj-ux-ico-information-s/, "Forecast composition no longer depends on an information icon");
 assert.match(recordsPage, /ForecastCompositionTooltip composition=\{displayedComposition\}>[\s\S]*currency\.format\(value\)/, "hovering the amount area owns the composition tooltip");
 assert.match(styles, /\.consumption-forecast-tooltip\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/, "the composition hover target fills the amount cell");
@@ -492,7 +506,7 @@ assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-
 assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.current\(\)[\s\S]*\{ root, rootMargin/, "the common page scroll root observes a paging sentinel through the latest append callback");
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
 assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
-assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts · \{visiblePlans\.length\} plans/, "the footer distinguishes account pages from visible CSV Detail plans");
+assert.doesNotMatch(recordsPage, /visiblePlans\.length\} plans/, "the plan-count display is removed rather than hiding a specific value");
 assert.match(recordsPage, /Load More[\s\S]*All accounts loaded\./, "manual fallback and final-page states remain explicit while loading uses the shared overlay");
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /recordsReplacementLoading = recordsLoadingPhase === "initial" \|\| recordsLoadingPhase === "query"/, "initial and replacement queries share an explicit non-table loading gate");

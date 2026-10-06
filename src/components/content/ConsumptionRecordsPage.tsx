@@ -466,6 +466,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const forecastEditorPopoverRef = useRef<HTMLDivElement | null>(null);
   const editEntryValueRef = useRef<number | null>(null);
   const pageScrollRef = useRef<HTMLDivElement | null>(null);
+  const tablePanelRef = useRef<HTMLElement | null>(null);
+  const viewportControlsRef = useRef<HTMLDivElement | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
   const doubleActivationRef = useRef(createDoubleActivationTracker());
@@ -807,6 +809,35 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     }
   };
 
+  const updateTableViewportControls = () => {
+    const root = pageScrollRef.current;
+    const panel = tablePanelRef.current;
+    const controls = viewportControlsRef.current;
+    const table = tableScrollRef.current;
+    if (!root || !panel || !controls || !table) return;
+
+    const rootRect = root.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    const rootTop = Math.max(0, rootRect.top);
+    const rootBottom = Math.min(window.innerHeight, rootRect.bottom);
+    const centerY = (rootTop + rootBottom) / 2;
+    const tableVisible = rootBottom > rootTop
+      && tableRect.bottom > rootTop
+      && tableRect.top < rootBottom
+      && centerY >= tableRect.top
+      && centerY <= tableRect.bottom;
+    const left = Math.max(rootRect.left, panelRect.left, 0);
+    const right = Math.min(rootRect.right, panelRect.right, window.innerWidth);
+    const centerX = left + Math.max(0, right - left) / 2;
+
+    controls.dataset.visible = tableVisible ? "true" : "false";
+    controls.style.setProperty("--consumption-viewport-center-x", `${centerX}px`);
+    controls.style.setProperty("--consumption-viewport-center-y", `${centerY}px`);
+    controls.style.setProperty("--consumption-viewport-left", `${left}px`);
+    controls.style.setProperty("--consumption-viewport-right", `${right}px`);
+  };
+
   const updateTableScrollState = () => {
     const table = tableScrollRef.current;
     if (!table) return;
@@ -814,6 +845,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       left: Math.round(table.scrollLeft),
       max: Math.max(0, Math.round(table.scrollWidth - table.clientWidth))
     });
+    updateTableViewportControls();
   };
 
   const handleTableScroll = () => {
@@ -821,6 +853,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   };
 
   const handlePageScroll = (event: Event) => {
+    updateTableViewportControls();
     const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
     if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
       void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
@@ -888,8 +921,16 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
   useEffect(() => {
     updateTableScrollState();
+    const resizeObserver = new ResizeObserver(updateTableViewportControls);
+    if (pageScrollRef.current) resizeObserver.observe(pageScrollRef.current);
+    if (tablePanelRef.current) resizeObserver.observe(tablePanelRef.current);
     window.addEventListener("resize", updateTableScrollState);
-    return () => window.removeEventListener("resize", updateTableScrollState);
+    window.addEventListener("scroll", updateTableViewportControls, true);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateTableScrollState);
+      window.removeEventListener("scroll", updateTableViewportControls, true);
+    };
   }, [accounts.length, displayQuarterOrder]);
 
   useEffect(() => {
@@ -962,6 +1003,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
   const submitRecordsQuery = async () =>
     runRecordsQuery({ fromQuarter, toQuarter, search: draftSearch.trim() });
+
+  const refreshRecords = async () => {
+    const { fromQuarter: appliedFromQuarter, toQuarter: appliedToQuarter, search } = recordsQueryRef.current;
+    return runRecordsQuery({ fromQuarter: appliedFromQuarter, toQuarter: appliedToQuarter, search });
+  };
 
   const selectQuarterRange = (nextFromQuarter: string, nextToQuarter: string) => {
     setRangeTouched(true);
@@ -1321,12 +1367,19 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     }
   };
 
-  const exportImportCompatibleCsv = async () => {
+  type ExportQuerySnapshot = Readonly<{
+    selectedPillar: ConsumptionPillar;
+    fromQuarter: string;
+    toQuarter: string;
+  }>;
+
+  const exportActualImportCompatibleCsv = async (requestQuery: ExportQuerySnapshot) => {
     if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     exportingRef.current = true;
     setIsExporting(true);
     setImportError("");
     try {
+      const { selectedPillar, fromQuarter, toQuarter } = requestQuery;
       const exported = await exportConsumptionImportCompatibleCsv(selectedPillar, fromQuarter, toQuarter);
       const url = URL.createObjectURL(exported.blob);
       try {
@@ -1535,8 +1588,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     || importPhase !== "idle" || forecastImportPhase !== "idle";
   const forecastImportActionsDisabled = !canWriteForecast || hasDraftChanges || dataMode !== "backend"
     || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle";
-  const exportActionsDisabled = recordsReplacementLoading || dataMode !== "backend" || isSaving || isExporting
+  const exportActionsDisabled = dataMode !== "backend" || hasDraftChanges || isSaving || isExporting
     || importPhase === "previewing" || importPhase === "applying" || forecastImportPhase === "applying";
+  const recordsActivityBusy = rangeLoading || recordsLoading;
   const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
     || importPhase === "previewing" || importPhase === "applying"
     || forecastImportPhase === "previewing" || forecastImportPhase === "applying";
@@ -1572,7 +1626,10 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
             disabled={exportActionsDisabled}
-            onojAction={() => void exportImportCompatibleCsv()}>
+            onojAction={() => {
+              const requestQuery = { selectedPillar, fromQuarter, toQuarter };
+              void exportActualImportCompatibleCsv(requestQuery);
+            }}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
@@ -1812,25 +1869,22 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </section>
       )}
 
-      <section class={`kpi-panel consumption-table-panel${recordsViewState === "error" ? " consumption-table-panel--error" : ""}`} aria-labelledby="consumptionTableTitle">
+      <section ref={tablePanelRef} class={`kpi-panel consumption-table-panel${recordsViewState === "error" ? " consumption-table-panel--error" : ""}`} aria-label="Consumption Records data">
 
         <div class="consumption-section-heading consumption-table-heading">
-          <strong id="consumptionTableTitle" class="consumption-table-title">
-            Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small>
-          </strong>
           <div class="consumption-records-toolbar" role="toolbar" aria-label="Consumption Records data controls">
             <div class="consumption-records-toolbar__left">
-              {showMtd && currentMtdAppliedDate
-                ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
               <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
                 disabled={dataMode !== "backend" || !currentMtdPeriod}
                 onClick={() => setShowMtd((current) => !current)}>
                 <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
               </button>
+              {showMtd && currentMtdAppliedDate
+                ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
             </div>
             <div class="consumption-records-toolbar-activity">
-              <PageActivity busy={pageBusy} busyLabel={pageBusyLabel}
-                lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} />
+              <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
+                refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} />
             </div>
           </div>
           {hasDraftChanges && (
@@ -1842,17 +1896,19 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           )}
         </div>
         <div id="consumptionTableContent" class="consumption-table-content">
-          <PageDataProgress busy={pageBusy} busyLabel={pageBusyLabel} />
+          <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false">
+            <PageDataProgress busy={recordsActivityBusy} busyLabel={pageBusyLabel} />
+            <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
+              <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
+              <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
+            </div>
+          </div>
           {recordsViewState === "error" ? (
             <div class="consumption-empty-state" role="alert">
               <strong>Unable to load Consumption Records.</strong>
               <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
             </div>
           ) : <>
-        <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
-          <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
-          <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
-        </div>
         <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
@@ -1932,7 +1988,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
           {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>Load More</button>}
           {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
-          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts · {visiblePlans.length} plans</small>
+          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
         </div>
           </>}
         </div>
