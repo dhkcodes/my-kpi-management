@@ -6128,7 +6128,7 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-page { display: block; padding: 0; }
 .kap-page-shell.consumption-page .kap-page-shell__inner { gap: 0; }
 .kap-page-shell.consumption-page .kap-page-shell__masthead { margin-bottom: .375rem; }
-.kap-page-shell.consumption-insights-page .kap-page-shell__masthead + .kap-page-filter-panel { margin-top: -.375rem; }
+.kap-page-shell.consumption-insights-page .kap-page-shell__masthead + .kap-page-filter { margin-top: -.375rem; }
 .kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: 0; min-height: 0; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }
 .consumption-table-panel { display: flex; flex: 1 0 auto; flex-direction: column; }
