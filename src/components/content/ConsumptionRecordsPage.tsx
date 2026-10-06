@@ -397,6 +397,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [actualControlTotals, setActualControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
+  const [actualControlRefreshState, setActualControlRefreshState] = useState<"loading" | "ready" | "failed">("loading");
   const [forecastVariances, setForecastVariances] = useState<ConsumptionForecastVariance[]>([]);
   const [accountForecasts, setAccountForecasts] = useState<ConsumptionAccountForecast[]>([]);
   const [draftForecastCompositions, setDraftForecastCompositions] = useState<Map<string, ForecastCompositionDraft>>(() => new Map());
@@ -552,6 +553,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
+    if (!append) setActualControlRefreshState("loading");
     recordsLoadingRef.current = true;
     setRecordsLoadingPhase(loadingPhase);
     const generation = ++recordsRequestGeneration.current;
@@ -609,6 +611,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           .forEach((control) => keyed.set(controlKey(control), { ...control }));
         return [...keyed.values()];
       });
+      if (!append) setActualControlRefreshState("ready");
       setForecastVariances((current) => append ? [...current, ...page.forecastVariances] : [...page.forecastVariances]);
       setAccountForecasts((current) => {
         const keyed = new Map((append ? current : []).map((forecast) => [`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast]));
@@ -667,6 +670,10 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       return page;
     } catch (error) {
       if (generation !== recordsRequestGeneration.current) return;
+      if (!append) {
+        setActualControlTotals([]);
+        setActualControlRefreshState("failed");
+      }
       throw error;
     } finally {
       if (generation === recordsRequestGeneration.current) {
@@ -1044,8 +1051,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     const control = controlRecord(controls, account, month);
     return control ? control.controlAmountExact ?? String(control.controlAmount) : undefined;
   };
-  const actualControlsRequiringConfirmation = (account: string, month: string) => actualControlTotals.filter((control) =>
-    control.account === account && control.periodKey === month && control.matchStatus !== "MATCH");
+  const actualControlsRequiringConfirmation = (account: string, month: string) =>
+    actualControlRefreshState === "ready"
+      ? actualControlTotals.filter((control) =>
+          control.account === account && control.periodKey === month && control.matchStatus !== "MATCH")
+      : [];
 
   const updateControlForecast = (account: string, month: string, valueExact: string | null) => {
     recordsRequestGeneration.current++;
@@ -1515,7 +1525,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           const key = `${series.id}-${month}`;
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
-            const variance = forecastVariances.find((item) => item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const composition = selectedPillar === "ALL" ? undefined : accountForecasts.find((item) =>
               item.account === series.customer && item.periodKey === month && item.pillar === selectedPillar);
             const canEditControl = canWrite && editable;
@@ -1551,14 +1560,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                 () => beginControlEdit(event.currentTarget, series.customer, month, valueExact))}
               onPointerCancel={() => doubleActivationRef.current.onPointerCancel()}>
               {displayedComposition ? <ForecastCompositionTooltip composition={displayedComposition}>
-                <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}
-                  {variance && variance.actualAmountExact !== null && variance.forecastAmountExact !== null && <small title="Account Actual minus preserved Final Forecast">
-                    Actual {exactCurrency(variance.actualAmountExact)} · Final {exactCurrency(variance.forecastAmountExact)} · Variance {signedExactCurrency(variance.varianceAmountExact)} ({signedExactPercent(variance.variancePercentExact)})
-                  </small>}</span>
-              </ForecastCompositionTooltip> : <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}
-                {variance && variance.actualAmountExact !== null && variance.forecastAmountExact !== null && <small title="Account Actual minus preserved Final Forecast">
-                  Actual {exactCurrency(variance.actualAmountExact)} · Final {exactCurrency(variance.forecastAmountExact)} · Variance {signedExactCurrency(variance.varianceAmountExact)} ({signedExactPercent(variance.variancePercentExact)})
-                </small>}</span>}
+                <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}</span>
+              </ForecastCompositionTooltip> : <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}</span>}
             </td>;
           }
           const controlWarnings = accountLevel ? actualControlsRequiringConfirmation(series.customer, month) : [];
@@ -1586,8 +1589,19 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
-  const controlsRequiringConfirmation = actualControlTotals.filter((control) => control.matchStatus !== "MATCH");
-  if (controlsRequiringConfirmation.length > 0) pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${controlsRequiringConfirmation.length}건의 과거 또는 불일치 Control이 있습니다. Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
+  if (actualControlRefreshState === "failed") pageMessages.push({ id: "records-control-load-failed", severity: "error", summary: "Actual Control 최신 조회 실패", detail: "금액 불일치로 판정하지 않았습니다. 다시 조회해 주세요. Actual Export는 서버에서 최신 Control과 Detail을 다시 검증합니다.", persistence: "sticky" });
+  const controlsRequiringConfirmation = actualControlRefreshState === "ready"
+    ? actualControlTotals.filter((control) => control.matchStatus !== "MATCH")
+    : [];
+  if (controlsRequiringConfirmation.length > 0) {
+    const examples = controlsRequiringConfirmation.slice(0, 3).map((control) => {
+      const reason = control.matchStatus === "NO_DETAIL" ? "현재 Detail 없음" : control.matchStatus === "STALE_CONTROL" ? "유효 상태 불일치" : "금액 불일치";
+      const detail = control.detailAmountExact ?? (control.detailAmount === null ? "없음" : String(control.detailAmount));
+      return `${control.account} · ${control.periodKey} · ${control.pillar}/${control.actualState} · Control ${control.controlAmountExact ?? control.controlAmount} · Detail ${detail} · ${reason}`;
+    });
+    const remainder = controlsRequiringConfirmation.length > examples.length ? ` 외 ${controlsRequiringConfirmation.length - examples.length}건` : "";
+    pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${examples.join(" | ")}${remainder}. 최신 Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
+  }
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
   const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting
     || importPhase !== "idle" || forecastImportPhase !== "idle";
