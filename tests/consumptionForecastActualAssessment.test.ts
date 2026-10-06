@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   assessForecastActualMonth,
+  assessForecastActualQuarter,
   countDistinctForecastActualAccounts,
   countForecastActualProblemAccounts,
   filterForecastActualProblemRows,
@@ -137,5 +138,51 @@ assert.deepEqual(totals, { totalAmount: "151", confirmedAmount: "130.25", mtdAmo
 assert.deepEqual(summarizeForecastActualActuals([row("A", [month({ actualAmount: null })])], ["FY27-SEP"]),
   { totalAmount: null, confirmedAmount: null, mtdAmount: null, includesMtd: false, hasActual: false },
   "missing Actual remains missing and is not converted to zero");
+
+const q2Progressing = row("Quarter A", [
+  month({ periodKey: "FY27-SEP", forecastAmount: "50", actualAmount: "50", actualState: "FINAL" }),
+  month({ periodKey: "FY27-OCT", forecastAmount: "50", actualAmount: null, actualState: null }),
+  month({ periodKey: "FY27-NOV", forecastAmount: "100", actualAmount: null, actualState: null })
+]);
+assert.deepEqual(assessForecastActualQuarter(q2Progressing, "Q2", new Date("2026-10-15T00:00:00Z"), "FINAL"), {
+  quarter: "Q2", status: "SHORTFALL", forecastAmount: "200", actualAmount: "50",
+  differenceAmount: "150", relevantAmount: "150"
+}, "a progressing quarter compares cumulative FINAL Actual with the complete stored quarter Forecast");
+assert.equal(
+  assessForecastActualQuarter(q2Progressing, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD").status,
+  "PARTIAL_ACTUAL",
+  "MTD ON never treats a missing current-month MTD row as zero or current Actual"
+);
+const q2WithMtd = row("Quarter B", [
+  month({ periodKey: "FY27-SEP", forecastAmount: "50", actualAmount: "50", actualState: "FINAL" }),
+  month({ periodKey: "FY27-OCT", forecastAmount: "50", actualAmount: "100", actualState: "MTD", actualAsOf: "2026-10-15" }),
+  month({ periodKey: "FY27-NOV", forecastAmount: "100", actualAmount: null, actualState: null })
+]);
+assert.equal(assessForecastActualQuarter(q2WithMtd, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD").relevantAmount, "50");
+const explicitZeroQuarter = row("Zero", [
+  month({ periodKey: "FY27-SEP", forecastAmount: "0", actualAmount: "0", actualState: "FINAL" }),
+  month({ periodKey: "FY27-OCT", forecastAmount: "0", actualAmount: "0", actualState: "MTD", actualAsOf: "2026-10-15" }),
+  month({ periodKey: "FY27-NOV", forecastAmount: "0", actualAmount: null, actualState: null })
+]);
+assert.equal(assessForecastActualQuarter(explicitZeroQuarter, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD").status, "MATCHED",
+  "an explicit zero Forecast and zero Actual are comparable and exactly matched");
+assert.equal(assessForecastActualQuarter(row("No forecast", [month({ forecastAmount: null, actualAmount: "1", actualState: "FINAL" })]), "Q2").status, "NO_FORECAST");
+assert.equal(assessForecastActualQuarter(row("Future", [
+  month({ periodKey: "FY27-DEC", forecastAmount: "10" }), month({ periodKey: "FY27-JAN", forecastAmount: "10" }), month({ periodKey: "FY27-FEB", forecastAmount: "10" })
+]), "Q3", new Date("2026-10-15T00:00:00Z")).status, "FUTURE");
+assert.equal(assessForecastActualQuarter(row("Closed partial", [
+  month({ periodKey: "FY27-JUN", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" }),
+  month({ periodKey: "FY27-JUL", forecastAmount: "10", actualAmount: null, actualState: null }),
+  month({ periodKey: "FY27-AUG", forecastAmount: "10", actualAmount: "10", actualState: "FINAL" })
+]), "Q1", new Date("2026-10-15T00:00:00Z")).status, "PARTIAL_ACTUAL");
+
+const repeatedAccountResult = assessForecastActualQuarter([
+  row("Shared", [month({ periodKey: "FY27-SEP", forecastAmount: "100", actualAmount: "80", actualState: "FINAL" })], "Rep A"),
+  row("Shared", [month({ periodKey: "FY27-SEP", forecastAmount: "50", actualAmount: "70", actualState: "FINAL" })], "Rep B")
+], "Q2", new Date("2026-10-15T00:00:00Z"));
+assert.deepEqual(repeatedAccountResult, {
+  quarter: "Q2", status: "MATCHED", forecastAmount: "150", actualAmount: "150",
+  differenceAmount: "0", relevantAmount: "0"
+}, "rows sharing an Account are combined before classification so cards never double-count that Account");
 
 console.log("Forecast vs Actual assessment tests passed.");
