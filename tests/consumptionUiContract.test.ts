@@ -109,6 +109,12 @@ assert.match(app, /kap-auth-checking__surface[\s\S]*<Footer \/>/,
   "the authentication frame reserves the same root and fixed-footer geometry before the page mounts");
 assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
   "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
+assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-shell\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+  "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
+assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+  "all three Consumption PageShell pages share the root content geometry");
+assert.match(content, /\{!isKapPageShellRoute && !\[[^\]]+\]\.includes\(activeRoute\.module\) && <section class="kpi-fiscal-year-panel"/,
+  "PageShell pages do not receive the legacy outer Fiscal Year panel above their own filters");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
   "shared KAP pages reserve the real footer row and keep the viewport itself from scrolling");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\) \.kpi-footer\s*\{[^}]*position:\s*static;[^}]*bottom:\s*auto;/s,
