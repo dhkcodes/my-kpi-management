@@ -1051,8 +1051,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     const control = controlRecord(controls, account, month);
     return control ? control.controlAmountExact ?? String(control.controlAmount) : undefined;
   };
-  const actualControlsRequiringConfirmation = (account: string, month: string) => actualControlTotals.filter((control) =>
-    control.account === account && control.periodKey === month && control.matchStatus !== "MATCH");
+  const actualControlsRequiringConfirmation = (account: string, month: string) =>
+    actualControlRefreshState === "ready"
+      ? actualControlTotals.filter((control) =>
+          control.account === account && control.periodKey === month && control.matchStatus !== "MATCH")
+      : [];
 
   const updateControlForecast = (account: string, month: string, valueExact: string | null) => {
     recordsRequestGeneration.current++;

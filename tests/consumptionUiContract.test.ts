@@ -656,6 +656,8 @@ assert.match(
 
 assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
 assert.match(recordsPage, /actualControlRefreshState === "ready"[\s\S]*matchStatus !== "MATCH"/, "only a completed latest query can produce a Control mismatch warning from screen state");
+assert.match(recordsPage, /actualControlsRequiringConfirmation[\s\S]*actualControlRefreshState === "ready"[\s\S]*actualControlTotals\.filter/,
+  "inline Actual cells must not reuse stale Control warnings while a replacement query is loading or failed");
 assert.match(recordsPage, /actualControlRefreshState === "failed"[\s\S]*Actual Control 최신 조회 실패[\s\S]*금액 불일치로 판정하지 않았습니다[\s\S]*서버에서 최신 Control과 Detail을 다시 검증/,
   "a failed latest-Control query is distinct from a monetary mismatch and leaves server export validation authoritative");
 assert.match(recordsPage, /control\.account[\s\S]*control\.periodKey[\s\S]*control\.pillar[\s\S]*control\.actualState[\s\S]*Control[\s\S]*Detail[\s\S]*reason/,
