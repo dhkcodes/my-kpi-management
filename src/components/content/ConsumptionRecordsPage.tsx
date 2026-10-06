@@ -1373,6 +1373,15 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     toQuarter: string;
   }>;
 
+  const snapshotAppliedExportQuery = (): ExportQuerySnapshot => {
+    const appliedQuery = recordsQueryRef.current;
+    return {
+      selectedPillar: appliedQuery.pillar,
+      fromQuarter: appliedQuery.fromQuarter,
+      toQuarter: appliedQuery.toQuarter,
+    };
+  };
+
   const exportActualImportCompatibleCsv = async (requestQuery: ExportQuerySnapshot) => {
     if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     exportingRef.current = true;
@@ -1626,10 +1635,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
             disabled={exportActionsDisabled}
-            onojAction={() => {
-              const requestQuery = { selectedPillar, fromQuarter, toQuarter };
-              void exportActualImportCompatibleCsv(requestQuery);
-            }}>
+            onojAction={() => void exportActualImportCompatibleCsv(snapshotAppliedExportQuery())}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
@@ -1946,7 +1952,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /><small>Account Forecast · {visiblePlanCount} visible Plans</small></span>
+                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /></span>
                             </span>
                           </button>
                         ) : singlePlan ? (

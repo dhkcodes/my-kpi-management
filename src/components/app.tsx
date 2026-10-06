@@ -783,10 +783,17 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 function AuthCheckingFrame({ appName }: { appName: string }) {
   return (
     <div class="oj-web-applayout-page kpi-shell kap-auth-checking" aria-label="Checking sign-in session" aria-busy="true">
-      <header class="kap-auth-checking__header"><strong>{appName}</strong></header>
+      <header class="oj-web-applayout-header kpi-header kap-auth-checking__header">
+        <div class="oj-flex-bar oj-sm-align-items-center kpi-header__bar kap-auth-checking__header-bar">
+          <strong>{appName}</strong>
+        </div>
+      </header>
       <div class="kpi-shell__body kap-auth-checking__body" aria-hidden="true">
-        <main class="kpi-content kap-auth-checking__content"><div class="kap-auth-checking__surface"></div></main>
+        <main class="oj-web-applayout-content kpi-content kap-auth-checking__content">
+          <section class="kap-page-shell kap-auth-checking__surface"></section>
+        </main>
       </div>
+      <Footer />
     </div>
   );
 }

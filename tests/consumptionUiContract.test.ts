@@ -18,6 +18,7 @@ const mtdDate = readFileSync("src/data/mtdDate.ts", "utf8");
 const pageShell = readFileSync("src/components/common/PageShell.tsx", "utf8");
 const doubleActivation = readFileSync("src/components/common/doubleActivation.ts", "utf8");
 const appBusyOverlay = readFileSync("src/components/AppBusyOverlay.tsx", "utf8");
+const app = readFileSync("src/components/app.tsx", "utf8");
 
 assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
 assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
@@ -30,10 +31,11 @@ assert.match(recordsPage, /headingSpacing="compact"/,
 assert.match(pageShell, /kap-page-shell__masthead[\s\S]*\{breadcrumb\}[\s\S]*kap-page-shell__heading/,
   "breadcrumb and heading share one stable masthead wrapper before, during, and after loading");
 assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*gap:/s);
-assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.25rem/s,
+assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.1rem/s,
   "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
 assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
-assert.match(pageShell, /display="all"[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*Refresh/, "the optional common refresh action remains visibly labelled and accessible even when the icon font is unavailable");
+assert.match(pageShell, /display="icons"[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*onClick=\{\(\) => void onRefresh\?\.\(\)\}/,
+  "the optional common refresh action keeps the original icon control and uses the physical click event");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
@@ -48,6 +50,8 @@ assert.match(styles, /\.kap-page-activity__control-slot\s*\{[^}]*min-width:[^}]*
 assert.match(appBusyOverlay, /oj-progress-bar[\s\S]*value=\{-1\}/, "route-entry fallback is a thin indeterminate JET bar rather than a floating Loading box");
 assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing|role="dialog"|aria-modal/, "route entry has no legacy or renamed full-screen loading box");
 assert.match(pageShell, /export function PageDataProgress/, "the shared shell exports the reusable data-area progress indicator");
+assert.match(pageShell, /PageDataProgress[\s\S]*if \(!busy\) return null/,
+  "the progress element unmounts completely after its shared busy lifecycle ends");
 assert.match(pageShell, /activityPosition\?: "heading" \| "custom"/, "pages can choose a custom activity slot without Records-specific logic in the shared shell");
 assert.match(recordsPage, /activityPosition="custom"[\s\S]*consumption-records-toolbar-activity[\s\S]*<PageActivity busy=\{recordsActivityBusy\}[\s\S]*onRefresh=\{refreshRecords\}/,
   "Records places the loading-circle/Refresh swap beside its completion time in the data toolbar");
@@ -71,8 +75,12 @@ assert.match(recordsPage, /const exportActionsDisabled =[^;]+hasDraftChanges[^;]
   "exports preserve edit-conflict protection independently of read-only search activity");
 assert.doesNotMatch(recordsPage, /const exportActionsDisabled =[^;]+(?:pageBusy|rangeLoading|recordsLoading|recordsReplacementLoading)[^;]+;/,
   "Forecast Export, Actual Export, and Actual Excel Export stay enabled while a search is in flight");
-assert.match(recordsPage, /const requestQuery = \{ selectedPillar, fromQuarter, toQuarter \};[\s\S]*exportActualImportCompatibleCsv\(requestQuery\)/,
-  "an Export click snapshots its search criteria before asynchronous work begins");
+assert.match(recordsPage, /const snapshotAppliedExportQuery = \(\): ExportQuerySnapshot => \{\s*const appliedQuery = recordsQueryRef\.current;/,
+  "export clicks snapshot the last successfully applied query instead of draft controls");
+assert.match(recordsPage, /exportActualImportCompatibleCsv\(snapshotAppliedExportQuery\(\)\)/,
+  "Actual Export snapshots the applied query at click time");
+assert.match(recordsPage, /const snapshotAppliedExportQuery = \(\): ExportQuerySnapshot => \{[\s\S]*recordsQueryRef\.current/,
+  "Export clicks derive criteria from the applied records query");
 assert.doesNotMatch(recordsPage, /const importActionsDisabled =[^;]+rangeLoading[^;]+;/,
   "read-only search does not disable independent import file selection");
 assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 0 auto[^}]*flex-direction:\s*column/s,
@@ -83,14 +91,20 @@ assert.match(styles, /\.consumption-viewport-controls\s*\{[^}]*position:\s*fixed
   "the progress and horizontal controls are fixed to the visible root content viewport without blocking the page");
 assert.match(recordsPage, /getBoundingClientRect\(\)[\s\S]*--consumption-viewport-center-y[\s\S]*data-visible/s,
   "Records computes viewport-fixed coordinates and hides controls unless the table crosses the root viewport center");
-assert.match(styles, /\.consumption-scroll-controls button:first-child[\s\S]*--consumption-viewport-left[\s\S]*\.consumption-scroll-controls button:last-child[\s\S]*--consumption-viewport-right/s,
-  "horizontal controls share the progress bar vertical center at the clipped left and right table edges");
-assert.match(styles, /\.consumption-page__header h1,\s*\.kap-page-shell\.consumption-page \.kap-page-shell__heading-copy h1\s*\{[^}]*font-size:\s*clamp\(1\.8rem, 3vw, 2\.35rem\)/s,
+assert.match(styles, /\.consumption-scroll-controls button:first-child[^}]*right:[^}]*--consumption-viewport-right[\s\S]*\.consumption-scroll-controls button:last-child[^}]*right:[^}]*--consumption-viewport-right/s,
+  "both horizontal controls stay grouped at the visible table's right edge and share its fixed vertical center");
+assert.match(styles, /\.consumption-page__header h1,\s*\.kap-page-shell\.consumption-page \.kap-page-shell__heading-copy h1\s*\{[^}]*font-size:\s*1\.65rem[^}]*font-weight:\s*700[^}]*line-height:\s*1\.2/s,
   "Analysis and Records use the same responsive Consumption page-title rule on desktop and mobile");
 assert.match(styles, /\.consumption-records-toolbar__left\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
   "Show MTD keeps its switch but drops the surrounding rectangular box");
 assert.doesNotMatch(recordsPage, /Account \/ Plan Consumption|consumption-table-plan-count/,
   "the old table title and plan-count summary stay removed");
+assert.doesNotMatch(recordsPage, /visible Plans|Account Forecast ·/,
+  "account rows omit the secondary plan-count copy");
+assert.match(app, /kap-auth-checking__surface[\s\S]*<Footer \/>/,
+  "the authentication frame reserves the same root and fixed-footer geometry before the page mounts");
+assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
+  "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
 assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kpi-shell:has\(\.kap-page-shell\)[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
   "low landscape viewports release the fixed app shell so the document can scroll");
 assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__heading\s*\{[^}]*flex-direction:\s*column;/,
