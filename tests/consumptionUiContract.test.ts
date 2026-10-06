@@ -205,6 +205,28 @@ assert.match(recordsPage, /result\.status === "APPLIED_NO_CONTROL_CHANGE" \|\| r
   "all supported no-mutation Forecast outcomes use the no-change message");
 assert.match(recordsPage, /forecastApplyingRef\.current[\s\S]*setForecastImportPhase\("applying"\)[\s\S]*finally[\s\S]*forecastApplyingRef\.current = false/,
   "Forecast Apply is synchronously locked against same-render double submission");
+assert.match(recordsPage, /actualApplyingRef\.current[\s\S]*setImportPhase\("applying"\)[\s\S]*finally[\s\S]*actualApplyingRef\.current = false/,
+  "Actual Apply is synchronously locked against same-render double submission");
+assert.match(recordsPage, /data-app-busy-surface=\{importPhase === "previewing" \|\| importPhase === "applying" \? "true" : undefined\}[\s\S]*Preparing Actual preview…/,
+  "Actual Import owns its visible preview-loading surface instead of exposing a title-only dialog or duplicate global overlay");
+assert.match(recordsPage, /data-app-busy-surface=\{forecastImportPhase === "previewing" \|\| forecastImportPhase === "applying" \? "true" : undefined\}[\s\S]*Preparing Forecast preview…/,
+  "Forecast Import owns one truthful preview-loading surface");
+assert.match(recordsPage, /\(importPhase === "preview" \|\| importPhase === "applying"\)[\s\S]*Applying Actual Import…/,
+  "Actual Preview remains mounted while Apply is running");
+assert.match(recordsPage, /\(forecastImportPhase === "preview" \|\| forecastImportPhase === "applying"\)[\s\S]*Applying Forecast Import…/,
+  "Forecast Preview remains mounted while Apply is running");
+assert.match(recordsPage, /Current value[\s\S]*Imported value[\s\S]*Difference[\s\S]*subtractExactDecimals\(String\(overwrite\.newValue\), String\(overwrite\.existingValue\)\)/,
+  "Actual Preview compares current, imported, and exact-decimal delta values side by side");
+assert.match(recordsPage, /Comparison scope:[\s\S]*does not label cells as New, Changed, or No change[\s\S]*Incoming cells[\s\S]*Explicit zero[\s\S]*Blank no-op[\s\S]*Errors/,
+  "Forecast Preview truthfully presents only fields supplied by its server contract and separates blank from explicit zero");
+assert.match(recordsPage, /confirmedPreCommitImportStatuses = new Set\(\[400, 401, 403, 404, 405, 409, 412, 413, 415, 422\]\)/,
+  "only known pre-commit HTTP rejections allow Apply retry; timeout and ambiguous failures require state verification");
+assert.match(recordsPage, /insertFactCount \+ pendingImport\.preview\.overwriteCount \+ pendingImport\.preview\.deleteFactCount === 0[\s\S]*deletes/,
+  "delete-only Actual imports are never described as metadata-only");
+assert.match(styles, /\.consumption-import-dialog-body \{[^}]*min-block-size:[^}]*width:/,
+  "Import dialog body keeps stable dimensions while phases change");
+assert.match(styles, /\.consumption-import-preview-scroll \{[^}]*overflow: auto/,
+  "dense Preview comparisons scroll inside the dialog");
 assert.match(recordsPage, /setForecastImportPhase\("complete"\);[\s\S]*?try \{[\s\S]*?await loadRecordsPage/,
   "a post-commit records refresh cannot relabel a successful Forecast apply as failed");
 assert.match(recordsPage, /반영은 완료됐지만 목록 새로고침에 실패했습니다/,
@@ -398,13 +420,13 @@ assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL", 
 assert.match(recordsPage, /pendingImport\.preview\.files\.map[\s\S]*detectedPillar[\s\S]*owner[\s\S]*fromPeriod[\s\S]*toPeriod[\s\S]*sourceRowCount/, "preview lists pillar, owner, range, and counts per file");
 assert.match(recordsPage, /sameValueDuplicateCount[\s\S]*conflictCount[\s\S]*pendingImport\.preview\.conflicts/, "preview summarizes same-value duplicates and conflicting keys");
 assert.match(recordsPage, /existingSameValueCount[\s\S]*overwriteCount[\s\S]*pendingImport\.preview\.overwrites/, "preview separates existing same-value rows from scoped Actual overwrites");
-assert.match(recordsPage, />New<[\s\S]*>Updates<[\s\S]*>No change<[\s\S]*>Errors</, "Preview presents the approved four decision states in order");
+assert.match(recordsPage, />New<[\s\S]*>Changed<[\s\S]*>No change<[\s\S]*>Errors</, "Preview presents the approved four decision states in order");
 assert.match(recordsPage, /<details class="consumption-import-technical-details"[\s\S]*Upload duplicates[\s\S]*Exact replay skipped[\s\S]*Existing Actuals to delete/, "technical counters including Delete stay collapsed by default");
-assert.match(recordsPage, /<details class="consumption-import-update-details"[\s\S]*Updates detail/, "old-to-new overwrite rows are collapsed until requested");
+assert.match(recordsPage, /<details class="consumption-import-update-details" open>[\s\S]*Changed values/, "old-to-new overwrite rows are prioritized in Preview");
 assert.match(recordsPage, /consumption-import-hard-conflict[\s\S]*Import blocked[\s\S]*conflict\.reason[\s\S]*conflict\.rows\[0\][\s\S]*conflict\.values\[0\][\s\S]*conflict\.rows\[1\][\s\S]*conflict\.values\[1\]/, "Hard Conflict is a dedicated blocking banner with rows, key, values, and reason");
-assert.match(recordsPage, /pendingImport\.preview\.hasConflicts \? "Resolve errors"[\s\S]*isExactReplayPreview[\s\S]*"Already imported"[\s\S]*"Apply metadata refresh"[\s\S]*`Apply \$\{pendingImport\.preview\.insertFactCount\} new · \$\{pendingImport\.preview\.overwriteCount\} updates`/, "CTA distinguishes errors, exact replay, metadata-only refresh, and fact changes");
+assert.match(recordsPage, /pendingImport\.preview\.hasConflicts \? "Resolve errors"[\s\S]*isExactReplayPreview[\s\S]*"Already imported"[\s\S]*"Apply metadata refresh"[\s\S]*`Apply \$\{pendingImport\.preview\.insertFactCount\} new · \$\{pendingImport\.preview\.overwriteCount\} updates · \$\{pendingImport\.preview\.deleteFactCount\} deletes`/, "CTA distinguishes errors, exact replay, metadata-only refresh, and all fact changes including delete-only imports");
 assert.match(recordsPage, /Existing Actuals to overwrite[\s\S]*existingValue[\s\S]*newValue/, "overwrite preview discloses old and new values for scoped Plan-period keys");
-assert.match(recordsPage, /disabled=\{!canWrite \|\| pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "write denial, conflicts, and exact replay previews disable atomic Import without blocking metadata-only refresh");
+assert.match(recordsPage, /disabled=\{importPhase === "applying" \|\| !canWrite \|\| pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "applying, write denial, conflicts, and exact replay previews disable atomic Import without blocking metadata-only refresh");
 assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinals\[0\]\}[\s\S]*formatConflictCurrency\(conflict\.values\[0\]\)/, "Hard Conflict rows preserve decimal strings and distinguish equal source filenames by upload ordinal");
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
 assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
@@ -458,7 +480,7 @@ assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationR
   "Forecast import capability follows the backend Attainment WRITE permission");
 assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastWorkbookFile[\s\S]*Forecast write permission is required/,
   "Forecast preview and apply use their dedicated write capability");
-assert.match(recordsPage, /forecastImportPhase === "preview"[\s\S]*disabled=\{!canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,
+assert.match(recordsPage, /forecastImportPhase === "preview" \|\| forecastImportPhase === "applying"[\s\S]*disabled=\{forecastImportPhase === "applying" \|\| !canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,
   "Forecast Apply button uses Attainment WRITE rather than Records WRITE");
 assert.doesNotMatch(recordsPage, /Forecast CSV Export|exportForecastCsv|exportConsumptionForecastCsv/, "Forecast CSV entry point is absent from the UI");
 assert.match(recordsPage, /Forecast Export/, "Forecast export button omits file-format wording");
