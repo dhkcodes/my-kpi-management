@@ -229,6 +229,8 @@ assert.match(styles, /\.consumption-import-dialog-body \{[^}]*min-block-size:[^}
   "Import dialog body fills the host and keeps stable dimensions while phases change");
 assert.match(styles, /@media[^]*#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*width: calc\(100vw - 2rem\)/,
   "Import dialog host fits the mobile viewport");
+assert.match(styles, /@media[^]*#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*left: 50% !important;[^}]*position: fixed !important;[^}]*top: 50% !important;[^}]*transform: translate\(-50%, -50%\) !important;/,
+  "Import dialog hosts stay centered in the mobile viewport instead of inheriting document offsets");
 assert.match(styles, /\.consumption-import-preview-scroll \{[^}]*overflow: auto/,
   "dense Preview comparisons scroll inside the dialog");
 assert.match(recordsPage, /setForecastImportPhase\("complete"\);[\s\S]*?try \{[\s\S]*?await loadRecordsPage/,

@@ -2739,7 +2739,14 @@ h4.weekly-activity-section-label--next-week,
   .consumption-account-column { min-width: 14rem !important; width: 14rem; }
   .consumption-scroll-controls { flex-direction: row; position: absolute; right: .65rem; top: 4.1rem; transform: none; }
   #consumptionImportDialog,
-  #consumptionForecastImportDialog { max-width: calc(100vw - 2rem); width: calc(100vw - 2rem); }
+  #consumptionForecastImportDialog {
+    left: 50% !important;
+    max-width: calc(100vw - 2rem);
+    position: fixed !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: calc(100vw - 2rem);
+  }
   .consumption-import-dialog-body { min-block-size: min(24rem, calc(100dvh - 10rem)); min-width: 0; width: 100%; }
   .consumption-import-progress { align-items: flex-start; flex-direction: column; justify-content: center; min-height: min(24rem, calc(100dvh - 10rem)); padding-inline: .25rem; }
   .consumption-import-preview .consumption-import-decision-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: visible; }
