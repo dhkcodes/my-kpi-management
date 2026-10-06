@@ -34,8 +34,10 @@ assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*fl
 assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.1rem/s,
   "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
 assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
-assert.match(pageShell, /display="icons"[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*onClick=\{\(\) => void onRefresh\?\.\(\)\}/,
-  "the optional common refresh action keeps the original icon control and uses the physical click event");
+assert.match(pageShell, /aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*onojAction=\{\(\) => void onRefresh\?\.\(\)\}[\s\S]*oj-ux-ico-refresh/,
+  "the optional icon-only Refresh action uses Oracle JET's physical activation event");
+assert.doesNotMatch(pageShell, /oj-ux-ico-refresh[^>]*><\/span>\s*Refresh/,
+  "Refresh does not render a visible text label beside the icon");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
