@@ -33,7 +33,7 @@ assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*fl
 assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.25rem/s,
   "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
 assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
-assert.match(pageShell, /aria-label="Refresh"[\s\S]*title="Refresh"/, "the optional common refresh action remains accessible");
+assert.match(pageShell, /display="all"[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*Refresh/, "the optional common refresh action remains visibly labelled and accessible even when the icon font is unavailable");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
