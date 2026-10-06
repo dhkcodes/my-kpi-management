@@ -39,6 +39,7 @@ export function PageFilterPanel({ children, className = "", ariaLabel = "Search 
 type PageActivityProps = Pick<PageShellProps, "busy" | "busyLabel" | "onRefresh" | "refreshDisabled"> & {
   lastCompletedAt?: Date | null;
   showBusyLabel?: boolean;
+  compactTimestampButton?: boolean;
 };
 
 const padTimestampPart = (value: number) => String(value).padStart(2, "0");
@@ -49,13 +50,18 @@ export function formatKstTimestamp(value: Date): string {
     + `${padTimestampPart(kst.getUTCHours())}:${padTimestampPart(kst.getUTCMinutes())}:${padTimestampPart(kst.getUTCSeconds())}`;
 }
 
+export function formatKstTime(value: Date): string {
+  return formatKstTimestamp(value).slice(-8);
+}
+
 export function PageActivity({
   busy = false,
   busyLabel = "Loading",
   onRefresh,
   refreshDisabled = false,
   lastCompletedAt = null,
-  showBusyLabel = true
+  showBusyLabel = true,
+  compactTimestampButton = false
 }: PageActivityProps) {
   const refreshSlotRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -68,6 +74,30 @@ export function PageActivity({
     return () => slot.removeEventListener("click", handleRefreshClick);
   }, [busy, onRefresh, refreshDisabled]);
   if (!busy && !onRefresh && !lastCompletedAt) return null;
+  const refreshTitle = lastCompletedAt
+    ? `Last successful completion (KST): ${formatKstTimestamp(lastCompletedAt)}`
+    : "No successful completion recorded yet";
+  if (compactTimestampButton) {
+    return (
+      <div class={`kap-page-activity is-compact-timestamp${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
+        <span ref={refreshSlotRef} class="kap-page-activity__control-slot">
+          <oj-button class="kap-page-activity__refresh" chroming="outlined" disabled={!onRefresh || refreshDisabled || busy}
+            aria-label={busy ? busyLabel : "Refresh"} title={refreshTitle}>
+            <span slot="startIcon" class="kap-page-activity__start-icon">
+              {busy
+                ? <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
+                : <span class="oj-ux-ico-refresh" aria-hidden="true"></span>}
+            </span>
+            <span class="kap-page-activity__reload-label">Reload</span>
+            <span class="kap-page-activity__separator" aria-hidden="true">|</span>
+            <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt?.toISOString()}>
+              {lastCompletedAt ? formatKstTime(lastCompletedAt) : "--:--:--"}
+            </time>
+          </oj-button>
+        </span>
+      </div>
+    );
+  }
   return (
     <div class={`kap-page-activity${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
       <span class="kap-page-activity__loading-group">
@@ -81,7 +111,7 @@ export function PageActivity({
               <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
             </span>
           ) : <oj-button class="kap-page-activity__refresh" chroming="borderless" disabled={!onRefresh || refreshDisabled}
-              aria-label="Refresh" title="Refresh">
+              aria-label="Refresh" title={refreshTitle}>
               <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
             </oj-button>}
         </span>

@@ -2428,6 +2428,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-page__header h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; margin: .2rem 0; }
 .consumption-page__header p, .consumption-section-heading p { color: var(--kpi-muted); line-height: 1.45; margin: .25rem 0 0; }
 .consumption-import-actions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; }
+.consumption-import-actions.is-compact { gap: .4rem; }
+.consumption-import-actions.is-compact oj-button { font-size: .74rem; min-height: 2.25rem; }
+.consumption-import-actions.is-compact oj-button [slot="startIcon"] { font-size: .9rem; }
 .consumption-pillar-selector { align-items: center; display: inline-flex; gap: .2rem; margin-top: .4rem; }
 .consumption-range-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-pillar .consumption-pillar-selector { margin-top: 0; }
@@ -2632,11 +2635,17 @@ h4.weekly-activity-section-label--next-week,
 .consumption-preq-gap.is-forecast { background: #e8f3f8 !important; color: #184f73; }
 .consumption-forecast-cell.is-draft { background: var(--kap-grid-draft-bg) !important; box-shadow: none; color: var(--kap-grid-draft-ink); }
 .consumption-quarter-heading, .consumption-table thead .consumption-account-column { color: #26343d; font-size: var(--consumption-grid-font-size); font-weight: 800; }
-.consumption-month-heading { color: #34434d; font-size: var(--consumption-grid-font-size); font-weight: 800; }
-.consumption-month-status { display: block; font-size: var(--consumption-grid-font-size); font-weight: 700; letter-spacing: .01em; line-height: 1.15; margin-top: .1rem; }
-.consumption-month-status.is-actual { color: #34601f; }
-.consumption-month-status.is-forecast { color: #175b8e; }
-.consumption-month-status.is-mtd { color: #a5470a; }
+.consumption-quarter-heading { border-block: 2px solid #85756a !important; letter-spacing: .025em; }
+.consumption-quarter-label { display: inline-block; font-size: .88rem; font-weight: 850; line-height: 1.2; }
+.consumption-month-heading { color: #34434d; font-size: var(--consumption-grid-font-size); font-weight: 800; padding-block: .42rem !important; }
+.consumption-month-heading.is-actual { box-shadow: inset 0 -3px #507a3a; }
+.consumption-month-heading.is-forecast { box-shadow: inset 0 -3px #2677a8; }
+.consumption-month-heading.is-mtd { box-shadow: inset 0 -3px #b85c16; }
+.consumption-month-label { display: block; font-size: .82rem; font-weight: 850; letter-spacing: .035em; line-height: 1.15; }
+.consumption-month-status { border: 1px solid currentColor; border-radius: .2rem; display: inline-flex; font-size: .62rem; font-weight: 800; justify-content: center; letter-spacing: .035em; line-height: 1; margin-top: .22rem; min-width: 3.65rem; padding: .18rem .3rem; }
+.consumption-month-status.is-actual { background: #f2f7ef; color: #34601f; }
+.consumption-month-status.is-forecast { background: #edf6fb; color: #175b8e; }
+.consumption-month-status.is-mtd { background: #fff4e9; color: #a5470a; }
 .consumption-quarter-total small { display: block; font-size: .68rem; font-weight: 850; }
 .consumption-quarter-total small.is-actual { color: #34601f; }
 .consumption-quarter-total small.is-forecast { color: #175b8e; }
@@ -2717,6 +2726,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-records-sentinel { height: 1px; width: 100%; }
 .consumption-pillar-forecast-note { color: var(--kpi-muted); flex-basis: 100%; font-size: .72rem; margin: 0; }
 .consumption-load-more.is-placeholder small { color: var(--kpi-muted); }
+.consumption-records-count-value { color: var(--oj-core-text-color-primary, #161513); font-size: 1.08em; font-weight: 850; }
 .consumption-records-loading { align-items: center; color: var(--kpi-muted); display: flex; font-size: .78rem; gap: .45rem; justify-content: flex-end; min-height: 1.5rem; min-width: 11.5rem; }
 .consumption-load-more button { background: var(--oj-button-outlined-chrome-bg-color); border: 1px solid var(--oj-button-outlined-chrome-border-color); border-radius: var(--oj-core-border-radius-sm); color: var(--oj-button-outlined-chrome-text-color); cursor: pointer; min-height: 2.25rem; padding: .4rem .75rem; }
 .consumption-insights-page {
@@ -5923,7 +5933,8 @@ h4.weekly-activity-section-label--next-week,
   .calendar-close-confirm__actions { align-items: stretch; flex-direction: column; }
 }
 
-/* Reusable viewport-bound page shell. Only pages that opt in with .kap-page-shell are affected. */
+/* Reusable viewport-bound page shell. Route classes apply before child mount; :has is the structural fallback. */
+.kpi-shell.is-kap-page-shell-route,
 .kpi-shell:has(.kap-page-shell) {
   box-sizing: border-box;
   display: grid;
@@ -5933,13 +5944,16 @@ h4.weekly-activity-section-label--next-week,
   overflow: hidden;
   padding-bottom: 0;
 }
+.kpi-shell.is-kap-page-shell-route .kpi-footer,
 .kpi-shell:has(.kap-page-shell) .kpi-footer {
   position: static;
   bottom: auto;
   margin-inline: 1.5rem;
   width: auto;
 }
+.kpi-shell.is-kap-page-shell-route .kpi-shell__body,
 .kpi-shell__body:has(.kap-page-shell) { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.kpi-content.is-kap-page-shell-route,
 .kpi-content:has(.kap-page-shell) { grid-template-rows: minmax(0, 1fr); min-height: 0; overflow: hidden; }
 .kap-page-shell {
   background: var(--oj-core-bg-color-content, #fff);
@@ -5992,21 +6006,29 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-data-progress oj-progress-bar { display: block; width: 100%; }
 .kap-page-activity__control-slot { align-items: flex-end; display: inline-flex; justify-content: flex-end; min-width: 2.75rem; width: 2.75rem; }
 .kap-page-activity__control-slot .kap-page-activity__status { visibility: visible; }
+.kap-page-activity.is-compact-timestamp { align-items: center; min-height: 2.5rem; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__control-slot { align-items: center; min-width: 0; width: auto; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__refresh { font-size: .78rem; font-weight: 700; min-height: 2.5rem; white-space: nowrap; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__start-icon { align-items: center; display: inline-flex; height: 1rem; justify-content: center; width: 1rem; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__progress { height: 1rem; width: 1rem; }
+.kap-page-activity__separator { color: var(--kpi-border-strong, #8b8580); margin-inline: .25rem; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__completed-at { color: inherit; font-size: inherit; padding: 0; }
 .kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
 .kap-page-shell__body { display: grid; flex: 1 0 auto; gap: .75rem; min-height: 0; min-width: 0; }
 
 /* Consumption Records is the first adopter; legacy nested scrolling is replaced by shell scrolling. */
 .kap-page-shell.consumption-page { display: block; padding: 0; }
-.kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: .25rem; min-height: 0; }
+.kap-page-shell.consumption-page .kap-page-shell__inner { gap: 0; }
+.kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: 0; min-height: 0; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }
 .consumption-table-panel { display: flex; flex: 1 0 auto; flex-direction: column; }
 .kap-page-shell.consumption-page .consumption-table-panel { min-height: 18rem; overflow: visible; }
 .kap-page-shell.consumption-page .consumption-table-content { display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0; position: relative; }
 .consumption-table-scroll { flex: 1 1 auto; min-height: 18rem; }
 .kap-page-shell.consumption-page .consumption-table-scroll { height: auto; overflow-x: auto; overflow-y: visible; }
-.consumption-table-heading { align-items: stretch; flex-direction: column; margin-bottom: .15rem; }
+.consumption-table-heading { align-items: stretch; flex-direction: column; margin: 0; }
 .kap-page-shell.consumption-page .consumption-table-heading__left { padding-left: .5rem; }
-.consumption-records-toolbar { align-items: flex-end; display: flex; gap: .6rem; justify-content: space-between; min-width: 0; width: 100%; }
+.consumption-records-toolbar { align-items: flex-end; display: flex; gap: 0; justify-content: space-between; margin: 0; min-width: 0; width: 100%; }
 .consumption-records-toolbar__left { align-items: center; border: 0; background: transparent; display: flex; flex-direction: row; gap: .55rem; min-width: 0; padding-inline-start: .5rem; }
 .consumption-records-toolbar-activity { align-items: flex-end; display: flex; flex: 0 0 auto; justify-content: flex-end; min-width: 0; }
 .consumption-records-toolbar-activity .kap-page-activity { justify-content: flex-end; }
@@ -6020,7 +6042,9 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-page .consumption-forecast-cell { touch-action: pan-x pan-y pinch-zoom; }
 
 @media (max-width: 760px) {
+  .kpi-shell.is-kap-page-shell-route .kpi-footer,
   .kpi-shell:has(.kap-page-shell) .kpi-footer { margin-inline: .75rem; }
+  .kpi-content.is-kap-page-shell-route,
   .kpi-content:has(.kap-page-shell) { padding: .75rem; }
   .kap-page-shell__scroll { -webkit-overflow-scrolling: touch; scrollbar-gutter: auto; }
   .kap-page-shell__heading { align-items: stretch; flex-direction: column; gap: .55rem; }
@@ -6034,6 +6058,7 @@ h4.weekly-activity-section-label--next-week,
   .kap-page-filter { align-items: stretch; display: grid; grid-template-columns: minmax(0, 1fr); padding: .65rem; }
   .kap-page-shell.consumption-page .consumption-import-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; width: 100%; }
   .kap-page-shell.consumption-page .consumption-import-actions oj-button { min-width: 0; width: 100%; }
+  .kap-page-shell.consumption-page .consumption-import-actions.is-compact oj-button { min-height: 2.75rem; }
   .kap-page-shell.consumption-page .kap-page-activity { justify-content: flex-end; }
   .consumption-records-toolbar { align-items: flex-end; flex-wrap: nowrap; }
   .consumption-records-toolbar__left { flex-wrap: wrap; }

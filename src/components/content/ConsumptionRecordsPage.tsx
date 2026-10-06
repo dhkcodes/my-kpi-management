@@ -1414,7 +1414,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   };
 
   const exportActualXlsx = async () => {
-    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    if (exportingRef.current || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     exportingRef.current = true;
     setIsExporting(true);
     setImportError("");
@@ -1440,7 +1440,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   };
 
   const exportForecastXlsx = async () => {
-    if (exportingRef.current || dataMode !== "backend" || isSaving || importPhase === "previewing" || importPhase === "applying") return;
+    if (exportingRef.current || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     exportingRef.current = true;
     setIsExporting(true);
     setImportError("");
@@ -1601,7 +1601,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     || importPhase !== "idle" || forecastImportPhase !== "idle";
   const forecastImportActionsDisabled = !canWriteForecast || hasDraftChanges || dataMode !== "backend"
     || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle";
-  const exportActionsDisabled = dataMode !== "backend" || hasDraftChanges || isSaving || isExporting
+  const exportActionsDisabled = hasDraftChanges || isSaving
     || importPhase === "previewing" || importPhase === "applying" || forecastImportPhase === "applying";
   const recordsActivityBusy = rangeLoading || recordsLoading;
   const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
@@ -1618,7 +1618,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
       busy={pageBusy} busyLabel={pageBusyLabel}
       activityPosition="custom"
-      actions={<div class="consumption-import-actions">
+      actions={<div class="consumption-import-actions is-compact">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
             disabled={importActionsDisabled} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1637,17 +1637,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
-          <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
-            disabled={exportActionsDisabled}
-            onojAction={() => void exportActualImportCompatibleCsv(snapshotAppliedExportQuery())}>
-            <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Actual Export"}
-          </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in Excel format"
             disabled={exportActionsDisabled}
             onojAction={() => void exportActualXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Actual Excel Export"}
+            {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
         </div>}
       messages={<ConsumptionMessageBanner messages={visiblePageMessages}
@@ -1894,7 +1888,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             </div>
             <div class="consumption-records-toolbar-activity">
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
-                refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} />
+                refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false}
+                compactTimestampButton />
             </div>
           </div>
           {hasDraftChanges && (
@@ -1926,14 +1921,14 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                 <th class="consumption-account-column" rowSpan={2}>Account / End User</th>
                 {quarters.map((quarter) => {
                   const forecastQuarter = getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month));
-                  return <th key={quarter} colSpan={5} class={`consumption-quarter-heading${forecastQuarter ? " is-forecast" : ""}`}>{quarter}</th>;
+                  return <th key={quarter} colSpan={5} class={`consumption-quarter-heading${forecastQuarter ? " is-forecast" : ""}`}><span class="consumption-quarter-label">{quarter}</span></th>;
                 })}
               </tr>
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
                   ...sortConsumptionMonthsNewestFirst(getQuarterMonths(quarter)).map((month) => {
                     const status = showMtd && month === currentMtdPeriod ? "MTD" : editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
-                    return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}>{shortMonth(month)}<small class={`consumption-month-status is-${status.toLowerCase()}`}>{status}</small></th>;
+                    return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}><span class="consumption-month-label">{shortMonth(month)}</span><small class={`consumption-month-status consumption-data-kind is-${status.toLowerCase()}`}>{status}</small></th>;
                   }),
                   <th key={`${quarter}-total`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-quarter-total is-forecast" : "consumption-quarter-total"}>Quarter Total</th>,
                   <th key={`${quarter}-gap`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-preq-gap is-forecast" : "consumption-preq-gap"}>PreQ Gap</th>
@@ -1998,7 +1993,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
           {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>Load More</button>}
           {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
-          <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts</small>
+          <small class="consumption-records-count">Showing <strong class="consumption-records-count-value">{loadedAccountCount}</strong> of <strong class="consumption-records-count-value">{recordsTotalAccounts}</strong> accounts</small>
         </div>
           </>}
         </div>
