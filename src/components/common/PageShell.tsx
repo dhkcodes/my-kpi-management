@@ -70,8 +70,8 @@ export function PageActivity({
               <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
               <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
             </span>
-          ) : <oj-button class="kap-page-activity__refresh" display="all" chroming="borderless" disabled={!onRefresh || refreshDisabled}
-              aria-label="Refresh" title="Refresh" onojAction={() => void onRefresh?.()}>
+          ) : <oj-button class="kap-page-activity__refresh" display="icons" chroming="borderless" disabled={!onRefresh || refreshDisabled}
+              aria-label="Refresh" title="Refresh" onClick={() => void onRefresh?.()}>
               <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
               Refresh
             </oj-button>}
@@ -82,9 +82,10 @@ export function PageActivity({
 }
 
 export function PageDataProgress({ busy = false, busyLabel = "Loading data" }: Pick<PageShellProps, "busy" | "busyLabel">) {
+  if (!busy) return null;
   return (
-    <div class={`kap-page-data-progress${busy ? " is-active" : ""}`} aria-hidden={busy ? "false" : "true"}>
-      <oj-progress-bar value={busy ? -1 : 0} aria-label={busyLabel}></oj-progress-bar>
+    <div class="kap-page-data-progress is-active" aria-hidden="false">
+      <oj-progress-bar value={-1} aria-label={busyLabel}></oj-progress-bar>
     </div>
   );
 }
