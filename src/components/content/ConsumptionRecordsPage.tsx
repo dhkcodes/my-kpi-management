@@ -38,6 +38,12 @@ import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCom
 import { validateForecastWorkbookFile } from "../../data/forecastWorkbookValidation";
 import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import {
+  ActualImportChangeDescription,
+  ForecastImportComparison,
+  buildForecastImportComparisons,
+  describeActualImportChange
+} from "../../data/consumptionImportComparison";
+import {
   ConsumptionAccountForecast,
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
@@ -230,11 +236,34 @@ const fallbackDisplayQuarterOrder = [...fallbackForecastQuarters, ...fallbackAct
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const exactCurrency = (value: string | number): string => formatExactCurrency(String(value));
 const formatForecastK = (amount: string | null) => amount === null ? "" : exactDecimalToK(amount);
-const parseActualPreviewKey = (key: string) => {
-  const [pillar = "—", account = "—", endUser = "—", plan = "—", period = "—"] = key.split("::");
-  return { pillar, account, endUser, plan, period };
+const normalizedImportIdentity = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase();
+const workspaceRangeForPeriods = (periods: readonly string[]) => {
+  const quarters = [...new Set(periods.map(getFiscalQuarter))].sort();
+  return quarters.length === 0 ? undefined : { fromQuarter: quarters[0], toQuarter: quarters[quarters.length - 1] };
 };
+const buildActualImportComparisons = (
+  preview: ConsumptionImportPreview,
+  workspaces: ReadonlyMap<Exclude<ConsumptionPillar, "ALL">, ConsumptionApiWorkspace>
+): ReadonlyMap<string, ActualImportChangeDescription> => new Map(preview.overwrites.map((overwrite) => {
+  const workspace = workspaces.get(overwrite.pillar);
+  const matches = workspace?.plans.filter((plan) => normalizedImportIdentity(plan.customer) === normalizedImportIdentity(overwrite.account)
+    && normalizedImportIdentity(plan.endUser) === normalizedImportIdentity(overwrite.endUser)
+    && normalizedImportIdentity(plan.planId) === normalizedImportIdentity(overwrite.planCode)) ?? [];
+  const plan = matches.length === 1 ? matches[0] : null;
+  const hasFinal = plan !== null && Object.prototype.hasOwnProperty.call(plan.actualsExact ?? {}, overwrite.periodKey);
+  const hasMtd = plan !== null && Object.prototype.hasOwnProperty.call(plan.mtdsExact ?? {}, overwrite.periodKey);
+  const existingState = hasFinal !== hasMtd ? (hasFinal ? "FINAL" : "MTD") : null;
+  const file = preview.files.find((candidate) => candidate.fileName === overwrite.fileName && candidate.detectedPillar === overwrite.pillar);
+  const incomingState = file ? (file.mtdPeriodKeys.includes(overwrite.periodKey) ? "MTD" : "FINAL") : null;
+  return [overwrite.key, describeActualImportChange(
+    overwrite.existingValue,
+    overwrite.newValue,
+    existingState,
+    incomingState
+  )];
+}));
 const formatForecastPreviewValue = (value: string | null) => value === null ? "Blank" : formatForecastK(value);
+const formatForecastDifference = (value: string) => `${compareExactDecimals(value, "0") > 0 ? "+" : ""}${formatForecastK(value)}`;
 const confirmedPreCommitImportStatuses = new Set([400, 401, 403, 404, 405, 409, 412, 413, 415, 422]);
 const isConfirmedPreCommitImportFailure = (error: unknown) =>
   error instanceof ConsumptionApiError && confirmedPreCommitImportStatuses.has(error.status);
@@ -348,10 +377,12 @@ type RecordsQuery = Readonly<{ fromQuarter: string; toQuarter: string; search: s
 type PendingImport = Readonly<{
   files: readonly File[];
   preview: ConsumptionImportPreview;
+  comparisons: ReadonlyMap<string, ActualImportChangeDescription>;
 }>;
 type PendingForecastImport = Readonly<{
   file: File;
   preview: ConsumptionForecastWidePreview;
+  comparisons: ReadonlyMap<number, ForecastImportComparison>;
 }>;
 type ConsumptionChartPoint = Readonly<{
   id: string;
@@ -1287,7 +1318,22 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     }
     try {
       const preview = await previewConsumptionForecastWide(file);
-      setPendingForecastImport({ file, preview });
+      let comparisonWorkspace: ConsumptionApiWorkspace | null = null;
+      try {
+        comparisonWorkspace = await fetchConsumptionWorkspace(
+          workspaceRangeForPeriods(preview.canonicalPeriods),
+          "ALL"
+        );
+      } catch {
+        // Preview remains usable; unsafe joins are shown as comparison unavailable and never guessed.
+      }
+      const comparisons = buildForecastImportComparisons(
+        preview.etag,
+        comparisonWorkspace?.etag ?? null,
+        preview.changes,
+        comparisonWorkspace?.accountForecasts ?? []
+      );
+      setPendingForecastImport({ file, preview, comparisons: new Map(comparisons.map((comparison, index) => [index, comparison])) });
       setForecastImportPhase("preview");
     } catch (error) {
       const message = formatConsumptionImportError(error, "Forecast preview", "Consumption Attainment", "Attainment");
@@ -1351,7 +1397,16 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     setImportPhase("previewing");
     try {
       const preview = await previewConsumptionImport(files, "ALL");
-      setPendingImport({ files, preview });
+      const comparisonWorkspaces = new Map<Exclude<ConsumptionPillar, "ALL">, ConsumptionApiWorkspace>();
+      const comparisonRange = workspaceRangeForPeriods(preview.files.flatMap((file) => [file.fromPeriod, file.toPeriod]));
+      await Promise.all([...new Set(preview.files.map((file) => file.detectedPillar))].map(async (pillar) => {
+        try {
+          comparisonWorkspaces.set(pillar, await fetchConsumptionWorkspace(comparisonRange, pillar));
+        } catch {
+          // Preview remains usable; an unresolved state is reported instead of inferred.
+        }
+      }));
+      setPendingImport({ files, preview, comparisons: buildActualImportComparisons(preview, comparisonWorkspaces) });
       setImportPhase("preview");
     } catch (error) {
       const message = formatConsumptionImportError(error, "Actual Import", "Consumption Records", "Records");
@@ -1776,14 +1831,16 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                   <strong id="consumptionImportOverwriteTitle">Existing Actuals to overwrite</strong>
                   <p>Scope is limited to the authenticated Owner, detected Pillar, and listed Plan/Period keys. Other Pillars and Forecasts are unchanged.</p>
                   <div class="consumption-import-preview-scroll"><table class="consumption-import-compare-table">
-                    <thead><tr><th>Status</th><th>Identity</th><th>Current value</th><th>Imported value</th><th>Difference</th></tr></thead>
+                    <thead><tr><th>Change</th><th>Identity</th><th>Current value</th><th>Imported value</th><th>Difference</th><th>Reason</th></tr></thead>
                     <tbody>{pendingImport.preview.overwrites.slice(0, 20).map((overwrite) => {
-                      const identity = parseActualPreviewKey(overwrite.key);
-                      const difference = subtractExactDecimals(String(overwrite.newValue), String(overwrite.existingValue));
+                      const comparison = pendingImport.comparisons.get(overwrite.key);
+                      const label = comparison?.amountChanged && comparison.metadataChanged ? "Amount + metadata"
+                        : comparison?.amountChanged ? "Amount" : comparison?.metadataChanged ? "Metadata" : "Compare unavailable";
                       return <tr key={overwrite.key}>
-                        <td><span class="consumption-import-status is-changed">Changed</span></td>
-                        <th scope="row"><strong>{identity.account}</strong><small>{identity.pillar} · {identity.endUser} · Plan {identity.plan} · {identity.period}</small></th>
-                        <td>{exactCurrency(overwrite.existingValue)}</td><td>{exactCurrency(overwrite.newValue)}</td><td>{signedExactCurrency(difference)}</td>
+                        <td><span class="consumption-import-status is-changed">{label}</span></td>
+                        <th scope="row"><strong>{overwrite.account}</strong><small>{overwrite.pillar} · {overwrite.endUser} · Plan {overwrite.planCode} · {overwrite.periodKey}</small></th>
+                        <td>{exactCurrency(overwrite.existingValue)}</td><td>{exactCurrency(overwrite.newValue)}</td><td>{comparison ? signedExactCurrency(comparison.difference) : "Comparison unavailable"}</td>
+                        <td>{comparison?.reason ?? "Status comparison unavailable"}</td>
                       </tr>;
                     })}</tbody>
                   </table></div>
@@ -1808,14 +1865,14 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             </div>
           )}
         </div>
-        <div slot="footer">
-          {(importPhase === "preview" || importPhase === "applying") && pendingImport && <><oj-button chroming="outlined" disabled={importPhase === "applying"} onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
-            disabled={importPhase === "applying" || !canWrite || pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
-            title={!canWrite ? "Write permission is required." : undefined}
-            onojAction={() => void applyPendingImport()}>{importPhase === "applying" ? "Applying Actual Import…" : pendingImport.preview.hasConflicts ? "Resolve errors"
-              : isExactReplayPreview(pendingImport.preview) ? "Already imported"
-                : pendingImport.preview.insertFactCount + pendingImport.preview.overwriteCount + pendingImport.preview.deleteFactCount === 0 ? "Apply metadata refresh"
-                  : `Apply ${pendingImport.preview.insertFactCount} new · ${pendingImport.preview.overwriteCount} updates · ${pendingImport.preview.deleteFactCount} deletes`}</oj-button></>}
+        <div slot="footer" class="consumption-import-footer">
+          {(importPhase === "preview" || importPhase === "applying") && pendingImport && <>
+            <span class="consumption-import-footer-summary">{pendingImport.preview.insertFactCount} new · {pendingImport.preview.overwriteCount} updates · {pendingImport.preview.deleteFactCount} deletes</span>
+            <span class="consumption-import-footer-actions"><oj-button chroming="outlined" disabled={importPhase === "applying"} onojAction={closeImportDialog}>Cancel</oj-button><oj-button chroming="callToAction"
+              disabled={importPhase === "applying" || !canWrite || pendingImport.preview.hasConflicts || isExactReplayPreview(pendingImport.preview)}
+              title={!canWrite ? "Write permission is required." : undefined}
+              onojAction={() => void applyPendingImport()}>{importPhase === "applying" ? "Applying…" : pendingImport.preview.hasConflicts ? "Resolve errors"
+                : isExactReplayPreview(pendingImport.preview) ? "Already imported" : "Apply"}</oj-button></span></>}
           {(importPhase === "complete" || importPhase === "warning" || importPhase === "error") && <oj-button chroming="callToAction" onojAction={closeImportDialog}>Close</oj-button>}
         </div>
       </oj-dialog>
@@ -1836,7 +1893,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <p><strong>{pendingForecastImport.preview.sourceFileName}</strong></p>
             <p class="consumption-import-reference-note"><strong>K-unit contract:</strong> Forecast Total, New, and EXP accept at most 2 decimal places; persisted amounts equal the entered K value × 1,000. Existing data is not bulk-rounded by this Import.</p>
             <p class="consumption-import-reference-note"><strong>Actual reference only:</strong> Actual values are read-only and are never imported by Forecast Import. {pendingForecastImport.preview.referenceNotice ?? ""}</p>
-            <p class="consumption-import-reference-note"><strong>Comparison scope:</strong> This Preview contract supplies incoming Forecast cells, not current persisted Forecast values. It therefore does not label cells as New, Changed, or No change; Apply remains server-authoritative and atomic.</p>
+            <p class="consumption-import-reference-note"><strong>Comparison safety:</strong> Current values are joined only when the Preview and workspace ETags match and the normalized Account + Pillar + Period key is unique. Unsafe joins remain Comparison unavailable; Apply remains server-authoritative and unchanged.</p>
             <dl class="consumption-import-decision-summary">
               <div><dt>Incoming cells</dt><dd>{pendingForecastImport.preview.forecastCellCount}</dd></div>
               <div><dt>Explicit zero</dt><dd>{pendingForecastImport.preview.explicitZeroCount}</dd></div>
@@ -1848,15 +1905,19 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <p><strong>Canonical periods:</strong> {pendingForecastImport.preview.canonicalPeriods.join(", ") || "None"}</p>
             <p>{`Exact Plan ${pendingForecastImport.preview.changes.filter((change) => change.resolution === "EXACT_PLAN").length} · Forecast-only / Plan unassigned ${pendingForecastImport.preview.planUnassignedCount} · Explicit zero ${pendingForecastImport.preview.explicitZeroCount}`}</p>
             {pendingForecastImport.preview.changes.length > 0 && <div class="consumption-import-preview-scroll"><table class="consumption-import-preview-table consumption-import-compare-table">
-              <thead><tr><th>Classification</th><th>Identity</th><th>Imported (K)</th><th>Composition</th><th>Resolution</th></tr></thead>
-              <tbody>{pendingForecastImport.preview.changes.slice(0, 100).map((change) => {
-                  const explicitZero = compareExactDecimals(change.forecastAmount, "0") === 0;
+              <thead><tr><th>Classification</th><th>Identity</th><th>Current (K)</th><th>Imported (K)</th><th>Difference (K)</th><th>Composition</th><th>Resolution</th></tr></thead>
+              <tbody>{pendingForecastImport.preview.changes.slice(0, 100).map((change, index) => {
+                  const comparison = pendingForecastImport.comparisons.get(index);
+                  const comparisonChanged = comparison?.status === "available" && compareExactDecimals(comparison.currentValue, comparison.inputValue) !== 0;
+                  const classification = comparison?.status !== "available" ? "Comparison unavailable" : comparisonChanged ? "Changed" : "No change";
                   return <tr key={`${change.rowNumber}-${change.account}-${change.periodKey}`}>
-                    <td><span class={`consumption-import-status ${explicitZero ? "is-unchanged" : "is-changed"}`}>{explicitZero ? "Explicit zero" : "Incoming"}</span></td>
-                    <th scope="row"><strong>{change.resolvedAccount}</strong><small>{change.endUser ?? "No End User"} · Plan {change.planCode ?? "UNASSIGNED"} · {change.periodKey}</small></th>
+                    <td><span class={`consumption-import-status ${comparisonChanged ? "is-changed" : "is-unchanged"}`}>{classification}</span></td>
+                    <th scope="row"><strong>{change.resolvedAccount}</strong><small>{change.pillar} · {change.periodKey}</small></th>
+                    <td>{comparison?.status === "available" ? formatForecastPreviewValue(comparison.currentValue) : "Comparison unavailable"}</td>
                     <td>{formatForecastPreviewValue(change.forecastAmount)}</td>
+                    <td>{comparison?.status === "available" ? formatForecastDifference(comparison.difference) : "—"}</td>
                     <td><small>T/N/E {[change.totalAmount, change.newAmount, change.expansionAmount].map(formatForecastPreviewValue).join(" / ")}<br />Reduction {formatForecastPreviewValue(change.reductionAmount)} · Source {change.previousSource}</small></td>
-                    <td>{change.resolution}</td>
+                    <td>{comparison?.status === "unavailable" ? comparison.reason : change.resolution}</td>
                   </tr>;
                 })}</tbody>
             </table></div>}

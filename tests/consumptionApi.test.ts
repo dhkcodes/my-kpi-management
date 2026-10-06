@@ -419,7 +419,7 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-reference", sources: [{ fileName: "forecast.csv", sha256: "a".repeat(64) }],
-    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", totalAmount: "900719925474.0003",
+    lines: [{ accountName: "A", normalizedAccount: "A", pillar: "DP", periodKey: "FY27-SEP", totalAmount: "900719925474.0003",
       newAmount: "0.0001", expansionAmount: "2", baseAmount: "900719925472.0002", reductionAmount: "3", reductionBasis: "PRIOR_QUARTER_ACTUAL",
       compositionStatus: "CLASSIFIED", sourceFile: "forecast.csv", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"],
@@ -431,7 +431,7 @@ void (async () => {
   assert.deepEqual(referencePreview.referenceColumns, ["reference_prior_quarter", "reference_prior_quarter_actual"]);
   assert.match(referencePreview.referenceNotice ?? "", /read-only.*never imported/i);
   assert.deepEqual(referencePreview.changes[0], {
-    rowNumber: 2, account: "A", resolvedAccount: "A", endUser: null, planCode: null, periodKey: "FY27-SEP",
+    rowNumber: 2, account: "A", normalizedAccount: "A", pillar: "DP", resolvedAccount: "A", endUser: null, planCode: null, periodKey: "FY27-SEP",
     forecastAmount: "900719925474.0003", totalAmount: "900719925474.0003", newAmount: "0.0001", expansionAmount: "2",
     baseAmount: "900719925472.0002", reductionAmount: "3",
     previousSource: "PRIOR_QUARTER_ACTUAL", compositionStatus: "CLASSIFIED", rawValue: "900719925474.0003|0.0001|2",
@@ -444,7 +444,7 @@ void (async () => {
 
   runtime.fetch = async () => new Response(JSON.stringify({
     etag: "cm-negative", sources: [{ fileName: "forecast.csv", sha256: "c".repeat(64) }],
-    lines: [{ accountName: "A", normalizedAccount: "A", periodKey: "FY27-SEP", amount: 7, totalAmount: 7,
+    lines: [{ accountName: "A", normalizedAccount: "A", pillar: "DP", periodKey: "FY27-SEP", amount: 7, totalAmount: 7,
       newAmount: -1, expansionAmount: 2, baseAmount: 6, reductionAmount: 3,
       compositionStatus: "CLASSIFIED", sourceRow: 2 }],
     populatedCellCount: 1, canonicalPeriods: ["FY27-SEP"]

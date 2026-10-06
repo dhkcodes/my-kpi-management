@@ -193,6 +193,7 @@ export type ConsumptionControlForecastUpdate = Readonly<{
 export type ConsumptionImportFilePreview = Readonly<{
   fileName: string; owner: string; fromPeriod: string; toPeriod: string; detectedPillar: Exclude<ConsumptionPillar, "ALL">;
   sourceSha256: string; planCount: number; controlTotalCount: number; sourceRowCount: number;
+  mtdPeriodKeys: readonly string[];
 }>;
 export type ConsumptionImportConflict = Readonly<{
   key: string; files: readonly string[]; values: readonly (string | null)[];
@@ -200,7 +201,8 @@ export type ConsumptionImportConflict = Readonly<{
   reason: "DUPLICATE_PLAN_ROW" | "CONFLICTING_UPLOAD_VALUE";
 }>;
 export type ConsumptionImportOverwrite = Readonly<{
-  key: string; existingValue: number; newValue: number; fileName: string;
+  key: string; pillar: Exclude<ConsumptionPillar, "ALL">; account: string; endUser: string; planCode: string; periodKey: string;
+  existingValue: string; newValue: string; fileName: string;
 }>;
 export type ConsumptionSalesRepChange = Readonly<{
   normalizedAccount: string;
@@ -247,6 +249,8 @@ export type ConsumptionForecastWideResolution = "EXACT_PLAN" | "SIMILAR_ACCOUNT"
 export type ConsumptionForecastWideChange = Readonly<{
   rowNumber: number;
   account: string;
+  normalizedAccount: string;
+  pillar: Exclude<ConsumptionPillar, "ALL">;
   resolvedAccount: string;
   endUser: string | null;
   planCode: string | null;
@@ -987,12 +991,24 @@ const parseWorkspace = (value: unknown, headerEtag?: string | null, expectedPill
   };
 };
 
+export const parseJsonPreservingExactNumericFields = (text: string, fieldNames: readonly string[]): unknown => {
+  if (fieldNames.length === 0) return JSON.parse(text) as unknown;
+  const escapedNames = fieldNames.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const fieldNumber = new RegExp(`([,{]\\s*"(?:${escapedNames})"\\s*:\\s*)(-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)`, "g");
+  return JSON.parse(text.replace(fieldNumber, "$1\"$2\"")) as unknown;
+};
+
 const request = async (path: string, init?: RequestInit,
-  conflictPillar: ConsumptionPillar = "ALL", quiet = false): Promise<{ response: Response; payload: unknown }> => {
+  conflictPillar: ConsumptionPillar = "ALL", quiet = false,
+  exactNumericFields: readonly string[] = []): Promise<{ response: Response; payload: unknown }> => {
   let response: Response;
   try { response = await (quiet ? apiFetchQuiet : apiFetch)(`${apiBase()}${path}`, init); } catch (cause) { throw new ConsumptionNetworkError(cause); }
   let payload: unknown = null;
-  try { payload = await response.json(); } catch { /* sanitized below */ }
+  try {
+    payload = exactNumericFields.length > 0
+      ? parseJsonPreservingExactNumericFields(await response.text(), exactNumericFields)
+      : await response.json();
+  } catch { /* sanitized below */ }
   if (!response.ok) {
     const error = typeof payload === "object" && payload !== null ? payload as { code?: unknown; message?: unknown; current?: unknown } : {};
     if (response.status === 409 && error.code === "VERSION_CONFLICT" && error.current) {
@@ -1151,15 +1167,18 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption import preview");
     const file = value as Record<string, unknown>;
     const detectedPillar = normalizeConsumptionPillar(file.pillar);
+    const mtdPeriodKeys = file.mtdPeriodKeys ?? [];
     if (!isNonEmptyString(file.sourceFileName) || !isNonEmptyString(file.sourceOwner)
       || !isPeriodKey(file.sourcePeriodFrom) || !isPeriodKey(file.sourcePeriodTo)
       || !(detectedPillar === "DP" || detectedPillar === "OCI")
       || typeof file.sourceSha256 !== "string" || !sha256Pattern.test(file.sourceSha256)
       || !Array.isArray(file.plans) || !Array.isArray(file.controlTotals)
+      || !Array.isArray(mtdPeriodKeys) || mtdPeriodKeys.some((period) => !isPeriodKey(period))
       || !isNonNegativeInteger(file.sourceRowCount)) throw new Error("Malformed Consumption import preview");
     return {fileName:file.sourceFileName,owner:file.sourceOwner,fromPeriod:file.sourcePeriodFrom,toPeriod:file.sourcePeriodTo,
       detectedPillar,sourceSha256:file.sourceSha256,planCount:file.plans.length,
-      controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount} as ConsumptionImportFilePreview;
+      controlTotalCount:file.controlTotals.length,sourceRowCount:file.sourceRowCount,
+      mtdPeriodKeys:[...mtdPeriodKeys] as string[]} as ConsumptionImportFilePreview;
   });
   const expectedNames=uploaded.map(file=>file.name);
   const actualNames=files.map(file=>file.fileName);
@@ -1198,9 +1217,10 @@ const decodeImportPreview = (payload: unknown, pillar: ConsumptionPillar, upload
     const overwritePillar = normalizeConsumptionPillar(overwrite.pillar);
     if (!(overwritePillar==="DP"||overwritePillar==="OCI") || !isNonEmptyString(overwrite.account)
       || !isNonEmptyString(overwrite.endUser) || !isNonEmptyString(overwrite.planCode) || !isPeriodKey(overwrite.periodKey)
-      || !isFiniteNumber(overwrite.existingValue) || !isFiniteNumber(overwrite.newValue)
+      || !isDecimalString(overwrite.existingValue) || !isDecimalString(overwrite.newValue)
       || !isNonEmptyString(overwrite.sourceFileName)) throw new Error("Malformed Consumption import preview");
     return {key:`${overwritePillar}::${overwrite.account}::${overwrite.endUser}::${overwrite.planCode}::${overwrite.periodKey}`,
+      pillar:overwritePillar,account:overwrite.account,endUser:overwrite.endUser,planCode:overwrite.planCode,periodKey:overwrite.periodKey,
       existingValue:overwrite.existingValue,newValue:overwrite.newValue,fileName:overwrite.sourceFileName} as ConsumptionImportOverwrite;
   });
   const overwriteKeys=new Set(overwrites.map((overwrite)=>overwrite.key));
@@ -1231,7 +1251,8 @@ export const previewConsumptionImport = async (input: string | readonly File[], 
       overwriteCount: 0, overwrites: [], salesRepChanges: [], conflictCount: 0, conflicts: [], hasConflicts: false };
   }
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
-  const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) });
+  const { payload } = await request(`/consumption/imports/preview?pillar=${pillar}`, { method: "POST", body: multipartFiles(input) }, pillar, false,
+    ["existingValue", "newValue"]);
   return decodeImportPreview(payload, pillar, input);
 };
 export const exportConsumptionImportCompatibleCsv = async (
@@ -1421,8 +1442,9 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
   const changes = raw.lines.map((value): ConsumptionForecastWideChange => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Forecast Wide preview");
     const line = value as Record<string, unknown>;
+    const pillar = normalizeConsumptionPillar(line.pillar);
     if (!isPositiveInteger(line.sourceRow) || !isNonEmptyString(line.accountName) || !isNonEmptyString(line.normalizedAccount)
-      || !isForecastPeriodKey(line.periodKey)) throw new Error("Malformed Forecast Wide preview");
+      || !(pillar === "DP" || pillar === "OCI") || !isForecastPeriodKey(line.periodKey)) throw new Error("Malformed Forecast Wide preview");
     const totalAmount = line.totalAmount === undefined ? line.amount : line.totalAmount;
     const nullableAmount = (field: string) => {
       const value = line[field];
@@ -1437,7 +1459,8 @@ const decodeForecastWidePreview = (payload: unknown, uploadedFileName: string): 
       ? line.compositionStatus as ConsumptionForecastCompositionStatus : "UNAVAILABLE";
     const newAmount = nullableAmount("newAmount");
     const expansionAmount = nullableAmount("expansionAmount");
-    return { rowNumber: line.sourceRow, account: line.accountName, resolvedAccount: line.accountName,
+    return { rowNumber: line.sourceRow, account: line.accountName, normalizedAccount: line.normalizedAccount, pillar,
+      resolvedAccount: line.accountName,
       endUser: null, planCode: null, periodKey: line.periodKey, forecastAmount: totalAmountExact,
       totalAmount: totalAmountExact, newAmount, expansionAmount, baseAmount: nullableAmount("baseAmount"),
       reductionAmount: nullableAmount("reductionAmount"),
