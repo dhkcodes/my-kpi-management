@@ -5965,6 +5965,8 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell__heading-actions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: .6rem; justify-content: flex-end; }
 .kap-page-activity { align-items: center; display: inline-flex; gap: .4rem; min-height: 2.5rem; }
 .kap-page-activity.is-busy { color: var(--kpi-muted); font-size: .75rem; font-weight: 750; white-space: nowrap; }
+.kap-page-activity__status { align-items: center; display: inline-flex; gap: .4rem; visibility: hidden; }
+.kap-page-activity__status.is-active { visibility: visible; }
 .kap-page-activity__progress { height: 1.25rem; width: 1.25rem; }
 .kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
 .kap-page-shell__body { display: grid; flex: 1 0 auto; gap: .75rem; min-height: 0; min-width: 0; }
