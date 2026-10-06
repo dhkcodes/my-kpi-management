@@ -124,14 +124,6 @@ export const assessForecastActualQuarter = (
     };
   }
 
-  const forecastMonths = months.filter((month) => month.forecastAmount !== null);
-  if (!forecastMonths.length) return {
-    quarter, status: "NO_FORECAST", forecastAmount: null, actualAmount: null,
-    differenceAmount: null, relevantAmount: null
-  };
-
-  // FINAL and MTD describe Actual provenance only: the target remains the full stored quarter Forecast.
-  const forecastAmount = forecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0");
   const availableActualMonths = months.filter((month) => {
     if (month.actualAmount === null) return false;
     if (month.actualState === "FINAL") return true;
@@ -142,6 +134,15 @@ export const assessForecastActualQuarter = (
   const actualAmount = availableActualMonths.length
     ? availableActualMonths.reduce((total, month) => addExactDecimals(total, month.actualAmount as string), "0")
     : null;
+
+  const forecastMonths = months.filter((month) => month.forecastAmount !== null);
+  if (!forecastMonths.length) return {
+    quarter, status: "NO_FORECAST", forecastAmount: null, actualAmount,
+    differenceAmount: null, relevantAmount: null
+  };
+
+  // FINAL and MTD describe Actual provenance only: the target remains the full stored quarter Forecast.
+  const forecastAmount = forecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0");
   if (!availableActualMonths.length) {
     return { quarter, status: "MISSING_ACTUAL", forecastAmount, actualAmount: null, differenceAmount: null, relevantAmount: null };
   }

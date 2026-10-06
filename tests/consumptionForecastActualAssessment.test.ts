@@ -166,7 +166,11 @@ const explicitZeroQuarter = row("Zero", [
 ]);
 assert.equal(assessForecastActualQuarter(explicitZeroQuarter, "Q2", new Date("2026-10-15T00:00:00Z"), "MTD").status, "MATCHED",
   "an explicit zero Forecast and zero Actual are comparable and exactly matched");
-assert.equal(assessForecastActualQuarter(row("No forecast", [month({ forecastAmount: null, actualAmount: "1", actualState: "FINAL" })]), "Q2").status, "NO_FORECAST");
+assert.deepEqual(
+  assessForecastActualQuarter(row("No forecast", [month({ forecastAmount: null, actualAmount: "1", actualState: "FINAL" })]), "Q2"),
+  { quarter: "Q2", status: "NO_FORECAST", forecastAmount: null, actualAmount: "1", differenceAmount: null, relevantAmount: null },
+  "a missing Forecast prevents comparison but must not hide an existing Actual"
+);
 assert.equal(assessForecastActualQuarter(row("Future", [
   month({ periodKey: "FY27-DEC", forecastAmount: "10" }), month({ periodKey: "FY27-JAN", forecastAmount: "10" }), month({ periodKey: "FY27-FEB", forecastAmount: "10" })
 ]), "Q3", new Date("2026-10-15T00:00:00Z")).status, "FUTURE");
