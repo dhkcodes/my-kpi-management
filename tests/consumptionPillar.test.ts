@@ -5,12 +5,21 @@ import {
   fetchConsumptionAnalysis,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
+  parseJsonPreservingExactNumericFields,
   previewConsumptionImport
 } from "../src/data/consumptionApi";
 import { consumptionPillarOptions, formatConsumptionDataCenter } from "../src/data/consumptionData";
 
 const runtime = globalThis as typeof globalThis & { __KPI_API_BASE_URL__?: string; fetch: typeof fetch };
 runtime.__KPI_API_BASE_URL__ = "http://unit.test/api/v1";
+
+assert.deepEqual(
+  parseJsonPreservingExactNumericFields(
+    '{"existingValue":9007199254740993.125,"newValue":-1.2e-7,"unchanged":42}',
+    ["existingValue", "newValue"]
+  ),
+  { existingValue: "9007199254740993.125", newValue: "-1.2e-7", unchanged: 42 }
+);
 
 const workspace = {
   selectedPillar: "DP",
@@ -91,7 +100,7 @@ void (async () => {
     exactReplayFileCount: 0,
     deletedFactCount: 0,
     overwrites: [{ pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
-      existingValue: 10, newValue: 11, sourceFileName: "dp.csv" }],
+      existingValue: "10", newValue: "11", sourceFileName: "dp.csv" }],
     salesRepChanges: [
       { normalizedAccount: "ACME", account: "Acme", beforeSalesRep: null, afterSalesRep: "Ada", changed: true },
       { normalizedAccount: "BETA", account: "Beta", beforeSalesRep: "Bob", afterSalesRep: "Bob", changed: false }
@@ -115,7 +124,10 @@ void (async () => {
   assert.equal(preview.exactReplayFileCount, 0);
   assert.equal(preview.existingSameValueCount, 5);
   assert.equal(preview.overwriteCount, 1);
-  assert.deepEqual(preview.overwrites[0], { key: "DP::A::EU::P1::FY27-JUN", existingValue: 10, newValue: 11, fileName: "dp.csv" });
+  assert.deepEqual(preview.overwrites[0], {
+    key: "DP::A::EU::P1::FY27-JUN", pillar: "DP", account: "A", endUser: "EU", planCode: "P1", periodKey: "FY27-JUN",
+    existingValue: "10", newValue: "11", fileName: "dp.csv"
+  });
   assert.deepEqual(preview.salesRepChanges, [
     { normalizedAccount: "ACME", account: "Acme", beforeSalesRep: null, afterSalesRep: "Ada", changed: true },
     { normalizedAccount: "BETA", account: "Beta", beforeSalesRep: "Bob", afterSalesRep: "Bob", changed: false }

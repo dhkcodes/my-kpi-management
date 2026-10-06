@@ -18,6 +18,8 @@ assert.equal(addExactDecimals("450359962737.0001", "450359962737.0002"), "900719
 assert.equal(subtractExactDecimals("0.0001", "900719925474.0003"), "-900719925474.0002");
 assert.equal(negateExactDecimal("0.0001"), "-0.0001");
 assert.equal(compareExactDecimals("900719925474.0003", "900719925474.0002"), 1);
+assert.equal(subtractExactDecimals("1.25e3", "2.5E-1"), "1249.75",
+  "scientific JSON number tokens are normalized without projecting through Number");
 
 assert.equal(formatExactCurrency("900719925474.0003"), "$900,719,925,474.0003");
 assert.equal(formatExactCurrency("0.0001"), "$0.0001");

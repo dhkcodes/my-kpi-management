@@ -211,18 +211,20 @@ assert.match(recordsPage, /data-app-busy-surface=\{importPhase === "previewing" 
   "Actual Import owns its visible preview-loading surface instead of exposing a title-only dialog or duplicate global overlay");
 assert.match(recordsPage, /data-app-busy-surface=\{forecastImportPhase === "previewing" \|\| forecastImportPhase === "applying" \? "true" : undefined\}[\s\S]*Preparing Forecast preview…/,
   "Forecast Import owns one truthful preview-loading surface");
-assert.match(recordsPage, /\(importPhase === "preview" \|\| importPhase === "applying"\)[\s\S]*Applying Actual Import…/,
+assert.match(recordsPage, /\(importPhase === "preview" \|\| importPhase === "applying"\)[\s\S]*Applying…/,
   "Actual Preview remains mounted while Apply is running");
 assert.match(recordsPage, /\(forecastImportPhase === "preview" \|\| forecastImportPhase === "applying"\)[\s\S]*Applying Forecast Import…/,
   "Forecast Preview remains mounted while Apply is running");
-assert.match(recordsPage, /Current value[\s\S]*Imported value[\s\S]*Difference[\s\S]*subtractExactDecimals\(String\(overwrite\.newValue\), String\(overwrite\.existingValue\)\)/,
-  "Actual Preview compares current, imported, and exact-decimal delta values side by side");
-assert.match(recordsPage, /Comparison scope:[\s\S]*does not label cells as New, Changed, or No change[\s\S]*Incoming cells[\s\S]*Explicit zero[\s\S]*Blank no-op[\s\S]*Errors/,
-  "Forecast Preview truthfully presents only fields supplied by its server contract and separates blank from explicit zero");
+assert.match(recordsPage, /Current value[\s\S]*Imported value[\s\S]*Difference[\s\S]*Reason[\s\S]*comparison\.difference[\s\S]*comparison\?\.reason/,
+  "Actual Preview distinguishes exact amount difference from FINAL/MTD metadata reasons");
+assert.match(recordsPage, /Comparison safety:[\s\S]*Preview and workspace ETags match[\s\S]*normalized Account \+ Pillar \+ Period key is unique[\s\S]*Comparison unavailable/,
+  "Forecast Preview discloses the safe join rules and never guesses missing values");
+assert.match(recordsPage, /buildForecastImportComparisons\([\s\S]*preview\.etag[\s\S]*comparisonWorkspace\?\.etag[\s\S]*preview\.changes[\s\S]*comparisonWorkspace\?\.accountForecasts/,
+  "Forecast current/input/difference comparison uses the read API with Preview ETag and full unique join keys");
 assert.match(recordsPage, /confirmedPreCommitImportStatuses = new Set\(\[400, 401, 403, 404, 405, 409, 412, 413, 415, 422\]\)/,
   "only known pre-commit HTTP rejections allow Apply retry; timeout and ambiguous failures require state verification");
-assert.match(recordsPage, /insertFactCount \+ pendingImport\.preview\.overwriteCount \+ pendingImport\.preview\.deleteFactCount === 0[\s\S]*deletes/,
-  "delete-only Actual imports are never described as metadata-only");
+assert.match(recordsPage, /consumption-import-footer-summary[\s\S]*new ·[\s\S]*updates ·[\s\S]*deletes[\s\S]*consumption-import-footer-actions[\s\S]*>Cancel<[\s\S]*: "Apply"/,
+  "Actual counts are separated from compact Cancel and Apply actions");
 assert.match(styles, /#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*width: min\(68rem, calc\(100vw - 3rem\)\)/,
   "Import dialog host owns the desktop width so JET centers the full comparison surface");
 assert.match(styles, /\.consumption-import-dialog-body \{[^}]*min-block-size:[^}]*width: 100%/,
@@ -231,6 +233,10 @@ assert.match(styles, /@media[^]*#consumptionImportDialog,[\s\S]*#consumptionFore
   "Import dialog host fits the mobile viewport");
 assert.match(styles, /@media[^]*#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*left: 50% !important;[^}]*position: fixed !important;[^}]*top: 50% !important;[^}]*transform: translate\(-50%, -50%\) !important;/,
   "Import dialog hosts stay centered in the mobile viewport instead of inheriting document offsets");
+assert.match(styles, /\.consumption-import-footer \{[^}]*display: flex;[^}]*width: 100%[\s\S]*\.consumption-import-footer-actions \{[^}]*display: flex;[^}]*flex-wrap: wrap;/,
+  "Actual footer and action group own flex geometry before the mobile column override");
+assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.consumption-import-footer \{[^}]*flex-direction: column;[\s\S]*\.consumption-import-footer-actions \{[^}]*justify-content: flex-end;[^}]*width: 100%/,
+  "mobile Actual counts occupy their own row while both action buttons stay inside the dialog");
 assert.match(styles, /\.consumption-import-preview-scroll \{[^}]*overflow: auto/,
   "dense Preview comparisons scroll inside the dialog");
 assert.match(recordsPage, /setForecastImportPhase\("complete"\);[\s\S]*?try \{[\s\S]*?await loadRecordsPage/,
@@ -430,7 +436,7 @@ assert.match(recordsPage, />New<[\s\S]*>Changed<[\s\S]*>No change<[\s\S]*>Errors
 assert.match(recordsPage, /<details class="consumption-import-technical-details"[\s\S]*Upload duplicates[\s\S]*Exact replay skipped[\s\S]*Existing Actuals to delete/, "technical counters including Delete stay collapsed by default");
 assert.match(recordsPage, /<details class="consumption-import-update-details" open>[\s\S]*Changed values/, "old-to-new overwrite rows are prioritized in Preview");
 assert.match(recordsPage, /consumption-import-hard-conflict[\s\S]*Import blocked[\s\S]*conflict\.reason[\s\S]*conflict\.rows\[0\][\s\S]*conflict\.values\[0\][\s\S]*conflict\.rows\[1\][\s\S]*conflict\.values\[1\]/, "Hard Conflict is a dedicated blocking banner with rows, key, values, and reason");
-assert.match(recordsPage, /pendingImport\.preview\.hasConflicts \? "Resolve errors"[\s\S]*isExactReplayPreview[\s\S]*"Already imported"[\s\S]*"Apply metadata refresh"[\s\S]*`Apply \$\{pendingImport\.preview\.insertFactCount\} new · \$\{pendingImport\.preview\.overwriteCount\} updates · \$\{pendingImport\.preview\.deleteFactCount\} deletes`/, "CTA distinguishes errors, exact replay, metadata-only refresh, and all fact changes including delete-only imports");
+assert.match(recordsPage, /pendingImport\.preview\.hasConflicts \? "Resolve errors"[\s\S]*isExactReplayPreview[\s\S]*"Already imported" : "Apply"/, "CTA blocks errors and exact replay while compact Apply uses the separate count summary");
 assert.match(recordsPage, /Existing Actuals to overwrite[\s\S]*existingValue[\s\S]*newValue/, "overwrite preview discloses old and new values for scoped Plan-period keys");
 assert.match(recordsPage, /disabled=\{importPhase === "applying" \|\| !canWrite \|\| pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "applying, write denial, conflicts, and exact replay previews disable atomic Import without blocking metadata-only refresh");
 assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinals\[0\]\}[\s\S]*formatConflictCurrency\(conflict\.values\[0\]\)/, "Hard Conflict rows preserve decimal strings and distinguish equal source filenames by upload ordinal");

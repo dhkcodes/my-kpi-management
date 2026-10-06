@@ -7,14 +7,21 @@ type ParsedExactDecimal = Readonly<{
   scale: number;
 }>;
 
-const EXACT_DECIMAL_PATTERN = /^([+-]?)(\d+)(?:\.(\d+))?$/;
+const EXACT_DECIMAL_PATTERN = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/;
 
 const parseExactDecimal = (value: string): ParsedExactDecimal => {
   const match = EXACT_DECIMAL_PATTERN.exec(value.trim());
   if (!match) throw new Error(`Invalid exact decimal: ${value}`);
   const fraction = match[3] ?? "";
-  const magnitude = integer(`${match[2]}${fraction}`);
-  return { coefficient: match[1] === "-" ? -magnitude : magnitude, scale: fraction.length };
+  const exponent = Number(match[4] ?? "0");
+  if (!Number.isSafeInteger(exponent)) throw new Error(`Invalid exact decimal: ${value}`);
+  let coefficient = integer(`${match[2]}${fraction}`);
+  let scale = fraction.length - exponent;
+  if (scale < 0) {
+    for (let index = 0; index < -scale; index += 1) coefficient *= integer(10);
+    scale = 0;
+  }
+  return { coefficient: match[1] === "-" ? -coefficient : coefficient, scale };
 };
 
 const powerOfTen = (scale: number): ExactInteger => {
