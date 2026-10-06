@@ -223,8 +223,12 @@ assert.match(recordsPage, /confirmedPreCommitImportStatuses = new Set\(\[400, 40
   "only known pre-commit HTTP rejections allow Apply retry; timeout and ambiguous failures require state verification");
 assert.match(recordsPage, /insertFactCount \+ pendingImport\.preview\.overwriteCount \+ pendingImport\.preview\.deleteFactCount === 0[\s\S]*deletes/,
   "delete-only Actual imports are never described as metadata-only");
-assert.match(styles, /\.consumption-import-dialog-body \{[^}]*min-block-size:[^}]*width:/,
-  "Import dialog body keeps stable dimensions while phases change");
+assert.match(styles, /#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*width: min\(68rem, calc\(100vw - 3rem\)\)/,
+  "Import dialog host owns the desktop width so JET centers the full comparison surface");
+assert.match(styles, /\.consumption-import-dialog-body \{[^}]*min-block-size:[^}]*width: 100%/,
+  "Import dialog body fills the host and keeps stable dimensions while phases change");
+assert.match(styles, /@media[^]*#consumptionImportDialog,[\s\S]*#consumptionForecastImportDialog \{[^}]*width: calc\(100vw - 2rem\)/,
+  "Import dialog host fits the mobile viewport");
 assert.match(styles, /\.consumption-import-preview-scroll \{[^}]*overflow: auto/,
   "dense Preview comparisons scroll inside the dialog");
 assert.match(recordsPage, /setForecastImportPhase\("complete"\);[\s\S]*?try \{[\s\S]*?await loadRecordsPage/,
