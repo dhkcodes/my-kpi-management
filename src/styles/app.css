@@ -6011,6 +6011,37 @@ h4.weekly-activity-section-label--next-week,
   .kap-page-shell.consumption-page .consumption-record-search { max-width: none; width: 100%; }
 }
 
+@media (max-height: 520px) {
+  .kpi-shell:has(.kap-page-shell) {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .kpi-shell__body:has(.kap-page-shell),
+  .kpi-content:has(.kap-page-shell),
+  .kap-page-shell,
+  .kap-page-shell__scroll {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .kap-page-shell__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .kap-page-shell__heading-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .kap-page-shell__body {
+    flex: 0 0 auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kap-page-shell__scroll { scroll-behavior: auto; }
 }
