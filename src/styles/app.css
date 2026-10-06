@@ -5364,26 +5364,21 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-status[data-tooltip]:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 2px; }
 .consumption-initial-state { min-height: min(44rem, calc(100vh - 7rem)); }
 
-/* Compact JET fallback while a routed page has not mounted its inline busy surface yet. */
+/* Non-blocking JET fallback used only while the authenticated page surface has not mounted. */
 .kap-app-loading {
-  align-items: center;
-  background: var(--oj-core-bg-color-content, #fff);
-  border: 1px solid var(--oj-core-divider-color, #d5d9df);
-  border-radius: var(--oj-core-border-radius-md, .4rem);
-  box-shadow: var(--oj-core-box-shadow-sm, 0 .3rem 1rem rgb(0 0 0 / 14%));
-  color: var(--oj-core-text-color-primary, #34383e);
-  display: flex;
-  font-size: .8rem;
-  font-weight: 700;
-  gap: .55rem;
-  left: 50%;
-  padding: .55rem .75rem;
+  left: 0;
   pointer-events: none;
   position: fixed;
-  top: calc(4.1rem + env(safe-area-inset-top));
-  transform: translateX(-50%);
+  right: 0;
+  top: env(safe-area-inset-top);
   z-index: 4000;
 }
+.kap-app-loading oj-progress-bar { display: block; width: 100%; }
+.kap-auth-checking { background: var(--oj-core-bg-color-page, #f4f6f8); }
+.kap-auth-checking__header { align-items: center; background: var(--oj-core-bg-color-content, #fff); border-bottom: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; min-height: 3.5rem; padding: .75rem 1rem; }
+.kap-auth-checking__body { min-height: 0; }
+.kap-auth-checking__content { min-height: 0; padding: 1rem; }
+.kap-auth-checking__surface { background: var(--oj-core-bg-color-content, #fff); border: 1px solid var(--kpi-border); border-radius: .75rem; box-sizing: border-box; height: 100%; min-height: calc(100dvh - 6rem); }
 @media (max-width: 600px) {
   .forecast-actual-info-trigger::after { position: fixed; left: 1rem; right: 1rem; top: 4.5rem; width: auto; }
 }
@@ -5958,25 +5953,41 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell__scroll.is-scrolling::-webkit-scrollbar-thumb { background: rgb(91 85 80 / 45%); }
 .kap-page-shell__scroll:focus-visible { outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: -2px; }
 .kap-page-shell__inner { box-sizing: border-box; display: flex; flex-direction: column; gap: .75rem; min-height: 100%; padding: .75rem; }
+.kap-page-shell__masthead { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.kap-page-shell__masthead.is-compact { gap: .25rem; }
 .kap-page-shell__heading { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; min-width: 0; }
 .kap-page-shell__heading-copy { min-width: 0; }
 .kap-page-shell__eyebrow { color: var(--kpi-muted); display: block; font-size: .72rem; font-weight: 800; letter-spacing: .03em; margin-top: .15rem; text-transform: uppercase; }
-.kap-page-shell__heading h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; line-height: 1.12; margin: .2rem 0 0; }
+.kap-page-shell__heading h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; line-height: 1.12; margin: 0; }
+.kap-page-shell__heading-copy.has-eyebrow h1 { margin-top: .2rem; }
 .kap-page-shell__heading-actions { align-items: center; display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: .6rem; justify-content: flex-end; }
-.kap-page-activity { align-items: center; display: inline-flex; gap: .4rem; min-height: 2.5rem; }
+.kap-page-activity { align-items: flex-end; display: inline-flex; gap: .4rem; min-height: 2.5rem; }
 .kap-page-activity.is-busy { color: var(--kpi-muted); font-size: .75rem; font-weight: 750; white-space: nowrap; }
-.kap-page-activity__status { align-items: center; display: inline-flex; gap: .4rem; visibility: hidden; }
+.kap-page-activity__loading-group { align-items: flex-end; display: inline-flex; gap: .35rem; min-width: 0; }
+.kap-page-activity__completed-at { color: var(--kpi-muted); font-size: .7rem; font-variant-numeric: tabular-nums; line-height: 1; padding-bottom: .08rem; white-space: nowrap; }
+.kap-page-activity__status { align-items: flex-end; display: inline-flex; flex: 0 0 auto; gap: .4rem; min-height: 1.25rem; visibility: hidden; }
 .kap-page-activity__status.is-active { visibility: visible; }
 .kap-page-activity__progress { height: 1.25rem; width: 1.25rem; }
+.kap-page-data-progress { left: 50%; max-width: calc(100% - 2rem); opacity: 0; pointer-events: none; position: absolute; top: 50%; transform: translate(-50%, -50%); visibility: hidden; width: min(20rem, 52%); z-index: 3; }
+.kap-page-data-progress.is-active { opacity: 1; visibility: visible; }
+.kap-page-data-progress oj-progress-bar { display: block; width: 100%; }
 .kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
 .kap-page-shell__body { display: grid; flex: 1 0 auto; gap: .75rem; min-height: 0; min-width: 0; }
 
 /* Consumption Records is the first adopter; legacy nested scrolling is replaced by shell scrolling. */
 .kap-page-shell.consumption-page { display: block; padding: 0; }
+.kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }
-.kap-page-shell.consumption-page .consumption-table-panel { min-height: 0; overflow: visible; }
-.kap-page-shell.consumption-page .consumption-table-content { display: grid; grid-template-rows: auto auto; min-height: 0; }
-.kap-page-shell.consumption-page .consumption-table-scroll { height: auto; min-height: 18rem; overflow-x: auto; overflow-y: visible; }
+.consumption-table-panel { display: flex; flex: 1 0 auto; flex-direction: column; }
+.kap-page-shell.consumption-page .consumption-table-panel { min-height: 18rem; overflow: visible; }
+.kap-page-shell.consumption-page .consumption-table-content { display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0; position: relative; }
+.consumption-table-scroll { flex: 1 1 auto; min-height: 18rem; }
+.kap-page-shell.consumption-page .consumption-table-scroll { height: auto; overflow-x: auto; overflow-y: visible; }
+.consumption-table-heading { align-items: stretch; flex-direction: column; }
+.consumption-records-toolbar { align-items: flex-end; display: flex; gap: .6rem; justify-content: space-between; min-width: 0; width: 100%; }
+.consumption-records-toolbar__left { align-items: flex-start; display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.consumption-records-toolbar-activity { align-items: flex-end; display: flex; flex: 0 0 auto; justify-content: flex-end; min-width: 0; }
+.consumption-records-toolbar-activity .kap-page-activity { justify-content: flex-end; }
 .kap-page-shell.consumption-page .consumption-forecast-cell { touch-action: pan-x pan-y pinch-zoom; }
 
 @media (max-width: 760px) {
@@ -5987,10 +5998,16 @@ h4.weekly-activity-section-label--next-week,
   .kap-page-shell__heading-actions > * { max-width: 100%; }
   .kap-page-shell__heading h1 { font-size: 1.65rem; }
   .kap-page-shell__inner { gap: .65rem; padding: .7rem; }
+  .kap-page-shell__masthead { gap: .65rem; }
+  .kap-page-shell__masthead.is-compact { gap: .25rem; }
   .kap-page-filter { align-items: stretch; display: grid; grid-template-columns: minmax(0, 1fr); padding: .65rem; }
   .kap-page-shell.consumption-page .consumption-import-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; width: 100%; }
   .kap-page-shell.consumption-page .consumption-import-actions oj-button { min-width: 0; width: 100%; }
   .kap-page-shell.consumption-page .kap-page-activity { justify-content: flex-end; }
+  .consumption-records-toolbar { align-items: flex-end; flex-wrap: nowrap; }
+  .consumption-records-toolbar-activity .kap-page-activity { gap: .25rem; min-width: 0; }
+  .consumption-records-toolbar-activity .kap-page-activity__completed-at { font-size: .66rem; }
+  .consumption-records-toolbar-activity .kap-page-activity__loading-group { flex-wrap: nowrap; }
   .kap-page-shell.consumption-page .consumption-record-search { max-width: none; width: 100%; }
 }
 

@@ -21,7 +21,19 @@ const appBusyOverlay = readFileSync("src/components/AppBusyOverlay.tsx", "utf8")
 
 assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
 assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
-assert.match(pageShell, /oj-progress-circle[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"/, "the common activity control combines Oracle JET progress and an accessible refresh action");
+assert.doesNotMatch(recordsPage, /eyebrow="Consumption \/ Attainment"|CONSUMPTION \/ ATTAINMENT/i,
+  "Records omits the redundant Consumption / Attainment eyebrow at the call site");
+assert.match(pageShell, /headingSpacing\?: "default" \| "compact"/,
+  "the shared shell exposes a generic compact heading-spacing contract rather than Records-specific text logic");
+assert.match(recordsPage, /headingSpacing="compact"/,
+  "Records opts into the common compact breadcrumb-to-title spacing");
+assert.match(pageShell, /kap-page-shell__masthead[\s\S]*\{breadcrumb\}[\s\S]*kap-page-shell__heading/,
+  "breadcrumb and heading share one stable masthead wrapper before, during, and after loading");
+assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*gap:/s);
+assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.25rem/s,
+  "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
+assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
+assert.match(pageShell, /aria-label="Refresh"[\s\S]*title="Refresh"/, "the optional common refresh action remains accessible");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
@@ -33,8 +45,38 @@ assert.match(pageShell, /kap-page-activity__status/, "loading status keeps a res
 assert.match(pageShell, /aria-hidden=\{busy \? "false" : "true"\}/, "the reserved loading slot is hidden from accessibility APIs when idle");
 assert.match(styles, /\.kap-page-activity__status\s*\{[^}]*visibility:\s*hidden/s);
 assert.match(styles, /\.kap-page-activity__status\.is-active\s*\{[^}]*visibility:\s*visible/s);
-assert.match(appBusyOverlay, /oj-progress-circle[\s\S]*Loading/, "the route-entry fallback uses the shared Oracle JET loading treatment");
-assert.doesNotMatch(appBusyOverlay, /Processing|role="dialog"|aria-modal/, "the legacy full-screen Processing dialog is removed");
+assert.match(appBusyOverlay, /oj-progress-bar[\s\S]*value=\{-1\}/, "route-entry fallback is a thin indeterminate JET bar rather than a floating Loading box");
+assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing|role="dialog"|aria-modal/, "route entry has no legacy or renamed full-screen loading box");
+assert.match(pageShell, /export function PageDataProgress/, "the shared shell exports the reusable data-area progress indicator");
+assert.match(pageShell, /activityPosition\?: "heading" \| "custom"/, "pages can choose a custom activity slot without Records-specific logic in the shared shell");
+assert.match(recordsPage, /activityPosition="custom"[\s\S]*consumption-records-toolbar-activity[\s\S]*<PageActivity busy=\{pageBusy\}/,
+  "Records places the shared circle activity beside its data toolbar instead of the title");
+assert.doesNotMatch(recordsPage, /consumption-records-toolbar-activity[\s\S]{0,400}<PageActivity[^>]*onRefresh=/,
+  "the Records data-toolbar right side contains only completion time and circular activity, not an extra refresh button");
+assert.match(recordsPage, /<PageDataProgress busy=\{pageBusy\}/,
+  "Records uses the same busy lifecycle for the non-blocking data-area progress bar");
+assert.match(pageShell, /export function formatKstTimestamp[\s\S]*getUTCFullYear[\s\S]*getUTCSeconds/,
+  "the shared loading element formats completion timestamps independently of the host timezone");
+assert.match(pageShell, /lastCompletedAt\?: Date \| null[\s\S]*kap-page-activity__completed-at/,
+  "the shared circle activity owns the reusable last-success timestamp display");
+assert.match(recordsPage, /const \[lastDataLoadedAt, setLastDataLoadedAt\] = useState<Date \| null>\(null\)/,
+  "Records shows no invented completion time before its first successful load");
+assert.match(recordsPage, /setLastDataLoadedAt\(new Date\(\)\)[\s\S]*return page/,
+  "Records updates the completion time only on a successfully decoded data response");
+assert.match(recordsPage, /<PageActivity busy=\{pageBusy\}[\s\S]*lastCompletedAt=\{lastDataLoadedAt\}/,
+  "the toolbar passes the last successful load time to the shared activity element");
+assert.match(apiSource, /apiFetchQuiet[\s\S]*fetchConsumptionRecords[\s\S]*request\([^;]+true\)/,
+  "Records queries preserve auth handling without activating the global interaction blocker");
+assert.match(recordsPage, /const importActionsDisabled =[^;]+;/,
+  "Import availability is derived independently from read-only search activity");
+assert.match(recordsPage, /const exportActionsDisabled =[^;]+recordsReplacementLoading[^;]+;/,
+  "result-dependent exports remain disabled while displayed records are being replaced");
+assert.doesNotMatch(recordsPage, /const importActionsDisabled =[^;]+rangeLoading[^;]+;/,
+  "read-only search does not disable independent import file selection");
+assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 0 auto[^}]*flex-direction:\s*column/s,
+  "the records table panel consumes remaining page height for short and empty results");
+assert.match(styles, /\.consumption-table-scroll\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:/s,
+  "the table viewport, not synthetic rows, absorbs remaining height");
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
@@ -306,7 +348,7 @@ assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|con
 
 // Consumption Records remains the mutable Data workspace and excludes analysis duplication.
 assert.match(recordsPage, /ariaLabelledBy="consumptionTitle"[\s\S]*title="Consumption Records"/, "data-management leaf uses the approved name through the common shell");
-assert.match(recordsPage, /breadcrumb={breadcrumb}[\s\S]*eyebrow="Consumption \/ Attainment"[\s\S]*title="Consumption Records"/, "Consumption Records supplies its breadcrumb, eyebrow, and title through the shared shell");
+assert.match(recordsPage, /breadcrumb={breadcrumb}[\s\S]*title="Consumption Records"[\s\S]*headingSpacing="compact"/, "Consumption Records supplies its breadcrumb and title through the compact shared masthead without a redundant eyebrow");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
 assert.match(recordsPage, /accept="\.csv,\.xlsx,text\/csv,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/, "Actual Import accepts CSV and XLSX files");
 assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, "Actual Import accepts multiple CSV or XLSX files");
@@ -451,7 +493,8 @@ assert.match(recordsPage, /Load More[\s\S]*All accounts loaded\./, "manual fallb
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /recordsReplacementLoading = recordsLoadingPhase === "initial" \|\| recordsLoadingPhase === "query"/, "initial and replacement queries share an explicit non-table loading gate");
 assert.match(recordsPage, /recordsViewState = resolveConsumptionRecordsViewState\([\s\S]*recordsReplacementLoading, dataMode, recordsQueryError, renderedRecordAccounts\.length\)/, "Records distinguishes loading, error, empty, and ready states from completed request data");
-assert.match(recordsPage, /recordsViewState === "loading" \? null[\s\S]*recordsViewState === "error"[\s\S]*Unable to load Consumption Records[\s\S]*consumption-table-panel/, "replacement loading hides the incomplete table and errors render separately before the completed table");
+assert.match(recordsPage, /consumption-table-panel[\s\S]*consumption-table-content[\s\S]*recordsViewState === "error"[\s\S]*Unable to load Consumption Records/,
+  "the table panel remains mounted through replacement loading and renders errors inside the stable data region");
 assert.match(recordsPage, /recordsViewState === "empty" &&[\s\S]*No Consumption Records match the selected range and filters\./, "the empty copy is reachable only from the completed empty state");
 assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*setRecordsQueryError\(message\)/, "replacement queries clear and set their own request error state without presenting stale counts");
 assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");

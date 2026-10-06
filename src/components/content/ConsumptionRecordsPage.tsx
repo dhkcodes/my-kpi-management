@@ -62,7 +62,7 @@ import {
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
-import { PageFilterPanel, PageShell } from "../common/PageShell";
+import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -445,6 +445,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [recordsHasMore, setRecordsHasMore] = useState(false);
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
   const [recordsQueryError, setRecordsQueryError] = useState("");
+  const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
   const blockingRecordsLoading = recordsLoadingPhase === "initial";
@@ -655,6 +656,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         searchExpanded.forEach((account) => next.add(account));
         return next;
       });
+      setLastDataLoadedAt(new Date());
       return page;
     } catch (error) {
       if (generation !== recordsRequestGeneration.current) return;
@@ -1529,6 +1531,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const controlsRequiringConfirmation = actualControlTotals.filter((control) => control.matchStatus !== "MATCH");
   if (controlsRequiringConfirmation.length > 0) pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${controlsRequiringConfirmation.length}건의 과거 또는 불일치 Control이 있습니다. Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
+  const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting
+    || importPhase !== "idle" || forecastImportPhase !== "idle";
+  const forecastImportActionsDisabled = !canWriteForecast || hasDraftChanges || dataMode !== "backend"
+    || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle";
+  const exportActionsDisabled = recordsReplacementLoading || dataMode !== "backend" || isSaving || isExporting
+    || importPhase === "previewing" || importPhase === "applying" || forecastImportPhase === "applying";
   const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
     || importPhase === "previewing" || importPhase === "applying"
     || forecastImportPhase === "previewing" || forecastImportPhase === "applying";
@@ -1536,45 +1544,40 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const refreshRecords = async () => {
-    setImportError("");
-    await runRecordsQuery({ fromQuarter, toQuarter, search: appliedSearchRef.current }, selectedPillar);
-  };
-
   return (
     <PageShell className="consumption-page" ariaLabelledBy="consumptionTitle"
       rootAttributes={{ "data-fiscal-year": fiscalYear }}
       scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={handlePageScroll}
-      breadcrumb={breadcrumb} eyebrow="Consumption / Attainment" title="Consumption Records"
-      busy={pageBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
-      refreshDisabled={hasDraftChanges || !!forecastEditor || pageBusy || dataMode !== "backend" || !rangeValid}
+      breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
+      busy={pageBusy} busyLabel={pageBusyLabel}
+      activityPosition="custom"
       actions={<div class="consumption-import-actions">
           <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
-            disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleActualFiles(event)} />
+            disabled={importActionsDisabled} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onChange={(event) => void handleForecastWorkbookFile(event)} />
-          <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={!canWriteForecast || hasDraftChanges || rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => forecastFileInputRef.current?.click()}>
+            disabled={forecastImportActionsDisabled} onChange={(event) => void handleForecastWorkbookFile(event)} />
+          <oj-button chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={forecastImportActionsDisabled} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>
           <oj-button chroming="outlined" title="Export FORECAST data in the Excel template format"
-            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            disabled={exportActionsDisabled}
             onojAction={() => void exportForecastXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={!canWrite || hasDraftChanges || rangeLoading || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle"} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={importActionsDisabled} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in the Consumption Import CSV format"
-            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            disabled={exportActionsDisabled}
             onojAction={() => void exportImportCompatibleCsv()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
           <oj-button chroming="outlined" title="Export ACTUAL data in Excel format"
-            disabled={rangeLoading || dataMode !== "backend" || isSaving || isExporting || importPhase === "previewing" || importPhase === "applying"}
+            disabled={exportActionsDisabled}
             onojAction={() => void exportActualXlsx()}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Actual Excel Export"}
@@ -1809,37 +1812,43 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         </section>
       )}
 
-      {recordsViewState === "loading" ? null : recordsViewState === "error" ? (
-        <section class="kpi-panel consumption-table-panel consumption-table-panel--error" aria-live="assertive">
-          <div class="consumption-empty-state" role="alert">
-            <strong>Unable to load Consumption Records.</strong>
-            <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
-          </div>
-        </section>
-      ) : (
-      <section class="kpi-panel consumption-table-panel" aria-labelledby="consumptionTableTitle">
+      <section class={`kpi-panel consumption-table-panel${recordsViewState === "error" ? " consumption-table-panel--error" : ""}`} aria-labelledby="consumptionTableTitle">
 
         <div class="consumption-section-heading consumption-table-heading">
-          <div>
-            <strong id="consumptionTableTitle" class="consumption-table-title">Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small></strong></div>
-          <div class="consumption-table-heading__actions">
-            {showMtd && currentMtdAppliedDate
-              ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
-            <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
-              disabled={dataMode !== "backend" || !currentMtdPeriod}
-              onClick={() => setShowMtd((current) => !current)}>
-              <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-            </button>
-            {hasDraftChanges && (
-              <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
-                <span>Draft changes</span>
-                <oj-button chroming="callToAction" disabled={!canWrite || isSaving} title={!canWrite ? "Write permission is required." : undefined} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
-                <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
-              </div>
-            )}
+          <strong id="consumptionTableTitle" class="consumption-table-title">
+            Account / Plan Consumption <small class="consumption-table-plan-count">{visiblePlans.length} plans</small>
+          </strong>
+          <div class="consumption-records-toolbar" role="toolbar" aria-label="Consumption Records data controls">
+            <div class="consumption-records-toolbar__left">
+              {showMtd && currentMtdAppliedDate
+                ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
+              <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
+                disabled={dataMode !== "backend" || !currentMtdPeriod}
+                onClick={() => setShowMtd((current) => !current)}>
+                <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+              </button>
+            </div>
+            <div class="consumption-records-toolbar-activity">
+              <PageActivity busy={pageBusy} busyLabel={pageBusyLabel}
+                lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} />
+            </div>
           </div>
+          {hasDraftChanges && (
+            <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
+              <span>Draft changes</span>
+              <oj-button chroming="callToAction" disabled={!canWrite || isSaving} title={!canWrite ? "Write permission is required." : undefined} onojAction={saveForecasts}>{isSaving ? "Saving…" : "Save"}</oj-button>
+              <oj-button chroming="outlined" disabled={isSaving} onojAction={cancelAllForecasts}>Cancel</oj-button>
+            </div>
+          )}
         </div>
         <div id="consumptionTableContent" class="consumption-table-content">
+          <PageDataProgress busy={pageBusy} busyLabel={pageBusyLabel} />
+          {recordsViewState === "error" ? (
+            <div class="consumption-empty-state" role="alert">
+              <strong>Unable to load Consumption Records.</strong>
+              <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
+            </div>
+          ) : <>
         <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
           <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
           <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
@@ -1925,9 +1934,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
           <small>Showing {loadedAccountCount} of {recordsTotalAccounts} accounts · {visiblePlans.length} plans</small>
         </div>
+          </>}
         </div>
       </section>
-      )}
     </PageShell>
   );
 }
