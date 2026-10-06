@@ -7,6 +7,7 @@ import {
   ConsumptionPlan,
   ConsumptionPillar,
   ConsumptionSignal,
+  applyConsumptionAccountForecastResolutions,
   applyConsumptionMtdDisplayOverride,
   aggregateConsumptionAccounts,
   aggregateConsumptionActualTotals,
@@ -1473,27 +1474,18 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       const manualChartCoordinate = manualExact === undefined ? undefined : exactDecimalToChartCoordinate(manualExact);
       return [month, resolveConsumptionControlTotal(series.plans, month, manualChartCoordinate)];
     })) : {};
-    const baseDisplaySeries: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number] = accountLevel && "plans" in series ? {
-      ...series,
-      actuals: Object.fromEntries(allMonths.flatMap((month) => {
-        const resolution = accountResolutions[month];
-        return !editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
-      })),
-      actualsExact: Object.fromEntries(allMonths.flatMap((month) => {
-        const resolution = accountResolutions[month];
-        return !editablePeriodIds.has(month) && resolution?.amountExact !== null ? [[month, resolution.amountExact]] : [];
-      })),
-      forecasts: Object.fromEntries(allMonths.flatMap((month) => {
-        const resolution = accountResolutions[month];
-        return editablePeriodIds.has(month) && resolution?.amount !== null ? [[month, resolution.amount]] : [];
-      })),
-      forecastsExact: Object.fromEntries(allMonths.flatMap((month) => {
+    const baseDisplaySeries: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number] = accountLevel && "plans" in series
+      ? applyConsumptionAccountForecastResolutions(series, allMonths.map((month) => {
         const resolution = accountResolutions[month];
         const manualExact = controlValueExact(draftControlTotals, series.customer, month);
-        const amountExact = manualExact ?? resolution?.amountExact;
-        return editablePeriodIds.has(month) && amountExact !== null && amountExact !== undefined ? [[month, amountExact]] : [];
+        return {
+          period: month,
+          editable: editablePeriodIds.has(month),
+          amount: resolution?.amount ?? null,
+          amountExact: manualExact ?? resolution?.amountExact ?? null
+        };
       }))
-    } : { ...series };
+      : { ...series };
     const currentMtdExact = accountLevel && "plans" in series
       ? serverAccountMtdTotals[series.customer] ?? {}
       : "mtdsExact" in series ? series.mtdsExact ?? {} : {};

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   ConsumptionPlan,
+  applyConsumptionAccountForecastResolutions,
   applyConsumptionMtdDisplayOverride,
   aggregateConsumptionAccounts,
   countUniqueConsumptionPlans,
@@ -104,6 +105,45 @@ assert.equal(isConsumptionMtdDisplayPeriod(true, "FY27-SEP", {}, "FY27-SEP"), fa
   "a missing current-period MTD remains an editable Forecast cell");
 assert.equal(isConsumptionMtdDisplayPeriod(true, "FY27-SEP", { "FY27-SEP": "1" }, "FY27-SEP"), true,
   "an existing current-period MTD is rendered as a read-only MTD cell");
+const zeroMtdDisplay = applyConsumptionMtdDisplayOverride(
+  mtdSource, "FY27-SEP", { "FY27-SEP": "0" }, true);
+assert.equal(zeroMtdDisplay.actuals["FY27-SEP"], 0,
+  "an explicit current-period MTD zero remains a valid displayed value");
+assert.equal(zeroMtdDisplay.actualsExact?.["FY27-SEP"], "0");
+assert.equal(Object.prototype.hasOwnProperty.call(zeroMtdDisplay.forecasts, "FY27-SEP"), false,
+  "the displayed MTD zero is not double-counted with the Forecast");
+assert.equal(mtdSource.forecasts["FY27-SEP"], 123,
+  "MTD display does not mutate the source Forecast, so Show MTD OFF restores it");
+
+const accountDisplaySource = {
+  id: "account-display",
+  customer: "Account Display",
+  endUser: "Multiple",
+  planId: "",
+  dataCenter: "Multiple",
+  planType: "Aggregate" as const,
+  actuals: { "FY27-AUG": 0, "FY27-SEP": 617 },
+  actualsExact: { "FY27-AUG": "0", "FY27-SEP": "617" },
+  forecasts: { "FY27-SEP": 999, "FY27-OCT": 900 },
+  forecastsExact: { "FY27-SEP": "999", "FY27-OCT": "900" },
+  plans: []
+};
+const accountDisplay = applyConsumptionAccountForecastResolutions(accountDisplaySource, [
+  { period: "FY27-SEP", editable: false, amount: 1000, amountExact: "1000" },
+  { period: "FY27-OCT", editable: true, amount: 1000, amountExact: "1000" }
+]);
+assert.equal(accountDisplay.actualsExact?.["FY27-SEP"], "617",
+  "a closed-month Account Forecast must not replace the authoritative Account Actual");
+assert.equal(Object.prototype.hasOwnProperty.call(accountDisplay.forecasts, "FY27-SEP"), false,
+  "a closed month must not retain a Forecast fallback beside its Actual");
+assert.equal(accountDisplay.forecastsExact?.["FY27-OCT"], "1000",
+  "an editable month uses the Account Forecast resolution");
+assert.equal(accountDisplay.actualsExact?.["FY27-AUG"], "0",
+  "an explicit zero Actual remains distinct from a missing Actual");
+assert.equal(Object.prototype.hasOwnProperty.call(accountDisplay.actuals, "FY27-JUL"), false,
+  "a missing Actual is not manufactured as zero");
+assert.equal(accountDisplaySource.forecastsExact?.["FY27-SEP"], "999",
+  "display resolution does not mutate the source used when pillar or Show MTD selection changes");
 const visibilityPlans: ConsumptionPlan[] = [
   { ...parsed.plans[0], id: "zero", planId: "ZERO", actuals: { "FY27-JUL": 0 }, forecasts: {} },
   { ...parsed.plans[0], id: "active", planId: "ACTIVE", actuals: { "FY27-JUL": -1 }, forecasts: {} },

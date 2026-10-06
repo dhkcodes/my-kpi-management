@@ -473,6 +473,49 @@ export type ConsumptionControlResolution = Readonly<{
   source: "MANUAL" | "DETAIL";
 }>;
 
+type ConsumptionDisplaySeries = Readonly<{
+  actuals: Readonly<Record<string, number>>;
+  forecasts: Readonly<Record<string, number>>;
+  actualsExact?: Readonly<Record<string, string>>;
+  forecastsExact?: Readonly<Record<string, string>>;
+}>;
+
+type ConsumptionAccountForecastResolution = Readonly<{
+  period: string;
+  editable: boolean;
+  amount: number | null;
+  amountExact: string | null;
+}>;
+
+/**
+ * Apply Account Forecast controls only to editable Forecast periods.
+ * Closed-period Actuals are authoritative, including explicit zero; a missing
+ * Actual remains missing and is never manufactured from a Forecast control.
+ */
+export const applyConsumptionAccountForecastResolutions = <T extends ConsumptionDisplaySeries>(
+  series: T,
+  resolutions: readonly ConsumptionAccountForecastResolution[]
+): T => {
+  const forecasts = { ...series.forecasts };
+  const forecastsExact = { ...(series.forecastsExact ?? {}) };
+  resolutions.forEach(({ period, editable, amount, amountExact }) => {
+    if (!editable || amount === null || amountExact === null) {
+      delete forecasts[period];
+      delete forecastsExact[period];
+      return;
+    }
+    forecasts[period] = amount;
+    forecastsExact[period] = amountExact;
+  });
+  return {
+    ...series,
+    actuals: { ...series.actuals },
+    actualsExact: series.actualsExact ? { ...series.actualsExact } : undefined,
+    forecasts,
+    forecastsExact
+  };
+};
+
 /** Resolve a Multiple row without conflating an absent child fact with an explicit zero. */
 export const resolveConsumptionControlTotal = (
   plans: readonly ConsumptionPlan[],
