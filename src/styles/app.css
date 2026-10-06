@@ -6062,6 +6062,14 @@ h4.weekly-activity-section-label--next-week,
   min-width: 0;
   overflow: hidden;
 }
+/* Neutralize legacy Forecast page scrolling now that PageShell owns the body scroll. */
+.kap-page-shell.forecast-actual-page {
+  grid-auto-rows: minmax(0, 1fr);
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 1rem;
+}
 .kap-page-shell__scroll {
   box-sizing: border-box;
   height: 100%;
