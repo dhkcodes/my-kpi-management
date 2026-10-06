@@ -5926,9 +5926,18 @@ h4.weekly-activity-section-label--next-week,
 /* Reusable viewport-bound page shell. Only pages that opt in with .kap-page-shell are affected. */
 .kpi-shell:has(.kap-page-shell) {
   box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
+  padding-bottom: 0;
+}
+.kpi-shell:has(.kap-page-shell) .kpi-footer {
+  position: static;
+  bottom: auto;
+  margin-inline: 1.5rem;
+  width: auto;
 }
 .kpi-shell__body:has(.kap-page-shell) { flex: 1 1 0; min-height: 0; overflow: hidden; }
 .kpi-content:has(.kap-page-shell) { grid-template-rows: minmax(0, 1fr); min-height: 0; overflow: hidden; }
@@ -5998,7 +6007,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-table-heading { align-items: stretch; flex-direction: column; margin-bottom: .15rem; }
 .kap-page-shell.consumption-page .consumption-table-heading__left { padding-left: .5rem; }
 .consumption-records-toolbar { align-items: flex-end; display: flex; gap: .6rem; justify-content: space-between; min-width: 0; width: 100%; }
-.consumption-records-toolbar__left { align-items: center; border: 0; background: transparent; display: flex; flex-direction: row; gap: .55rem; min-width: 0; }
+.consumption-records-toolbar__left { align-items: center; border: 0; background: transparent; display: flex; flex-direction: row; gap: .55rem; min-width: 0; padding-inline-start: .5rem; }
 .consumption-records-toolbar-activity { align-items: flex-end; display: flex; flex: 0 0 auto; justify-content: flex-end; min-width: 0; }
 .consumption-records-toolbar-activity .kap-page-activity { justify-content: flex-end; }
 .consumption-viewport-controls { inset: 0; opacity: 0; position: fixed; pointer-events: none; visibility: hidden; z-index: 18; }
@@ -6011,6 +6020,7 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-page .consumption-forecast-cell { touch-action: pan-x pan-y pinch-zoom; }
 
 @media (max-width: 760px) {
+  .kpi-shell:has(.kap-page-shell) .kpi-footer { margin-inline: .75rem; }
   .kpi-content:has(.kap-page-shell) { padding: .75rem; }
   .kap-page-shell__scroll { -webkit-overflow-scrolling: touch; scrollbar-gutter: auto; }
   .kap-page-shell__heading { align-items: stretch; flex-direction: column; gap: .55rem; }
@@ -6034,21 +6044,6 @@ h4.weekly-activity-section-label--next-week,
 }
 
 @media (max-height: 520px) {
-  .kpi-shell:has(.kap-page-shell) {
-    height: auto;
-    min-height: 100dvh;
-    overflow: visible;
-  }
-
-  .kpi-shell__body:has(.kap-page-shell),
-  .kpi-content:has(.kap-page-shell),
-  .kap-page-shell,
-  .kap-page-shell__scroll {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-
   .kap-page-shell__heading {
     align-items: stretch;
     flex-direction: column;
@@ -6057,10 +6052,6 @@ h4.weekly-activity-section-label--next-week,
   .kap-page-shell__heading-actions {
     justify-content: flex-start;
     width: 100%;
-  }
-
-  .kap-page-shell__body {
-    flex: 0 0 auto;
   }
 }
 

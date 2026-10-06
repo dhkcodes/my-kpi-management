@@ -99,8 +99,8 @@ assert.match(styles, /\.consumption-scroll-controls button:first-child[^}]*right
   "both horizontal controls stay grouped at the visible table's right edge and share its fixed vertical center");
 assert.match(styles, /\.consumption-page__header h1,\s*\.kap-page-shell\.consumption-page \.kap-page-shell__heading-copy h1\s*\{[^}]*font-size:\s*1\.65rem[^}]*font-weight:\s*700[^}]*line-height:\s*1\.2/s,
   "Analysis and Records use the same responsive Consumption page-title rule on desktop and mobile");
-assert.match(styles, /\.consumption-records-toolbar__left\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
-  "Show MTD keeps its switch but drops the surrounding rectangular box");
+assert.match(styles, /\.consumption-records-toolbar__left\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*padding-inline-start:\s*\.5rem;/s,
+  "Show MTD keeps its borderless switch and aligns with the table's inner content line");
 assert.doesNotMatch(recordsPage, /Account \/ Plan Consumption|consumption-table-plan-count/,
   "the old table title and plan-count summary stay removed");
 assert.doesNotMatch(recordsPage, /visible Plans|Account Forecast ·/,
@@ -109,8 +109,12 @@ assert.match(app, /kap-auth-checking__surface[\s\S]*<Footer \/>/,
   "the authentication frame reserves the same root and fixed-footer geometry before the page mounts");
 assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
   "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
-assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kpi-shell:has\(\.kap-page-shell\)[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
-  "low landscape viewports release the fixed app shell so the document can scroll");
+assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
+  "shared KAP pages reserve the real footer row and keep the viewport itself from scrolling");
+assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\) \.kpi-footer\s*\{[^}]*position:\s*static;[^}]*bottom:\s*auto;/s,
+  "shared KAP pages keep the footer in the shell grid so its actual responsive height cannot cover page content");
+assert.doesNotMatch(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kpi-shell:has\(\.kap-page-shell\)[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
+  "low landscape viewports retain the fixed shell and root-owned scrolling");
 assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__heading\s*\{[^}]*flex-direction:\s*column;/,
   "low landscape viewports stack the page title above actions instead of overlapping them");
 
