@@ -57,6 +57,16 @@ export function PageActivity({
   lastCompletedAt = null,
   showBusyLabel = true
 }: PageActivityProps) {
+  const refreshSlotRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const slot = refreshSlotRef.current;
+    if (!slot) return;
+    const handleRefreshClick = () => {
+      if (!busy && !refreshDisabled) void onRefresh?.();
+    };
+    slot.addEventListener("click", handleRefreshClick);
+    return () => slot.removeEventListener("click", handleRefreshClick);
+  }, [busy, onRefresh, refreshDisabled]);
   if (!busy && !onRefresh && !lastCompletedAt) return null;
   return (
     <div class={`kap-page-activity${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
@@ -64,8 +74,7 @@ export function PageActivity({
         {lastCompletedAt && <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt.toISOString()}>
           {formatKstTimestamp(lastCompletedAt)}
         </time>}
-        <span class="kap-page-activity__control-slot"
-          onClick={busy || refreshDisabled || !onRefresh ? undefined : () => void onRefresh()}>
+        <span ref={refreshSlotRef} class="kap-page-activity__control-slot">
           {busy ? (
             <span class="kap-page-activity__status">
               <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
