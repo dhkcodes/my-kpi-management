@@ -34,8 +34,8 @@ assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*fl
 assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.1rem/s,
   "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
 assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
-assert.match(pageShell, /aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*onojAction=\{\(\) => void onRefresh\?\.\(\)\}[\s\S]*oj-ux-ico-refresh/,
-  "the optional icon-only Refresh action uses Oracle JET's physical activation event");
+assert.match(pageShell, /kap-page-activity__control-slot[\s\S]*onClick=\{busy \|\| refreshDisabled \|\| !onRefresh \? undefined : \(\) => void onRefresh\(\)\}[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*oj-ux-ico-refresh/,
+  "the icon-only Refresh action handles the physical click at the stable slot surrounding Oracle JET's button");
 assert.doesNotMatch(pageShell, /oj-ux-ico-refresh[^>]*><\/span>\s*Refresh/,
   "Refresh does not render a visible text label beside the icon");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
