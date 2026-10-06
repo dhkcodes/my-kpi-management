@@ -119,6 +119,8 @@ assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fisc
   "PageShell routes that preserve the Fiscal Year selector expose the two-row layout modifier");
 assert.match(styles, /\.kpi-content\.is-kap-page-shell-route\.has-fiscal-year-panel\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s,
   "the preserved Fiscal Year selector occupies its original row above the viewport-bound PageShell");
+assert.match(styles, /\.kap-page-shell\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\)/s,
+  "PageShell constrains its content row so tall mobile pages scroll internally instead of expanding beneath the fixed footer");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
   "shared KAP pages reserve the real footer row and keep the viewport itself from scrolling");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\) \.kpi-footer\s*\{[^}]*position:\s*static;[^}]*bottom:\s*auto;/s,
