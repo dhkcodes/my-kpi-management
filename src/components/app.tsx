@@ -632,7 +632,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
 
 
     return (
-      <div id="appContainer" class="oj-web-applayout-page kpi-shell">
+      <div id="appContainer" class={`oj-web-applayout-page kpi-shell${activeRoute.module === "consumptionRecords" ? " is-kap-page-shell-route" : ""}`}>
         <Header
           appName={appName}
           profile={profile}

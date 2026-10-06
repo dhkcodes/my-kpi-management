@@ -34,10 +34,10 @@ assert.match(styles, /\.kap-page-shell__masthead\s*\{[^}]*display:\s*flex[^}]*fl
 assert.match(styles, /\.kap-page-shell__masthead\.is-compact\s*\{[^}]*gap:\s*\.1rem/s,
   "the compact spacing is a shared masthead rule without leaving an eyebrow-sized gap");
 assert.match(pageShell, /oj-progress-circle/, "the common activity control exposes Oracle JET progress");
-assert.match(pageShell, /refreshSlotRef[\s\S]*addEventListener\("click", handleRefreshClick\)[\s\S]*ref=\{refreshSlotRef\}[\s\S]*aria-label="Refresh"[\s\S]*title="Refresh"[\s\S]*oj-ux-ico-refresh/,
-  "the icon-only Refresh action binds a physical click listener to the stable slot surrounding Oracle JET's button");
-assert.doesNotMatch(pageShell, /oj-ux-ico-refresh[^>]*><\/span>\s*Refresh/,
-  "Refresh does not render a visible text label beside the icon");
+assert.match(pageShell, /refreshSlotRef[\s\S]*addEventListener\("click", handleRefreshClick\)[\s\S]*ref=\{refreshSlotRef\}[\s\S]*aria-label="Refresh"[\s\S]*title=\{refreshTitle\}[\s\S]*oj-ux-ico-refresh/,
+  "the shared Refresh action binds a physical click listener and exposes the full KST timestamp as a tooltip");
+assert.match(pageShell, /compactTimestampButton\?[\s\S]*formatKstTime[\s\S]*Reload[\s\S]*kap-page-activity__separator/,
+  "the reusable opt-in compact Refresh control combines JET icon, Reload, separator, and HH:mm:ss");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
@@ -79,8 +79,8 @@ assert.doesNotMatch(recordsPage, /const exportActionsDisabled =[^;]+(?:pageBusy|
   "Forecast Export, Actual Export, and Actual Excel Export stay enabled while a search is in flight");
 assert.match(recordsPage, /const snapshotAppliedExportQuery = \(\): ExportQuerySnapshot => \{\s*const appliedQuery = recordsQueryRef\.current;/,
   "export clicks snapshot the last successfully applied query instead of draft controls");
-assert.match(recordsPage, /exportActualImportCompatibleCsv\(snapshotAppliedExportQuery\(\)\)/,
-  "Actual Export snapshots the applied query at click time");
+assert.match(recordsPage, /const exportActualImportCompatibleCsv = async \(requestQuery: ExportQuerySnapshot\)[\s\S]*exportConsumptionImportCompatibleCsv\(/,
+  "the hidden Actual CSV path and its applied-query safety logic remain available without a rendered button");
 assert.match(recordsPage, /const snapshotAppliedExportQuery = \(\): ExportQuerySnapshot => \{[\s\S]*recordsQueryRef\.current/,
   "Export clicks derive criteria from the applied records query");
 assert.match(recordsPage, /recordsQueryRef\.current = \{[\s\S]*fromQuarter:\s*page\.fromQuarter[\s\S]*toQuarter:\s*page\.toQuarter/,
@@ -414,8 +414,9 @@ assert.match(recordsPage, /renderSalesRepPreview\(pendingForecastImport\.preview
 assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Changed[\s\S]*Unchanged/, "Sales Rep preview exposes account, before-to-after, and changed/unchanged semantics");
 assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
 assert.match(recordsPage, /exportConsumptionForecastXlsx[\s\S]*exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
-assert.match(recordsPage, /\{isExporting \? "Exporting…" : "Actual Export"\}[\s\S]*title="Export ACTUAL data in Excel format"[\s\S]*\{isExporting \? "Exporting…" : "Actual Excel Export"\}/, "Actual CSV Export remains available with one adjacent Excel Export control");
-assert.match(recordsPage, /exportConsumptionActualXlsx\(\)/, "Actual Excel Export is wired to the XLSX API helper");
+assert.doesNotMatch(recordsPage, /title="Export ACTUAL data in the Consumption Import CSV format"/, "Actual CSV Export is hidden from the toolbar without deleting its helper");
+assert.match(recordsPage, /title="Export ACTUAL data in Excel format"[\s\S]*\{isExporting \? "Exporting…" : "Actual Export"\}/, "the visible Actual Export is the XLSX control");
+assert.match(recordsPage, /exportConsumptionActualXlsx\(\)/, "Actual Export remains wired to the XLSX API helper");
 assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompositionCategory \} \| null>/, "Forecast composition supports All and each classified drill category");
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
@@ -527,7 +528,8 @@ assert.match(recordsPage, /useEffect\(\(\) => \{[\s\S]*const root = pageScrollRe
 assert.match(recordsPage, /recordsHasMore[\s\S]*loadRecordsPage\(true\)/, "near-bottom scroll and Load More request the next server page");
 assert.match(recordsPage, /IntersectionObserver[\s\S]*loadMoreRecordsRef\.current\(\)[\s\S]*\{ root, rootMargin/, "the common page scroll root observes a paging sentinel through the latest append callback");
 assert.match(recordsPage, /data-records-sentinel/, "the table scroll region owns the paging sentinel");
-assert.match(recordsPage, /Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "server total account metadata drives the loading summary");
+assert.match(recordsPage, /Showing\s*<strong class="consumption-records-count-value">\{loadedAccountCount\}<\/strong>\s*of\s*<strong class="consumption-records-count-value">\{recordsTotalAccounts\}<\/strong>\s*accounts/,
+  "server total account metadata drives the highlighted loading summary");
 assert.doesNotMatch(recordsPage, /visiblePlans\.length\} plans/, "the plan-count display is removed rather than hiding a specific value");
 assert.match(recordsPage, /Load More[\s\S]*All accounts loaded\./, "manual fallback and final-page states remain explicit while loading uses the shared overlay");
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
@@ -618,7 +620,8 @@ assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S
 assert.match(insightsPage, /contributionPercentText\(plan\.percentageExact\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidthChartCoordinate\(plan\.percentageExact\)\}%/, "Plan Contribution uses each exact Plan percentage and projects only the visual track width");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
 assert.doesNotMatch(recordsPage, /consumption-records-loading|Loading Consumption Records/u, "Records footer uses the shared app loading overlay instead of a local status");
-assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing \{loadedAccountCount\} of \{recordsTotalAccounts\} accounts/, "Records always reserves its Load More and Showing footer");
+assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing\s*<strong class="consumption-records-count-value">\{loadedAccountCount\}<\/strong>\s*of\s*<strong class="consumption-records-count-value">\{recordsTotalAccounts\}<\/strong>\s*accounts/,
+  "Records always reserves its Load More and highlighted Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
 assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Records uses the full Accounts & Workloads loader instead of flashing an initializing Apply control");
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
@@ -685,5 +688,30 @@ assert.match(forecastActualPage, /onInput[\s\S]*setAccount\(""\)/, "typing away 
 assert.doesNotMatch(forecastActualPage, /Plan|Opportunity/, "the Account-level comparison does not mix Plan or Opportunity data into Forecast and Actual");
 assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
 assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
+
+assert.match(app, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
+  "the authenticated shell opts into the Records viewport layout before the child surface mounts");
+assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
+  "the content layout is route-stable during Home to Records navigation without relying only on :has timing");
+assert.match(recordsPage, /<PageActivity[\s\S]*compactTimestampButton/,
+  "Records opts into the reusable compound Reload and HH:mm:ss control");
+assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,
+  "the legacy Actual CSV export action is hidden without deleting its underlying export function");
+assert.match(recordsPage, /title="Export ACTUAL data in Excel format"[\s\S]*Actual Export/,
+  "the visible Actual Export remains the XLSX download");
+assert.match(recordsPage, /const exportActionsDisabled = hasDraftChanges \|\| isSaving[\s\S]*disabled=\{exportActionsDisabled\}/,
+  "exports preserve draft and mutation conflict protection");
+assert.doesNotMatch(recordsPage, /const exportActionsDisabled =[^;]+(?:dataMode|rangeLoading|recordsLoading|recordsReplacementLoading|isExporting)[^;]+;/,
+  "initial loading, search, refresh, and a sibling export render do not bulk-disable valid XLSX actions");
+assert.doesNotMatch(recordsPage, /const export(?:ActualXlsx|ForecastXlsx) = async \(\) => \{[^}]*dataMode/s,
+  "valid XLSX export endpoints remain callable before the Records query settles");
+assert.match(recordsPage, /consumption-quarter-label[\s\S]*consumption-month-label[\s\S]*consumption-data-kind/,
+  "quarter, month, Forecast, and Actual headers expose distinct semantic styling hooks");
+assert.match(recordsPage, /consumption-records-count-value[^>]*>\{loadedAccountCount\}[\s\S]*consumption-records-count-value[^>]*>\{recordsTotalAccounts\}/,
+  "both live account counts are individually highlighted");
+assert.match(styles, /\.consumption-records-toolbar\s*\{[^}]*gap:\s*0[^}]*margin:\s*0/s,
+  "the Records toolbar removes outer vertical gaps between filters and the table");
+assert.match(styles, /\.consumption-import-actions\.is-compact[\s\S]*min-height:\s*2\.25rem/s,
+  "Records action buttons are compact while retaining the mobile minimum touch size override");
 
 console.log("consumptionUiContract tests passed");
