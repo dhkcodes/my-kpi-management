@@ -83,6 +83,8 @@ assert.match(recordsPage, /exportActualImportCompatibleCsv\(snapshotAppliedExpor
   "Actual Export snapshots the applied query at click time");
 assert.match(recordsPage, /const snapshotAppliedExportQuery = \(\): ExportQuerySnapshot => \{[\s\S]*recordsQueryRef\.current/,
   "Export clicks derive criteria from the applied records query");
+assert.match(recordsPage, /recordsQueryRef\.current = \{[\s\S]*fromQuarter:\s*page\.fromQuarter[\s\S]*toQuarter:\s*page\.toQuarter/,
+  "the first successful response stores its resolved quarter range as the last applied query");
 assert.doesNotMatch(recordsPage, /const importActionsDisabled =[^;]+rangeLoading[^;]+;/,
   "read-only search does not disable independent import file selection");
 assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*flex:\s*1 0 auto[^}]*flex-direction:\s*column/s,
@@ -508,9 +510,9 @@ assert.match(recordsPage, /if \(append && \(recordsLoadingRef\.current[\s\S]*gen
 assert.match(recordsPage, /const requestQuery(?:: RecordsQuery)? = append \? recordsQueryRef\.current[\s\S]*offset: append \? recordsNextOffset : 0/, "append requests retain the last applied filter snapshot instead of unsubmitted draft controls");
 const recordsFetchIndex = recordsPage.indexOf("const page = await fetchConsumptionRecords");
 const recordsFreshnessIndex = recordsPage.indexOf("if (generation !== recordsRequestGeneration.current)");
-const recordsQueryCommitIndex = recordsPage.indexOf("recordsQueryRef.current = requestQuery");
+const recordsQueryCommitIndex = recordsPage.indexOf("recordsQueryRef.current = {");
 assert.ok(recordsFetchIndex >= 0 && recordsFreshnessIndex > recordsFetchIndex && recordsQueryCommitIndex > recordsFreshnessIndex, "a replacement query becomes append-authoritative only after its response succeeds and remains current");
-assert.match(recordsPage, /if \(!append\) \{\s*recordsQueryRef\.current = requestQuery;\s*setFromQuarter\(page\.fromQuarter\);\s*setToQuarter\(page\.toQuarter\);\s*setRangeInitialized\(true\);\s*setRangeTouched\(false\);\s*\}/, "append responses never overwrite query controls that remain editable during background loading");
+assert.match(recordsPage, /if \(!append\) \{\s*recordsQueryRef\.current = \{\s*\.\.\.requestQuery,\s*fromQuarter: page\.fromQuarter,\s*toQuarter: page\.toQuarter,\s*\};\s*setFromQuarter\(page\.fromQuarter\);\s*setToQuarter\(page\.toQuarter\);\s*setRangeInitialized\(true\);\s*setRangeTouched\(false\);\s*\}/, "append responses never overwrite query controls that remain editable during background loading");
 assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase, preserveDrafts\)/, "ETag changes restart paging with the same applied query and draft-preservation mode before snapshots can be mixed");
 assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:\s*"ACCOUNT"[\s\S]*direction:\s*"ASC"/, "records paging uses a stable server order without user-facing sort controls");
 assert.match(recordsPage, /new Map[\s\S]*page\.accountGroups[\s\S]*setSavedPlans[\s\S]*setDraftPlans/, "loaded account pages append with account and plan deduplication");
