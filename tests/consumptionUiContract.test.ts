@@ -655,8 +655,14 @@ assert.match(
 );
 
 assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
-assert.match(recordsPage, /actualControlTotals[\s\S]*matchStatus !== "MATCH"/, "stale or mismatched controls must remain visible rather than being silently omitted");
+assert.match(recordsPage, /actualControlRefreshState === "ready"[\s\S]*matchStatus !== "MATCH"/, "only a completed latest query can produce a Control mismatch warning from screen state");
+assert.match(recordsPage, /actualControlRefreshState === "failed"[\s\S]*Actual Control 최신 조회 실패[\s\S]*금액 불일치로 판정하지 않았습니다[\s\S]*서버에서 최신 Control과 Detail을 다시 검증/,
+  "a failed latest-Control query is distinct from a monetary mismatch and leaves server export validation authoritative");
+assert.match(recordsPage, /control\.account[\s\S]*control\.periodKey[\s\S]*control\.pillar[\s\S]*control\.actualState[\s\S]*Control[\s\S]*Detail[\s\S]*reason/,
+  "Control warnings identify Account, month, Pillar, Actual state, amounts, and reason");
 assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale control must show both amounts and the confirmation-required state");
+assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|Actual \{exactCurrency\(variance\.actualAmountExact\)\} · Final/,
+  "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
 assert.match(forecastActualPage, /aria-label="Include MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
