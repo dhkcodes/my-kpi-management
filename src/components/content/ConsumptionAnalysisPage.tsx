@@ -120,7 +120,7 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
   return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}><span>DC {display.primary}</span></span>;
 };
 
-export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) {
+export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; fiscalYears: readonly FiscalYear[]; onFiscalYearChange: (fiscalYear: FiscalYear) => void; breadcrumb?: ComponentChildren }>) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [includeMtd, setIncludeMtd] = useState(false);
   const [selectedSalesRep, setSelectedSalesRep] = useState("");
@@ -142,16 +142,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const requestGeneration = useRef(0);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setSelectedAccountContext("");
-    setSelectedSalesRep("");
-    setCandidateSearch("");
-    setDebouncedCandidateSearch("");
-    setSelectedAlertId("");
-    setSelectedAccountName("");
-    setSelectedMovement(null);
-  }, [fiscalYear]);
 
   useEffect(() => {
     if (candidateComposing) return;
@@ -321,6 +311,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
+  const fiscalYearControl = <label class="consumption-analysis-fy-control">
+    <span>Current FY <strong>{fiscalYear}</strong></span>
+    <select aria-label="Selected fiscal year" value={fiscalYear}
+      onChange={(event) => onFiscalYearChange(event.currentTarget.value as FiscalYear)}>
+      {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
+    </select>
+  </label>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
@@ -330,7 +327,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   };
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
-    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading} busyLabel="Loading analysis" onRefresh={refreshAnalysis}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
     <PageDataProgress busy={loading} busyLabel="Loading analysis" />
@@ -424,7 +421,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
   return <PageShell className="consumption-insights-page" ariaLabelledBy="consumptionAnalysisTitle"
     rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
-    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
     actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
       <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
@@ -439,17 +436,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </div>}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}
     filters={<PageFilterPanel className="consumption-insights-header-actions" ariaLabel="Consumption Analysis filters">
-        <div class="consumption-analysis-mtd-control">
-          {includeMtd && mtdAppliedDate
-            ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small>
-            : null}
-          <span class="kpi-section-label">MTD</span>
-          <button type="button" role="switch" aria-label="Include MTD" aria-checked={includeMtd}
-            disabled={loading || !analysis?.currentMtdAvailable} class="consumption-mtd-switch"
-            onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
-            <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-          </button>
-        </div>
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
@@ -498,9 +484,19 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
         </div>
         </div>
     </PageFilterPanel>}>
-    <div class="consumption-records-toolbar" data-html2canvas-ignore="true">
-      <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
-        onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
+    <div class="consumption-records-toolbar consumption-analysis-toolbar" role="toolbar" aria-label="Consumption Analysis data controls" data-html2canvas-ignore="true">
+      <div class="consumption-records-toolbar__left">
+        <button type="button" role="switch" aria-label="Show MTD" aria-checked={includeMtd}
+          disabled={loading || !analysis.currentMtdAvailable} class="consumption-mtd-switch"
+          onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
+          <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+        </button>
+        {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small> : null}
+      </div>
+      <div class="consumption-records-toolbar-activity">
+        <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
+          onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
+      </div>
     </div>
     <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
