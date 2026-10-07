@@ -1,7 +1,7 @@
 import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { beginAppBusy } from "../../app/appBusy";
-import { FiscalYear } from "../../data/kpiMockData";
+import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 import { formatMtdAppliedDate } from "../../data/mtdDate";
 import {
   ConsumptionAnalysis,
@@ -311,8 +311,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
-  const fiscalYearControl = <label class="consumption-analysis-fy-control">
-    <span>Current FY <strong>{fiscalYear}</strong></span>
+  const currentFiscalYear = getLatestFiscalYear();
+  const fiscalYearControl = <label class="consumption-analysis-fy-control"
+    aria-label={`Current FY ${currentFiscalYear}; selected ${fiscalYear}`}>
+    <span>Current FY <strong>{currentFiscalYear}</strong></span>
     <select aria-label="Selected fiscal year" value={fiscalYear}
       onChange={(event) => onFiscalYearChange(event.currentTarget.value as FiscalYear)}>
       {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}

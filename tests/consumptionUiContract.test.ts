@@ -140,6 +140,8 @@ assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MT
   "Records shows one compact UTC-basis MTD applied date beside the switch");
 assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*As of \{mtdAppliedDate\}[\s\S]*PageActivity/u,
   "Analysis places Show MTD at the toolbar left and Reload with KST time at the right");
+assert.match(insightsPage, /const currentFiscalYear = getLatestFiscalYear\(\)[\s\S]*Current FY <strong>\{currentFiscalYear\}<\/strong>[\s\S]*value=\{fiscalYear\}/,
+  "the current FY indicator stays independent from the user-selected fiscal year");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
   "FY, Pillar, Sales Rep, Account and MTD remain wired to the Analysis request");
 assert.match(insightsPage, /id="consumptionSalesRepContext"[\s\S]*id="consumptionAccountContext"/,
