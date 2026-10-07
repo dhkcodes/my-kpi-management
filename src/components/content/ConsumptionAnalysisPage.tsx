@@ -69,14 +69,15 @@ const actualEntryText = (status: "PROVIDED" | "MISSING", amountExact: string) =>
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MTD_COLOR = "#b56a3b";
-const OPEN_FORECAST_TOOLTIP = "FINAL periods are excluded. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
+const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
+const OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal. The denominator is covered-period total minus provisional MTD and includes finalized Actual. This is not the chart composition share.";
 const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip">
   <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label={label} aria-describedby={id}></button>
   <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
 </span>;
-const OpenForecastLabel = ({ tooltipId }: Readonly<{ tooltipId?: string }>) => {
+const OpenForecastLabel = ({ tooltipId, tooltipText = OPEN_FORECAST_TOOLTIP }: Readonly<{ tooltipId?: string; tooltipText?: string }>) => {
   const generatedId = useId();
-  return <span>Open Forecast <InfoTooltip id={tooltipId ?? `openForecastTooltip-${generatedId}`} label="Explain Open Forecast" text={OPEN_FORECAST_TOOLTIP} /></span>;
+  return <span>Open Forecast <InfoTooltip id={tooltipId ?? `openForecastTooltip-${generatedId}`} label="Explain Open Forecast" text={tooltipText} /></span>;
 };
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
 const ALL_ACCOUNTS = "All Accounts Total";
@@ -632,7 +633,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
       <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel tooltipId="coveredPeriodForecastTooltip" /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
-      <article class="kpi-panel"><span><OpenForecastLabel tooltipId="forecastExposureTooltip" /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
+      <article class="kpi-panel"><span><OpenForecastLabel tooltipId="forecastExposureTooltip" tooltipText={OPEN_FORECAST_EXPOSURE_TOOLTIP} /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
     </section>
 
