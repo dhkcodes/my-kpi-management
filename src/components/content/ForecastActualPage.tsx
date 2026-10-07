@@ -23,8 +23,6 @@ import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../c
 const formatAmount = (value: string | null, unavailable = "Unconfirmed") => value === null ? unavailable : formatExactKFixed(value, 2);
 const SortIndicator = ({ active, direction }: { active: boolean; direction: ForecastActualSortDirection }) => active
   ? <span class={`forecast-actual-sort-indicator is-${direction}`} aria-hidden="true"></span> : null;
-const ScrollChevron = ({ direction }: { direction: "left" | "right" }) => <span class={`forecast-actual-chevron is-${direction}`} aria-hidden="true"></span>;
-
 const shortStatus = (label: string) => {
   if (label === "Final shortfall") return "Final gap";
   if (label === "Projected MTD shortfall") return "Projected gap";
@@ -89,9 +87,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const [accountComposing, setAccountComposing] = useState(false);
   const [accountOptionCache, setAccountOptionCache] = useState<string[]>([]);
   const [activeAccountIndex, setActiveAccountIndex] = useState(0);
-  const [monthScroll, setMonthScroll] = useState({ left: false, right: false });
   const accountComboboxRef = useRef<HTMLDivElement>(null);
-  const monthScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSalesRep(""); setAccount(""); setAccountSearch(""); setAccountOptionCache([]); setResultFilter(null);
@@ -200,21 +196,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     return accountOptions.filter((option) => !query || option.toLocaleLowerCase().includes(query));
   }, [accountOptions, debouncedAccountSearch]);
 
-  const refreshMonthScrollState = () => {
-    const element = monthScrollRef.current;
-    if (!element) return setMonthScroll({ left: false, right: false });
-    setMonthScroll({ left: element.scrollLeft > 1, right: element.scrollLeft + element.clientWidth < element.scrollWidth - 1 });
-  };
-  useEffect(() => {
-    const frame = requestAnimationFrame(refreshMonthScrollState);
-    window.addEventListener("resize", refreshMonthScrollState);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", refreshMonthScrollState); };
-  }, [periods.length, rows.length]);
-  const scrollMonths = (direction: -1 | 1) => monthScrollRef.current?.scrollBy({ left: direction * Math.max(240, monthScrollRef.current.clientWidth * .72), behavior: "smooth" });
-  const handleMonthScrollKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault(); scrollMonths(event.key === "ArrowLeft" ? -1 : 1);
-  };
+
   const toggleSort = (key: ForecastActualSortKey) => {
     if (sortKey === key) return setSortDirection((current) => current === "asc" ? "desc" : "asc");
     setSortKey(key); setSortDirection(key === "salesRep" || key === "account" ? "asc" : "desc");
@@ -245,7 +227,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const selectedTotalActual = sumQuarterValue(selectedRangeResults, (result) => result.actualAmount);
 
   return <PageShell className="consumption-insights-page forecast-actual-page" ariaLabelledBy="forecastActualTitle"
-    breadcrumb={breadcrumb} eyebrow="Consumption / Forecast vs Actual" title="Forecast vs Actual"
+    breadcrumb={breadcrumb} title="Forecast vs Actual" headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
     actions={<div class="forecast-actual-control forecast-actual-mtd-control">
       <span>MTD</span>
@@ -256,8 +238,6 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
           <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
         </button>
-        <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results" onRefresh={() => setRefreshNonce((value) => value + 1)}
-          lastCompletedAt={lastCompletedAt} />
       </div>
     </div>}
     filters={<PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
@@ -320,12 +300,13 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       {resultFilter && <div class="forecast-actual-result-filter" role="status"><span>{resultFilter.quarter} · {resultLabel(resultFilter.status)}</span><button type="button" onClick={() => setResultFilter(null)}>Clear result filter</button></div>}
 
       <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar"><span class="forecast-actual-unit-note">Amount: K USD</span></div>
-        <div class="consumption-scroll-controls" aria-label="Monthly horizontal scroll controls">
-          <button type="button" aria-label="Scroll monthly columns left" disabled={!monthScroll.left} onClick={() => scrollMonths(-1)}><ScrollChevron direction="left" /></button>
-          <button type="button" aria-label="Scroll monthly columns right" disabled={!monthScroll.right} onClick={() => scrollMonths(1)}><ScrollChevron direction="right" /></button>
+        <div class="forecast-actual-matrix-toolbar">
+          <span class="forecast-actual-unit-note">Amount: K USD</span>
+          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
+            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
+            showBusyLabel={false} compactTimestampButton />
         </div>
-        <div class="forecast-actual-month-scroll" ref={monthScrollRef} tabIndex={0} onScroll={refreshMonthScrollState} onKeyDown={handleMonthScrollKeyDown}>
+        <div class="forecast-actual-matrix-layout">
           <table class="forecast-actual-matrix">
             <thead>
               <tr class="forecast-actual-group-header">

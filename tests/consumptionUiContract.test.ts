@@ -731,7 +731,10 @@ assert.match(forecastActualPage, /visibleForecastActualPeriods/, "monthly values
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
 assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
   "Consumption Analysis displays authoritative MTD metadata even when MTD amounts are excluded");
-assert.match(forecastActualPage, /monthScrollRef[\s\S]*handleMonthScrollKeyDown[\s\S]*scrollMonths/, "Forecast vs Actual provides synchronized month scrolling with buttons and keyboard controls");
+assert.doesNotMatch(forecastActualPage, /monthScrollRef|handleMonthScrollKeyDown|scrollMonths|consumption-scroll-controls/,
+  "Forecast vs Actual delegates scrolling to the shared root PageShell");
+assert.match(forecastActualPage, /forecast-actual-matrix-layout/,
+  "Forecast vs Actual keeps a non-clipping matrix layout inside the root scroller");
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account,[\s\S]*\.forecast-actual-matrix tbody \.is-rep[^{]*\{[^}]*position:\s*sticky/,
   "Forecast vs Actual keeps Account and Sales Rep fixed while grouped months scroll");
 assert.match(forecastActualSort, /compareNullableDecimal[\s\S]*compareExactDecimals[\s\S]*key === "forecast"[\s\S]*key === "actual"[\s\S]*key === "projected"[\s\S]*key\.slice\("month:"\.length\)/, "Forecast vs Actual numeric sort keys use exact-decimal comparison");
@@ -743,10 +746,10 @@ assert.doesNotMatch(forecastActualPage, /Plan|Opportunity/, "the Account-level c
 assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
 assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
 
-assert.match(app, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
-  "the authenticated shell opts into the Records viewport layout before the child surface mounts");
-assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
-  "the content layout is route-stable during Home to Records navigation without relying only on :has timing");
+assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+  "the authenticated shell opts into the shared viewport layout before the child surface mounts");
+assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+  "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
 assert.match(recordsPage, /<PageActivity[\s\S]*compactTimestampButton/,
   "Records opts into the reusable compound Reload and HH:mm:ss control");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,

@@ -60,14 +60,20 @@ assert.match(styles, /\.forecast-actual-status-cell[^}]*text-align:\s*center/u);
 for (const column of ["is-forecast", "is-actual", "is-difference", "is-status"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-(?:subhead|value)\\.${column}[^}]*background`, "u"), `${column} column has a readable distinguishing background`);
 }
-assert.match(styles, /\.forecast-actual-month-scroll[^}]*max-height:[^;}]+[^}]*overflow:\s*auto/u);
+assert.doesNotMatch(page, /forecast-actual-month-scroll|consumption-scroll-controls|handleMonthScrollKeyDown|monthScrollRef/u,
+  "Forecast vs Actual does not own an internal table scroller or scroll controls");
+assert.match(page, /forecast-actual-matrix-layout/u);
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.kap-page-shell__scroll[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/u,
+  "the shared root page shell owns both scroll axes");
+assert.match(styles, /\.forecast-actual-matrix-layout[^}]*overflow:\s*visible/u,
+  "the matrix layout stays visible instead of clipping right columns or lower rows");
 assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center/u,
   "Sales Rep values are centered");
 for (const column of ["is-forecast", "is-actual", "is-difference"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-value\\.${column}[^}]*text-align:\\s*right`, "u"), `${column} values are right aligned`);
 }
-assert.match(styles, /\.forecast-actual-matrix-shell > \.consumption-scroll-controls[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/u,
-  "horizontal scroll buttons stay at the visible matrix midpoint");
+assert.match(page, /forecast-actual-matrix-toolbar[^]*PageActivity[^]*showBusyLabel=\{false\} compactTimestampButton/u,
+  "Reload and completion time use the same compact table-toolbar activity treatment as Consumption Records");
 assert.match(styles, /--forecast-rep-width:\s*7rem[^}]*--forecast-month-width:\s*5\.5rem/u,
   "wide Forecast vs Actual columns are compacted without collapsing content");
 assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*min-width:\s*var\(--forecast-rep-width\)[^}]*width:\s*var\(--forecast-rep-width\)/u,
@@ -76,7 +82,8 @@ assert.match(styles, /\.forecast-actual-matrix \.forecast-actual-period-group[^}
   "period groups consume all compacted leaf-column widths");
 assert.match(page, /forecast-actual-control forecast-actual-mtd-control[^]*<span>MTD<\/span>[^]*forecast-actual-mtd-row/u,
   "MTD is a field label above its date and toggle row");
-assert.match(page, /onKeyDown=\{handleMonthScrollKeyDown\}/u);
+assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
+  "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);

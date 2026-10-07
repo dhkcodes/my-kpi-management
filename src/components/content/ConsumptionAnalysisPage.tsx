@@ -330,7 +330,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   };
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
-    breadcrumb={breadcrumb} eyebrow="Consumption / Analysis" title="Consumption Analysis" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
     busy={loading} busyLabel="Loading analysis" onRefresh={refreshAnalysis}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
     <PageDataProgress busy={loading} busyLabel="Loading analysis" />
@@ -424,7 +424,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
 
   return <PageShell className="consumption-insights-page" ariaLabelledBy="consumptionAnalysisTitle"
     rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
-    breadcrumb={breadcrumb} eyebrow="Consumption / Analysis" title="Consumption Analysis" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
     actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
       <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}

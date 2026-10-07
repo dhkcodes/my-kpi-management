@@ -6129,6 +6129,24 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-page .kap-page-shell__inner { gap: 0; }
 .kap-page-shell.consumption-page .kap-page-shell__masthead { margin-bottom: .375rem; }
 .kap-page-shell.consumption-insights-page .kap-page-shell__masthead + .kap-page-filter { margin-top: -.375rem; }
+.kap-page-shell.consumption-insights-page .kap-page-shell__heading-copy h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.2;
+  margin: .2rem 0;
+}
+.kap-page-filter.forecast-actual-toolbar,
+.kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: auto; overflow-y: auto; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: max-content; }
+.forecast-actual-matrix-shell { max-width: none; min-width: 100%; overflow: visible; width: max-content; }
+.forecast-actual-matrix-layout { min-width: 100%; overflow: visible; width: max-content; }
+.forecast-actual-matrix .is-quarter-result { left: 17.5rem; }
+.forecast-actual-matrix-toolbar { align-items: center; }
+@media (max-width: 760px) {
+  .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
+}
 .kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: 0; min-height: 0; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }
 .consumption-table-panel { display: flex; flex: 1 0 auto; flex-direction: column; }
