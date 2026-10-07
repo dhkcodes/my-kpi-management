@@ -115,8 +115,8 @@ assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "for
   "all three Consumption PageShell pages share the root content geometry");
 assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
   "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
-assert.match(insightsPage, /primaryFiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
-  "Analysis renders its selected FY button and menu beside the title");
+assert.match(insightsPage, /<oj-menu-button[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}[\s\S]*<oj-menu slot="menu"[\s\S]*onojMenuAction=\{handleFiscalYearMenuAction\}[\s\S]*titleControls=\{fiscalYearControl\}/u,
+  "Analysis renders the official Oracle JET outlined menu button beside the title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
 assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
@@ -138,10 +138,16 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*MTD updated \{mtdAppliedDate\}[\s\S]*PageActivity/u,
-  "Analysis places the MTD import/update date at the toolbar left and Reload with KST time at the right");
-assert.match(insightsPage, /aria-label=\{`Selected fiscal year \$\{fiscalYear\}`\}[\s\S]*role="menu" aria-label="Select fiscal year"[\s\S]*Earlier FYs…/,
-  "the selected FY opens a compact current/adjacent year menu with collapsed earlier years");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>MTD updated \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
+  "Analysis shows the MTD import/update date only while Show MTD is enabled");
+assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
+  "the JET fiscal-year menu keeps current and adjacent years visible with older years in an Earlier FYs submenu");
+assert.match(insightsPage, /const handleFiscalYearMenuAction[\s\S]*event\.detail\.selectedValue[\s\S]*fiscalYears\.includes\(year\)[\s\S]*onFiscalYearChange\(year\)/,
+  "the JET fiscal-year menu accepts only loaded FY values and preserves the existing FY selection callback");
+assert.doesNotMatch(insightsPage, /handleFiscalYearMenuKeyDown/,
+  "the native JET menu owns keyboard navigation rather than a custom key handler");
+assert.doesNotMatch(insightsPage, /role="menuitemradio"|consumption-analysis-fy-earlier/u,
+  "Analysis no longer maintains a custom ARIA menu implementation");
 assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
   "Analysis removes the Current FY prose and native FY select");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
@@ -166,6 +172,14 @@ assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*gap:\s*\.2rem[^}]*\
   "Analysis filter labels use the Records 3.2-pixel label-to-control gap and therefore the same filter height");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select,[\s\S]*\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter input\s*\{[^}]*font-size:\s*\.72rem;/s,
   "Analysis Sales Rep and Account controls use the Records 11.52-pixel font size");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*text-transform:\s*none;/s,
+  "Analysis Pillar label retains natural capitalization");
+assert.match(styles, /\.consumption-insights-filter\s*\{[^}]*text-transform:\s*none;/s,
+  "Analysis Sales Rep and Account labels retain natural capitalization");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-mtd-applied-date\s*\{[^}]*font-size:\s*\.78rem;/s,
+  "Analysis MTD timestamp matches the Reload auxiliary text size");
+assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__refresh\s*\{[^}]*font-size:\s*\.78rem;/,
+  "the compact Reload control retains the same .78rem font-size reference");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
