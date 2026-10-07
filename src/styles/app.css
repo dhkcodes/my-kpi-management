@@ -6154,6 +6154,8 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-insights-page .consumption-insights-pillar { order: 1; }
 .kap-page-shell.consumption-insights-page .consumption-insights-context { flex: 1 1 auto; order: 2; }
 .kap-page-shell.consumption-insights-page .consumption-insights-filter select,
+.kap-page-shell.consumption-insights-page .consumption-insights-filter input { font-size: .72rem; }
+.kap-page-shell.consumption-insights-page .consumption-insights-filter select,
 .kap-page-shell.consumption-insights-page .consumption-insights-filter input,
 .kap-page-shell.consumption-insights-page .consumption-insights-pillar button { box-sizing: border-box; height: 2.25rem; min-height: 2.25rem; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar { align-items: center; min-height: 2.5rem; }

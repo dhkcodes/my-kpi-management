@@ -164,6 +164,8 @@ assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-she
   "Analysis matches the Records 5.2-pixel toolbar-to-first-content spacing");
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*gap:\s*\.2rem[^}]*\}[\s\S]*\.consumption-insights-filter\s*\{[^}]*gap:\s*\.2rem/s,
   "Analysis filter labels use the Records 3.2-pixel label-to-control gap and therefore the same filter height");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select,[\s\S]*\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter input\s*\{[^}]*font-size:\s*\.72rem;/s,
+  "Analysis Sales Rep and Account controls use the Records 11.52-pixel font size");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
