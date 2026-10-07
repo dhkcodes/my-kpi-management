@@ -88,6 +88,6 @@ assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*1
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);
 assert.match(analysis, /FINAL periods are excluded\. Forecast for an included MTD period remains shown\. Total removes overlapping Forecast once and uses MTD instead\./u);
-assert.match(analysis, /\{includeMtd && mtdAppliedDate[\s\S]*<small class="consumption-mtd-applied-date">As of \{mtdAppliedDate\}<\/small>/u);
+assert.match(analysis, /\{mtdAppliedDate \? <time class="consumption-mtd-applied-date"[^>]*>[\s\S]*MTD updated \{mtdAppliedDate\}<\/time> : null\}/u);
 
 console.log("forecast actual MTD UI contract tests passed");

@@ -115,8 +115,8 @@ assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "for
   "all three Consumption PageShell pages share the root content geometry");
 assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
   "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
-assert.match(insightsPage, /fiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
-  "Analysis renders its selected FY beside the title");
+assert.match(insightsPage, /primaryFiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
+  "Analysis renders its selected FY button and menu beside the title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
 assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
@@ -138,10 +138,12 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*As of \{mtdAppliedDate\}[\s\S]*PageActivity/u,
-  "Analysis places Show MTD at the toolbar left and Reload with KST time at the right");
-assert.match(insightsPage, /const currentFiscalYear = getLatestFiscalYear\(\)[\s\S]*Current FY <strong>\{currentFiscalYear\}<\/strong>[\s\S]*value=\{fiscalYear\}/,
-  "the current FY indicator stays independent from the user-selected fiscal year");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*MTD updated \{mtdAppliedDate\}[\s\S]*PageActivity/u,
+  "Analysis places the MTD import/update date at the toolbar left and Reload with KST time at the right");
+assert.match(insightsPage, /aria-label=\{`Selected fiscal year \$\{fiscalYear\}`\}[\s\S]*role="menu" aria-label="Select fiscal year"[\s\S]*Earlier FYs…/,
+  "the selected FY opens a compact current/adjacent year menu with collapsed earlier years");
+assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
+  "Analysis removes the Current FY prose and native FY select");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
   "FY, Pillar, Sales Rep, Account and MTD remain wired to the Analysis request");
 assert.match(insightsPage, /id="consumptionSalesRepContext"[\s\S]*id="consumptionAccountContext"/,
@@ -166,6 +168,16 @@ assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
 
 assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
+assert.match(insightsPage, /Attention Accounts <InfoTooltip[^>]*text=\{attentionCoverageLabel\}/,
+  "Attention Accounts moves its coverage prose into an immediate accessible tooltip");
+assert.match(insightsPage, /Account Contribution <InfoTooltip[\s\S]*Plan Contribution <InfoTooltip/,
+  "Account and Plan contribution coverage prose is exposed from title tooltips instead of visible paragraphs");
+assert.match(insightsPage, /finalizedActualExact = subtractExactDecimals\(row\.actualAmountExact, row\.mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(row\.forecastAmountExact, row\.overlapAmountExact\)[\s\S]*seriesId: "MTD actual"/,
+  "FY stacked totals split MTD from Actual and remove Forecast overlap without double counting");
+assert.match(insightsPage, /mtdQuarter = fiscalQuarterForPeriod[\s\S]*finalizedActualExact = subtractExactDecimals\(quarter\.actualAmountExact, mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(quarter\.forecastAmountExact, overlapExact\)/,
+  "quarter totals use the same non-duplicating MTD split");
+assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
+  "tooltips display immediately for hover, keyboard focus, and touch focus");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
