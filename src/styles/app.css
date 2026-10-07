@@ -6161,6 +6161,8 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar-activity { margin-left: auto; }
 .kap-page-shell.consumption-insights-page .kap-page-shell__body { gap: .75rem; }
 .consumption-info-tooltip { display: inline-flex; position: relative; vertical-align: middle; }
+/* Shared KPI panels clip decorative overflow; tooltip panels must allow the popup to escape. */
+.consumption-insights-page .kpi-panel:has(.consumption-info-tooltip) { overflow: visible; }
 .consumption-mtd-control { align-items: center; display: inline-flex; position: relative; }
 .consumption-info-tooltip__trigger { align-items: center; background: transparent; border: 0; color: var(--oj-link-text-color, #0066cc); cursor: help; display: inline-flex; font-size: .85rem; height: 1.15rem; justify-content: center; margin: 0 .1rem; padding: 0; width: 1.15rem; }
 .consumption-info-tooltip__trigger:focus-visible { border-radius: 50%; outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 1px; }
