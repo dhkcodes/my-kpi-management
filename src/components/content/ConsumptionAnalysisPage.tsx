@@ -14,6 +14,7 @@ import {
   ConsumptionAnalysisPlan,
   ForecastCompositionCategory,
   ConsumptionPillar,
+  calculateOpenForecastExposureExact,
   consumptionPillarOptions,
   filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
@@ -28,7 +29,6 @@ import {
   exactDecimalToChartCoordinate,
   formatExactKFixed,
   formatExactPercent,
-  multiplyExactDecimalByInteger,
   negateExactDecimal,
   subtractExactDecimals
 } from "../../data/exactDecimal";
@@ -445,9 +445,11 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
-  const forecastExposureBaseExact = subtractExactDecimals(analysis.portfolio.totalAmountExact, analysis.mtdSummary?.amountExact ?? "0");
-  const forecastExposureExact = compareExactDecimals(forecastExposureBaseExact, "0") <= 0
-    ? "0" : divideExactDecimal(multiplyExactDecimalByInteger(analysis.portfolio.forecastAmountExact, 100), forecastExposureBaseExact, PERCENT_DISPLAY_PRECISION);
+  const forecastExposureExact = calculateOpenForecastExposureExact(
+    analysis.portfolio.forecastAmountExact,
+    analysis.portfolio.totalAmountExact,
+    analysis.mtdSummary?.amountExact ?? "0"
+  );
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contributionPeriodLabel = analysis.periodCoverage.actualPeriods.length === 0
     ? "No finalized Actual period"

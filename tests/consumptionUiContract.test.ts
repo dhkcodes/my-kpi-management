@@ -156,6 +156,14 @@ assert.match(pageShell, /titleControls\?: ComponentChildren[\s\S]*kap-page-shell
   "the shared PageShell exposes a backwards-compatible title control slot");
 assert.match(styles, /\.consumption-analysis-toolbar \.consumption-records-toolbar-activity\s*\{[^}]*margin-left:\s*auto/s,
   "the Analysis data toolbar keeps Reload aligned on the right of Show MTD");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__inner\s*\{[^}]*gap:\s*\.375rem;/s,
+  "Analysis uses the Records six-pixel masthead/filter and filter/toolbar rhythm without negative margins");
+assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-/s,
+  "Analysis does not hide spacing differences with a negative filter margin");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body\s*\{[^}]*gap:\s*\.325rem;/s,
+  "Analysis matches the Records 5.2-pixel toolbar-to-first-content spacing");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*gap:\s*\.2rem[^}]*\}[\s\S]*\.consumption-insights-filter\s*\{[^}]*gap:\s*\.2rem/s,
+  "Analysis filter labels use the Records 3.2-pixel label-to-control gap and therefore the same filter height");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
@@ -176,8 +184,10 @@ assert.match(insightsPage, /finalizedActualExact = subtractExactDecimals\(row\.a
   "FY stacked totals split MTD from Actual and remove Forecast overlap without double counting");
 assert.match(insightsPage, /mtdQuarter = fiscalQuarterForPeriod[\s\S]*finalizedActualExact = subtractExactDecimals\(quarter\.actualAmountExact, mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(quarter\.forecastAmountExact, overlapExact\)/,
   "quarter totals use the same non-duplicating MTD split");
-assert.match(insightsPage, /forecastExposureExact = compareExactDecimals[\s\S]*divideExactDecimal\(multiplyExactDecimalByInteger\(analysis\.portfolio\.forecastAmountExact, 100\), forecastExposureBaseExact, PERCENT_DISPLAY_PRECISION\)/,
-  "Open Forecast exposure converts the exact 0-to-1 ratio to percentage points exactly once before adding the percent sign");
+assert.match(insightsPage, /forecastExposureExact = calculateOpenForecastExposureExact\([\s\S]*analysis\.portfolio\.forecastAmountExact,[\s\S]*analysis\.portfolio\.totalAmountExact,[\s\S]*analysis\.mtdSummary\?\.amountExact \?\? "0"[\s\S]*\);/,
+  "Open Forecast exposure uses the executable exact-decimal calculation covered by consumptionData tests");
+assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
+  "Open Forecast exposure renders the calculated percentage-point value with one percent sign");
 assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD and includes finalized Actual\. This is not the chart composition share\."/,
   "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
@@ -451,7 +461,7 @@ assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{se
 assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Consumption Analysis exposes the shared compact All, DP, OCI selector");
 assert.match(insightsPage, /consumption-insights-header-actions[\s\S]*consumption-insights-pillar[\s\S]*>Pillar<[\s\S]*consumption-pillar-selector[\s\S]*consumption-insights-context[\s\S]*>Account</, "Analysis places labelled Pillar before Account inside one filter row");
 assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items:\s*end[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap[^}]*gap:\s*\.75rem/, "Analysis filter row aligns Pillar and Account with Redwood spacing and natural wrapping");
-assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.25rem/, "Pillar uses the same labelled filter rhythm as Account");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.2rem/, "Pillar uses the Records labelled filter rhythm");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-filter--account \{[^}]*flex:\s*0 0 auto;[^}]*\}/, "mobile Account filter clears the desktop 18rem flex basis so it cannot create vertical space before Overview");
 assert.doesNotMatch(insightsPage, /setSelectedPillar\(option\.value\);\s*setSelectedAccountContext\(""\)/, "Pillar changes preserve a still-valid selected Account for cross filtering");
 assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[\s\S]*value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while candidate search does not clear context");
