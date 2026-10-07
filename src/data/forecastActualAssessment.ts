@@ -29,6 +29,38 @@ export type ForecastActualTotals = Readonly<{
   hasActual: boolean;
 }>;
 
+export const FORECAST_ACTUAL_QUARTERS = ["Q1", "Q2", "Q3", "Q4"] as const;
+export type ForecastActualQuarter = typeof FORECAST_ACTUAL_QUARTERS[number];
+export type ForecastActualQuarterStatus =
+  | "SHORTFALL"
+  | "MATCHED"
+  | "EXCEEDED"
+  | "NO_FORECAST"
+  | "MISSING_ACTUAL"
+  | "PARTIAL_ACTUAL"
+  | "FUTURE";
+
+export type ForecastActualQuarterResult = Readonly<{
+  quarter: ForecastActualQuarter;
+  status: ForecastActualQuarterStatus;
+  forecastAmount: string | null;
+  actualAmount: string | null;
+  differenceAmount: string | null;
+  relevantAmount: string | null;
+}>;
+
+const QUARTER_MONTHS: Readonly<Record<ForecastActualQuarter, readonly string[]>> = Object.freeze({
+  Q1: Object.freeze(["JUN", "JUL", "AUG"]),
+  Q2: Object.freeze(["SEP", "OCT", "NOV"]),
+  Q3: Object.freeze(["DEC", "JAN", "FEB"]),
+  Q4: Object.freeze(["MAR", "APR", "MAY"])
+});
+
+export const forecastActualQuarterForPeriod = (periodKey: string): ForecastActualQuarter | null => {
+  const month = periodKey.split("-")[1];
+  return FORECAST_ACTUAL_QUARTERS.find((quarter) => QUARTER_MONTHS[quarter].includes(month)) ?? null;
+};
+
 const compareToZero = (value: string): number => compareExactDecimals(value, "0");
 const unavailable = (tooltip: string, differenceAmount: string | null = null): ForecastActualMonthAssessment => ({
   kind: "UNAVAILABLE",
@@ -50,6 +82,96 @@ const fiscalPeriodCalendarDate = (periodKey: string): Readonly<{ year: number; m
   const fiscalEndYear = match[1].length === 2 ? 2000 + Number(match[1]) : Number(match[1]);
   const month = monthByCode[match[2]];
   return { year: month >= 6 ? fiscalEndYear - 1 : fiscalEndYear, month };
+};
+
+const periodStart = (periodKey: string): number | null => {
+  const period = fiscalPeriodCalendarDate(periodKey);
+  return period === null ? null : Date.UTC(period.year, period.month - 1, 1);
+};
+
+const periodIsFuture = (periodKey: string, now: Date): boolean => {
+  const start = periodStart(periodKey);
+  return start !== null && start > Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+};
+
+/** Shared Account-quarter result for cards, filtering, sorting, and the Result column. */
+export const assessForecastActualQuarter = (
+  rowOrRows: ForecastActualRow | readonly ForecastActualRow[],
+  quarter: ForecastActualQuarter,
+  now = new Date(),
+  actualMode: "FINAL" | "MTD" = "FINAL"
+): ForecastActualQuarterResult => {
+  const sourceRows: readonly ForecastActualRow[] = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
+  const months = sourceRows.flatMap((row) => row.months)
+    .filter((month) => forecastActualQuarterForPeriod(month.periodKey) === quarter);
+  const fiscalYearPrefix = sourceRows.flatMap((row) => row.months)
+    .map((month) => month.periodKey.split("-")[0])
+    .find((prefix) => /^FY(?:\d{2}|\d{4})$/u.test(prefix ?? "")) ?? null;
+  const expectedPeriodKeys = fiscalYearPrefix === null
+    ? months.map((month) => month.periodKey)
+    : QUARTER_MONTHS[quarter].map((monthCode) => `${fiscalYearPrefix}-${monthCode}`);
+  const currentPeriodStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+  // A future quarter is Not started even when Forecast has not been stored yet.
+  if (expectedPeriodKeys.length > 0 && expectedPeriodKeys.every((periodKey) => periodIsFuture(periodKey, now))) {
+    const futureForecastMonths = months.filter((month) => month.forecastAmount !== null);
+    const futureForecastAmount = futureForecastMonths.length
+      ? futureForecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0")
+      : null;
+    return {
+      quarter, status: "FUTURE", forecastAmount: futureForecastAmount, actualAmount: null,
+      differenceAmount: null, relevantAmount: null
+    };
+  }
+
+  const availableActualMonths = months.filter((month) => {
+    if (month.actualAmount === null) return false;
+    if (month.actualState === "FINAL") return true;
+    if (actualMode !== "MTD" || month.actualState !== "MTD") return false;
+    return periodStart(month.periodKey) === currentPeriodStart
+      && effectiveMtdDate(month.periodKey, month.actualAsOf) !== null;
+  });
+  const actualAmount = availableActualMonths.length
+    ? availableActualMonths.reduce((total, month) => addExactDecimals(total, month.actualAmount as string), "0")
+    : null;
+
+  const forecastMonths = months.filter((month) => month.forecastAmount !== null);
+  if (!forecastMonths.length) return {
+    quarter, status: "NO_FORECAST", forecastAmount: null, actualAmount,
+    differenceAmount: null, relevantAmount: null
+  };
+
+  // FINAL and MTD describe Actual provenance only: the target remains the full stored quarter Forecast.
+  const forecastAmount = forecastMonths.reduce((total, month) => addExactDecimals(total, month.forecastAmount as string), "0");
+  if (!availableActualMonths.length) {
+    return { quarter, status: "MISSING_ACTUAL", forecastAmount, actualAmount: null, differenceAmount: null, relevantAmount: null };
+  }
+
+  // Every elapsed period requires FINAL. Current MTD is optional: if absent/invalid,
+  // preserve the cumulative FINAL-only Actual and Gap rather than converting it to zero.
+  const missingElapsedFinal = expectedPeriodKeys
+    .filter((periodKey) => {
+      const start = periodStart(periodKey);
+      return start !== null && start < currentPeriodStart;
+    })
+    .some((periodKey) => !months.some((month) =>
+      month.periodKey === periodKey && month.actualState === "FINAL" && month.actualAmount !== null));
+  if (missingElapsedFinal) {
+    return { quarter, status: "PARTIAL_ACTUAL", forecastAmount, actualAmount, differenceAmount: null, relevantAmount: actualAmount };
+  }
+
+  // Quarter Gap follows the product contract: Forecast - Actual.
+  const differenceAmount = subtractExactDecimals(forecastAmount, actualAmount as string);
+  const comparison = compareExactDecimals(differenceAmount, "0");
+  if (comparison > 0) return {
+    quarter, status: "SHORTFALL", forecastAmount, actualAmount,
+    differenceAmount, relevantAmount: differenceAmount
+  };
+  if (comparison < 0) return {
+    quarter, status: "EXCEEDED", forecastAmount, actualAmount,
+    differenceAmount, relevantAmount: subtractExactDecimals("0", differenceAmount)
+  };
+  return { quarter, status: "MATCHED", forecastAmount, actualAmount, differenceAmount, relevantAmount: "0" };
 };
 
 const effectiveMtdDate = (

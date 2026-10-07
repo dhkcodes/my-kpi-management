@@ -37,6 +37,7 @@ import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
+import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
 
@@ -49,8 +50,8 @@ const percentageTextExact = (percentageExact: string | null, signed = false) => 
   : `${signed && compareExactDecimals(percentageExact, "0") > 0 ? "+" : ""}${divideExactDecimal(percentageExact, "1", PERCENT_DISPLAY_PRECISION)}%`;
 const qoqKind = (status: ConsumptionAnalysisQuarter["status"]) => status === "ACTUAL" ? "ACTUAL"
   : status === "FORECAST" ? "FORECAST" : status === "MIXED" ? "MIXED" : status === "NOT_OPEN" ? "NOT OPEN" : "INCOMPLETE";
-const splitLabel = (value: { actualAmountExact: string; forecastAmountExact: string }) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · FORECAST ${formatExactKFixed(value.forecastAmountExact, 2)}`;
-const planSplitLabel = (value: ConsumptionAnalysisPlan) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · FORECAST ${value.forecastEntryStatus === "UNAVAILABLE" ? "N/A" : formatExactKFixed(value.forecastAmountExact, 2)}`;
+const splitLabel = (value: { actualAmountExact: string; forecastAmountExact: string }) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · Open Forecast ${formatExactKFixed(value.forecastAmountExact, 2)}`;
+const planSplitLabel = (value: ConsumptionAnalysisPlan) => `ACTUAL ${formatExactKFixed(value.actualAmountExact, 2)} · Open Forecast ${value.forecastEntryStatus === "UNAVAILABLE" ? "N/A" : formatExactKFixed(value.forecastAmountExact, 2)}`;
 // Oracle JET accepts Number coordinates only. These helpers are the sole lossy chart boundary.
 const amountExactToKChartCoordinate = (amountExact: string): number => exactDecimalToChartCoordinate(divideExactDecimal(amountExact, "1000", 12)!);
 const trendChartCoordinateLabel = ({ value }: Readonly<{ value: number }>) => `${chartCurrencyK.format(value / 1000)} K`;
@@ -66,6 +67,9 @@ const actualEntryText = (status: "PROVIDED" | "MISSING", amountExact: string) =>
   ? "Actual not entered" : compareExactDecimals(amountExact, "0") === 0 ? "Actual 0 entered" : "Actual only";
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
+const OPEN_FORECAST_TOOLTIP = "FINAL periods are excluded. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
+const OpenForecastLabel = () => <span>Open Forecast <span class="oj-ux-ico-information-s" role="img" tabIndex={0}
+  aria-label={OPEN_FORECAST_TOOLTIP} title={OPEN_FORECAST_TOOLTIP}></span></span>;
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
 const ALL_ACCOUNTS = "All Accounts Total";
 const COMPOSITION_CATEGORIES: readonly ForecastCompositionCategory[] = ["All", "New", "Expansion", "Reduction"];
@@ -134,8 +138,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const [selectedMovement, setSelectedMovement] = useState<{ quarter: string; category: ForecastCompositionCategory } | null>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | "">("");
   const [exportError, setExportError] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const requestGeneration = useRef(0);
-  const exportTargetRef = useRef<HTMLElement>(null);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -181,6 +186,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
                 return;
         }
         setAnalysis(value);
+        setLastDataLoadedAt(new Date());
         if (includeMtd && !value.currentMtdAvailable) setIncludeMtd(false);
         setSelectedAlertId((current) => value.alerts.some((alert) => alert.alertId === current) ? current : "");
         setSelectedAccountName((current) => current && value.accounts.some((account) => account.account === current) ? current : "");
@@ -201,7 +207,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
       })
       .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, includeMtd, selectedAccountContext, selectedPillar, selectedSalesRep]);
+  }, [debouncedCandidateSearch, fiscalYear, includeMtd, refreshTrigger, selectedAccountContext, selectedPillar, selectedSalesRep]);
 
   // Keep the last completed response mounted while same-FY filters refresh.
   // The refresh indicator makes that transition explicit; replacing the
@@ -277,15 +283,15 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     return chart(rows.flatMap((row) => [
       { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmountChartCoordinate, color: ACTUAL_COLOR,
         dataLabel: formatExactKFixed(row.actualAmountExact), shortDesc: `${row.label} ACTUAL ${formatExactKFixed(row.actualAmountExact)}` },
-      { id: `${row.label}-forecast`, seriesId: "FORECAST", groupId: row.label, value: row.forecastAmountChartCoordinate, color: FORECAST_COLOR,
-        dataLabel: formatExactKFixed(row.forecastAmountExact), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} FORECAST ${formatExactKFixed(row.forecastAmountExact)}` }
+      { id: `${row.label}-forecast`, seriesId: "Open Forecast", groupId: row.label, value: row.forecastAmountChartCoordinate, color: FORECAST_COLOR,
+        dataLabel: formatExactKFixed(row.forecastAmountExact), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} Open Forecast ${formatExactKFixed(row.forecastAmountExact)}` }
     ]));
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
     return chart(analysis.quarters.flatMap((quarter) => [
       { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: quarter.actualAmountChartCoordinate, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${formatExactKFixed(quarter.actualAmountExact)}` },
-      { id: `${quarter.quarter}-forecast`, seriesId: "FORECAST", groupId: quarter.quarter, value: quarter.forecastAmountChartCoordinate, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} FORECAST ${formatExactKFixed(quarter.forecastAmountExact)}` }
+      { id: `${quarter.quarter}-forecast`, seriesId: "Open Forecast", groupId: quarter.quarter, value: quarter.forecastAmountChartCoordinate, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} Open Forecast ${formatExactKFixed(quarter.forecastAmountExact)}` }
     ]));
   }, [analysis]);
   const movementChart = useMemo(() => {
@@ -318,10 +324,17 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
-  if (!analysis) return <section class="consumption-insights-page consumption-initial-state">
-    <header class="consumption-page__header consumption-insights-header"><div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1>Consumption Analysis</h1></div></header>
-    <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
-  </section>;
+  const refreshAnalysis = () => {
+    setLoading(true);
+    setRefreshTrigger((current) => current + 1);
+  };
+  if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
+    ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
+    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
+    busy={loading} busyLabel="Loading analysis" onRefresh={refreshAnalysis}
+    messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
+    <PageDataProgress busy={loading} busyLabel="Loading analysis" />
+  </PageShell>;
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
@@ -358,7 +371,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
   };
 
   const downloadCanvas = async (format: "png" | "pdf") => {
-    const target = exportTargetRef.current;
+    const target = document.getElementById("consumptionAnalysisExportTarget");
     if (!target || exporting) return;
     setExporting(format);
     setExportError("");
@@ -409,10 +422,23 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     }
   };
 
-  return <section ref={exportTargetRef} class="consumption-insights-page" aria-labelledby="consumptionAnalysisTitle" aria-busy={loading ? "true" : "false"} data-fiscal-year={fiscalYear} data-account-context={selectedAccountContext || "all"}>
-    <header class="consumption-page__header consumption-insights-header">
-      <div>{breadcrumb}<span class="kpi-eyebrow">Consumption / Analysis</span><h1 id="consumptionAnalysisTitle">Consumption Analysis</h1></div>
-      <div class="consumption-insights-header-actions">
+  return <PageShell className="consumption-insights-page" ariaLabelledBy="consumptionAnalysisTitle"
+    rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
+    breadcrumb={breadcrumb} title="Consumption Analysis" headingSpacing="compact"
+    busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
+    actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
+      <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
+        title="Export the current Consumption Analysis view as PNG" onojAction={() => void downloadCanvas("png")}>
+        <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Exporting…" : "PNG"}
+      </oj-button>
+      <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
+        title="Export the current Consumption Analysis view as PDF" onojAction={() => void downloadCanvas("pdf")}>
+        <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Exporting…" : "PDF"}
+      </oj-button>
+      {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
+    </div>}
+    messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}
+    filters={<PageFilterPanel className="consumption-insights-header-actions" ariaLabel="Consumption Analysis filters">
         <div class="consumption-analysis-mtd-control">
           {includeMtd && mtdAppliedDate
             ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small>
@@ -423,19 +449,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
             <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>
-
-        </div>
-        <div class="consumption-insights-export">
-          <span>Export</span>
-          <div class="consumption-export-actions" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
-            <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("png")}>
-              <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PNG</span></>
-            </button>
-            <button type="button" disabled={loading || !!exporting} onClick={() => void downloadCanvas("pdf")}>
-              <><span class="oj-ux-ico-download" aria-hidden="true"></span><span>PDF</span></>
-            </button>
-            {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
-          </div>
         </div>
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
@@ -484,10 +497,12 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           </div>
         </div>
         </div>
-      </div>
-    </header>
-
-    <ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />
+    </PageFilterPanel>}>
+    <div class="consumption-records-toolbar" data-html2canvas-ignore="true">
+      <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
+        onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
+    </div>
+    <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
@@ -505,21 +520,21 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast">FORECAST {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
-      <article class="kpi-panel"><span>Forecast exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
+      <article class="kpi-panel"><span><OpenForecastLabel /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
     </section>
 
     <section class="consumption-insights-performance-grid">
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
-        <div class="consumption-section-heading"><div><span class="kpi-section-label">{actualLabel} + Forecast</span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>{actualLabel} <i class="is-forecast"></i>FORECAST</span></div>
+        <div class="consumption-section-heading"><div><span class="kpi-section-label">{actualLabel} + <OpenForecastLabel /></span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>{actualLabel} <i class="is-forecast"></i><OpenForecastLabel /></span></div>
         <div class="consumption-insights-total-regions">
-          <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendChartCoordinateLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and FORECAST stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
+          <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendChartCoordinateLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and Open Forecast stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
           <div class="consumption-insights-quarter-totals">
             <h3>{analysis.fiscalYear} Mixed quarter consumption</h3>
-            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendChartCoordinateLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL-first and FORECAST fallback consumption in K`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
+            <oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={quarterTotalsChart} dataLabel={trendChartCoordinateLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label={`${analysis.fiscalYear} Q1 Q2 Q3 Q4 ACTUAL-first and Open Forecast fallback consumption in K`}><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart>
           </div>
         </div>
       </section>
@@ -597,8 +612,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
           <span class="consumption-sales-attention-amounts"><strong>Actual {formatExactKFixed(account.actualAmountExact)}</strong><small>{account.forecastEntryStatus === "MISSING"
             ? "Forecast missing · Covered-period expected unavailable"
             : account.forecastEntryStatus === "ZERO"
-              ? <>Forecast {formatExactKFixed(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>
-              : <>Forecast {formatExactKFixed(account.forecastAmountExact)} · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>}</small></span>
+              ? <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>
+              : <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>}</small></span>
         </button>)}{attentionAccounts.length === 0 && <p class="consumption-empty-state">No Accounts require attention for this context.</p>}</div>
       </section>
     </section>
@@ -618,5 +633,5 @@ export function ConsumptionAnalysisPage({ fiscalYear, breadcrumb }: Readonly<{ f
         </section>
       </div>
     </section>
-  </section>;
+  </PageShell>;
 }

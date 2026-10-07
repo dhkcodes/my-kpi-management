@@ -109,6 +109,18 @@ assert.match(app, /kap-auth-checking__surface[\s\S]*<Footer \/>/,
   "the authentication frame reserves the same root and fixed-footer geometry before the page mounts");
 assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
   "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
+assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-shell\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+  "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
+assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+  "all three Consumption PageShell pages share the root content geometry");
+assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
+  "Analysis and Forecast preserve the existing outer Fiscal Year selector while Records remains exempt");
+assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
+  "PageShell routes that preserve the Fiscal Year selector expose the two-row layout modifier");
+assert.match(styles, /\.kpi-content\.is-kap-page-shell-route\.has-fiscal-year-panel\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s,
+  "the preserved Fiscal Year selector occupies its original row above the viewport-bound PageShell");
+assert.match(styles, /\.kap-page-shell\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\)/s,
+  "PageShell constrains its content row so tall mobile pages scroll internally instead of expanding beneath the fixed footer");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
   "shared KAP pages reserve the real footer row and keep the viewport itself from scrolling");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\) \.kpi-footer\s*\{[^}]*position:\s*static;[^}]*bottom:\s*auto;/s,
@@ -138,12 +150,12 @@ assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
-assert.match(insightsPage, /Forecast \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
-  "entered Forecast and covered-period expected use separate fields without changing contribution totals");
+assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+  "entered Open Forecast and covered-period expected use separate fields without changing contribution totals");
 assert.match(insightsPage, /Forecast missing · Covered-period expected unavailable/,
   "missing Forecast remains distinct and does not fabricate an expected amount");
-assert.match(insightsPage, /Forecast \{formatExactKFixed\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
-  "an explicit zero Forecast remains distinct while showing the covered-period sum");
+assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+  "an explicit zero Open Forecast remains distinct while showing the covered-period sum");
 assert.doesNotMatch(insightsPage, /FY Expected/, "partial-year coverage is never presented as a full-year expectation");
 assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.consumption-sales-attention-list button\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*\}/,
   "mobile Attention Account rows stack long labels and amounts instead of overlapping");
@@ -318,8 +330,8 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'accountsWor
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
 assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
-assert.match(insightsPage, /aria-busy=\{loading \? "true" : "false"\}/, "Analysis exposes refresh state without replacing its mounted page shell");
-assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading|Loading Consumption Analysis/u, "Analysis uses the shared app overlay for initial and FY-transition loading");
+assert.match(insightsPage, /<PageShell[\s\S]*<PageActivity busy=\{loading\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis exposes refresh state without replacing its mounted page shell");
+assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
@@ -455,7 +467,7 @@ assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompo
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
 assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
-assert.match(insightsPage, /consumption-insights-export[\s\S]*<span>Export<\/span>[\s\S]*downloadCanvas\("png"\)[\s\S]*downloadCanvas\("pdf"\)/, "PNG and PDF controls have one aligned Export field label");
+assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("png"\)[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("pdf"\)/, "PNG and PDF controls use the shared compact heading-action alignment");
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
 assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
@@ -719,11 +731,14 @@ assert.match(forecastActualPage, /visibleForecastActualPeriods/, "monthly values
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
 assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
   "Consumption Analysis displays authoritative MTD metadata even when MTD amounts are excluded");
-assert.match(forecastActualPage, /monthScrollRef[\s\S]*handleMonthScrollKeyDown[\s\S]*scrollMonths/, "Forecast vs Actual provides synchronized month scrolling with buttons and keyboard controls");
+assert.doesNotMatch(forecastActualPage, /monthScrollRef|handleMonthScrollKeyDown|scrollMonths|consumption-scroll-controls/,
+  "Forecast vs Actual delegates scrolling to the shared root PageShell");
+assert.match(forecastActualPage, /forecast-actual-matrix-layout/,
+  "Forecast vs Actual keeps a non-clipping matrix layout inside the root scroller");
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account,[\s\S]*\.forecast-actual-matrix tbody \.is-rep[^{]*\{[^}]*position:\s*sticky/,
   "Forecast vs Actual keeps Account and Sales Rep fixed while grouped months scroll");
 assert.match(forecastActualSort, /compareNullableDecimal[\s\S]*compareExactDecimals[\s\S]*key === "forecast"[\s\S]*key === "actual"[\s\S]*key === "projected"[\s\S]*key\.slice\("month:"\.length\)/, "Forecast vs Actual numeric sort keys use exact-decimal comparison");
-assert.match(forecastActualPage, /setQuarter\(event\.currentTarget\.value\); setSalesRep\(""\); resetAccountScope\(\)/, "Quarter changes clear stale dependent filters");
+assert.match(forecastActualPage, /setQuarter\(event\.currentTarget\.value\); setResultFilter\(null\)/, "Quarter changes clear the stale quarter-result drilldown while retaining independent Account and Sales Rep filters");
 assert.match(forecastActualPage, /useEffect\(\(\) => \{[\s\S]*setSalesRep\(""\)[\s\S]*setAccount\(""\)[\s\S]*\}, \[fiscalYear\]\)/,
   "Fiscal Year changes from the shared page context clear stale Sales Rep and Account filters before requesting the new scope");
 assert.match(forecastActualPage, /onInput[\s\S]*setAccount\(""\)/, "typing away from a selected Account clears the hidden applied filter");
@@ -731,10 +746,10 @@ assert.doesNotMatch(forecastActualPage, /Plan|Opportunity/, "the Account-level c
 assert.match(apiSource, /forecast-vs-actual/, "the Forecast comparison page uses the dedicated read API");
 assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu route is connected to content dispatch");
 
-assert.match(app, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
-  "the authenticated shell opts into the Records viewport layout before the child surface mounts");
-assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*is-kap-page-shell-route/,
-  "the content layout is route-stable during Home to Records navigation without relying only on :has timing");
+assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+  "the authenticated shell opts into the shared viewport layout before the child surface mounts");
+assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+  "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
 assert.match(recordsPage, /<PageActivity[\s\S]*compactTimestampButton/,
   "Records opts into the reusable compound Reload and HH:mm:ss control");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,

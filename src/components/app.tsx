@@ -630,9 +630,10 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       void handleAccountsWorkloadsQueryChange(nextQuery);
     };
 
+    const isKapPageShellRoute = ["consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
 
     return (
-      <div id="appContainer" class={`oj-web-applayout-page kpi-shell${activeRoute.module === "consumptionRecords" ? " is-kap-page-shell-route" : ""}`}>
+      <div id="appContainer" class={`oj-web-applayout-page kpi-shell${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}`}>
         <Header
           appName={appName}
           profile={profile}
