@@ -138,8 +138,10 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>MTD updated \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
-  "Analysis shows the MTD import/update date only while Show MTD is enabled");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>Updated \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
+  "Analysis shows the import batch update date as Updated YYYY-MM-DD only while Show MTD is enabled");
+assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
+  "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
 assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
   "the JET fiscal-year menu keeps current and adjacent years visible with older years in an Earlier FYs submenu");
 assert.match(insightsPage, /const handleFiscalYearMenuAction[\s\S]*event\.detail\.selectedValue[\s\S]*fiscalYears\.includes\(year\)[\s\S]*onFiscalYearChange\(year\)/,
@@ -176,8 +178,8 @@ assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*text-transform:\s*n
   "Analysis Pillar label retains natural capitalization");
 assert.match(styles, /\.consumption-insights-filter\s*\{[^}]*text-transform:\s*none;/s,
   "Analysis Sales Rep and Account labels retain natural capitalization");
-assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-mtd-applied-date\s*\{[^}]*font-size:\s*\.78rem;/s,
-  "Analysis MTD timestamp matches the Reload auxiliary text size");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-mtd-applied-date\s*\{[^}]*font-size:\s*\.78rem;[^}]*font-weight:\s*600;[^}]*line-height:\s*1;/s,
+  "Analysis update timestamp matches the Reload auxiliary text size, weight, and line height");
 assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__refresh\s*\{[^}]*font-size:\s*\.78rem;/,
   "the compact Reload control retains the same .78rem font-size reference");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,

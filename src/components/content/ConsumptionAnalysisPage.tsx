@@ -561,7 +561,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           <span id="showMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
         </span>
         {includeMtd && mtdAppliedDate ? <time class="consumption-mtd-applied-date" dateTime={mtdAppliedTimestamp ?? undefined}
-          title={mtdAppliedTimestamp ?? undefined}>MTD updated {mtdAppliedDate}</time> : null}
+          title={mtdAppliedTimestamp ?? undefined}>Updated {mtdAppliedDate}</time> : null}
       </div>
       <div class="consumption-records-toolbar-activity">
         <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}

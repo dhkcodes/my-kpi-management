@@ -6153,7 +6153,7 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar { align-items: center; min-height: 2.5rem; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar__left { padding-inline-start: 0; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar-activity { margin-left: auto; }
-.kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-mtd-applied-date { font-size: .78rem; }
+.kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-mtd-applied-date { font-size: .78rem; font-weight: 600; line-height: 1; }
 .kap-page-shell.consumption-insights-page .kap-page-shell__body { gap: .325rem; }
 .consumption-info-tooltip { display: inline-flex; position: relative; vertical-align: middle; }
 /* Shared KPI panels clip decorative overflow; tooltip panels must allow the popup to escape. */
