@@ -176,8 +176,10 @@ assert.match(insightsPage, /finalizedActualExact = subtractExactDecimals\(row\.a
   "FY stacked totals split MTD from Actual and remove Forecast overlap without double counting");
 assert.match(insightsPage, /mtdQuarter = fiscalQuarterForPeriod[\s\S]*finalizedActualExact = subtractExactDecimals\(quarter\.actualAmountExact, mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(quarter\.forecastAmountExact, overlapExact\)/,
   "quarter totals use the same non-duplicating MTD split");
-assert.match(insightsPage, /forecastExposureExact = compareExactDecimals[\s\S]*divideExactDecimal\(multiplyExactDecimalByInteger\(analysis\.portfolio\.forecastAmountExact, 100\), forecastExposureBaseExact, PERCENT_DISPLAY_PRECISION\)/,
-  "Open Forecast exposure converts the exact 0-to-1 ratio to percentage points exactly once before adding the percent sign");
+assert.match(insightsPage, /forecastExposureExact = calculateOpenForecastExposureExact\([\s\S]*analysis\.portfolio\.forecastAmountExact,[\s\S]*analysis\.portfolio\.totalAmountExact,[\s\S]*analysis\.mtdSummary\?\.amountExact \?\? "0"[\s\S]*\);/,
+  "Open Forecast exposure uses the executable exact-decimal calculation covered by consumptionData tests");
+assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
+  "Open Forecast exposure renders the calculated percentage-point value with one percent sign");
 assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD and includes finalized Actual\. This is not the chart composition share\."/,
   "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,

@@ -1,4 +1,15 @@
-import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, subtractExactDecimals } from "./exactDecimal";
+import { addExactDecimals, compareExactDecimals, divideExactDecimal, exactDecimalToChartCoordinate, multiplyExactDecimalByInteger, subtractExactDecimals } from "./exactDecimal";
+
+export const calculateOpenForecastExposureExact = (
+  forecastAmountExact: string,
+  coveredTotalExact: string,
+  provisionalMtdExact: string
+): string => {
+  const denominatorExact = subtractExactDecimals(coveredTotalExact, provisionalMtdExact);
+  return compareExactDecimals(denominatorExact, "0") <= 0
+    ? "0"
+    : divideExactDecimal(multiplyExactDecimalByInteger(forecastAmountExact, 100), denominatorExact, 2)!;
+};
 
 export type ConsumptionMonthStatus = "ACTUAL" | "FORECAST" | "MIXED" | "INCOMPLETE";
 export type ConsumptionRecordsViewState = "loading" | "error" | "empty" | "ready";

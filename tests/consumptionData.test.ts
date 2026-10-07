@@ -8,6 +8,7 @@ import {
   aggregateConsumptionActualTotals,
   buildDisplayQuarterSummaries,
   buildQuarterSummary,
+  calculateOpenForecastExposureExact,
   detectConsumptionSignals,
   expandConsumptionQuarterOptions,
   filterVisibleConsumptionPlans,
@@ -25,6 +26,11 @@ import {
   seedForecastMonths,
   sortConsumptionMonthsNewestFirst
 } from "../src/data/consumptionData";
+
+assert.equal(calculateOpenForecastExposureExact("501850", "1445771", "32886"), "35.52",
+  "Open Forecast exposure converts the exact ratio to percentage points exactly once");
+assert.equal(calculateOpenForecastExposureExact("501850", "32886", "32886"), "0",
+  "Open Forecast exposure is zero when covered total minus provisional MTD is not positive");
 
 const csv = [
   "Customer,End User,Sold To,Plan ID,Data Center,Plan Type,FY26-MAR,FY26-APR,FY26-MAY,FY27-JUN,FY27-JUL,FY27-AUG,Total",
