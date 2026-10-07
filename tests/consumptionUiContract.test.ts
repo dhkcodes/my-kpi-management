@@ -164,6 +164,8 @@ assert.match(pageShell, /titleControls\?: ComponentChildren[\s\S]*kap-page-shell
   "the shared PageShell exposes a backwards-compatible title control slot");
 assert.match(styles, /\.consumption-analysis-toolbar \.consumption-records-toolbar-activity\s*\{[^}]*margin-left:\s*auto/s,
   "the Analysis data toolbar keeps Reload aligned on the right of Show MTD");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-records-toolbar__left\s*\{[^}]*padding-inline-start:\s*\.5rem;/s,
+  "Analysis aligns the Show MTD switch, label, and update timestamp with the Records eight-pixel left inset");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__inner\s*\{[^}]*gap:\s*\.375rem;/s,
   "Analysis uses the Records six-pixel masthead/filter and filter/toolbar rhythm without negative margins");
 assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-/s,
