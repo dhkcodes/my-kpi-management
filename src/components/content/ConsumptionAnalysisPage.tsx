@@ -34,7 +34,11 @@ import {
 } from "../../data/exactDecimal";
 import "ojs/ojprogress-circle";
 import "ojs/ojchart";
+import "ojs/ojbutton";
+import "ojs/ojmenu";
+import "ojs/ojoption";
 import type { ojChart } from "ojs/ojchart";
+import type { ojMenu } from "ojs/ojmenu";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
@@ -157,12 +161,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const [exportError, setExportError] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
-  const [fiscalYearMenuOpen, setFiscalYearMenuOpen] = useState(false);
-  const [earlierFiscalYearsOpen, setEarlierFiscalYearsOpen] = useState(false);
   const requestGeneration = useRef(0);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
-  const fiscalYearMenuRef = useRef<HTMLDivElement>(null);
-  const fiscalYearButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (candidateComposing) return;
@@ -179,27 +179,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [comboboxOpen]);
 
-  useEffect(() => {
-    if (!fiscalYearMenuOpen) return;
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (!fiscalYearMenuRef.current?.contains(event.target as Node)) {
-        setFiscalYearMenuOpen(false);
-        setEarlierFiscalYearsOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
-  }, [fiscalYearMenuOpen]);
-
-  useEffect(() => {
-    if (!fiscalYearMenuOpen) return;
-    const frame = requestAnimationFrame(() => {
-      const checked = fiscalYearMenuRef.current?.querySelector<HTMLButtonElement>('button[role="menuitemradio"][aria-checked="true"]');
-      const first = fiscalYearMenuRef.current?.querySelector<HTMLButtonElement>('.consumption-analysis-fy-menu button');
-      (checked ?? first)?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [fiscalYearMenuOpen]);
 
   useEffect(() => {
     let active = true;
@@ -378,56 +357,30 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const mtdAppliedDate = formatMtdAppliedDate(mtdAppliedTimestamp);
   const currentFiscalYear = getLatestFiscalYear();
   const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
-  const primaryFiscalYears = fiscalYears.filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
-    .sort((left, right) => Number(left.slice(2)) - Number(right.slice(2)));
-  const earlierFiscalYears = fiscalYears.filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
+  const adjacentFiscalYears = fiscalYears
+    .filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
     .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
-  const selectFiscalYear = (year: FiscalYear) => {
-    onFiscalYearChange(year);
-    setFiscalYearMenuOpen(false);
-    setEarlierFiscalYearsOpen(false);
-    requestAnimationFrame(() => fiscalYearButtonRef.current?.focus());
+  const earlierFiscalYears = fiscalYears
+    .filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
+    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
+  const handleFiscalYearMenuAction = (event: ojMenu.ojMenuAction) => {
+    const year = String(event.detail.selectedValue) as FiscalYear;
+    if (fiscalYears.includes(year) && year !== fiscalYear) onFiscalYearChange(year);
   };
-  const handleFiscalYearMenuKeyDown = (event: KeyboardEvent) => {
-    const buttons = Array.from(fiscalYearMenuRef.current?.querySelectorAll<HTMLButtonElement>(".consumption-analysis-fy-menu button") ?? []);
-    const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % buttons.length;
-    else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = buttons.length - 1;
-    else if (event.key === "Escape") {
-      event.preventDefault();
-      setFiscalYearMenuOpen(false);
-      setEarlierFiscalYearsOpen(false);
-      fiscalYearButtonRef.current?.focus();
-      return;
-    }
-    if (nextIndex !== null && buttons.length > 0) {
-      event.preventDefault();
-      buttons[nextIndex]?.focus();
-    }
-  };
-  const fiscalYearControl = <div class="consumption-analysis-fy-control" ref={fiscalYearMenuRef}>
-    <button ref={fiscalYearButtonRef} type="button" class="consumption-analysis-fy-button" aria-haspopup="menu" aria-expanded={fiscalYearMenuOpen}
-      aria-label={`Selected fiscal year ${fiscalYear}`}
-      onKeyDown={(event) => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setFiscalYearMenuOpen(true); } }}
-      onClick={() => { setFiscalYearMenuOpen((open) => !open); setEarlierFiscalYearsOpen(false); }}>
-      <span>{fiscalYear}</span><span class="oj-ux-ico-chevron-down" aria-hidden="true"></span>
-    </button>
-    {fiscalYearMenuOpen && <div class="consumption-analysis-fy-menu" role="menu" aria-label="Select fiscal year" onKeyDown={handleFiscalYearMenuKeyDown}>
-      {primaryFiscalYears.map((year) => <button key={year} type="button" role="menuitemradio" aria-checked={fiscalYear === year}
-        onClick={() => selectFiscalYear(year)}><span>{year}</span>{year === currentFiscalYear && <small>Current</small>}</button>)}
-      {earlierFiscalYears.length > 0 && <>
-        <button type="button" class="consumption-analysis-fy-earlier" role="menuitem" aria-expanded={earlierFiscalYearsOpen}
-          onClick={() => setEarlierFiscalYearsOpen((open) => !open)}>Earlier FYs…</button>
-        {earlierFiscalYearsOpen && <div class="consumption-analysis-fy-earlier-list">
-          {earlierFiscalYears.map((year) => <button key={year} type="button" role="menuitemradio" aria-checked={fiscalYear === year}
-            onClick={() => selectFiscalYear(year)}>{year}</button>)}
-        </div>}
-      </>}
-    </div>}
-  </div>;
+  const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button oj-button-sm" chroming="outlined"
+    aria-label={`Selected fiscal year ${fiscalYear}`}>
+    {fiscalYear}
+    <oj-menu slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
+      {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
+        {year === currentFiscalYear ? `${year} · Current` : year}
+      </oj-option>)}
+      {earlierFiscalYears.length > 0 && <oj-option>Earlier FYs…
+        <oj-menu>
+          {earlierFiscalYears.map((year) => <oj-option key={year} value={year}>{year}</oj-option>)}
+        </oj-menu>
+      </oj-option>}
+    </oj-menu>
+  </oj-menu-button>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
@@ -607,7 +560,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           </button>
           <span id="showMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
         </span>
-        {mtdAppliedDate ? <time class="consumption-mtd-applied-date" dateTime={mtdAppliedTimestamp ?? undefined}
+        {includeMtd && mtdAppliedDate ? <time class="consumption-mtd-applied-date" dateTime={mtdAppliedTimestamp ?? undefined}
           title={mtdAppliedTimestamp ?? undefined}>MTD updated {mtdAppliedDate}</time> : null}
       </div>
       <div class="consumption-records-toolbar-activity">
