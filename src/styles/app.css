@@ -6072,8 +6072,9 @@ h4.weekly-activity-section-label--next-week,
   max-height: none;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: 1rem;
+  padding: 0;
 }
+.kap-page-shell.consumption-insights-page { gap: 0; padding: 0; }
 .kap-page-shell__scroll {
   box-sizing: border-box;
   height: 100%;
@@ -6139,7 +6140,13 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-filter.forecast-actual-toolbar,
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: auto; overflow-y: auto; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: max-content; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 0; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__body,
+.kap-page-shell.forecast-actual-page .forecast-actual-results {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
+}
 .forecast-actual-matrix-shell { max-width: none; min-width: 100%; overflow: visible; width: max-content; }
 .forecast-actual-matrix-layout { min-width: 100%; overflow: visible; width: max-content; }
 .forecast-actual-matrix .is-quarter-result { left: 17.5rem; }

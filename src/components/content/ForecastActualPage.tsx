@@ -299,13 +299,13 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       </section>
       {resultFilter && <div class="forecast-actual-result-filter" role="status"><span>{resultFilter.quarter} · {resultLabel(resultFilter.status)}</span><button type="button" onClick={() => setResultFilter(null)}>Clear result filter</button></div>}
 
+      <div class="forecast-actual-matrix-toolbar">
+        <span class="forecast-actual-unit-note">Amount: K USD</span>
+        <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
+          onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
+          showBusyLabel={false} compactTimestampButton />
+      </div>
       <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar">
-          <span class="forecast-actual-unit-note">Amount: K USD</span>
-          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
-            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
-            showBusyLabel={false} compactTimestampButton />
-        </div>
         <div class="forecast-actual-matrix-layout">
           <table class="forecast-actual-matrix">
             <thead>
