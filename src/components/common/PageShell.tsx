@@ -7,6 +7,7 @@ import "ojs/ojprogress-bar";
 type PageShellProps = {
   ariaLabelledBy: string;
   title: ComponentChildren;
+  titleControls?: ComponentChildren;
   eyebrow?: ComponentChildren;
   breadcrumb?: ComponentChildren;
   actions?: ComponentChildren;
@@ -131,6 +132,7 @@ export function PageDataProgress({ busy = false, busyLabel = "Loading data" }: P
 export function PageShell({
   ariaLabelledBy,
   title,
+  titleControls,
   eyebrow,
   breadcrumb,
   actions,
@@ -177,7 +179,10 @@ export function PageShell({
             <header class="kap-page-shell__heading">
               <div class={`kap-page-shell__heading-copy${eyebrow ? " has-eyebrow" : ""}`}>
                 {eyebrow && <span class="kpi-eyebrow">{eyebrow}</span>}
-                <h1 id={ariaLabelledBy}>{title}</h1>
+                <div class="kap-page-shell__title-row">
+                  <h1 id={ariaLabelledBy}>{title}</h1>
+                  {titleControls && <div class="kap-page-shell__title-controls">{titleControls}</div>}
+                </div>
               </div>
               <div class="kap-page-shell__heading-actions">
                 {activityPosition === "heading" && <PageActivity busy={busy} busyLabel={busyLabel} onRefresh={onRefresh} refreshDisabled={refreshDisabled} />}

@@ -113,8 +113,12 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
-assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
-  "Analysis and Forecast preserve the existing outer Fiscal Year selector while Records remains exempt");
+assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
+  "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
+assert.match(insightsPage, /fiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
+  "Analysis renders its selected FY beside the title");
+assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
+  "Analysis wires FY selection through the existing route state");
 assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
   "PageShell routes that preserve the Fiscal Year selector expose the two-row layout modifier");
 assert.match(styles, /\.kpi-content\.is-kap-page-shell-route\.has-fiscal-year-panel\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s,
@@ -134,8 +138,20 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /formatMtdAppliedDate\(analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf\)[\s\S]*As of \{mtdAppliedDate\}[\s\S]*role="switch"/u,
-  "Analysis shows the authoritative UTC-basis As of date immediately before the MTD switch");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*As of \{mtdAppliedDate\}[\s\S]*PageActivity/u,
+  "Analysis places Show MTD at the toolbar left and Reload with KST time at the right");
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
+  "FY, Pillar, Sales Rep, Account and MTD remain wired to the Analysis request");
+assert.match(insightsPage, /id="consumptionSalesRepContext"[\s\S]*id="consumptionAccountContext"/,
+  "Sales Rep and Account filters remain present after the layout move");
+assert.match(insightsPage, /downloadCanvas\("png"\)[\s\S]*downloadCanvas\("pdf"\)/,
+  "PNG and PDF exports remain present after the layout move");
+assert.doesNotMatch(insightsPage, /useEffect\(\(\) => \{[\s\S]{0,900}setSelected(?:Pillar|SalesRep|AccountContext)[\s\S]{0,900}\}, \[fiscalYear\]\)/,
+  "FY changes do not reset the current Analysis filter view before reloading the selected year");
+assert.match(pageShell, /titleControls\?: ComponentChildren[\s\S]*kap-page-shell__title-row[\s\S]*kap-page-shell__title-controls/,
+  "the shared PageShell exposes a backwards-compatible title control slot");
+assert.match(styles, /\.consumption-analysis-toolbar \.consumption-records-toolbar-activity\s*\{[^}]*margin-left:\s*auto/s,
+  "the Analysis data toolbar keeps Reload aligned on the right of Show MTD");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
 assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
@@ -324,7 +340,7 @@ assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*i
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is visible for Consumption Analysis and hidden for FY-independent Account Management and Consumption Records");
+assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis title selector and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
@@ -396,7 +412,7 @@ assert.match(insightsPage, /selectedMovement\.category === "All" \? <tfoot><tr><
 assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
 assert.equal(insightsPage.includes("const [includeMtd, setIncludeMtd] = useState(false)"), true, "Include MTD is default OFF");
 assert.equal(insightsPage.includes("includeMtd"), true, "Analysis request includes the MTD mode");
-assert.equal(insightsPage.includes("Include MTD"), true, "Analysis exposes the Include MTD toggle");
+assert.equal(insightsPage.includes("Show MTD"), true, "Analysis exposes the Show MTD toolbar toggle");
 assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
 assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
 assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
