@@ -809,6 +809,7 @@ assert.match(forecastActualPage, /Remaining to Target[\s\S]*Confirmed Shortfall[
 assert.doesNotMatch(forecastActualPage, /Full-period summary|FINAL periods only/,
   "misleading mixed-period summary columns are removed from the monthly matrix");
 assert.match(forecastActualPage, /<span class="forecast-actual-value-badge is-pending"><span>Actual<\/span><span>Pending<\/span><\/span>[\s\S]*N\/A/, "the table-only Actual Pending badge renders as two explicit lines and stays distinct from N/A");
+assert.match(styles, /\.forecast-actual-month-value\.is-actual \.forecast-actual-value-badge\.is-pending\s*\{[^}]*display:\s*inline-grid[^}]*\}/, "only Actual cells force the pending badge onto two visual rows");
 assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
 assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
