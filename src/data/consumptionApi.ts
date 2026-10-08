@@ -1043,7 +1043,12 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
   return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
 };
 
-export type ConsumptionImportMetadata = Readonly<{ forecastImportedAt: string | null; actualImportedAt: string | null }>;
+export type ConsumptionImportMetadata = Readonly<{
+  forecastSourceFileName: string | null;
+  forecastImportedAt: string | null;
+  actualSourceFileName: string | null;
+  actualImportedAt: string | null;
+}>;
 export const fetchConsumptionImportMetadata = async (range: ConsumptionWorkspaceRange, pillar: ConsumptionPillar): Promise<ConsumptionImportMetadata> => {
   const parameters = new URLSearchParams({ fromQuarter: range.fromQuarter, toQuarter: range.toQuarter, pillar });
   const { payload } = await request(`/consumption/import-metadata?${parameters}`, undefined, pillar, true);
@@ -1054,7 +1059,17 @@ export const fetchConsumptionImportMetadata = async (range: ConsumptionWorkspace
     if (typeof value !== "string" || Number.isNaN(Date.parse(value))) throw new Error("Malformed Consumption import metadata");
     return value;
   };
-  return { forecastImportedAt: timestamp(raw.forecastImportedAt), actualImportedAt: timestamp(raw.actualImportedAt) };
+  const fileName = (value: unknown): string | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string" || !value.trim()) throw new Error("Malformed Consumption import metadata");
+    return value;
+  };
+  return {
+    forecastSourceFileName: fileName(raw.forecastSourceFileName),
+    forecastImportedAt: timestamp(raw.forecastImportedAt),
+    actualSourceFileName: fileName(raw.actualSourceFileName),
+    actualImportedAt: timestamp(raw.actualImportedAt)
+  };
 };
 const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   if (value === undefined || value === null) {

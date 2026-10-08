@@ -6,6 +6,7 @@ import {
   exportConsumptionActualXlsx,
   exportConsumptionImportCompatibleCsv,
   exportConsumptionForecastCsv,
+  fetchConsumptionImportMetadata,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   fetchForecastActualComparison,
@@ -503,6 +504,23 @@ void (async () => {
     "MTD responses may omit null projection-status fields under NON_NULL serialization");
   assert.equal(mtdComparison.rows[0]?.months[0]?.actualAsOf, "2026-09-10T09:00:00+09:00",
     "MTD parsing preserves the complete import timestamp and offset");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    forecastSourceFileName: "FY27 Forecast.csv",
+    forecastImportedAt: "2026-10-05T13:26:17+09:00",
+    actualSourceFileName: "FY27 Actual.xlsx",
+    actualImportedAt: "2026-10-06T17:36:28+09:00"
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  assert.deepEqual(
+    await fetchConsumptionImportMetadata({ fromQuarter: "FY27-Q1", toQuarter: "FY27-Q4" }, "ALL"),
+    {
+      forecastSourceFileName: "FY27 Forecast.csv",
+      forecastImportedAt: "2026-10-05T13:26:17+09:00",
+      actualSourceFileName: "FY27 Actual.xlsx",
+      actualImportedAt: "2026-10-06T17:36:28+09:00"
+    },
+    "Import metadata preserves the stored source filenames instead of synthesizing them"
+  );
 
   runtime.fetch = async () => new Response(JSON.stringify({ ...mtdComparisonPayload,
     rows: [{ ...mtdComparisonPayload.rows[0], actualShortfall: "false" }] }),

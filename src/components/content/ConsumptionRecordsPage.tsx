@@ -513,7 +513,10 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
   const [recordsQueryError, setRecordsQueryError] = useState("");
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
-  const [importMetadata, setImportMetadata] = useState<{ forecastImportedAt: string | null; actualImportedAt: string | null }>({ forecastImportedAt: null, actualImportedAt: null });
+  const [importMetadata, setImportMetadata] = useState<{
+    forecastSourceFileName: string | null; forecastImportedAt: string | null;
+    actualSourceFileName: string | null; actualImportedAt: string | null;
+  }>({ forecastSourceFileName: null, forecastImportedAt: null, actualSourceFileName: null, actualImportedAt: null });
   const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
   const blockingRecordsLoading = recordsLoadingPhase === "initial";
@@ -661,6 +664,13 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           nextOffset: nextPage.nextOffset,
           hasMore: nextPage.hasMore
         };
+      }
+      if (!append) {
+        const accountNames = page.accountGroups.map((group) => group.account);
+        const uniqueAccountCount = new Set(accountNames).size;
+        if (page.hasMore || uniqueAccountCount !== accountNames.length || uniqueAccountCount !== page.totalAccounts) {
+          throw new Error("Consumption Records complete-list validation failed. No partial results were displayed.");
+        }
       }
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
@@ -1741,8 +1751,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nLast Import file: Not available\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
-  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nLast Import file: Not available\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
+  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nLast Import file: ${importMetadata.actualSourceFileName ?? "Not available"}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
     ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
