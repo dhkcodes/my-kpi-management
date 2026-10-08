@@ -6803,7 +6803,7 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-overview { align-items: start; }
 .forecast-actual-total-strip { grid-template-rows: repeat(2, minmax(3.75rem, auto)); }
 .forecast-actual-total-strip > span { padding: .35rem .5rem; }
-.forecast-actual-total-strip > .forecast-actual-total-value {
+.forecast-actual-total-strip .forecast-actual-total-value {
   align-items: baseline;
   display: inline-flex;
   flex-wrap: nowrap;
