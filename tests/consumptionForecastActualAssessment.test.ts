@@ -38,13 +38,13 @@ const row = (account: string, months: ForecastActualMonth[], salesRep = "Rep"): 
 
 const finalShortfall = assessForecastActualMonth(month({ actualState: "FINAL", actualAmount: "80" }));
 assert.equal(finalShortfall.kind, "FINAL_SHORTFALL");
-assert.equal(finalShortfall.label, "Final shortfall");
+assert.equal(finalShortfall.label, "Confirmed Shortfall");
 assert.equal(finalShortfall.differenceAmount, "-20");
 assert.equal(finalShortfall.differenceLabel, "Difference");
 
 const finalOnTrack = assessForecastActualMonth(month({ actualState: "FINAL", actualAmount: "100" }));
 assert.equal(finalOnTrack.kind, "NORMAL");
-assert.equal(finalOnTrack.label, "On track");
+assert.equal(finalOnTrack.label, "Matched");
 
 const mtdShortfall = assessForecastActualMonth(month({
   actualState: "MTD",
@@ -53,7 +53,7 @@ const mtdShortfall = assessForecastActualMonth(month({
   forecastAmount: "30"
 }));
 assert.equal(mtdShortfall.kind, "MTD_SHORTFALL");
-assert.equal(mtdShortfall.label, "Projected shortfall");
+assert.equal(mtdShortfall.label, "Projected Shortfall");
 assert.equal(mtdShortfall.differenceAmount, "-20", "current Difference uses MTD Actual, not projected Actual");
 assert.equal(mtdShortfall.differenceLabel, "Difference");
 assert.equal(mtdShortfall.projectedAmount, "12", "Sep 28 minus 3 days gives effective day 25; 10 / 25 * 30 = 12");
@@ -73,7 +73,7 @@ assert.equal(recurringProjectionNearThreshold.projectedDifferenceAmount, "0",
   "the exact positive difference may round to zero for display but must never change sign");
 assert.equal(recurringProjectionNearThreshold.kind, "NORMAL",
   "31 / 3 is exactly above 10.3333332; display rounding must not classify it as a shortfall");
-assert.equal(recurringProjectionNearThreshold.label, "Projected on track");
+assert.equal(recurringProjectionNearThreshold.label, "Projected On Track");
 
 const mtdZero = assessForecastActualMonth(month({
   actualState: "MTD",
@@ -84,11 +84,11 @@ const mtdZero = assessForecastActualMonth(month({
 assert.equal(mtdZero.projectedAmount, "0", "zero MTD is a real value, not missing");
 assert.equal(mtdZero.kind, "MTD_SHORTFALL");
 
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: null, actualAsOf: "2026-09-28" })).label, "Not comparable");
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: null })).label, "Not comparable");
-assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: "2026-09-02" })).label, "Not comparable",
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: null, actualAsOf: "2026-09-28" })).label, "N/A");
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: null })).label, "N/A");
+assert.equal(assessForecastActualMonth(month({ actualState: "MTD", actualAmount: "10", actualAsOf: "2026-09-02" })).label, "N/A",
   "an adjusted date outside the target month is not extrapolated across a month boundary");
-assert.equal(assessForecastActualMonth(month({ forecastAmount: null, actualState: "FINAL", actualAmount: "80" })).label, "Not comparable");
+assert.equal(assessForecastActualMonth(month({ forecastAmount: null, actualState: "FINAL", actualAmount: "80" })).label, "N/A");
 
 const rows = [
   row("A", [month({ actualState: "FINAL", actualAmount: "80" }), month({ periodKey: "FY27-OCT", actualState: "FINAL", actualAmount: "70" })]),
@@ -113,8 +113,8 @@ const periodRows = [row("A", [
 ])];
 assert.deepEqual(
   visibleForecastActualPeriods(["FY27-MAY", "FY27-DEC", "FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG"], periodRows),
-  ["FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG", "FY27-JUL", "FY27-JUN"],
-  "Forecast and Actual-only months are both visible; entered zero is retained and null-only months are excluded"
+  ["FY27-MAY", "FY27-DEC", "FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG", "FY27-JUL", "FY27-JUN"],
+  "The complete server fiscal calendar remains visible; value-only row periods are merged and entered zero is retained"
 );
 assert.deepEqual(
   visibleForecastActualPeriods([], [row("Actual only", [

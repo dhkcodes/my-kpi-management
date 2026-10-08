@@ -83,12 +83,13 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 const koreaBusinessDate = (): string => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
 }).format(new Date());
-const formatKstImportDate = (timestamp: string | null): string | null => {
+const formatKstImportTimestamp = (timestamp: string | null): string | null => {
   if (!timestamp) return null;
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
   }).formatToParts(new Date(timestamp)).map((part) => [part.type, part.value]));
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 };
 
 export const consumptionRecordsOperationError = (error: unknown, fallback: string): string => {
@@ -536,7 +537,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const tablePanelRef = useRef<HTMLElement | null>(null);
   const viewportControlsRef = useRef<HTMLDivElement | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
-  const recordsSentinelRef = useRef<HTMLDivElement | null>(null);
+
   const doubleActivationRef = useRef(createDoubleActivationTracker());
   const exportingRef = useRef(false);
   const actualApplyingRef = useRef(false);
@@ -624,14 +625,43 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     setRecordsLoadingPhase(loadingPhase);
     const generation = ++recordsRequestGeneration.current;
     try {
-      const page = await fetchConsumptionRecords({
+      let page = await fetchConsumptionRecords({
         fromQuarter: requestQuery.fromQuarter, toQuarter: requestQuery.toQuarter, search: requestQuery.search,
         offset: append ? recordsNextOffset : 0,
-        limit: append ? 10 : initialConsumptionRecordsBatchSize(window.innerHeight),
+        limit: 100,
         sort: "ACCOUNT",
         direction: "ASC",
         pillar: requestQuery.pillar
       });
+      const visitedOffsets = new Set<number>();
+      while (!append && page.hasMore) {
+        if (generation !== recordsRequestGeneration.current) return;
+        if (visitedOffsets.has(page.nextOffset)) {
+          throw new Error("Consumption Records pagination did not advance. Please refresh.");
+        }
+        visitedOffsets.add(page.nextOffset);
+        const nextPage = await fetchConsumptionRecords({
+          fromQuarter: requestQuery.fromQuarter, toQuarter: requestQuery.toQuarter, search: requestQuery.search,
+          offset: page.nextOffset,
+          limit: 100,
+          sort: "ACCOUNT",
+          direction: "ASC",
+          pillar: requestQuery.pillar
+        });
+        if (nextPage.etag !== page.etag) {
+          throw new Error("Consumption Records changed while the complete list was loading. Please refresh.");
+        }
+        page = {
+          ...page,
+          plans: [...page.plans, ...nextPage.plans],
+          controlTotals: [...page.controlTotals, ...nextPage.controlTotals],
+          accountForecasts: [...page.accountForecasts, ...nextPage.accountForecasts],
+          forecastVariances: [...page.forecastVariances, ...nextPage.forecastVariances],
+          accountGroups: [...page.accountGroups, ...nextPage.accountGroups],
+          nextOffset: nextPage.nextOffset,
+          hasMore: nextPage.hasMore
+        };
+      }
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
         return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts);
@@ -837,10 +867,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
-  const forecastImportedDate = formatKstImportDate(importMetadata.forecastImportedAt);
-  const actualImportedDate = formatKstImportDate(importMetadata.actualImportedAt);
+  const forecastImportedDate = formatKstImportTimestamp(importMetadata.forecastImportedAt);
+  const actualImportedDate = formatKstImportTimestamp(importMetadata.actualImportedAt);
   const staleMtdPeriods = Object.keys(serverMtdStatuses).filter((period) => serverMtdStatuses[period] === "FINAL_UPLOAD_REQUIRED");
   const loadedAccountCount = renderedRecordAccounts.length;
+  const loadedPlanCount = countUniqueConsumptionPlans(renderedRecordAccounts.flatMap((account) => account.plans));
   const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
   const signals = useMemo(() => serverSignals ?? [], [serverSignals]);
   const selectedSignal = signals.find((signal) => signal.id === selectedSignalId) ?? null;
@@ -937,27 +968,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     updateTableScrollState();
   };
 
-  const handlePageScroll = (event: Event) => {
+  const handlePageScroll = (_event: Event) => {
     updateTableViewportControls();
-    const { scrollHeight, scrollTop, clientHeight } = event.currentTarget as HTMLDivElement;
-    if (scrollHeight - scrollTop - clientHeight <= 96 && recordsHasMore && !recordsLoading && !hasDraftChanges) {
-      void loadRecordsPage(true).catch((error) => setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
-    }
   };
-
-  useEffect(() => {
-    const root = pageScrollRef.current;
-    const sentinel = recordsSentinelRef.current;
-    if (!root || !sentinel || !recordsHasMore || hasDraftChanges) return undefined;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting) && !recordsLoadingRef.current) {
-        void loadMoreRecordsRef.current().catch((error) =>
-          setImportError(error instanceof Error ? error.message : "More Consumption Records could not be loaded."));
-      }
-    }, { root, rootMargin: "0px 0px 96px 0px", threshold: 0 });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [recordsHasMore, hasDraftChanges]);
 
   const moveTableHorizontally = (direction: -1 | 1) => {
     const table = tableScrollRef.current;
@@ -1728,8 +1741,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nImported on ${forecastImportedDate ?? "Not available"}`;
-  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nImported on ${actualImportedDate ?? "Not available"}`;
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nLast Import file: Not available\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
+  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nLast Import file: Not available\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
     ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
@@ -2073,6 +2086,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
             </div>
           ) : <>
+        {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
+          <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
+        </div>}
         <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
@@ -2147,12 +2163,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               {recordsViewState === "empty" && <tr><td class="consumption-empty-state" colSpan={1 + quarters.length * 5}>No Consumption Records match the selected range and filters.</td></tr>}
             </tbody>
           </table>
-          <div ref={recordsSentinelRef} class="consumption-records-sentinel" data-records-sentinel aria-hidden="true"></div>
-        </div>
-        <div class={`consumption-load-more${recordsHasMore ? "" : " is-placeholder"}`}>
-          {recordsHasMore && <button type="button" disabled={recordsLoading || hasDraftChanges} onClick={() => void loadRecordsPage(true)}>Load More</button>}
-          {!recordsHasMore && !recordsLoading && !rangeLoading && loadedAccountCount > 0 && <span class="consumption-records-complete" role="status">All accounts loaded.</span>}
-          <small class="consumption-records-count">Showing <strong class="consumption-records-count-value">{loadedAccountCount}</strong> of <strong class="consumption-records-count-value">{recordsTotalAccounts}</strong> accounts</small>
         </div>
           </>}
         </div>

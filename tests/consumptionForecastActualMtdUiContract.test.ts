@@ -19,7 +19,9 @@ assert.match(mtdControl, /onClick=\{onToggle\}/u);
 assert.equal((mtdControl.match(/role="switch"/gu) ?? []).length, 1);
 assert.match(page, /checked=\{actualMode === "MTD"\}/u);
 assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\}/u);
-assert.match(page, /mtdAppliedDate=\{mtdAppliedDate\}/u);
+assert.match(page, /mtdAppliedDate=\{mtdAppliedTimestamp\}/u);
+assert.match(page, /actualMode === "FINAL"[^]*actualMode: "MTD"[^]*setMtdAppliedTimestamp/u,
+  "the tooltip fetches and retains the real MTD timestamp while Show MTD is off");
 assert.match(page, /onToggle=\{\(\) => \{ setResultFilter\(null\); setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\); \}\}/u);
 assert.match(page, /consumption-pillar-selector[^]*aria-pressed/u, "Pillar uses the same button selector as Consumption Analysis");
 assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[^]*Updated on \{updatedOn\}/u,
@@ -28,20 +30,20 @@ assert.match(mtdControl, /aria-describedby=\{tooltipId\}[^]*consumption-info-too
   "only the dedicated information trigger owns the shared MTD tooltip");
 
 assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPeriods \?\? \[\], currentData\?\.rows \?\? \[\]\)/u,
-  "months stop at the latest period that has a real Forecast value within the selected scope");
+  "the visible calendar merges the server fiscal calendar with value-bearing row periods");
 assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/month-count row is removed");
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
 assert.match(page, /const formatAmount = \(value: string \| null, unavailable = "Unconfirmed"\) => value === null \? unavailable : formatExactKFixed\(value, 2\)/u,
   "amount formatter retains the K unit");
-assert.match(page, /Total Forecast<\/small><strong>\{formatAmount\(selectedTotalForecast, "N\/A"\)\}<\/strong>/u,
+assert.match(page, /Total Actual<\/small><strong>\{formatAmount\(selectedTotalActual, "N\/A"\)\}<\/strong>/u,
   "the redundant K USD label and duplicate K suffix are removed");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
 for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");
 assert.doesNotMatch(page, /assessment\.differenceLabel/u, "Difference does not repeat a verbose formula label");
-assert.match(page, /Projected gap/u);
-assert.match(page, /Final gap/u);
-assert.match(page, /Pending/u);
+assert.match(page, /Projected Shortfall/u);
+assert.match(page, /Confirmed Shortfall/u);
+assert.match(page, /Actual Pending/u);
 assert.match(page, /N\/A/u);
 assert.match(page, /statusTooltip/u, "short table labels keep their full meaning in an accessible tooltip");
 assert.match(page, /assessForecastActualQuarter/u, "cards and visible rows share one Account-quarter assessment source");

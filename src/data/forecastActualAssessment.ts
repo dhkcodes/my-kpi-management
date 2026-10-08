@@ -13,7 +13,7 @@ export type ForecastActualAssessmentKind = "NORMAL" | "FINAL_SHORTFALL" | "MTD_S
 
 export type ForecastActualMonthAssessment = Readonly<{
   kind: ForecastActualAssessmentKind;
-  label: "On track" | "Final shortfall" | "Projected on track" | "Projected shortfall" | "Unconfirmed" | "Not comparable";
+  label: "Matched" | "Exceeded" | "Confirmed Shortfall" | "Projected On Track" | "Projected Shortfall" | "Actual Pending" | "N/A";
   differenceAmount: string | null;
   differenceLabel: "Difference" | "Not comparable";
   projectedAmount: string | null;
@@ -64,7 +64,7 @@ export const forecastActualQuarterForPeriod = (periodKey: string): ForecastActua
 const compareToZero = (value: string): number => compareExactDecimals(value, "0");
 const unavailable = (tooltip: string, differenceAmount: string | null = null): ForecastActualMonthAssessment => ({
   kind: "UNAVAILABLE",
-  label: "Not comparable",
+  label: "N/A",
   differenceAmount,
   differenceLabel: differenceAmount === null ? "Not comparable" : "Difference",
   projectedAmount: null,
@@ -207,16 +207,17 @@ export const assessForecastActualMonth = (month: ForecastActualMonth): ForecastA
   if (month.actualState === "FINAL") {
     if (month.actualAmount === null) {
       return {
-        kind: "UNCONFIRMED", label: "Unconfirmed", differenceAmount: null, differenceLabel: "Not comparable",
+        kind: "UNCONFIRMED", label: "Actual Pending", differenceAmount: null, differenceLabel: "Not comparable",
         projectedAmount: null, projectedDifferenceAmount: null,
         tooltip: "Final Actual is not available yet. Future months are not marked as shortfalls."
       };
     }
     const differenceAmount = subtractExactDecimals(month.actualAmount, month.forecastAmount);
-    const shortfall = compareToZero(differenceAmount) < 0;
+    const comparison = compareToZero(differenceAmount);
+    const shortfall = comparison < 0;
     return {
       kind: shortfall ? "FINAL_SHORTFALL" : "NORMAL",
-      label: shortfall ? "Final shortfall" : "On track",
+      label: shortfall ? "Confirmed Shortfall" : comparison > 0 ? "Exceeded" : "Matched",
       differenceAmount,
       differenceLabel: "Difference",
       projectedAmount: null,
@@ -249,7 +250,7 @@ export const assessForecastActualMonth = (month: ForecastActualMonth): ForecastA
     const shortfall = compareToZero(projectedDifferenceNumerator) < 0;
     return {
       kind: shortfall ? "MTD_SHORTFALL" : "NORMAL",
-      label: shortfall ? "Projected shortfall" : "Projected on track",
+      label: shortfall ? "Projected Shortfall" : "Projected On Track",
       differenceAmount: currentDifferenceAmount,
       differenceLabel: "Difference",
       projectedAmount,
@@ -259,7 +260,7 @@ export const assessForecastActualMonth = (month: ForecastActualMonth): ForecastA
   }
 
   return {
-    kind: "UNCONFIRMED", label: "Unconfirmed", differenceAmount: null, differenceLabel: "Not comparable",
+    kind: "UNCONFIRMED", label: "Actual Pending", differenceAmount: null, differenceLabel: "Not comparable",
     projectedAmount: null, projectedDifferenceAmount: null,
     tooltip: "Actual is not confirmed yet. Future months are not marked as shortfalls."
   };
@@ -307,8 +308,7 @@ export const visibleForecastActualPeriods = (
   rows.forEach((row) => row.months.forEach((item) => {
     if (item.forecastAmount !== null || item.actualAmount !== null) periodsWithValues.add(item.periodKey);
   }));
-  return forecastActualPeriodsLatestFirst([...new Set([...fullPeriods, ...periodsWithValues])])
-    .filter((period) => periodsWithValues.has(period));
+  return forecastActualPeriodsLatestFirst([...new Set([...fullPeriods, ...periodsWithValues])]);
 };
 
 const addNullable = (current: string | null, value: string): string => current === null ? value : addExactDecimals(current, value);

@@ -21,7 +21,7 @@ import {
 import { compareForecastActualRows, type ForecastActualSortDirection, type ForecastActualSortKey } from "../../data/forecastActualSort";
 import { addExactDecimals, compareExactDecimals, formatExactKFixed } from "../../data/exactDecimal";
 import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
-import { formatMtdAppliedDate } from "../../data/mtdDate";
+
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 
@@ -32,18 +32,13 @@ const renderTotalAmount = (value: string | null) => value === null
 const SortIndicator = ({ active, direction }: { active: boolean; direction: ForecastActualSortDirection }) => active
   ? <span class={`forecast-actual-sort-indicator is-${direction}`} aria-hidden="true"></span> : null;
 const shortStatus = (label: string) => {
-  if (label === "Final shortfall") return "Final gap";
-  if (label === "Projected MTD shortfall") return "Projected gap";
-  if (label === "Projected on track") return "Projected OK";
-  if (label === "Unconfirmed") return "Pending";
-  if (label === "Not comparable") return "N/A";
   return label;
 };
 const statusTooltip = (label: string, tooltip: string) => {
-  if (label === "Final shortfall") return `Final shortfall means confirmed Final Actual is below Forecast. ${tooltip}`;
-  if (label === "Projected MTD shortfall") return `Projected shortfall means projected month-end Actual is below Forecast; it is not a confirmed Final Actual gap. ${tooltip}`;
-  if (label === "Projected on track") return `Projected month-end Actual is on track against Forecast. ${tooltip}`;
-  if (label === "Unconfirmed") return `Actual is not confirmed, so Forecast and Actual cannot be compared yet. ${tooltip}`;
+  if (label === "Confirmed Shortfall") return `Confirmed Shortfall means confirmed Final Actual is below Forecast. ${tooltip}`;
+  if (label === "Projected Shortfall") return `Projected Shortfall means projected month-end Actual is below Forecast; it is not a confirmed Final Actual gap. ${tooltip}`;
+  if (label === "Projected On Track") return `Projected month-end Actual is on track against Forecast. ${tooltip}`;
+  if (label === "Actual Pending") return `Actual is not confirmed, so Forecast and Actual cannot be compared yet. ${tooltip}`;
   return tooltip;
 };
 const monthByPeriod = (row: ForecastActualRow, periodKey: string) => row.months.find((month) => month.periodKey === periodKey);
@@ -58,8 +53,8 @@ const monthLabel = (periodKey: string) => {
 
 type QuarterResultFilter = Readonly<{ quarter: ForecastActualQuarter; status: "SHORTFALL" | "MATCHED" | "EXCEEDED" }>;
 const resultLabel = (status: ForecastActualQuarterStatus) => ({
-  SHORTFALL: "Shortfall", MATCHED: "Matched", EXCEEDED: "Exceeded", NO_FORECAST: "No forecast",
-  MISSING_ACTUAL: "Actual missing", PARTIAL_ACTUAL: "Partial actual", FUTURE: "Future"
+  SHORTFALL: "Confirmed Shortfall", MATCHED: "Matched", EXCEEDED: "Exceeded", NO_FORECAST: "N/A",
+  MISSING_ACTUAL: "Actual Pending", PARTIAL_ACTUAL: "Actual Pending", FUTURE: "Actual Pending"
 }[status]);
 const resultTooltip = (result: ForecastActualQuarterResult) => {
   if (result.status === "MATCHED") return "Matched means the quarter difference is exactly zero; the displayed amount is the zero difference, not the sum of matched Actual.";
@@ -86,6 +81,14 @@ const sumDifferenceBySign = (rows: readonly ForecastActualRow[], periodKey: stri
     .filter((value) => sign === "NEGATIVE" ? compareExactDecimals(value, "0") < 0 : compareExactDecimals(value, "0") > 0);
   return values.length ? values.reduce((total, value) => addExactDecimals(total, value), "0") : null;
 };
+const latestMtdAppliedTimestamp = (comparison: ForecastActualComparison): string | null => {
+  const timestamps = comparison.rows.flatMap((row) => row.months)
+    .filter((month) => month.actualState === "MTD" && month.actualAsOf)
+    .map((month) => month.actualAsOf as string)
+    .map((value) => ({ value, time: new Date(value).getTime() }))
+    .filter(({ time }) => !Number.isNaN(time)).sort((left, right) => left.time - right.time);
+  return timestamps[timestamps.length - 1]?.value ?? null;
+};
 
 export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{
   fiscalYear: FiscalYear;
@@ -106,6 +109,8 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   const [resultFilter, setResultFilter] = useState<QuarterResultFilter | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [lastCompletedAt, setLastCompletedAt] = useState<Date | null>(null);
+  const [jetControlsReady, setJetControlsReady] = useState(false);
+  const [mtdAppliedTimestamp, setMtdAppliedTimestamp] = useState<string | null>(null);
   const [accountSearchOpen, setAccountSearchOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState("");
   const [debouncedAccountSearch, setDebouncedAccountSearch] = useState("");
@@ -120,6 +125,13 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   const viewportControlsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let active = true;
+    Promise.all(["oj-menu-button", "oj-menu"].map((name) => customElements.whenDefined(name)))
+      .then(() => { if (active) setJetControlsReady(true); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     setSalesRep(""); setAccount(""); setAccountSearch(""); setAccountOptionCache([]); setResultFilter(null);
   }, [fiscalYear]);
 
@@ -127,7 +139,17 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     const controller = new AbortController();
     setLoading(true); setError("");
     fetchForecastActualComparison({ fiscalYear, quarter: "ALL", pillar, actualMode, salesRep, account }, controller.signal)
-      .then((next) => { if (!controller.signal.aborted) { setData(next); setLastCompletedAt(new Date()); } })
+      .then(async (next) => {
+        let appliedTimestamp = latestMtdAppliedTimestamp(next);
+        if (!appliedTimestamp && actualMode === "FINAL" && next.currentMtdAvailable) {
+          const metadata = await fetchForecastActualComparison(
+            { fiscalYear, quarter: "ALL", pillar, actualMode: "MTD", salesRep, account }, controller.signal);
+          appliedTimestamp = latestMtdAppliedTimestamp(metadata);
+        }
+        if (!controller.signal.aborted) {
+          setData(next); setMtdAppliedTimestamp(appliedTimestamp); setLastCompletedAt(new Date());
+        }
+      })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load Forecast vs Actual."); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -162,6 +184,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   // Preserve the previous result while the next filtered request is in flight.
   // The effect cleanup guards against stale responses replacing newer ones.
   const currentData = data;
+  const contentReady = jetControlsReady && currentData !== null && !loading;
 
   const allPeriods = useMemo(
     () => visibleForecastActualPeriods(currentData?.fullForecastPeriods ?? [], currentData?.rows ?? []),
@@ -218,14 +241,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     exceeded: sumDifferenceBySign(rows, periodKey, "POSITIVE")
   }])) as Record<string, Readonly<{ forecast: string | null; actual: string | null; shortfall: string | null; exceeded: string | null }>>, [periods, rows]);
   const displayedActualMode = currentData?.actualMode ?? actualMode;
-  const mtdAppliedDate = useMemo(() => {
-    const timestamps = (currentData?.rows ?? []).flatMap((row) => row.months)
-      .filter((month) => month.actualState === "MTD" && month.actualAsOf)
-      .map((month) => month.actualAsOf as string)
-      .map((value) => ({ value, time: new Date(value).getTime() }))
-      .filter(({ time }) => !Number.isNaN(time)).sort((left, right) => left.time - right.time);
-    return formatMtdAppliedDate(timestamps[timestamps.length - 1]?.value);
-  }, [currentData]);
+
   const accountOptions = account ? accountOptionCache : (data?.accountOptions ?? accountOptionCache);
   const filteredAccountOptions = useMemo(() => {
     const query = debouncedAccountSearch.toLocaleLowerCase();
@@ -358,7 +374,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={updateViewportControls}
     breadcrumb={breadcrumb} title="Forecast vs Actual" titleControls={fiscalYearControl} headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
-    filters={<PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
+    filters={contentReady ? <PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
       <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
         {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={pillar === option.value}
           onClick={() => { if (option.value === pillar) return; setPillar(option.value); setSalesRep(""); resetAccountScope(); }}>{option.label}</button>)}
@@ -383,16 +399,16 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
           </div>}
         </div>
       </div>
-    </PageFilterPanel>}>
+    </PageFilterPanel> : undefined}>
 
     {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
-    <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual results" />
+    <PageDataProgress busy={!contentReady && !error} busyLabel="Loading Forecast vs Actual results" />
 
-    {currentData && <div class="forecast-actual-results" aria-busy={loading}>
+    {contentReady && currentData && <div class="forecast-actual-results" aria-busy="false">
       <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
         <div class="consumption-records-toolbar__left">
           <ConsumptionMtdControl checked={actualMode === "MTD"} disabled={loading || !currentData?.currentMtdAvailable}
-            mtdAppliedDate={mtdAppliedDate}
+            mtdAppliedDate={mtdAppliedTimestamp}
             onToggle={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}
             tooltipId="forecast-show-mtd-tooltip" />
         </div>
@@ -404,14 +420,15 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
       </div>
       <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
         <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
-          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
-          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
-            <em class="forecast-actual-total-mtd">{displayedActualMode === "MTD" ? `MTD included · ${formatAmount(selectedMtdActual, "N/A")}` : "Final only"}</em>
+          <span class="forecast-actual-total-card forecast-actual-total-card--actual"><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
+            {displayedActualMode === "MTD" && <em class="forecast-actual-total-mtd">MTD included · <mark>{formatAmount(selectedMtdActual, "N/A")}</mark></em>}
           </span>
+          <span class="forecast-actual-total-card forecast-actual-total-card--forecast"><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
         </div>
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
           return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}
+            role="button" tabIndex={0} aria-pressed={quarter === card.quarter || resultFilter?.quarter === card.quarter}
             onClick={(event) => {
               if ((event.target as HTMLElement).closest("button")) return;
               if (quarter === card.quarter || resultFilter?.quarter === card.quarter) {
@@ -421,14 +438,18 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 setQuarter(card.quarter);
                 setResultFilter(null);
               }
+            }} onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              if (quarter === card.quarter || resultFilter?.quarter === card.quarter) { setQuarter("ALL"); setResultFilter(null); }
+              else { setQuarter(card.quarter); setResultFilter(null); }
             }}>
             <header><strong>{card.quarter}</strong><small class={card.quarter === currentQuarter ? "is-in-progress" : "is-quarter-result"}>{card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
             <div class="forecast-actual-quarter-actions">
               {(["SHORTFALL", "MATCHED", "EXCEEDED"] as const).map((status) => {
-                const fullLabel = status === "SHORTFALL" ? "Shortfall" : status === "MATCHED" ? "Matched" : "Exceeded";
-                const baseLabel = status === "SHORTFALL" ? "Gap" : status === "MATCHED" ? "Match" : "Over";
                 const isProvisional = card.quarter === currentQuarter;
-                const label = isProvisional ? `Open ${baseLabel}` : baseLabel;
+                const fullLabel = status === "SHORTFALL" ? (isProvisional ? "Remaining to Target" : "Confirmed Shortfall") : status === "MATCHED" ? "Matched" : "Exceeded";
+                const label = fullLabel;
                 const amount = status === "SHORTFALL" ? card.shortfallAmount : status === "MATCHED" ? card.matchedAmount : card.exceededAmount;
                 const tooltip = `${isProvisional ? "This quarter is in progress; amounts and status are provisional. " : ""}${status === "MATCHED"
                   ? "Matched difference is exactly 0 K USD. It is not the sum of matched customers' Actual. Activate to filter matched Accounts."
@@ -487,9 +508,9 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                     const month = monthByPeriod(row, periodKey);
                     if (!month) return [
                       <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty" title="Forecast has not been entered.">No FCST</td>,
-                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual data is not available for this month."><span class="forecast-actual-value-badge is-pending">Pending</span></td>,
+                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual data is not available for this month."><span class="forecast-actual-value-badge is-pending">Actual Pending</span></td>,
                       <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty" title="Not comparable until both Forecast and Actual are available."><span class="forecast-actual-value-badge is-na">N/A</span></td>,
-                      <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual data is not available for this month." data-tooltip="Actual data is not available for this month." aria-label="Pending: Actual data is not available for this month." tabIndex={0}>Pending</span></td>
+                      <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual data is not available for this month." data-tooltip="Actual data is not available for this month." aria-label="Actual Pending: Actual data is not available for this month." tabIndex={0}>Actual Pending</span></td>
                     ];
                     const assessment = assessForecastActualMonth(month);
                     const statusClass = assessment.kind === "FINAL_SHORTFALL" ? "is-shortfall" : assessment.kind === "MTD_SHORTFALL" ? "is-projection-watch" : assessment.kind === "NORMAL" ? "is-on-track" : "is-unavailable";
@@ -500,7 +521,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                     const statusLabel = shortStatus(assessment.label);
                     return [
                       <td key={`${periodKey}-forecast`} class={`forecast-actual-month-value is-forecast ${month.forecastAmount === null ? "is-empty" : "forecast-actual-number"}`} title={month.forecastAmount === null ? "Forecast has not been entered." : "Forecast amount in K USD."}>{month.forecastAmount === null ? "No FCST" : formatAmount(month.forecastAmount)}</td>,
-                      <td key={`${periodKey}-actual`} class={`forecast-actual-month-value is-actual ${month.actualAmount === null ? "is-empty" : "forecast-actual-number"} ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualAmount === null ? "Actual data is not available for this month." : month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? <span class="forecast-actual-value-badge is-pending">Pending</span> : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
+                      <td key={`${periodKey}-actual`} class={`forecast-actual-month-value is-actual ${month.actualAmount === null ? "is-empty" : "forecast-actual-number"} ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualAmount === null ? "Actual data is not available for this month." : month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? <span class="forecast-actual-value-badge is-pending">Actual Pending</span> : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
                       <td key={`${periodKey}-difference`} class={`forecast-actual-month-value is-difference ${assessment.differenceAmount === null ? "is-empty" : "forecast-actual-number"} ${differenceClass}`} title={assessment.tooltip}>{assessment.differenceAmount === null ? <span class="forecast-actual-value-badge is-na">N/A</span> : formatAmount(assessment.differenceAmount)}</td>,
                       <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class={`forecast-actual-status ${statusClass}`} title={statusTooltipText} data-tooltip={statusTooltipText} aria-label={`${statusLabel}: ${statusTooltipText}`} tabIndex={0}>{statusLabel}</span>{assessment.projectedAmount !== null ? <small>Month-end {formatAmount(assessment.projectedAmount)}</small> : null}</td>
                     ];
@@ -529,7 +550,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 ])}
               </tr>
               <tr class="is-shortfall-row">
-                <th colSpan={3} class="forecast-actual-total-label is-sticky">Difference · Shortfall total</th>
+                <th colSpan={3} class="forecast-actual-total-label is-sticky">Difference · Confirmed Shortfall total</th>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-shortfall-forecast`} aria-hidden="true">—</td>,
                   <td key={`${periodKey}-shortfall-actual`} aria-hidden="true">—</td>,

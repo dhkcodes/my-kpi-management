@@ -77,7 +77,7 @@ const MTD_COLOR = "#b56a3b";
 const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
 const OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal. The denominator is covered-period total minus provisional MTD and includes finalized Actual. This is not the chart composition share.";
 const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip">
-  <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label={label} aria-describedby={id}></button>
+  <button type="button" class="consumption-info-tooltip__trigger" aria-label={label} aria-describedby={id}>!</button>
   <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
 </span>;
 const OpenForecastLabel = ({ tooltipId, tooltipText = OPEN_FORECAST_TOOLTIP }: Readonly<{ tooltipId?: string; tooltipText?: string }>) => {
@@ -391,9 +391,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
-    busy={loading} busyLabel="Loading Consumption Analysis" onRefresh={refreshAnalysis}
+    onRefresh={refreshAnalysis}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
-    <PageDataProgress busy={loading} busyLabel="Loading Consumption Analysis" />
+    <PageDataProgress busy={loading} busyLabel="Loading data" />
   </PageShell>;
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
@@ -522,7 +522,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           <div class="consumption-insights-filter consumption-insights-filter--account">
             <label htmlFor="consumptionAccountContext">Account</label>
             <div class="consumption-insights-combobox" ref={consumptionComboboxRef}>
-            <input id="consumptionAccountContext" type="search" role="combobox" aria-autocomplete="list"
+            <input id="consumptionAccountContext" type="text" role="combobox" aria-autocomplete="list"
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
             value={comboboxOpen ? candidateSearch : selectedContextLabel}
@@ -558,7 +558,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           tooltipId="analysis-show-mtd-tooltip" />
       </div>
       <div class="consumption-records-toolbar-activity">
-        <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
+        <PageActivity busy={false} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
           onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
       </div>
     </div>
