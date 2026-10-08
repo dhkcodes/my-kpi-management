@@ -6708,11 +6708,20 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   justify-items: center;
   min-height: 0;
   padding: .42rem .55rem;
+  position: relative;
   text-align: center;
 }
-.forecast-actual-total-strip small { font-size: 1rem; justify-self: start; }
-.forecast-actual-total-strip strong { align-self: center; font-size: 1rem; grid-column: 1; justify-self: center; }
-.forecast-actual-total-strip .forecast-actual-total-mtd { grid-column: 1; min-height: .9rem; }
+.forecast-actual-total-strip small { font-size: .7rem; justify-self: start; }
+.forecast-actual-total-strip strong {
+  font-size: 1rem;
+  left: 50%;
+  line-height: 1;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+.forecast-actual-total-strip .forecast-actual-total-mtd { align-self: end; grid-column: 1; min-height: .7rem; }
 .forecast-actual-total-mtd mark { background: transparent; color: #0b607d; font-weight: 850; }
 .forecast-actual-quarter-cards article { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
 .forecast-actual-quarter-cards article:hover,
@@ -6729,6 +6738,7 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   font-weight: 800;
   line-height: normal;
 }
+.forecast-actual-pillar .consumption-pillar-selector { margin-top: 0; }
 .forecast-actual-pillar .consumption-pillar-selector button { font-size: .72rem; font-weight: 800; line-height: normal; }
 
 .kap-page-shell.consumption-page .consumption-table-panel,
