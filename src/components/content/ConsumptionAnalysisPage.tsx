@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useId, useMemo, useRef, useState } from "preact/hooks";
 import { beginAppBusy } from "../../app/appBusy";
 import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 import { formatMtdAppliedDate } from "../../data/mtdDate";
@@ -14,6 +14,7 @@ import {
   ConsumptionAnalysisPlan,
   ForecastCompositionCategory,
   ConsumptionPillar,
+  calculateOpenForecastExposureExact,
   consumptionPillarOptions,
   filterForecastCompositionAccounts,
   formatConsumptionDataCenter,
@@ -33,7 +34,11 @@ import {
 } from "../../data/exactDecimal";
 import "ojs/ojprogress-circle";
 import "ojs/ojchart";
+import "ojs/ojbutton";
+import "ojs/ojmenu";
+import "ojs/ojoption";
 import type { ojChart } from "ojs/ojchart";
+import type { ojMenu } from "ojs/ojmenu";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
@@ -67,9 +72,17 @@ const actualEntryText = (status: "PROVIDED" | "MISSING", amountExact: string) =>
   ? "Actual not entered" : compareExactDecimals(amountExact, "0") === 0 ? "Actual 0 entered" : "Actual only";
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
-const OPEN_FORECAST_TOOLTIP = "FINAL periods are excluded. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
-const OpenForecastLabel = () => <span>Open Forecast <span class="oj-ux-ico-information-s" role="img" tabIndex={0}
-  aria-label={OPEN_FORECAST_TOOLTIP} title={OPEN_FORECAST_TOOLTIP}></span></span>;
+const MTD_COLOR = "#b56a3b";
+const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
+const OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal. The denominator is covered-period total minus provisional MTD and includes finalized Actual. This is not the chart composition share.";
+const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip">
+  <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label={label} aria-describedby={id}></button>
+  <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
+</span>;
+const OpenForecastLabel = ({ tooltipId, tooltipText = OPEN_FORECAST_TOOLTIP }: Readonly<{ tooltipId?: string; tooltipText?: string }>) => {
+  const generatedId = useId();
+  return <span>Open Forecast <InfoTooltip id={tooltipId ?? `openForecastTooltip-${generatedId}`} label="Explain Open Forecast" text={tooltipText} /></span>;
+};
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
 const ALL_ACCOUNTS = "All Accounts Total";
 const COMPOSITION_CATEGORIES: readonly ForecastCompositionCategory[] = ["All", "New", "Expansion", "Reduction"];
@@ -100,6 +113,14 @@ const candidateSearchText = (candidate: ConsumptionAnalysisAccountCandidate) =>
   [candidate.account, ...candidate.workloads, ...candidate.planIds].join(" ").toLocaleLowerCase();
 const matchesCandidate = (candidate: ConsumptionAnalysisAccountCandidate, search: string) =>
   candidateSearchText(candidate).includes(search.trim().toLocaleLowerCase());
+const fiscalQuarterForPeriod = (periodKey: string | undefined) => {
+  const month = periodKey?.split("-")[1];
+  if (["JUN", "JUL", "AUG"].includes(month ?? "")) return "Q1";
+  if (["SEP", "OCT", "NOV"].includes(month ?? "")) return "Q2";
+  if (["DEC", "JAN", "FEB"].includes(month ?? "")) return "Q3";
+  if (["MAR", "APR", "MAY"].includes(month ?? "")) return "Q4";
+  return "";
+};
 
 const findAlertPlan = (analysis: ConsumptionAnalysis, alert: ConsumptionAnalysisAlert): ConsumptionAnalysisPlan | null =>
   analysis.accounts.find((account) => account.account === alert.account)?.workloads
@@ -157,6 +178,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [comboboxOpen]);
+
 
   useEffect(() => {
     let active = true;
@@ -264,25 +286,46 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
 
   const fiscalTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
+    const mtdAmountExact = analysis.mtdSummary?.amountExact ?? "0";
+    const overlapAmountExact = analysis.portfolio.forecastOverlapAmountExact;
     const rows = [
       { label: analysis.fiscalYear, actualAmountExact: analysis.portfolio.actualAmountExact, forecastAmountExact: analysis.portfolio.forecastAmountExact,
-        actualAmountChartCoordinate: analysis.portfolio.actualAmountChartCoordinate, forecastAmountChartCoordinate: analysis.portfolio.forecastAmountChartCoordinate },
+        mtdAmountExact, overlapAmountExact },
       { label: analysis.priorFiscalYear, actualAmountExact: analysis.portfolio.priorActualAmountExact, forecastAmountExact: analysis.portfolio.priorForecastAmountExact,
-        actualAmountChartCoordinate: exactDecimalToChartCoordinate(analysis.portfolio.priorActualAmountExact), forecastAmountChartCoordinate: exactDecimalToChartCoordinate(analysis.portfolio.priorForecastAmountExact) }
+        mtdAmountExact: "0", overlapAmountExact: "0" }
     ];
-    return chart(rows.flatMap((row) => [
-      { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: row.actualAmountChartCoordinate, color: ACTUAL_COLOR,
-        dataLabel: formatExactKFixed(row.actualAmountExact), shortDesc: `${row.label} ACTUAL ${formatExactKFixed(row.actualAmountExact)}` },
-      { id: `${row.label}-forecast`, seriesId: "Open Forecast", groupId: row.label, value: row.forecastAmountChartCoordinate, color: FORECAST_COLOR,
-        dataLabel: formatExactKFixed(row.forecastAmountExact), pattern: "smallDiagonalRight" as const, shortDesc: `${row.label} Open Forecast ${formatExactKFixed(row.forecastAmountExact)}` }
-    ]));
+    return chart(rows.flatMap((row) => {
+      const finalizedActualExact = subtractExactDecimals(row.actualAmountExact, row.mtdAmountExact);
+      const nonOverlappingForecastExact = subtractExactDecimals(row.forecastAmountExact, row.overlapAmountExact);
+      const points: InsightChartPoint[] = [
+        { id: `${row.label}-actual`, seriesId: "ACTUAL", groupId: row.label, value: exactDecimalToChartCoordinate(finalizedActualExact), color: ACTUAL_COLOR,
+          shortDesc: `${row.label} finalized ACTUAL ${formatExactKFixed(finalizedActualExact)}` },
+        { id: `${row.label}-forecast`, seriesId: "Open Forecast", groupId: row.label, value: exactDecimalToChartCoordinate(nonOverlappingForecastExact), color: FORECAST_COLOR,
+          pattern: "smallDiagonalRight", shortDesc: `${row.label} non-overlapping Open Forecast ${formatExactKFixed(nonOverlappingForecastExact)}` }
+      ];
+      if (compareExactDecimals(row.mtdAmountExact, "0") > 0) points.splice(1, 0,
+        { id: `${row.label}-mtd`, seriesId: "MTD actual", groupId: row.label, value: exactDecimalToChartCoordinate(row.mtdAmountExact), color: MTD_COLOR,
+          shortDesc: `${row.label} MTD actual ${formatExactKFixed(row.mtdAmountExact)}` });
+      return points;
+    }));
   }, [analysis]);
   const quarterTotalsChart = useMemo(() => {
     if (!analysis) return chart([]);
-    return chart(analysis.quarters.flatMap((quarter) => [
-      { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: quarter.actualAmountChartCoordinate, color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} ACTUAL ${formatExactKFixed(quarter.actualAmountExact)}` },
-      { id: `${quarter.quarter}-forecast`, seriesId: "Open Forecast", groupId: quarter.quarter, value: quarter.forecastAmountChartCoordinate, color: FORECAST_COLOR, pattern: "smallDiagonalRight" as const, shortDesc: `${quarter.quarter} Open Forecast ${formatExactKFixed(quarter.forecastAmountExact)}` }
-    ]));
+    const mtdQuarter = fiscalQuarterForPeriod(analysis.mtdSummary?.periodKey);
+    return chart(analysis.quarters.flatMap((quarter) => {
+      const mtdAmountExact = quarter.quarter === mtdQuarter ? analysis.mtdSummary?.amountExact ?? "0" : "0";
+      const overlapExact = quarter.forecastOverlapAmountExact;
+      const finalizedActualExact = subtractExactDecimals(quarter.actualAmountExact, mtdAmountExact);
+      const nonOverlappingForecastExact = subtractExactDecimals(quarter.forecastAmountExact, overlapExact);
+      const points: InsightChartPoint[] = [
+        { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(finalizedActualExact), color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} finalized ACTUAL ${formatExactKFixed(finalizedActualExact)}` },
+        { id: `${quarter.quarter}-forecast`, seriesId: "Open Forecast", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(nonOverlappingForecastExact), color: FORECAST_COLOR, pattern: "smallDiagonalRight", shortDesc: `${quarter.quarter} non-overlapping Open Forecast ${formatExactKFixed(nonOverlappingForecastExact)}` }
+      ];
+      if (compareExactDecimals(mtdAmountExact, "0") > 0) points.splice(1, 0,
+        { id: `${quarter.quarter}-mtd`, seriesId: "MTD actual", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(mtdAmountExact), color: MTD_COLOR,
+          shortDesc: `${quarter.quarter} MTD actual ${formatExactKFixed(mtdAmountExact)}` });
+      return points;
+    }));
   }, [analysis]);
   const movementChart = useMemo(() => {
     if (!analysis) return chart([]);
@@ -310,16 +353,34 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     markerSize: emphasizedTrendPeriods.has(point.periodKey) ? 9 : 5,
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
-  const mtdAppliedDate = formatMtdAppliedDate(analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf);
+  const mtdAppliedTimestamp = analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf;
+  const mtdAppliedDate = formatMtdAppliedDate(mtdAppliedTimestamp);
   const currentFiscalYear = getLatestFiscalYear();
-  const fiscalYearControl = <label class="consumption-analysis-fy-control"
-    aria-label={`Current FY ${currentFiscalYear}; selected ${fiscalYear}`}>
-    <span>Current FY <strong>{currentFiscalYear}</strong></span>
-    <select aria-label="Selected fiscal year" value={fiscalYear}
-      onChange={(event) => onFiscalYearChange(event.currentTarget.value as FiscalYear)}>
-      {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
-    </select>
-  </label>;
+  const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
+  const adjacentFiscalYears = fiscalYears
+    .filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
+    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
+  const earlierFiscalYears = fiscalYears
+    .filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
+    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
+  const handleFiscalYearMenuAction = (event: ojMenu.ojMenuAction) => {
+    const year = String(event.detail.selectedValue) as FiscalYear;
+    if (fiscalYears.includes(year) && year !== fiscalYear) onFiscalYearChange(year);
+  };
+  const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button oj-button-sm" chroming="outlined"
+    aria-label={`Selected fiscal year ${fiscalYear}`}>
+    {fiscalYear}
+    <oj-menu slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
+      {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
+        {year === currentFiscalYear ? `${year} · Current` : year}
+      </oj-option>)}
+      {earlierFiscalYears.length > 0 && <oj-option>Earlier FYs…
+        <oj-menu>
+          {earlierFiscalYears.map((year) => <oj-option key={year} value={year}>{year}</oj-option>)}
+        </oj-menu>
+      </oj-option>}
+    </oj-menu>
+  </oj-menu-button>;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
@@ -337,9 +398,11 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
-  const forecastExposureBaseExact = subtractExactDecimals(analysis.portfolio.totalAmountExact, analysis.mtdSummary?.amountExact ?? "0");
-  const forecastExposureExact = compareExactDecimals(forecastExposureBaseExact, "0") <= 0
-    ? "0" : divideExactDecimal(analysis.portfolio.forecastAmountExact, forecastExposureBaseExact, PERCENT_DISPLAY_PRECISION);
+  const forecastExposureExact = calculateOpenForecastExposureExact(
+    analysis.portfolio.forecastAmountExact,
+    analysis.portfolio.totalAmountExact,
+    analysis.mtdSummary?.amountExact ?? "0"
+  );
   const selectedContextLabel = selectedAccountContext || ALL_ACCOUNTS;
   const contributionPeriodLabel = analysis.periodCoverage.actualPeriods.length === 0
     ? "No finalized Actual period"
@@ -354,7 +417,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     : periods.length === 1 ? periods[0] : `${periods[0]}–${periods[periods.length - 1]}`;
   const attentionCoverageLabel = `Finalized Actual ${periodRange(analysis.periodCoverage.actualPeriods)} + opened Forecast periods ${periodRange(analysis.periodCoverage.forecastPeriods)} · MTD excluded`;
   const displayedActualAmountExact = analysis.portfolio.actualAmountExact;
-  const actualLabel = includeMtd && analysis.mtdSummary !== null ? "Actual (MTD 포함)" : "Actual";
+  const actualLabel = includeMtd && analysis.mtdSummary !== null
+    ? `Actual (includes MTD ${formatExactKFixed(analysis.mtdSummary.amountExact, 2)})` : "Actual";
 
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmountExact: addExactDecimals(total.totalForecastAmountExact, account.totalForecastAmountExact),
@@ -488,12 +552,16 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </PageFilterPanel>}>
     <div class="consumption-records-toolbar consumption-analysis-toolbar" role="toolbar" aria-label="Consumption Analysis data controls" data-html2canvas-ignore="true">
       <div class="consumption-records-toolbar__left">
-        <button type="button" role="switch" aria-label="Show MTD" aria-checked={includeMtd}
-          disabled={loading || !analysis.currentMtdAvailable} class="consumption-mtd-switch"
-          onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
-          <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-        </button>
-        {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</small> : null}
+        <span class="consumption-mtd-control consumption-info-tooltip">
+          <button type="button" role="switch" aria-label="Show MTD" aria-checked={includeMtd} aria-describedby="showMtdTooltip"
+            disabled={loading || !analysis.currentMtdAvailable} class="consumption-mtd-switch"
+            onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
+            <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+          </button>
+          <span id="showMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
+        </span>
+        {includeMtd && mtdAppliedDate ? <time class="consumption-mtd-applied-date" dateTime={mtdAppliedTimestamp ?? undefined}
+          title={mtdAppliedTimestamp ?? undefined}>Updated {mtdAppliedDate}</time> : null}
       </div>
       <div class="consumption-records-toolbar-activity">
         <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
@@ -518,15 +586,15 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
+      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel tooltipId="coveredPeriodForecastTooltip" /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
-      <article class="kpi-panel"><span><OpenForecastLabel /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
+      <article class="kpi-panel"><span><OpenForecastLabel tooltipId="forecastExposureTooltip" tooltipText={OPEN_FORECAST_EXPOSURE_TOOLTIP} /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
     </section>
 
     <section class="consumption-insights-performance-grid">
       <section class="kpi-panel" aria-labelledby="fyQuarterTotalsTitle">
-        <div class="consumption-section-heading"><div><span class="kpi-section-label">{actualLabel} + <OpenForecastLabel /></span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>{actualLabel} <i class="is-forecast"></i><OpenForecastLabel /></span></div>
+        <div class="consumption-section-heading"><div><span class="kpi-section-label">{actualLabel} + <OpenForecastLabel tooltipId="totalsHeadingForecastTooltip" /></span><h2 id="fyQuarterTotalsTitle">FY &amp; Quarter totals</h2></div><span class="consumption-insights-legend"><i class="is-actual"></i>Finalized ACTUAL {includeMtd && analysis.mtdSummary && <><i class="is-mtd"></i>MTD actual</>} <i class="is-forecast"></i><OpenForecastLabel tooltipId="totalsLegendForecastTooltip" /></span></div>
         <div class="consumption-insights-total-regions">
           <div class="consumption-insights-fy-total"><h3>Covered-period totals</h3><oj-chart class="consumption-insights-totals-chart" type="bar" orientation="horizontal" stack="on" data={fiscalTotalsChart} dataLabel={trendChartCoordinateLabel} legend={{ rendered: "off" }} styleDefaults={{ dataLabelPosition: "center" }} aria-label="Covered-period ACTUAL and Open Forecast stacked totals"><template slot="itemTemplate" render={renderInsightChartItem}></template></oj-chart></div>
           <div class="consumption-insights-totals-divider" role="separator" aria-orientation="vertical"></div>
@@ -604,7 +672,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
         </div>
       </section>
-      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts</h2><p>{attentionCoverageLabel}</p></div></div>
+      <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts <InfoTooltip id="attentionAccountsTooltip" label="Explain Attention Accounts coverage" text={attentionCoverageLabel} /></h2></div></div>
         <div class="consumption-sales-attention-list">{attentionAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}>
           <span><strong>{account.account}</strong><small>{account.salesRep} · {account.attentionReasons.join(" · ")}</small></span>
           <span class="consumption-sales-attention-amounts"><strong>Actual {formatExactKFixed(account.actualAmountExact)}</strong><small>{account.forecastEntryStatus === "MISSING"
@@ -619,14 +687,14 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     <section class="consumption-insights-contribution" aria-label="Account to Plan contribution">
       <span class="kpi-section-label">Account Contribution → Plan Contribution · ACTUAL ONLY</span>
       <div class="consumption-insights-contribution-grid">
-        <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution</h2><p>{selectedContextLabel} · {contributionPeriodLabel}</p></div></div>
+        <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution <InfoTooltip id="accountContributionTooltip" label="Explain Account Contribution coverage" text={`${selectedContextLabel} · ${contributionPeriodLabel}`} /></h2></div></div>
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
             class={selectedAccount?.account === account.account ? "is-selected" : ""} aria-pressed={selectedAccount?.account === account.account}
             onClick={() => setSelectedAccountName(account.account)}>
             <span>{account.account} · {account.salesRep}</span><strong>{formatExactKFixed(account.actualAmountExact)}</strong><small>{contributionPercentText(account.percentageExact)} · {actualEntryText(account.actualEntryStatus, account.actualAmountExact)}</small><i><b style={`width:${contributionBarWidthChartCoordinate(account.percentageExact)}%`}></b></i>
           </button>)}</div>
         </section>
-        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution</h2><p>{selectedAccount?.account ?? "Select an Account"} · {contributionPeriodLabel}</p></div></div>
+        <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution <InfoTooltip id="planContributionTooltip" label="Explain Plan Contribution coverage" text={`${selectedAccount?.account ?? "Select an Account"} · ${contributionPeriodLabel}`} /></h2></div></div>
           <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentageExact)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentageExact)} of ${percentageContext}; ACTUAL ${formatExactKFixed(plan.actualAmountExact)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidthChartCoordinate(plan.percentageExact)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {formatExactKFixed(plan.actualAmountExact)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmountExact)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>

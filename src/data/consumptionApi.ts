@@ -109,6 +109,7 @@ export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "
 export type ConsumptionAnalysisQuarter = Omit<ConsumptionAmountSplit, "status"> & Readonly<{
   status: ConsumptionAmountSplit["status"] | "NOT_OPEN";
   quarter: "Q1" | "Q2" | "Q3" | "Q4"; coveragePercent: number;
+  forecastOverlapAmountExact: string;
   qoqChangeAmountExact: string | null; qoqChangePercentExact: string | null;
 }>;
 export type ConsumptionAnalysisAlert = Readonly<{
@@ -156,6 +157,7 @@ export type ConsumptionAnalysis = Readonly<{
   salesRepOverview: readonly ConsumptionSalesRepOverview[];
   portfolio: ConsumptionAmountSplit & Readonly<{
     coveragePercent: number; priorActualAmountExact: string; priorForecastAmountExact: string; priorTotalAmountExact: string;
+    forecastOverlapAmountExact: string;
     priorStatus: ConsumptionAmountSplit["status"]; priorCoveragePercent: number;
   }>;
   mtdSummary: Readonly<{ periodKey: string; amountExact: string; asOf: string | null }> | null;
@@ -639,10 +641,19 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
         || compareExactDecimals(split.totalAmountExact, "0") !== 0 || quarter.coveragePercent !== 0
         || quarter.qoqChangeAmount !== null || quarter.qoqChangePercent !== null))) return malformedAnalysis();
     return { ...split, status: quarter.status as ConsumptionAnalysisQuarter["status"], quarter: quarter.quarter as ConsumptionAnalysisQuarter["quarter"],
+      forecastOverlapAmountExact: decodeExactDecimal(quarter.forecastOverlapAmount)!.exact,
       coveragePercent: quarter.coveragePercent, qoqChangeAmountExact: qoqChangeAmount?.exact ?? null,
       qoqChangePercentExact: qoqChangePercent?.exact ?? null };
   });
   if (quarters.length !== 4 || quarters.some((quarter, index) => quarter.quarter !== `Q${index + 1}`)) return malformedAnalysis();
+  if (mtdSummary !== null) {
+    const mtdQuarterParts = mtdQuarter?.split("-") ?? [];
+    const quarterCode = mtdQuarterParts[mtdQuarterParts.length - 1];
+    const mappedQuarter = quarters.find((quarter) => quarter.quarter === quarterCode);
+    if (!mappedQuarter || compareExactDecimals(mtdSummary.amountExact, "0") < 0
+      || compareExactDecimals(mtdSummary.amountExact, portfolioSplit.actualAmountExact) > 0
+      || compareExactDecimals(mtdSummary.amountExact, mappedQuarter.actualAmountExact) > 0) return malformedAnalysis();
+  }
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
     const split = parseContributionAmountSplit(value); const account = value as Record<string, unknown>;
     const percentage = decodeNullableExactDecimal(account.percentage);
@@ -747,6 +758,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     selectedSalesRep: raw.selectedSalesRep as string | null, salesRepOptions: raw.salesRepOptions as string[], periodCoverage, salesRepOverview,
     portfolio: { ...portfolioSplit, priorActualAmountExact: priorActual.exact,
       priorForecastAmountExact: priorForecast.exact, priorTotalAmountExact: priorTotal.exact,
+      forecastOverlapAmountExact: decodeExactDecimal(portfolioRaw.forecastOverlapAmount)!.exact,
       coveragePercent: portfolioRaw.coveragePercent, priorStatus: portfolioRaw.priorStatus as ConsumptionAmountSplit["status"],
       priorCoveragePercent: portfolioRaw.priorCoveragePercent }, mtdSummary, mtdAsOf,
     currentMtdAvailable: raw.currentMtdAvailable, quarters, accountCandidates, contextActualTrend, alerts, accounts,

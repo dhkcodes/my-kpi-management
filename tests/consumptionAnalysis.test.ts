@@ -198,7 +198,19 @@ void (async () => {
     { periodKey: "FY27-SEP", amountExact: "1700", asOf: "2026-09-22T09:00:00+09:00" },
     "MTD responses accept display Forecast while Total excludes the overlapping current-period Forecast");
   assert.equal(withMtd.portfolio.totalAmountExact, "2510");
+  assert.equal(withMtd.portfolio.forecastOverlapAmountExact, "300",
+    "the decoder preserves the server overlap used to remove current-period double counting");
   assert.equal(withMtd.quarters[1].totalAmountExact, "2360");
+  assert.equal(withMtd.quarters[1].forecastOverlapAmountExact, "300");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...mtdAnalysis,
+    mtdSummary: { ...mtdAnalysis.mtdSummary, amount: 1701 }
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => fetchConsumptionAnalysis({
+    fiscalYear: "FY27", search: "", account: "", pillar: "OCI", includeMtd: true
+  }), /Malformed Consumption analysis/,
+  "the decoder rejects an MTD slice larger than its containing quarter Actual");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...mtdAnalysis,

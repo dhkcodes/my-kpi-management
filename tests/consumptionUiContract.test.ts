@@ -113,10 +113,10 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
-assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
-  "Analysis, Forecast vs Actual, and Records use title-row FY handling instead of the outer selector");
-assert.match(insightsPage, /fiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
-  "Analysis renders its selected FY beside the title");
+assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
+  "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
+assert.match(insightsPage, /<oj-menu-button[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}[\s\S]*<oj-menu slot="menu"[\s\S]*onojMenuAction=\{handleFiscalYearMenuAction\}[\s\S]*titleControls=\{fiscalYearControl\}/u,
+  "Analysis renders the official Oracle JET outlined menu button beside the title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
 assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
@@ -138,10 +138,20 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*Updated on \{mtdAppliedDate\}[\s\S]*PageActivity/u,
-  "Analysis places Show MTD with an Updated on date at the toolbar left and Reload with KST time at the right");
-assert.match(insightsPage, /const currentFiscalYear = getLatestFiscalYear\(\)[\s\S]*Current FY <strong>\{currentFiscalYear\}<\/strong>[\s\S]*value=\{fiscalYear\}/,
-  "the current FY indicator stays independent from the user-selected fiscal year");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>Updated \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
+  "Analysis shows the import batch update date as Updated YYYY-MM-DD only while Show MTD is enabled");
+assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
+  "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
+assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
+  "the JET fiscal-year menu keeps current and adjacent years visible with older years in an Earlier FYs submenu");
+assert.match(insightsPage, /const handleFiscalYearMenuAction[\s\S]*event\.detail\.selectedValue[\s\S]*fiscalYears\.includes\(year\)[\s\S]*onFiscalYearChange\(year\)/,
+  "the JET fiscal-year menu accepts only loaded FY values and preserves the existing FY selection callback");
+assert.doesNotMatch(insightsPage, /handleFiscalYearMenuKeyDown/,
+  "the native JET menu owns keyboard navigation rather than a custom key handler");
+assert.doesNotMatch(insightsPage, /role="menuitemradio"|consumption-analysis-fy-earlier/u,
+  "Analysis no longer maintains a custom ARIA menu implementation");
+assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
+  "Analysis removes the Current FY prose and native FY select");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
   "FY, Pillar, Sales Rep, Account and MTD remain wired to the Analysis request");
 assert.match(insightsPage, /id="consumptionSalesRepContext"[\s\S]*id="consumptionAccountContext"/,
@@ -154,10 +164,30 @@ assert.match(pageShell, /titleControls\?: ComponentChildren[\s\S]*kap-page-shell
   "the shared PageShell exposes a backwards-compatible title control slot");
 assert.match(styles, /\.consumption-analysis-toolbar \.consumption-records-toolbar-activity\s*\{[^}]*margin-left:\s*auto/s,
   "the Analysis data toolbar keeps Reload aligned on the right of Show MTD");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-records-toolbar__left\s*\{[^}]*padding-inline-start:\s*\.5rem;/s,
+  "Analysis aligns the Show MTD switch, label, and update timestamp with the Records eight-pixel left inset");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__inner\s*\{[^}]*gap:\s*\.375rem;/s,
+  "Analysis uses the Records six-pixel masthead/filter and filter/toolbar rhythm without negative margins");
+assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-/s,
+  "Analysis does not hide spacing differences with a negative filter margin");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body\s*\{[^}]*gap:\s*\.325rem;/s,
+  "Analysis matches the Records 5.2-pixel toolbar-to-first-content spacing");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*gap:\s*\.2rem[^}]*\}[\s\S]*\.consumption-insights-filter\s*\{[^}]*gap:\s*\.2rem/s,
+  "Analysis filter labels use the Records 3.2-pixel label-to-control gap and therefore the same filter height");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select,[\s\S]*\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter input\s*\{[^}]*font-size:\s*\.72rem;/s,
+  "Analysis Sales Rep and Account controls use the Records 11.52-pixel font size");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*text-transform:\s*none;/s,
+  "Analysis Pillar label retains natural capitalization");
+assert.match(styles, /\.consumption-insights-filter\s*\{[^}]*text-transform:\s*none;/s,
+  "Analysis Sales Rep and Account labels retain natural capitalization");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-mtd-applied-date\s*\{[^}]*font-size:\s*\.78rem;[^}]*font-weight:\s*600;[^}]*line-height:\s*1;/s,
+  "Analysis update timestamp matches the Reload auxiliary text size, weight, and line height");
+assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__refresh\s*\{[^}]*font-size:\s*\.78rem;/,
+  "the compact Reload control retains the same .78rem font-size reference");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
-assert.match(forecastActualPage, /Updated on \{mtdAppliedDate\}/u,
-  "Forecast vs Actual shows the same compact Updated on date beside the switch without repeating MTD");
+assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
+  "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
   "Records numeric cells contain numbers only");
@@ -166,6 +196,22 @@ assert.doesNotMatch(insightsPage, /MTD 수집 시각|MTD 입력 기준일/u,
 
 assert.match(insightsPage, /const attentionCoverageLabel = `Finalized Actual \$\{periodRange\(analysis\.periodCoverage\.actualPeriods\)\} \+ opened Forecast periods \$\{periodRange\(analysis\.periodCoverage\.forecastPeriods\)\} · MTD excluded`/,
   "Attention Accounts names the actual and forecast period ranges and keeps MTD excluded");
+assert.match(insightsPage, /Attention Accounts <InfoTooltip[^>]*text=\{attentionCoverageLabel\}/,
+  "Attention Accounts moves its coverage prose into an immediate accessible tooltip");
+assert.match(insightsPage, /Account Contribution <InfoTooltip[\s\S]*Plan Contribution <InfoTooltip/,
+  "Account and Plan contribution coverage prose is exposed from title tooltips instead of visible paragraphs");
+assert.match(insightsPage, /finalizedActualExact = subtractExactDecimals\(row\.actualAmountExact, row\.mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(row\.forecastAmountExact, row\.overlapAmountExact\)[\s\S]*seriesId: "MTD actual"/,
+  "FY stacked totals split MTD from Actual and remove Forecast overlap without double counting");
+assert.match(insightsPage, /mtdQuarter = fiscalQuarterForPeriod[\s\S]*finalizedActualExact = subtractExactDecimals\(quarter\.actualAmountExact, mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(quarter\.forecastAmountExact, overlapExact\)/,
+  "quarter totals use the same non-duplicating MTD split");
+assert.match(insightsPage, /forecastExposureExact = calculateOpenForecastExposureExact\([\s\S]*analysis\.portfolio\.forecastAmountExact,[\s\S]*analysis\.portfolio\.totalAmountExact,[\s\S]*analysis\.mtdSummary\?\.amountExact \?\? "0"[\s\S]*\);/,
+  "Open Forecast exposure uses the executable exact-decimal calculation covered by consumptionData tests");
+assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
+  "Open Forecast exposure renders the calculated percentage-point value with one percent sign");
+assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD and includes finalized Actual\. This is not the chart composition share\."/,
+  "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
+assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
+  "tooltips display immediately for hover, keyboard focus, and touch focus");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
@@ -342,7 +388,7 @@ assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*i
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by compact title selectors for Analysis and Forecast vs Actual and remains hidden for FY-independent pages");
+assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis title selector and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
@@ -435,7 +481,7 @@ assert.match(recordsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{se
 assert.match(insightsPage, /consumptionPillarOptions\.map[\s\S]*aria-pressed=\{selectedPillar === option\.value\}[\s\S]*setSelectedPillar\(option\.value\)/, "Consumption Analysis exposes the shared compact All, DP, OCI selector");
 assert.match(insightsPage, /consumption-insights-header-actions[\s\S]*consumption-insights-pillar[\s\S]*>Pillar<[\s\S]*consumption-pillar-selector[\s\S]*consumption-insights-context[\s\S]*>Account</, "Analysis places labelled Pillar before Account inside one filter row");
 assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items:\s*end[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap[^}]*gap:\s*\.75rem/, "Analysis filter row aligns Pillar and Account with Redwood spacing and natural wrapping");
-assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.25rem/, "Pillar uses the same labelled filter rhythm as Account");
+assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.2rem/, "Pillar uses the Records labelled filter rhythm");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-filter--account \{[^}]*flex:\s*0 0 auto;[^}]*\}/, "mobile Account filter clears the desktop 18rem flex basis so it cannot create vertical space before Overview");
 assert.doesNotMatch(insightsPage, /setSelectedPillar\(option\.value\);\s*setSelectedAccountContext\(""\)/, "Pillar changes preserve a still-valid selected Account for cross filtering");
 assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[\s\S]*value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while candidate search does not clear context");
