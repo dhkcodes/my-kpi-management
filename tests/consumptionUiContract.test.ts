@@ -405,7 +405,7 @@ assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads
 assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
-assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts Total[\s\S]*accountCandidates/, "the only analysis filter after FY is a searchable Account combobox whose first option is the portfolio total");
+assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts/, "the analysis filter is a searchable Account combobox whose first option is the portfolio total");
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
@@ -476,7 +476,7 @@ assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPe
 assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtdsExact[\s\S]*applyConsumptionMtdDisplayOverride\(\s*baseDisplaySeries,\s*currentMtdPeriod,\s*currentMtdExact,\s*showMtd\s*\)/,
   "account and plan MTD use the tested exact-decimal override without being stored or classified as Forecast");
 assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
-assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
+assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?role="switch"[\s\S]*?aria-checked=\{showMtd\}[\s\S]*?class="consumption-mtd-switch"[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
   "Records places Show MTD at the far left and the stable loading/Refresh slot at the far right");
 const forecastCompositionTooltipSource = recordsPage.slice(
   recordsPage.indexOf("const ForecastCompositionTooltip"),
@@ -789,7 +789,7 @@ assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|
   "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
-assert.match(forecastActualPage, /aria-label="Include MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
+assert.match(forecastActualPage, /aria-label="Show MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
   "Forecast vs Actual exposes the shared MTD switch");
 assert.match(forecastActualPage, /Final shortfall[\s\S]*Projected MTD shortfall[\s\S]*Accounts/,
   "summary cards show deduplicated problem-account counts and the current account scope");

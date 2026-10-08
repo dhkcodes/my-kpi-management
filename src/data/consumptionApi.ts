@@ -1039,8 +1039,21 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
   if (range) { parameters.set("fromQuarter", range.fromQuarter); parameters.set("toQuarter", range.toQuarter); }
   if (pillar !== undefined) parameters.set("pillar", pillar);
   const query = parameters.size > 0 ? `?${parameters}` : "";
-  const { response, payload } = await request(`/consumption/workspace${query}`);
+  const { response, payload } = await request(`/consumption/workspace${query}`, undefined, selectedPillar, true);
   return parseWorkspace(payload, response.headers.get("ETag"), selectedPillar);
+};
+
+export type ConsumptionImportMetadata = Readonly<{ forecastImportedAt: string | null; actualImportedAt: string | null }>;
+export const fetchConsumptionImportMetadata = async (): Promise<ConsumptionImportMetadata> => {
+  const { payload } = await request("/consumption/import-metadata", undefined, "ALL", true);
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption import metadata");
+  const raw = payload as Record<string, unknown>;
+  const timestamp = (value: unknown): string | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string" || Number.isNaN(Date.parse(value))) throw new Error("Malformed Consumption import metadata");
+    return value;
+  };
+  return { forecastImportedAt: timestamp(raw.forecastImportedAt), actualImportedAt: timestamp(raw.actualImportedAt) };
 };
 const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   if (value === undefined || value === null) {
@@ -1143,7 +1156,7 @@ export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery):
   const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account, salesRep: query.salesRep ?? "" });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
   if (query.includeMtd !== undefined) parameters.set("includeMtd", String(query.includeMtd));
-  const { payload } = await request(`/consumption/analysis?${parameters}`);
+  const { payload } = await request(`/consumption/analysis?${parameters}`, undefined, query.pillar, true);
   const decoded = parseConsumptionAnalysis(payload);
   const expectedPriorFiscalYear = `FY${String((Number(query.fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;
   if (decoded.selectedPillar !== pillar || decoded.fiscalYear !== query.fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();
@@ -1623,7 +1636,7 @@ export const fetchForecastActualComparison = async (filters: Readonly<{
     pillar: filters.pillar, actualMode: filters.actualMode });
   if (filters.salesRep) query.set("salesRep", filters.salesRep);
   if (filters.account) query.set("account", filters.account);
-  const { payload } = await request(`/consumption/forecast-vs-actual?${query}`, { signal });
+  const { payload } = await request(`/consumption/forecast-vs-actual?${query}`, { signal }, filters.pillar, true);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Forecast vs Actual response");
   const raw = payload as Record<string, unknown>;
   const stringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");

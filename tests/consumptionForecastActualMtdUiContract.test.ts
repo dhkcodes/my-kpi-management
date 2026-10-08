@@ -24,7 +24,8 @@ assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPer
   "months stop at the latest period that has a real Forecast value within the selected scope");
 assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/month-count row is removed");
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
-assert.match(page, /<em>K USD<\/em>/u, "the K unit remains visible with the selected-scope totals");
+assert.match(page, /Total Forecast<\/small><strong>\{formatAmount\(selectedTotalForecast, "N\/A"\)\} K<\/strong>/u,
+  "the redundant K USD label is removed while the K amount unit remains visible");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
 for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");

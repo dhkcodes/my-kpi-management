@@ -60,6 +60,7 @@ import {
   exportConsumptionActualXlsx,
   exportConsumptionForecastXlsx,
   exportConsumptionImportCompatibleCsv,
+  fetchConsumptionImportMetadata,
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
@@ -81,6 +82,13 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 const koreaBusinessDate = (): string => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
 }).format(new Date());
+const formatKstImportDate = (timestamp: string | null): string | null => {
+  if (!timestamp) return null;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date(timestamp)).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
 
 export const consumptionRecordsOperationError = (error: unknown, fallback: string): string => {
   if (!(error instanceof ConsumptionApiError)) return error instanceof Error ? error.message : fallback;
@@ -487,6 +495,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
   const [recordsQueryError, setRecordsQueryError] = useState("");
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
+  const [importMetadata, setImportMetadata] = useState<{ forecastImportedAt: string | null; actualImportedAt: string | null }>({ forecastImportedAt: null, actualImportedAt: null });
   const businessDateRef = useRef(koreaBusinessDate());
   const recordsLoading = recordsLoadingPhase !== "idle";
   const blockingRecordsLoading = recordsLoadingPhase === "initial";
@@ -707,6 +716,10 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         return next;
       });
       setLastDataLoadedAt(new Date());
+      if (!append) {
+        const metadata = await fetchConsumptionImportMetadata().catch(() => null);
+        if (metadata && generation === recordsRequestGeneration.current) setImportMetadata(metadata);
+      }
       return page;
     } catch (error) {
       if (generation !== recordsRequestGeneration.current) return;
@@ -806,6 +819,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
   const currentMtdAppliedDate = formatMtdAppliedDate(currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null);
+  const forecastImportedDate = formatKstImportDate(importMetadata.forecastImportedAt);
+  const actualImportedDate = formatKstImportDate(importMetadata.actualImportedAt);
   const staleMtdPeriods = Object.keys(serverMtdStatuses).filter((period) => serverMtdStatuses[period] === "FINAL_UPLOAD_REQUIRED");
   const loadedAccountCount = renderedRecordAccounts.length;
   const visibleTableRowCount = renderedRecordAccounts.reduce((count, account) => count + 1 + (expandedAccounts.has(account.customer) ? account.plans.length : 0), 0);
@@ -1998,19 +2013,23 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div class="consumption-section-heading consumption-table-heading">
           <div class="consumption-records-toolbar" role="toolbar" aria-label="Consumption Records data controls">
             <div class="consumption-records-toolbar__left">
-              <button type="button" role="switch" aria-checked={showMtd} class="consumption-mtd-switch"
+              <span class="consumption-mtd-control consumption-info-tooltip">
+              <button type="button" role="switch" aria-label="Show MTD" aria-describedby="recordsShowMtdTooltip" aria-checked={showMtd} class="consumption-mtd-switch"
                 disabled={dataMode !== "backend" || !currentMtdPeriod}
                 onClick={() => setShowMtd((current) => !current)}>
-                <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+                <span class="consumption-mtd-switch__label">Show MTD<sup aria-hidden="true">!</sup></span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
               </button>
-              <span class="consumption-info-tooltip consumption-mtd-tooltip">
-                <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label="About Show MTD" aria-describedby="recordsShowMtdTooltip"></button>
-                <span id="recordsShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
+              <span id="recordsShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
               </span>
               {showMtd && currentMtdAppliedDate
                 ? <small class="consumption-mtd-applied-date">Updated on {currentMtdAppliedDate}</small> : null}
             </div>
             <div class="consumption-records-toolbar-activity">
+              <span class="consumption-import-dates" aria-label="Latest successful import dates">
+                <span>Forecast Imported on {forecastImportedDate ?? "Not available"}</span>
+                <span aria-hidden="true">|</span>
+                <span>Actual Imported on {actualImportedDate ?? "Not available"}</span>
+              </span>
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
                 refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false}
                 compactTimestampButton />

@@ -378,20 +378,18 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     </PageFilterPanel>}>
 
     {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
-    {!currentData && loading && <div class="forecast-actual-results forecast-actual-loading" role="status" aria-live="polite">Loading Forecast vs Actual results…</div>}
     <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual results" />
 
     {currentData && <div class="forecast-actual-results" aria-busy={loading}>
       <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
         <div class="consumption-records-toolbar__left">
-          <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
+          <span class="consumption-mtd-control consumption-info-tooltip">
+          <button type="button" role="switch" aria-label="Show MTD" aria-describedby="forecastShowMtdTooltip" aria-checked={actualMode === "MTD"}
             disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
             onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
-            <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+            <span class="consumption-mtd-switch__label">Show MTD<sup aria-hidden="true">!</sup></span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>
-          <span class="consumption-info-tooltip consumption-mtd-tooltip">
-            <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label="About Show MTD" aria-describedby="forecastShowMtdTooltip"></button>
-            <span id="forecastShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
+          <span id="forecastShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
           </span>
           {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</span>}
         </div>
@@ -403,8 +401,8 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
       </div>
       <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
         <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
-          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong><em>K USD</em></span>
-          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong><em>K USD</em></span>
+          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")} K</strong></span>
+          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")} K</strong></span>
         </div>
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
@@ -414,9 +412,12 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
               if (quarter === card.quarter || resultFilter?.quarter === card.quarter) {
                 setQuarter("ALL");
                 setResultFilter(null);
+              } else {
+                setQuarter(card.quarter);
+                setResultFilter(null);
               }
             }}>
-            <header><strong>{card.quarter}</strong><small>{card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
+            <header><strong>{card.quarter}</strong><small class={card.quarter === currentQuarter ? "is-in-progress" : "is-quarter-result"}>{card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
             <div class="forecast-actual-quarter-actions">
               {(["SHORTFALL", "MATCHED", "EXCEEDED"] as const).map((status) => {
                 const fullLabel = status === "SHORTFALL" ? "Shortfall" : status === "MATCHED" ? "Matched" : "Exceeded";
@@ -430,7 +431,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 const pressed = resultFilter?.quarter === card.quarter && resultFilter.status === status;
                 return <button key={status} type="button" class={`is-${status.toLowerCase()}`} aria-pressed={pressed}
                   aria-label={`${card.quarter} ${fullLabel}: ${formatAmount(amount, "0")} K USD. ${tooltip}`} data-tooltip={tooltip}
-                  onClick={() => toggleResultFilter(card.quarter, status)}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong><small>K USD</small></button>;
+                  onClick={(event) => { event.stopPropagation(); toggleResultFilter(card.quarter, status); }}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong><small>K USD</small></button>;
               })}
             </div>
           </article>;
@@ -497,9 +498,9 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 <th class="forecast-actual-total-label is-sticky is-account">Monthly Forecast total</th><td class="forecast-actual-total-label-spacer is-sticky is-rep" aria-hidden="true"></td><td class="forecast-actual-total-label-spacer is-sticky is-quarter-result" aria-hidden="true"></td>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-forecast-total`} class="forecast-actual-number is-forecast">{formatAmount(monthlyTotals[periodKey]?.forecast ?? null, "N/A")}</td>,
-                  <td key={`${periodKey}-forecast-total-actual`} aria-hidden="true">—</td>,
-                  <td key={`${periodKey}-forecast-total-difference`} aria-hidden="true">—</td>,
-                  <td key={`${periodKey}-forecast-total-status`} aria-hidden="true">—</td>
+                  <td key={`${periodKey}-forecast-total-actual`} class="is-actual" aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-forecast-total-difference`} class="is-difference" aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-forecast-total-status`} class="is-status" aria-hidden="true">—</td>
                 ])}
               </tr>
               <tr>

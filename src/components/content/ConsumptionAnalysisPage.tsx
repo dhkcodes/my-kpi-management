@@ -109,8 +109,7 @@ const renderInsightChartItem = ({ data }: Readonly<{ data: InsightChartPoint }>)
 </oj-chart-item>;
 
 const chart = (points: readonly InsightChartPoint[]) => new ArrayDataProvider([...points], { keyAttributes: "id" });
-const candidateSearchText = (candidate: ConsumptionAnalysisAccountCandidate) =>
-  [candidate.account, ...candidate.workloads, ...candidate.planIds].join(" ").toLocaleLowerCase();
+const candidateSearchText = (candidate: ConsumptionAnalysisAccountCandidate) => candidate.account.toLocaleLowerCase();
 const matchesCandidate = (candidate: ConsumptionAnalysisAccountCandidate, search: string) =>
   candidateSearchText(candidate).includes(search.trim().toLocaleLowerCase());
 const fiscalQuarterForPeriod = (periodKey: string | undefined) => {
@@ -391,9 +390,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
-    busy={loading} busyLabel="Loading analysis" onRefresh={refreshAnalysis}
+    busy={loading} busyLabel="Loading Consumption Analysis" onRefresh={refreshAnalysis}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
-    <PageDataProgress busy={loading} busyLabel="Loading analysis" />
+    <PageDataProgress busy={loading} busyLabel="Loading Consumption Analysis" />
   </PageShell>;
 
   const latestCompleteQuarter = [...analysis.quarters].reverse()
@@ -526,7 +525,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
             aria-expanded={comboboxOpen} aria-controls="consumptionAccountOptions"
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
             value={comboboxOpen ? candidateSearch : selectedContextLabel}
-            placeholder="Search Account, Workload or Plan ID"
+            placeholder="Search Account"
             onClick={(event) => { setComboboxOpen(true); setCandidateSearch(""); event.currentTarget.select(); }}
             onInput={(event) => { setCandidateSearch(event.currentTarget.value); setComboboxOpen(true); setActiveCandidateIndex(0); }}
             onCompositionStart={() => setCandidateComposing(true)}
@@ -536,13 +535,13 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           {comboboxOpen && <div id="consumptionAccountOptions" class="consumption-insights-options" role="listbox">
             <button id="consumption-account-option-0" type="button" role="option" aria-selected={!selectedAccountContext}
               class={activeCandidateIndex === 0 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext("")}>
-              <strong>All Accounts Total</strong><small>Portfolio reaggregation</small>
+              <strong>All Accounts</strong>
             </button>
             {analysis.accountCandidates.filter((candidate) => matchesCandidate(candidate, candidateSearch)).map((candidate, index) => <button
               id={`consumption-account-option-${index + 1}`} type="button" role="option" key={candidate.account}
               aria-selected={selectedAccountContext === candidate.account} class={activeCandidateIndex === index + 1 ? "is-active" : ""}
               onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext(candidate.account)}>
-              <strong>{candidate.account}</strong><small>{[...candidate.workloads, ...candidate.planIds].join(" · ")}</small>
+              <strong>{candidate.account}</strong>
             </button>)}
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
           </div>}
@@ -556,7 +555,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           <button type="button" role="switch" aria-label="Show MTD" aria-checked={includeMtd} aria-describedby="showMtdTooltip"
             disabled={loading || !analysis.currentMtdAvailable} class="consumption-mtd-switch"
             onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
-            <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+            <span class="consumption-mtd-switch__label">Show MTD<sup aria-hidden="true">!</sup></span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
           </button>
           <span id="showMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
         </span>
@@ -571,7 +570,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">Current ownership · K USD</span><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
+      <div class="consumption-section-heading"><div><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
       </div>
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={analysis.selectedSalesRep === row.salesRep ? "is-selected" : ""}>
