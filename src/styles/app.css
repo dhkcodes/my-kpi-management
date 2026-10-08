@@ -6701,17 +6701,23 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   width: 100%;
 }
 .forecast-actual-total-strip > span {
-  align-items: stretch;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  justify-items: center;
   min-height: 0;
   padding: .42rem .55rem;
   position: relative;
   text-align: center;
 }
-.forecast-actual-total-strip small { font-size: .7rem; justify-self: start; }
+.forecast-actual-total-strip small {
+  font-size: .625rem;
+  left: 50%;
+  line-height: 1;
+  max-width: calc(100% - .8rem);
+  overflow: hidden;
+  position: absolute;
+  text-overflow: ellipsis;
+  top: .3rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
 .forecast-actual-total-strip strong {
   font-size: 1rem;
   left: 50%;
@@ -6721,7 +6727,17 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   transform: translate(-50%, -50%);
   white-space: nowrap;
 }
-.forecast-actual-total-strip .forecast-actual-total-mtd { align-self: end; grid-column: 1; min-height: .7rem; }
+.forecast-actual-total-strip .forecast-actual-total-mtd {
+  bottom: .25rem;
+  font-size: .55rem;
+  left: 50%;
+  line-height: 1;
+  margin: 0;
+  min-height: 0;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
 .forecast-actual-total-mtd mark { background: transparent; color: #0b607d; font-weight: 850; }
 .forecast-actual-quarter-cards article { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
 .forecast-actual-quarter-cards article:hover,
