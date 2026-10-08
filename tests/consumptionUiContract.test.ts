@@ -574,8 +574,10 @@ assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-offic
   "Forecast file picker accepts Excel workbooks only");
 assert.match(recordsPage, /validateForecastWorkbookFile\(file\)[\s\S]*previewConsumptionForecastWide\(file\)/,
   "Forecast validates extension, MIME, and XLSX signature before preview upload");
-assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("records"\)\)/,
-  "Forecast import capability follows the surviving Records WRITE permission while Attainment is closed");
+assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("attainment"\)\)/,
+  "Forecast import capability follows the server's existing Attainment WRITE and Admin policy");
+assert.doesNotMatch(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("records"\)\)/,
+  "Records WRITE alone does not expose Forecast upload controls");
 assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastWorkbookFile[\s\S]*Forecast write permission is required/,
   "Forecast preview and apply use their dedicated write capability");
 assert.match(recordsPage, /forecastImportPhase === "preview" \|\| forecastImportPhase === "applying"[\s\S]*disabled=\{forecastImportPhase === "applying" \|\| !canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,
@@ -805,8 +807,8 @@ assert.match(forecastActualPage, /visibleForecastActualPeriods/, "monthly values
 assert.match(recordsPage, /mtdAsOfByPeriod/, "Forecast Records consumes account-level MTD import timestamps");
 assert.match(insightsPage, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/,
   "Consumption Analysis displays authoritative MTD metadata even when MTD amounts are excluded");
-assert.doesNotMatch(forecastActualPage, /monthScrollRef|handleMonthScrollKeyDown|scrollMonths|consumption-scroll-controls/,
-  "Forecast vs Actual delegates scrolling to the shared root PageShell");
+assert.doesNotMatch(forecastActualPage, /monthScrollRef|handleMonthScrollKeyDown|scrollMonths/,
+  "Forecast vs Actual delegates vertical scrolling to the shared root PageShell");
 assert.match(forecastActualPage, /forecast-actual-matrix-layout/,
   "Forecast vs Actual keeps a non-clipping matrix layout inside the root scroller");
 assert.match(styles, /\.forecast-actual-matrix tbody \.is-account,[\s\S]*\.forecast-actual-matrix tbody \.is-rep[^{]*\{[^}]*position:\s*sticky/,
@@ -844,5 +846,39 @@ assert.match(styles, /\.consumption-records-toolbar\s*\{[^}]*gap:\s*0[^}]*margin
   "the Records toolbar removes outer vertical gaps between filters and the table");
 assert.match(styles, /\.consumption-import-actions\.is-compact[\s\S]*min-height:\s*2\.25rem/s,
   "Records action buttons are compact while retaining the mobile minimum touch size override");
+
+assert.match(forecastActualPage, /scrollElementRef=\{\(element\) => \{ pageScrollRef\.current = element; \}\}/,
+  "Forecast vs Actual observes the root page scroller without introducing a nested vertical scroller");
+assert.match(forecastActualPage, /ref=\{matrixFrameRef\}/,
+  "Forecast vs Actual measures the visible matrix frame");
+assert.match(forecastActualPage, /ref=\{viewportControlsRef\}/,
+  "Forecast vs Actual positions a dedicated native pointer control in the viewport");
+assert.match(forecastActualPage, /class="consumption-viewport-controls forecast-actual-viewport-controls"/,
+  "Forecast vs Actual reuses the Records viewport-control behavior");
+assert.match(forecastActualPage, /controls\.dataset\.visible = tableVisible \? "true" : "false"/,
+  "Forecast vs Actual reveals the control only while its horizontally scrollable matrix is visible");
+assert.match(styles, /\.forecast-actual-viewport-controls\s*\{[^}]*z-index:\s*48;/,
+  "Forecast vs Actual keeps its viewport controls on top of sticky matrix cells");
+
+assert.match(forecastActualPage, /Actual data is not available for this month\./,
+  "Pending explains that monthly Actual data is unavailable");
+assert.doesNotMatch(forecastActualPage, /Actual is not confirmed\./,
+  "Pending no longer conflates absent Actual with MTD confirmation");
+
+assert.doesNotMatch(forecastActualPage, /class="forecast-actual-total-label" colSpan=\{3\}/,
+  "monthly total labels do not span across sticky identity columns");
+assert.match(forecastActualPage, /class="forecast-actual-total-label is-sticky is-account"/,
+  "monthly total labels own the Account sticky column");
+assert.match(forecastActualPage, /class="forecast-actual-total-label-spacer is-sticky is-rep"/,
+  "monthly totals reserve the Sales Rep sticky column");
+assert.match(forecastActualPage, /class="forecast-actual-total-label-spacer is-sticky is-quarter-result"/,
+  "monthly totals reserve the Result sticky column");
+
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar,[\s\S]*?\.kap-page-shell\.forecast-actual-page \.forecast-actual-data-toolbar\s*\{[\s\S]*?min-height:\s*2\.75rem;/,
+  "mobile Analysis and Forecast toolbars use the Records 44px rhythm");
+assert.match(styles, /\.forecast-actual-data-toolbar \.consumption-records-toolbar__left\s*\{[\s\S]*?align-items:\s*center;[\s\S]*?flex-direction:\s*row;/,
+  "mobile Forecast toolbar keeps its metadata in the Records row rhythm");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body,[\s\S]*?\.kap-page-shell\.forecast-actual-page \.kap-page-shell__body\s*\{[\s\S]*?gap:\s*\.375rem;/,
+  "mobile Analysis and Forecast content spacing matches Records");
 
 console.log("consumptionUiContract tests passed");

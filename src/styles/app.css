@@ -6272,10 +6272,10 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 /* Consumption cross-page alignment (Records is the reference surface). */
 .kap-page-shell.consumption-insights-page .kap-page-shell__body,
 .kap-page-shell.forecast-actual-page .kap-page-shell__body {
-  gap: .325rem;
+  gap: .375rem;
 }
 .kap-page-shell.forecast-actual-page .forecast-actual-results {
-  gap: .325rem;
+  gap: .375rem;
 }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar,
 .kap-page-shell.forecast-actual-page .forecast-actual-data-toolbar {
@@ -6344,16 +6344,12 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   outline-offset: 1px;
 }
 
-/* Forecast vs Actual overlay remains vertically anchored while the matrix passes the viewport. */
+/* Forecast vs Actual reuses the Records viewport controls while the matrix passes the viewport. */
 .forecast-actual-matrix-frame {
-  overflow: clip;
+  overflow: visible;
 }
-.forecast-actual-scroll-controls {
-  position: sticky;
-  top: calc(50dvh - 1.25rem);
-  float: right;
-  height: max-content;
-  margin: .65rem .65rem -3rem 0;
+.forecast-actual-viewport-controls {
+  z-index: 48;
 }
 
 .forecast-actual-quarter-cards article.is-selected {
@@ -6378,6 +6374,17 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
   text-align: left;
   z-index: 7;
 }
+.forecast-actual-monthly-totals .forecast-actual-total-label,
+.forecast-actual-monthly-totals .forecast-actual-total-label-spacer {
+  background: color-mix(in srgb, var(--oj-core-bg-color-neutral) 72%, var(--oj-core-bg-color-content));
+  position: sticky;
+  z-index: 9;
+}
+.forecast-actual-monthly-totals .forecast-actual-total-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .forecast-actual-monthly-totals .is-negative { color: #b42318; }
 .forecast-actual-monthly-totals .is-positive { color: #18794e; }
 
@@ -6388,8 +6395,14 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
     min-width: 0;
     width: 100%;
   }
-  .forecast-actual-scroll-controls {
-    top: calc(50dvh - 1.25rem);
-    margin-right: .4rem;
+  .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar,
+  .kap-page-shell.forecast-actual-page .forecast-actual-data-toolbar {
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  .forecast-actual-data-toolbar .consumption-records-toolbar__left {
+    align-items: center;
+    flex-direction: row;
+    gap: .55rem;
   }
 }

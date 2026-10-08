@@ -60,12 +60,12 @@ assert.match(styles, /\.forecast-actual-status-cell[^}]*text-align:\s*center/u);
 for (const column of ["is-forecast", "is-actual", "is-difference", "is-status"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-(?:subhead|value)\\.${column}[^}]*background`, "u"), `${column} column has a readable distinguishing background`);
 }
-assert.match(page, /forecast-actual-scroll-controls[^]*scrollMatrix\(-1\)[^]*scrollMatrix\(1\)/u,
+assert.match(page, /forecast-actual-viewport-controls[^]*scrollMatrix\(-1\)[^]*scrollMatrix\(1\)/u,
   "Forecast vs Actual exposes the standard horizontal navigation controls");
 assert.match(page, /forecast-actual-matrix-shell/u);
 assert.match(styles, /\.forecast-actual-matrix-shell[^}]*overflow-x:\s*auto/u,
   "the matrix shell owns horizontal scrolling");
-assert.match(styles, /\.forecast-actual-scroll-controls[^}]*position:\s*sticky/u,
+assert.match(styles, /\.consumption-viewport-controls[^}]*position:\s*fixed/u,
   "horizontal controls remain available while the matrix is vertically visible");
 assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center/u,
   "Sales Rep values are centered");
