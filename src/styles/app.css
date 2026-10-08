@@ -6153,13 +6153,27 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: hidden; overflow-y: auto; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 0; width: 100%; }
-.forecast-actual-matrix-shell { max-width: 100%; min-width: 0; overflow-x: auto; width: 100%; }
+.forecast-actual-overview { align-items: stretch; display: grid; gap: .55rem; grid-template-columns: 8.75rem minmax(0, 1fr); }
+.forecast-actual-total-strip { align-content: stretch; display: grid; flex: none; gap: .4rem; grid-template-columns: 1fr; width: auto; }
+.forecast-actual-total-strip > span { min-height: 0; padding: .45rem .55rem; }
+.forecast-actual-quarter-cards { min-width: 0; }
+.forecast-actual-matrix-frame { border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; min-width: 0; overflow: hidden; position: relative; }
+.forecast-actual-matrix-shell { -webkit-overflow-scrolling: touch; border: 0; border-radius: 0; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; touch-action: pan-x pan-y; width: 100%; }
+.forecast-actual-matrix-shell:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: -2px; }
 .forecast-actual-matrix-layout { min-width: 100%; width: max-content; }
 .forecast-actual-matrix .is-quarter-result { left: 17.5rem; }
-.forecast-actual-matrix-toolbar { align-items: center; border-bottom: 0; justify-content: flex-end; }
-.forecast-actual-matrix-shell { border: 0; border-radius: 0; }
+.forecast-actual-scroll-controls { align-items: center; background: color-mix(in srgb, var(--oj-core-bg-color-content, #fff) 92%, transparent); border: 1px solid var(--oj-core-divider-color); border-radius: 999px; box-shadow: 0 2px 8px rgb(0 0 0 / 14%); display: flex; gap: .15rem; padding: .2rem; position: absolute; right: .65rem; top: .65rem; z-index: 12; }
+.forecast-actual-scroll-controls button { align-items: center; background: var(--oj-core-bg-color-content, #fff); border: 0; border-radius: 50%; color: var(--oj-core-text-color-primary); cursor: pointer; display: inline-flex; height: 2rem; justify-content: center; padding: 0; width: 2rem; }
+.forecast-actual-scroll-controls button:hover { background: var(--oj-core-bg-color-hover, #f1efed); }
+.forecast-actual-scroll-controls button:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 1px; }
+.forecast-actual-data-toolbar .consumption-mtd-applied-date { white-space: nowrap; }
 @media (max-width: 760px) {
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
+  .forecast-actual-overview { grid-template-columns: minmax(0, 1fr); }
+  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .forecast-actual-total-strip > span { min-width: 0; }
+  .forecast-actual-data-toolbar .consumption-records-toolbar__left { align-items: flex-start; flex-direction: column; gap: 0; }
+  .forecast-actual-scroll-controls { right: .4rem; top: .4rem; }
 }
 .kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: 0; min-height: 0; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }

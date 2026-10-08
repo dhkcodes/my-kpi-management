@@ -113,8 +113,8 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
-assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
-  "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
+assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
+  "Analysis, Forecast vs Actual, and Records use title-row FY handling instead of the outer selector");
 assert.match(insightsPage, /fiscalYears\.map[\s\S]*titleControls=\{fiscalYearControl\}/,
   "Analysis renders its selected FY beside the title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
@@ -342,7 +342,7 @@ assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*i
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis title selector and remains hidden for FY-independent pages");
+assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by compact title selectors for Analysis and Forecast vs Actual and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");

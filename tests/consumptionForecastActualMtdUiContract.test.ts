@@ -17,8 +17,11 @@ assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\
 assert.match(page, /setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\)/u);
 assert.equal((page.match(/role="switch"/gu) ?? []).length, 1);
 assert.match(page, /consumption-pillar-selector[^]*aria-pressed/u, "Pillar uses the same button selector as Consumption Analysis");
-assert.match(page, /displayedActualMode === "MTD" && mtdAppliedDate[^]*consumption-mtd-applied-date[^]*Updated on \{mtdAppliedDate\}[^]*role="switch"/u,
-  "MTD applied date uses the shared Updated on label and stays with the switch");
+assert.match(page, /forecast-actual-data-toolbar[^]*role="switch"[^]*displayedActualMode === "MTD" && mtdAppliedDate[^]*Updated on \{mtdAppliedDate\}/u,
+  "MTD and its Updated on date stay in the shared data toolbar with Reload");
+assert.match(page, /titleControls=\{fiscalYearControl\}/u, "FY selection is beside the page title");
+assert.match(page, /aria-label="Selected fiscal year" value=\{fiscalYear\}[^]*onFiscalYearChange/u,
+  "the title FY selector preserves the existing FY change handler");
 
 assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPeriods \?\? \[\], currentData\?\.rows \?\? \[\]\)/u,
   "months stop at the latest period that has a real Forecast value within the selected scope");
@@ -62,19 +65,21 @@ assert.match(styles, /\.forecast-actual-status-cell[^}]*text-align:\s*center/u);
 for (const column of ["is-forecast", "is-actual", "is-difference", "is-status"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-(?:subhead|value)\\.${column}[^}]*background`, "u"), `${column} column has a readable distinguishing background`);
 }
-assert.doesNotMatch(page, /forecast-actual-month-scroll|consumption-scroll-controls|handleMonthScrollKeyDown|monthScrollRef/u,
-  "Forecast vs Actual does not own an internal table scroller or scroll controls");
+assert.match(page, /forecast-actual-matrix-shell" ref=\{matrixScrollRef\}/u,
+  "Forecast vs Actual owns an internal table scroller");
+assert.match(page, /aria-label="Scroll table left"[^]*scrollMatrix\(-1\)/u);
+assert.match(page, /aria-label="Scroll table right"[^]*scrollMatrix\(1\)/u);
 assert.match(page, /forecast-actual-matrix-layout/u);
-assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.kap-page-shell__scroll[^}]*overflow-x:\s*auto[^}]*overflow-y:\s*auto/u,
-  "the shared root page shell owns both scroll axes");
-assert.match(styles, /\.forecast-actual-matrix-layout[^}]*overflow:\s*visible/u,
-  "the matrix layout stays visible instead of clipping right columns or lower rows");
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.kap-page-shell__scroll[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/u,
+  "the shared root page shell cannot scroll horizontally");
+assert.match(styles, /\.forecast-actual-matrix-shell[^}]*overflow-x:\s*auto[^}]*touch-action:\s*pan-x pan-y/u,
+  "the matrix alone owns horizontal and mobile touch scrolling");
 assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center/u,
   "Sales Rep values are centered");
 for (const column of ["is-forecast", "is-actual", "is-difference"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-value\\.${column}[^}]*text-align:\\s*right`, "u"), `${column} values are right aligned`);
 }
-assert.match(page, /forecast-actual-matrix-toolbar[^]*PageActivity[^]*showBusyLabel=\{false\} compactTimestampButton/u,
+assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*showBusyLabel=\{false\} compactTimestampButton/u,
   "Reload and completion time use the same compact table-toolbar activity treatment as Consumption Records");
 assert.match(styles, /--forecast-rep-width:\s*7rem[^}]*--forecast-month-width:\s*5\.5rem/u,
   "wide Forecast vs Actual columns are compacted without collapsing content");
@@ -82,8 +87,11 @@ assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*min-width:\s*var\(--
   "the compact Sales Rep width is applied to the matrix cells");
 assert.match(styles, /\.forecast-actual-matrix \.forecast-actual-period-group[^}]*var\(--forecast-month-width\)[^}]*var\(--forecast-status-width\)/u,
   "period groups consume all compacted leaf-column widths");
-assert.match(page, /forecast-actual-control forecast-actual-mtd-control[^]*<span>MTD<\/span>[^]*forecast-actual-mtd-row/u,
-  "MTD is a field label above its date and toggle row");
+assert.match(page, /forecast-actual-data-toolbar[^]*<span>MTD<\/span>[^]*consumption-mtd-switch__track/u,
+  "MTD is aligned with Reload in the shared data toolbar");
+assert.match(page, /forecast-actual-overview[^]*forecast-actual-total-strip[^]*forecast-actual-quarter-cards/u,
+  "the stacked Total cards precede the quarter cards in one compact overview row");
+assert.match(styles, /\.forecast-actual-overview[^}]*grid-template-columns:\s*8\.75rem minmax\(0, 1fr\)/u);
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 

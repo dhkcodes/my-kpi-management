@@ -67,7 +67,12 @@ const sumQuarterValue = (results: readonly ForecastActualQuarterResult[], select
   return values.length ? values.reduce((total, value) => addExactDecimals(total, value), "0") : null;
 };
 
-export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) => {
+export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{
+  fiscalYear: FiscalYear;
+  fiscalYears: readonly FiscalYear[];
+  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
+  breadcrumb?: ComponentChildren;
+}>) => {
   const [quarter, setQuarter] = useState("ALL");
   const [pillar, setPillar] = useState<ConsumptionPillar>("ALL");
   const [actualMode, setActualMode] = useState<ForecastActualMode>("FINAL");
@@ -88,6 +93,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const [accountOptionCache, setAccountOptionCache] = useState<string[]>([]);
   const [activeAccountIndex, setActiveAccountIndex] = useState(0);
   const accountComboboxRef = useRef<HTMLDivElement>(null);
+  const matrixScrollRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setSalesRep(""); setAccount(""); setAccountSearch(""); setAccountOptionCache([]); setResultFilter(null);
@@ -225,9 +231,21 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     : [result[quarter as ForecastActualQuarter]]);
   const selectedTotalForecast = sumQuarterValue(selectedRangeResults, (result) => result.forecastAmount);
   const selectedTotalActual = sumQuarterValue(selectedRangeResults, (result) => result.actualAmount);
+  const fiscalYearControl = <label class="consumption-analysis-fy-control forecast-actual-fy-control">
+    <span>FY</span>
+    <select aria-label="Selected fiscal year" value={fiscalYear}
+      onChange={(event) => onFiscalYearChange(event.currentTarget.value as FiscalYear)}>
+      {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
+    </select>
+  </label>;
+  const scrollMatrix = (direction: -1 | 1) => {
+    const viewport = matrixScrollRef.current;
+    if (!viewport) return;
+    viewport.scrollBy({ left: direction * Math.max(320, viewport.clientWidth * .78), behavior: "smooth" });
+  };
 
   return <PageShell className="consumption-insights-page forecast-actual-page" ariaLabelledBy="forecastActualTitle"
-    breadcrumb={breadcrumb} title="Forecast vs Actual" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Forecast vs Actual" titleControls={fiscalYearControl} headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
     filters={<PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
       <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
@@ -254,17 +272,6 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
           </div>}
         </div>
       </div>
-      <div class="forecast-actual-control forecast-actual-mtd-control">
-        <span>MTD</span>
-        <div class="forecast-actual-mtd-row">
-          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</span>}
-          <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
-            disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
-            onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
-            <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-          </button>
-        </div>
-      </div>
     </PageFilterPanel>}>
 
     {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
@@ -272,11 +279,27 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual results" />
 
     {currentData && <div class="forecast-actual-results" aria-busy={loading}>
-      <section class="forecast-actual-total-strip" aria-label="Selected scope totals">
-        <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong><em>K USD</em></span>
-        <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong><em>K USD</em></span>
-      </section>
-      <section class="forecast-actual-quarter-cards" aria-label="Quarter results">
+      <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
+        <div class="consumption-records-toolbar__left">
+          <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
+            disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
+            onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
+            <span>MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+          </button>
+          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</span>}
+        </div>
+        <div class="consumption-records-toolbar-activity">
+          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
+            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
+            showBusyLabel={false} compactTimestampButton />
+        </div>
+      </div>
+      <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
+        <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
+          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong><em>K USD</em></span>
+          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong><em>K USD</em></span>
+        </div>
+        <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
           return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}>
             <header><strong>{card.quarter}</strong><small>{card.quarter === currentQuarter ? "In progress · cumulative Actual" : "Quarter result"}</small></header>
@@ -296,16 +319,13 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
             </div>
           </article>;
         })}
+        </div>
       </section>
       {resultFilter && <div class="forecast-actual-result-filter" role="status"><span>{resultFilter.quarter} · {resultLabel(resultFilter.status)}</span><button type="button" onClick={() => setResultFilter(null)}>Clear result filter</button></div>}
 
-      <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar">
-          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
-            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
-            showBusyLabel={false} compactTimestampButton />
-        </div>
-        <div class="forecast-actual-matrix-layout">
+      <section class="forecast-actual-matrix-frame" aria-label="Forecast vs Actual monthly table">
+        <section class="forecast-actual-matrix-shell" ref={matrixScrollRef} tabIndex={0} aria-label="Scrollable monthly comparison table">
+          <div class="forecast-actual-matrix-layout">
           <table class="forecast-actual-matrix">
             <thead>
               <tr class="forecast-actual-group-header">
@@ -356,6 +376,11 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
               {!rows.length && <tr><td class="forecast-actual-empty" colSpan={3 + periods.length * 4}>{resultFilter ? "No accounts match the selected quarter result filter." : "No accounts match the selected filters."}</td></tr>}
             </tbody>
           </table>
+          </div>
+        </section>
+        <div class="forecast-actual-scroll-controls" aria-label="Scroll monthly table">
+          <button type="button" aria-label="Scroll table left" title="Scroll table left" onClick={() => scrollMatrix(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>
+          <button type="button" aria-label="Scroll table right" title="Scroll table right" onClick={() => scrollMatrix(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
         </div>
       </section>
     </div>}
