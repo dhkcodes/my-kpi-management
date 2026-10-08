@@ -411,7 +411,7 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumption
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
 assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
-assert.match(insightsPage, /<PageShell[\s\S]*<PageActivity busy=\{false\}[\s\S]*refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis exposes one progress state without replacing its mounted page shell or duplicating a busy spinner");
+assert.match(insightsPage, /\{!loading && \([\s\S]*<PageActivity busy=\{false\}[\s\S]*refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*\)\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis suppresses the reload control during initial loading while retaining only the centered progress indicator");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
@@ -808,7 +808,9 @@ assert.match(forecastActualPage, /Remaining to Target[\s\S]*Confirmed Shortfall[
   "quarter cards use the approved result terminology");
 assert.doesNotMatch(forecastActualPage, /Full-period summary|FINAL periods only/,
   "misleading mixed-period summary columns are removed from the monthly matrix");
-assert.match(forecastActualPage, /Actual Pending[\s\S]*N\/A/, "missing Actual and impossible comparisons stay distinct");
+assert.match(forecastActualPage, /<span class="forecast-actual-value-badge is-pending"><span>Actual<\/span><span>Pending<\/span><\/span>[\s\S]*N\/A/, "the table-only Actual Pending badge renders as two explicit lines and stays distinct from N/A");
+assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
+assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
 assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf[\s\S]*latestMtdAppliedTimestamp/, "Forecast vs Actual derives one header date from actual MTD import timestamps");
