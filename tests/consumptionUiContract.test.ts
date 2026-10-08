@@ -138,8 +138,8 @@ assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
 assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
   "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*As of \{mtdAppliedDate\}[\s\S]*PageActivity/u,
-  "Analysis places Show MTD at the toolbar left and Reload with KST time at the right");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*Updated on \{mtdAppliedDate\}[\s\S]*PageActivity/u,
+  "Analysis places Show MTD with an Updated on date at the toolbar left and Reload with KST time at the right");
 assert.match(insightsPage, /const currentFiscalYear = getLatestFiscalYear\(\)[\s\S]*Current FY <strong>\{currentFiscalYear\}<\/strong>[\s\S]*value=\{fiscalYear\}/,
   "the current FY indicator stays independent from the user-selected fiscal year");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
@@ -156,8 +156,8 @@ assert.match(styles, /\.consumption-analysis-toolbar \.consumption-records-toolb
   "the Analysis data toolbar keeps Reload aligned on the right of Show MTD");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
-assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
-  "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
+assert.match(forecastActualPage, /Updated on \{mtdAppliedDate\}/u,
+  "Forecast vs Actual shows the same compact Updated on date beside the switch without repeating MTD");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
   "Records numeric cells contain numbers only");

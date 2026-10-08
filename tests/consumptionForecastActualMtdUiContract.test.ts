@@ -17,14 +17,14 @@ assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\
 assert.match(page, /setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\)/u);
 assert.equal((page.match(/role="switch"/gu) ?? []).length, 1);
 assert.match(page, /consumption-pillar-selector[^]*aria-pressed/u, "Pillar uses the same button selector as Consumption Analysis");
-assert.match(page, /displayedActualMode === "MTD" && mtdAppliedDate[^]*consumption-mtd-applied-date[^]*As of \{mtdAppliedDate\}[^]*role="switch"/u,
-  "MTD applied date uses the shared As of label and stays with the switch");
+assert.match(page, /displayedActualMode === "MTD" && mtdAppliedDate[^]*consumption-mtd-applied-date[^]*Updated on \{mtdAppliedDate\}[^]*role="switch"/u,
+  "MTD applied date uses the shared Updated on label and stays with the switch");
 
 assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPeriods \?\? \[\], currentData\?\.rows \?\? \[\]\)/u,
   "months stop at the latest period that has a real Forecast value within the selected scope");
 assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/month-count row is removed");
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
-assert.match(page, /forecast-actual-unit-note[^]*K USD/u, "the K unit remains as a concise standalone note");
+assert.doesNotMatch(page, /Amount: K USD/u, "the redundant matrix amount note is removed");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
 for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");
@@ -48,6 +48,8 @@ assert.match(page, /\{displayedResultQuarter\} Result<\/th>/u);
 assert.doesNotMatch(page, /Accounts · activate to filter/u, "quarter cards do not display Account counts");
 
 assert.match(styles, /\.forecast-actual-quarter-cards[^}]*grid-template-columns:/u);
+assert.match(styles, /\.forecast-actual-quarter-cards[^}]*repeat\(4, minmax\(0, 1fr\)\)/u,
+  "the four quarter cards share the available desktop width without forcing overflow");
 assert.match(styles, /\.forecast-actual-quarter-actions button[^}]*cursor:\s*pointer/u);
 assert.match(styles, /\.forecast-actual-quarter-result\.is-shortfall/u);
 assert.match(styles, /\.forecast-actual-quarter-result\.is-matched/u);
@@ -88,6 +90,6 @@ assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*1
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);
 assert.match(analysis, /FINAL periods are excluded\. Forecast for an included MTD period remains shown\. Total removes overlapping Forecast once and uses MTD instead\./u);
-assert.match(analysis, /\{includeMtd && mtdAppliedDate[\s\S]*<small class="consumption-mtd-applied-date">As of \{mtdAppliedDate\}<\/small>/u);
+assert.match(analysis, /\{includeMtd && mtdAppliedDate[\s\S]*<small class="consumption-mtd-applied-date">Updated on \{mtdAppliedDate\}<\/small>/u);
 
 console.log("forecast actual MTD UI contract tests passed");

@@ -493,7 +493,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
           <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
         </button>
-        {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">As of {mtdAppliedDate}</small> : null}
+        {includeMtd && mtdAppliedDate ? <small class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</small> : null}
       </div>
       <div class="consumption-records-toolbar-activity">
         <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}

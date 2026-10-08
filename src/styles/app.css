@@ -5494,17 +5494,16 @@ h4.weekly-activity-section-label--next-week,
 
 /* Forecast vs Actual quarter-result drilldown. */
 .forecast-actual-total-strip {
-  align-items: center;
-  color: var(--oj-core-text-color-secondary);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: .72rem;
-  gap: .5rem 1rem;
+  display: grid;
+  gap: .4rem;
+  grid-template-columns: repeat(2, minmax(7.75rem, 10.5rem));
 }
-.forecast-actual-total-strip span { align-items: baseline; display: inline-flex; gap: .25rem; }
-.forecast-actual-total-strip strong { color: var(--oj-core-text-color-primary); font-size: .9rem; font-variant-numeric: tabular-nums; }
-.forecast-actual-quarter-cards { display: grid; gap: .65rem; grid-template-columns: repeat(4, minmax(11rem, 1fr)); }
-.forecast-actual-quarter-cards article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; display: grid; gap: .55rem; min-width: 0; padding: .65rem; }
+.forecast-actual-total-strip span { align-items: baseline; background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .08rem .3rem; grid-template-columns: 1fr auto; padding: .42rem .55rem; }
+.forecast-actual-total-strip small { color: var(--oj-core-text-color-secondary); font-size: .62rem; grid-column: 1 / -1; }
+.forecast-actual-total-strip strong { color: var(--oj-core-text-color-primary); font-size: .88rem; font-variant-numeric: tabular-nums; }
+.forecast-actual-total-strip em { color: var(--oj-core-text-color-secondary); font-size: .55rem; font-style: normal; }
+.forecast-actual-quarter-cards { display: grid; gap: .45rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.forecast-actual-quarter-cards article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .42rem; min-width: 0; padding: .52rem; }
 .forecast-actual-quarter-cards article.is-selected { border-color: var(--oj-core-brand-color-1); box-shadow: inset 0 0 0 1px var(--oj-core-brand-color-1); }
 .forecast-actual-quarter-cards header { align-items: baseline; display: flex; gap: .4rem; justify-content: space-between; }
 .forecast-actual-quarter-cards header > strong { font-size: 1rem; }
@@ -5513,7 +5512,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-quarter-totals span { color: var(--oj-core-text-color-secondary); display: grid; font-size: .65rem; gap: .1rem; }
 .forecast-actual-quarter-totals strong { color: var(--oj-core-text-color-primary); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .forecast-actual-quarter-actions { display: grid; gap: .3rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.forecast-actual-quarter-actions button { align-content: center; background: #f5f6f7; border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; color: var(--oj-core-text-color-primary); cursor: pointer; display: grid; font: inherit; gap: .08rem; min-height: 3.1rem; padding: .3rem; position: relative; text-align: center; }
+.forecast-actual-quarter-actions button { align-content: center; background: #f5f6f7; border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; color: var(--oj-core-text-color-primary); cursor: pointer; display: grid; font: inherit; gap: .08rem; min-height: 2.75rem; min-width: 0; padding: .25rem .15rem; position: relative; text-align: center; }
 .forecast-actual-quarter-actions button:disabled { cursor: default; opacity: .45; }
 .forecast-actual-quarter-actions button:not(:disabled):hover,
 .forecast-actual-quarter-actions button[aria-pressed="true"] { border-color: var(--oj-core-brand-color-1); box-shadow: inset 0 0 0 1px var(--oj-core-brand-color-1); }
@@ -5527,7 +5526,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-result-filter button { background: transparent; border: 0; color: var(--oj-core-brand-color-1); cursor: pointer; font: inherit; padding: .25rem; text-decoration: underline; }
 .forecast-actual-matrix .is-quarter-result { left: 18.5rem; min-width: 7rem; width: 7rem; }
 .forecast-actual-matrix thead .is-quarter-result { background: #dfe8f1; z-index: 11; }
-.forecast-actual-matrix tbody .is-quarter-result { background: #f8fafc; box-shadow: 2px 0 5px rgb(22 43 66 / 10%); position: sticky; text-align: center; z-index: 4; }
+.forecast-actual-matrix tbody .is-quarter-result { background: #f8fafc !important; background-clip: padding-box; box-shadow: 2px 0 5px rgb(22 43 66 / 10%); isolation: isolate; position: sticky; text-align: center; z-index: 6; }
 .forecast-actual-quarter-result { align-items: center; border: 1px solid currentColor; border-radius: .35rem; display: inline-flex; flex-direction: column; font-size: .62rem; gap: .08rem; line-height: 1.15; min-width: 5.7rem; padding: .25rem .3rem; position: relative; }
 .forecast-actual-quarter-result small { font-size: .6rem; font-variant-numeric: tabular-nums; }
 .forecast-actual-quarter-result.is-shortfall { background: #fce8e6; color: #8f2417; }
@@ -5538,11 +5537,11 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-quarter-result.is-partial_actual,
 .forecast-actual-quarter-result.is-future { background: #f0f1f3; color: #5d6470; }
 @media (max-width: 1000px) {
-  .forecast-actual-quarter-cards { grid-template-columns: repeat(2, minmax(11rem, 1fr)); }
+  .forecast-actual-quarter-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .forecast-actual-quarter-cards { display: flex; overflow-x: auto; padding-bottom: .25rem; scroll-snap-type: x proximity; }
-  .forecast-actual-quarter-cards article { flex: 0 0 17rem; scroll-snap-align: start; }
+  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .forecast-actual-quarter-cards { grid-template-columns: minmax(0, 1fr); }
   .forecast-actual-matrix .is-account { min-width: 8.5rem; width: 8.5rem; }
   .forecast-actual-matrix .is-rep { left: 8.5rem; }
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
@@ -6153,11 +6152,12 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-filter.forecast-actual-toolbar,
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: auto; overflow-y: auto; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: max-content; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 100%; width: 100%; }
 .forecast-actual-matrix-shell { max-width: none; min-width: 100%; overflow: visible; width: max-content; }
 .forecast-actual-matrix-layout { min-width: 100%; overflow: visible; width: max-content; }
 .forecast-actual-matrix .is-quarter-result { left: 17.5rem; }
-.forecast-actual-matrix-toolbar { align-items: center; }
+.forecast-actual-matrix-toolbar { align-items: center; border-bottom: 0; justify-content: flex-end; }
+.forecast-actual-matrix-shell { border: 0; border-radius: 0; }
 @media (max-width: 760px) {
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
 }
