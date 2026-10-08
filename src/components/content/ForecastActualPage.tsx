@@ -401,8 +401,8 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
       </div>
       <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
         <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
-          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")} K</strong></span>
-          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")} K</strong></span>
+          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
+          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong></span>
         </div>
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {

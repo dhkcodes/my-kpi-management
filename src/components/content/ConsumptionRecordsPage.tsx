@@ -717,7 +717,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       });
       setLastDataLoadedAt(new Date());
       if (!append) {
-        const metadata = await fetchConsumptionImportMetadata().catch(() => null);
+        const metadata = await fetchConsumptionImportMetadata(
+          { fromQuarter: page.fromQuarter, toQuarter: page.toQuarter }, page.selectedPillar
+        ).catch(() => null);
         if (metadata && generation === recordsRequestGeneration.current) setImportMetadata(metadata);
       }
       return page;

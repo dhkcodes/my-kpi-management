@@ -1044,8 +1044,9 @@ export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRang
 };
 
 export type ConsumptionImportMetadata = Readonly<{ forecastImportedAt: string | null; actualImportedAt: string | null }>;
-export const fetchConsumptionImportMetadata = async (): Promise<ConsumptionImportMetadata> => {
-  const { payload } = await request("/consumption/import-metadata", undefined, "ALL", true);
+export const fetchConsumptionImportMetadata = async (range: ConsumptionWorkspaceRange, pillar: ConsumptionPillar): Promise<ConsumptionImportMetadata> => {
+  const parameters = new URLSearchParams({ fromQuarter: range.fromQuarter, toQuarter: range.toQuarter, pillar });
+  const { payload } = await request(`/consumption/import-metadata?${parameters}`, undefined, pillar, true);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption import metadata");
   const raw = payload as Record<string, unknown>;
   const timestamp = (value: unknown): string | null => {
