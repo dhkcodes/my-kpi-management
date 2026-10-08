@@ -6268,3 +6268,128 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 @media (prefers-reduced-motion: reduce) {
   .kap-page-shell__scroll { scroll-behavior: auto; }
 }
+
+/* Consumption cross-page alignment (Records is the reference surface). */
+.kap-page-shell.consumption-insights-page .kap-page-shell__body,
+.kap-page-shell.forecast-actual-page .kap-page-shell__body {
+  gap: .325rem;
+}
+.kap-page-shell.forecast-actual-page .forecast-actual-results {
+  gap: .325rem;
+}
+.kap-page-shell.consumption-insights-page .consumption-analysis-toolbar,
+.kap-page-shell.forecast-actual-page .forecast-actual-data-toolbar {
+  align-items: flex-end;
+  min-height: 0;
+}
+.kap-page-shell.consumption-insights-page .consumption-insights-filter--account {
+  flex: 0 0 4rem;
+  max-width: 4rem;
+  min-width: 4rem;
+  width: 4rem;
+}
+
+/* Shared Redwood Light FY selector treatment; outlined chroming remains owned by JET. */
+oj-menu-button.consumption-analysis-fy-button,
+oj-menu-button.forecast-actual-fy-button {
+  --oj-button-outlined-chrome-bg-color: #f4f7f8;
+  --oj-button-outlined-chrome-border-color: #9fb3c1;
+  --oj-button-outlined-chrome-text-color: #29485b;
+  --oj-button-outlined-chrome-bg-color-hover: #eaf1f4;
+  --oj-button-outlined-chrome-border-color-hover: #6f91a7;
+  --oj-button-outlined-chrome-text-color-hover: #17394e;
+  --oj-button-outlined-chrome-bg-color-active: #dce9ef;
+  --oj-button-outlined-chrome-border-color-active: #527d97;
+  --oj-button-outlined-chrome-text-color-active: #12384f;
+  background: #f4f7f8;
+  border-radius: .375rem;
+  color: #29485b;
+  min-width: 5.75rem;
+  white-space: nowrap;
+}
+oj-menu-button.consumption-analysis-fy-button:hover,
+oj-menu-button.forecast-actual-fy-button:hover,
+oj-menu-button.consumption-analysis-fy-button[aria-expanded="true"],
+oj-menu-button.forecast-actual-fy-button[aria-expanded="true"] {
+  background: #eaf1f4;
+  color: #17394e;
+}
+oj-menu-button.consumption-analysis-fy-button:focus-within,
+oj-menu-button.forecast-actual-fy-button:focus-within {
+  border-radius: .375rem;
+  outline: 2px solid #2f6f95;
+  outline-offset: 2px;
+}
+
+/* Records keeps its viewport-fixed behavior while adopting the Forecast vs Actual button language. */
+.consumption-viewport-controls .consumption-scroll-controls button {
+  align-items: center;
+  background: var(--oj-core-bg-color-content, #fff);
+  border: 1px solid var(--oj-core-divider-color);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 14%);
+  color: var(--oj-core-text-color-primary);
+  display: inline-flex;
+  font-size: 1rem;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  width: 2rem;
+}
+.consumption-viewport-controls .consumption-scroll-controls button:hover:not(:disabled) {
+  background: var(--oj-core-bg-color-hover, #f1efed);
+}
+.consumption-viewport-controls .consumption-scroll-controls button:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color);
+  outline-offset: 1px;
+}
+
+/* Forecast vs Actual overlay remains vertically anchored while the matrix passes the viewport. */
+.forecast-actual-matrix-frame {
+  overflow: clip;
+}
+.forecast-actual-scroll-controls {
+  position: sticky;
+  top: calc(50dvh - 1.25rem);
+  float: right;
+  height: max-content;
+  margin: .65rem .65rem -3rem 0;
+}
+
+.forecast-actual-quarter-cards article.is-selected {
+  background: color-mix(in srgb, var(--oj-core-brand-color-1) 6%, var(--oj-core-bg-color-content));
+  cursor: pointer;
+}
+.forecast-actual-quarter-actions button:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color);
+  outline-offset: 1px;
+}
+.forecast-actual-monthly-totals th,
+.forecast-actual-monthly-totals td {
+  background: color-mix(in srgb, var(--oj-core-bg-color-neutral) 72%, var(--oj-core-bg-color-content));
+  border-top: 1px solid var(--oj-core-divider-color);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.forecast-actual-monthly-totals th {
+  left: 0;
+  position: sticky;
+  text-align: left;
+  z-index: 7;
+}
+.forecast-actual-monthly-totals .is-negative { color: #b42318; }
+.forecast-actual-monthly-totals .is-positive { color: #18794e; }
+
+@media (max-width: 760px) {
+  .kap-page-shell.consumption-insights-page .consumption-insights-filter--account {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .forecast-actual-scroll-controls {
+    top: calc(50dvh - 1.25rem);
+    margin-right: .4rem;
+  }
+}

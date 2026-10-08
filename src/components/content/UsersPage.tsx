@@ -17,7 +17,7 @@ type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthS
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
 const menuLabels: Record<(typeof assignableMenuPermissionIds)[number], string> = {
   "kpis-overview": "KPI", "weekly-activities": "Weekly", calendar: "Calendar", "meeting-notes": "Meeting Notes", "accounts-workloads": "Account Management — Overview & Account & Workload",
-  analysis: "Consumption Analysis", "forecast-actual": "Forecast vs Actual", attainment: "Consumption Attainment", records: "Consumption Records"
+  analysis: "Consumption Analysis", "forecast-actual": "Forecast vs Actual", records: "Consumption Records"
 };
 
 // `rawValue` is current even when Enter submits before JET commits `value`.

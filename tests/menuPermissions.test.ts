@@ -40,10 +40,11 @@ assert.equal(getNavigationRoute("customers-overview").id, "home", "disabled lega
 assert.equal(canAccessRoute(user, { id: "customers-overview", module: "myCustomers360", pageTitle: "Portfolio Overview" }), false,
   "legacy Customer 360 route remains inaccessible even when supplied directly");
 assert.ok(!(assignableMenuPermissionIds as readonly string[]).includes("customers-overview"), "legacy Customer 360 is not assignable in user administration");
+assert.ok(!(assignableMenuPermissionIds as readonly string[]).includes("attainment"), "closed Attainment is not assignable in user administration");
 
 const visibleIds = filterNavigationItems(navItems, user).flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]);
-for (const visible of ["home", "kpis-overview", "weekly-activities", "calendar", "meeting-notes", "analysis", "forecast-actual", "attainment"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
-for (const hidden of ["customers-overview", "account-management-overview", "accounts-workloads", "records"]) assert.ok(!visibleIds.includes(hidden), `${hidden} should be hidden`);
+for (const visible of ["home", "kpis-overview", "weekly-activities", "calendar", "meeting-notes", "analysis", "forecast-actual"]) assert.ok(visibleIds.includes(visible), `${visible} should be visible`);
+for (const hidden of ["customers-overview", "account-management-overview", "accounts-workloads", "attainment", "records"]) assert.ok(!visibleIds.includes(hidden), `${hidden} should be hidden`);
 
 const accountReadOnly = parseAuthProfile({ ...base, menuPermissions: { ...allRead, "accounts-workloads": "READ" } });
 assert.equal(canAccessRoute(accountReadOnly, getNavigationRoute("account-management-overview")), true);
@@ -52,7 +53,7 @@ assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("account-manageme
 assert.equal(canWriteRoute(accountReadOnly, getNavigationRoute("accounts-workloads")), false);
 
 const admin: AuthSession = { ...base, access: "Admin", menuPermissions: {}, status: "ACTIVE" };
-for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "attainment", "records", "users"]) {
+for (const routeId of ["activity-a", "weekly-activities", "account-management-overview", "accounts-workloads", "analysis", "records", "users"]) {
   assert.equal(canWriteRoute(admin, getNavigationRoute(routeId)), true, `Admin can write ${routeId}`);
 }
 assert.equal(getRoutePermission(admin, getNavigationRoute("calendar")), "WRITE", "Admin can use Calendar without a stored grant");
@@ -68,7 +69,7 @@ assert.equal(getRoutePermission(admin, getNavigationRoute("activity-a")), "OWN",
 assert.equal(getRoutePermission(admin, getNavigationRoute("weekly-activities")), "OWN", "Weekly backend remains owner-scoped");
 
 const noGrants: AuthSession = { ...base, menuPermissions: Object.fromEntries(Object.keys(allRead).map((id) => [id, "NONE"])) as MenuPermissionMap, status: "ACTIVE" };
-for (const routeId of Object.keys(allRead).filter((id) => id !== "customers-overview")) {
+for (const routeId of Object.keys(allRead).filter((id) => id !== "customers-overview" && id !== "attainment")) {
   assert.equal(canAccessRoute(noGrants, getNavigationRoute(routeId)), false);
 }
 assert.equal(getNavigationRoute("customers-overview").module, "home");
