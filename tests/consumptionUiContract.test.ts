@@ -113,16 +113,12 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
-assert.match(content, /const showsFiscalYearPanel = !\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/,
-  "Analysis uses its compact title-row fiscal-year selector while Records remains exempt from the outer selector");
+
 assert.match(insightsPage, /<oj-menu-button[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}[\s\S]*<oj-menu slot="menu"[\s\S]*onojMenuAction=\{handleFiscalYearMenuAction\}[\s\S]*titleControls=\{fiscalYearControl\}/u,
   "Analysis renders the official Oracle JET outlined menu button beside the title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
-assert.match(content, /isKapPageShellRoute && showsFiscalYearPanel \? " has-fiscal-year-panel"/,
-  "PageShell routes that preserve the Fiscal Year selector expose the two-row layout modifier");
-assert.match(styles, /\.kpi-content\.is-kap-page-shell-route\.has-fiscal-year-panel\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s,
-  "the preserved Fiscal Year selector occupies its original row above the viewport-bound PageShell");
+
 assert.match(styles, /\.kap-page-shell\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\)/s,
   "PageShell constrains its content row so tall mobile pages scroll internally instead of expanding beneath the fixed footer");
 assert.match(styles, /\.kpi-shell:has\(\.kap-page-shell\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[^}]*height:\s*100dvh;[^}]*overflow:\s*hidden;[^}]*padding-bottom:\s*0;/s,
@@ -136,10 +132,10 @@ assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__hea
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
-assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*MTD 반영 일자 \{currentMtdAppliedDate\}/u,
-  "Records shows one compact UTC-basis MTD applied date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>Updated \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
-  "Analysis shows the import batch update date as Updated YYYY-MM-DD only while Show MTD is enabled");
+assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*Updated on \{currentMtdAppliedDate\}/u,
+  "Records shows one compact UTC-basis Updated on date beside the switch");
+assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>Updated on \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
+  "Analysis shows the import batch update date as Updated on YYYY-MM-DD only while Show MTD is enabled");
 assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
   "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
 assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
@@ -186,7 +182,7 @@ assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activ
   "the compact Reload control retains the same .78rem font-size reference");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
-assert.match(forecastActualPage, /As of \{mtdAppliedDate\}/u,
+assert.match(forecastActualPage, /Updated on \{mtdAppliedDate\}/u,
   "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
@@ -332,6 +328,8 @@ assert.match(recordsPage, /처리 결과를 확인하지 못했습니다\. 반�
   "ambiguous Actual apply results must explicitly require a data-state check");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
+const authSession = readFileSync("src/auth/authSession.ts", "utf8");
+const menuPermissions = readFileSync("src/auth/menuPermissions.ts", "utf8");
 const staticServer = readFileSync("scripts/spa_server.py", "utf8");
 
 assert.match(styles,
@@ -381,14 +379,22 @@ assert.match(styles,
   /@media \(min-width: 64rem\)[\s\S]*\.consumption-page\s*\{[^}]*padding-block:\s*\.45rem;[^}]*\}[\s\S]*\.consumption-table-panel\s*\{[^}]*padding:\s*0;/,
   "desktop Records moves the former table padding to the outer panel without reducing table space");
 
-// Navigation and route ownership.
-assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "attainment"[\s\S]*label: "Attainment"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved Consumption leaf names exist");
+// Navigation and route ownership. Attainment is hidden at the UI/permission/routing boundary while its code remains reversible.
+assert.match(navigation, /export const consumptionNavItems[\s\S]*id: "analysis"[\s\S]*label: "Analysis"[\s\S]*id: "forecast-actual"[\s\S]*label: "Forecast vs Actual"[\s\S]*id: "records"[\s\S]*label: "Records"/, "approved visible Consumption leaf names exist");
+assert.doesNotMatch(navigation, /id: "attainment"[\s\S]{0,80}label: "Attainment"/, "Attainment is absent from the navigation tree");
+assert.doesNotMatch(routes, /attainment:\s*\{\s*id:\s*"attainment"/, "Attainment has no routable navigation target");
+assert.match(routes, /"attainment":\s*"attainment"/, "legacy URL parsing remains explicit so route lookup can deny it");
+assert.doesNotMatch(authSession, /title:\s*"Consumption Attainment"/, "Attainment is absent from role permission settings");
+assert.match(authSession, /assignableMenuPermissionIds = \[(?![\s\S]{0,300}"attainment")[\s\S]{0,300}\] as const/, "Attainment is absent from assignable menu permissions");
+assert.doesNotMatch(menuPermissions, /route\.module === "consumptionAttainment"/, "closed Attainment has no route-permission mapping");
+assert.doesNotMatch(content, /AttainmentPage/, "closed Attainment is not imported or dispatched by content routing");
+assert.match(attainmentPage, /export function AttainmentPage/, "feature code and data behavior remain preserved");
 assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/, "Consumption is the parent of the approved leaves");
 assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*id: "records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis title selector and remains hidden for FY-independent pages");
+assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis and Forecast vs Actual selectors and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
@@ -472,7 +478,11 @@ assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAcco
 assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
 assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?role="switch" aria-checked=\{showMtd\} class="consumption-mtd-switch"[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
   "Records places Show MTD at the far left and the stable loading/Refresh slot at the far right");
-assert.doesNotMatch(recordsPage, /oj-ux-ico-information-s/, "Forecast composition no longer depends on an information icon");
+const forecastCompositionTooltipSource = recordsPage.slice(
+  recordsPage.indexOf("const ForecastCompositionTooltip"),
+  recordsPage.indexOf("const toApiControlTotals")
+);
+assert.doesNotMatch(forecastCompositionTooltipSource, /oj-ux-ico-information-s/, "Forecast composition no longer depends on an information icon");
 assert.match(recordsPage, /ForecastCompositionTooltip composition=\{displayedComposition\}>[\s\S]*currency\.format\(value\)/, "hovering the amount area owns the composition tooltip");
 assert.match(styles, /\.consumption-forecast-tooltip\s*\{[^}]*display:\s*flex[^}]*width:\s*100%/, "the composition hover target fills the amount cell");
 assert.doesNotMatch(attainmentPage, /included-period results|not asserted to be a complete full-year outlook/, "Attainment removes the standing technical completeness disclaimer");
@@ -564,8 +574,8 @@ assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-offic
   "Forecast file picker accepts Excel workbooks only");
 assert.match(recordsPage, /validateForecastWorkbookFile\(file\)[\s\S]*previewConsumptionForecastWide\(file\)/,
   "Forecast validates extension, MIME, and XLSX signature before preview upload");
-assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("attainment"\)\)/,
-  "Forecast import capability follows the backend Attainment WRITE permission");
+assert.match(content, /canWriteForecast = canWriteRoute\(profile, getNavigationRoute\("records"\)\)/,
+  "Forecast import capability follows the surviving Records WRITE permission while Attainment is closed");
 assert.match(recordsPage, /canWriteForecast[\s\S]*handleForecastWorkbookFile[\s\S]*Forecast write permission is required/,
   "Forecast preview and apply use their dedicated write capability");
 assert.match(recordsPage, /forecastImportPhase === "preview" \|\| forecastImportPhase === "applying"[\s\S]*disabled=\{forecastImportPhase === "applying" \|\| !canWriteForecast \|\| pendingForecastImport\.preview\.hasBlockedErrors\}[\s\S]*title=\{!canWriteForecast \? "Forecast write permission is required\." : undefined\}/,

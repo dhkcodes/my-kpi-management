@@ -2,6 +2,10 @@ import { ComponentChildren, h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { KeyboardEvent } from "preact/compat";
 import "ojs/ojprogress-circle";
+import "ojs/ojbutton";
+import "ojs/ojmenu";
+import "ojs/ojoption";
+import type { ojMenu } from "ojs/ojmenu";
 import { fetchForecastActualComparison, type ForecastActualComparison, type ForecastActualMode, type ForecastActualRow } from "../../data/consumptionApi";
 import { consumptionPillarOptions, type ConsumptionPillar } from "../../data/consumptionData";
 import {
@@ -16,7 +20,7 @@ import {
 } from "../../data/forecastActualAssessment";
 import { compareForecastActualRows, type ForecastActualSortDirection, type ForecastActualSortKey } from "../../data/forecastActualSort";
 import { addExactDecimals, compareExactDecimals, formatExactKFixed } from "../../data/exactDecimal";
-import { FiscalYear } from "../../data/kpiMockData";
+import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 import { formatMtdAppliedDate } from "../../data/mtdDate";
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 
@@ -66,8 +70,25 @@ const sumQuarterValue = (results: readonly ForecastActualQuarterResult[], select
   const values = results.map(selector).filter((value): value is string => value !== null);
   return values.length ? values.reduce((total, value) => addExactDecimals(total, value), "0") : null;
 };
+const sumMonthlyValue = (rows: readonly ForecastActualRow[], periodKey: string, selector: (month: ForecastActualRow["months"][number]) => string | null) => {
+  const values = rows.map((row) => monthByPeriod(row, periodKey))
+    .filter((month): month is ForecastActualRow["months"][number] => Boolean(month))
+    .map(selector).filter((value): value is string => value !== null);
+  return values.length ? values.reduce((total, value) => addExactDecimals(total, value), "0") : null;
+};
+const sumDifferenceBySign = (rows: readonly ForecastActualRow[], periodKey: string, sign: "NEGATIVE" | "POSITIVE") => {
+  const values = rows.map((row) => monthByPeriod(row, periodKey)?.differenceAmount ?? null)
+    .filter((value): value is string => value !== null)
+    .filter((value) => sign === "NEGATIVE" ? compareExactDecimals(value, "0") < 0 : compareExactDecimals(value, "0") > 0);
+  return values.length ? values.reduce((total, value) => addExactDecimals(total, value), "0") : null;
+};
 
-export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; breadcrumb?: ComponentChildren }>) => {
+export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{
+  fiscalYear: FiscalYear;
+  fiscalYears: readonly FiscalYear[];
+  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
+  breadcrumb?: ComponentChildren;
+}>) => {
   const [quarter, setQuarter] = useState("ALL");
   const [pillar, setPillar] = useState<ConsumptionPillar>("ALL");
   const [actualMode, setActualMode] = useState<ForecastActualMode>("FINAL");
@@ -88,6 +109,7 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
   const [accountOptionCache, setAccountOptionCache] = useState<string[]>([]);
   const [activeAccountIndex, setActiveAccountIndex] = useState(0);
   const accountComboboxRef = useRef<HTMLDivElement>(null);
+  const matrixScrollRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setSalesRep(""); setAccount(""); setAccountSearch(""); setAccountOptionCache([]); setResultFilter(null);
@@ -181,6 +203,12 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
       return compared || left.account.localeCompare(right.account, undefined, { sensitivity: "base" });
     });
   }, [currentData, quarterResultsByAccount, resultFilter, sortDirection, sortKey]);
+  const monthlyTotals = useMemo(() => Object.fromEntries(periods.map((periodKey) => [periodKey, {
+    forecast: sumMonthlyValue(rows, periodKey, (month) => month.forecastAmount),
+    actual: sumMonthlyValue(rows, periodKey, (month) => month.actualAmount),
+    shortfall: sumDifferenceBySign(rows, periodKey, "NEGATIVE"),
+    exceeded: sumDifferenceBySign(rows, periodKey, "POSITIVE")
+  }])) as Record<string, Readonly<{ forecast: string | null; actual: string | null; shortfall: string | null; exceeded: string | null }>>, [periods, rows]);
   const displayedActualMode = currentData?.actualMode ?? actualMode;
   const mtdAppliedDate = useMemo(() => {
     const timestamps = (currentData?.rows ?? []).flatMap((row) => row.months)
@@ -225,27 +253,47 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     : [result[quarter as ForecastActualQuarter]]);
   const selectedTotalForecast = sumQuarterValue(selectedRangeResults, (result) => result.forecastAmount);
   const selectedTotalActual = sumQuarterValue(selectedRangeResults, (result) => result.actualAmount);
+  const currentFiscalYear = getLatestFiscalYear();
+  const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
+  const adjacentFiscalYears = fiscalYears
+    .filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
+    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
+  const earlierFiscalYears = fiscalYears
+    .filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
+    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
+  const handleFiscalYearMenuAction = (event: ojMenu.ojMenuAction) => {
+    const year = String(event.detail.selectedValue) as FiscalYear;
+    if (fiscalYears.includes(year) && year !== fiscalYear) onFiscalYearChange(year);
+  };
+  const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button forecast-actual-fy-button oj-button-sm" chroming="outlined"
+    aria-label={`Selected fiscal year ${fiscalYear}`}>
+    {fiscalYear}
+    <oj-menu slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
+      {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
+        {year === currentFiscalYear ? `${year} · Current` : year}
+      </oj-option>)}
+      {earlierFiscalYears.length > 0 && <oj-option>Earlier FYs…
+        <oj-menu>
+          {earlierFiscalYears.map((year) => <oj-option key={year} value={year}>{year}</oj-option>)}
+        </oj-menu>
+      </oj-option>}
+    </oj-menu>
+  </oj-menu-button>;
+  const scrollMatrix = (direction: -1 | 1) => {
+    const viewport = matrixScrollRef.current;
+    if (!viewport) return;
+    viewport.scrollBy({ left: direction * Math.max(320, viewport.clientWidth * .78), behavior: "smooth" });
+  };
 
   return <PageShell className="consumption-insights-page forecast-actual-page" ariaLabelledBy="forecastActualTitle"
-    breadcrumb={breadcrumb} title="Forecast vs Actual" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Forecast vs Actual" titleControls={fiscalYearControl} headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
-    actions={<div class="forecast-actual-control forecast-actual-mtd-control">
-      <span>MTD</span>
-      <div class="forecast-actual-mtd-row">
-        {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">As of {mtdAppliedDate}</span>}
-        <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
-          disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
-          onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
-          <span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-        </button>
-      </div>
-    </div>}
     filters={<PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
-      <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setResultFilter(null); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
       <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
         {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={pillar === option.value}
           onClick={() => { if (option.value === pillar) return; setPillar(option.value); setSalesRep(""); resetAccountScope(); }}>{option.label}</button>)}
       </div></div>
+      <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setResultFilter(null); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
       <label class="forecast-actual-control">Sales Rep<select id="forecastActualSalesRep" value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccountScope(); }}><option value="">All</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
       <div class="forecast-actual-control forecast-actual-search-panel">
         <label htmlFor="forecastActualAccountSearch">Account</label>
@@ -272,41 +320,65 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
     <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual results" />
 
     {currentData && <div class="forecast-actual-results" aria-busy={loading}>
-      <section class="forecast-actual-total-strip" aria-label="Selected scope totals">
-        <span>Total Forecast <strong>{formatAmount(selectedTotalForecast, "N/A")}</strong> K USD</span>
-        <span>Total Actual <strong>{formatAmount(selectedTotalActual, "N/A")}</strong> K USD</span>
-      </section>
-      <section class="forecast-actual-quarter-cards" aria-label="Quarter results">
+      <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
+        <div class="consumption-records-toolbar__left">
+          <button type="button" role="switch" aria-label="Include MTD" aria-checked={actualMode === "MTD"}
+            disabled={loading || !currentData?.currentMtdAvailable} class="consumption-mtd-switch"
+            onClick={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}>
+            <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
+          </button>
+          <span class="consumption-info-tooltip consumption-mtd-tooltip">
+            <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label="About Show MTD" aria-describedby="forecastShowMtdTooltip"></button>
+            <span id="forecastShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
+          </span>
+          {displayedActualMode === "MTD" && mtdAppliedDate && <span class="consumption-mtd-applied-date">Updated on {mtdAppliedDate}</span>}
+        </div>
+        <div class="consumption-records-toolbar-activity">
+          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
+            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
+            showBusyLabel={false} compactTimestampButton />
+        </div>
+      </div>
+      <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
+        <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
+          <span><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong><em>K USD</em></span>
+          <span><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong><em>K USD</em></span>
+        </div>
+        <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
-          return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}>
-            <header><strong>{card.quarter}</strong><small>{card.quarter === currentQuarter ? "In progress · cumulative Actual" : "Quarter result"}</small></header>
-            <div class="forecast-actual-quarter-totals"><span>Forecast <strong>{formatAmount(card.forecastAmount, "N/A")}</strong></span><span>Actual <strong>{formatAmount(card.actualAmount, "N/A")}</strong></span></div>
+          return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("button")) return;
+              if (quarter === card.quarter || resultFilter?.quarter === card.quarter) {
+                setQuarter("ALL");
+                setResultFilter(null);
+              }
+            }}>
+            <header><strong>{card.quarter}</strong><small>{card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
             <div class="forecast-actual-quarter-actions">
               {(["SHORTFALL", "MATCHED", "EXCEEDED"] as const).map((status) => {
-                const label = status === "SHORTFALL" ? "Shortfall" : status === "MATCHED" ? "Matched" : "Exceeded";
+                const fullLabel = status === "SHORTFALL" ? "Shortfall" : status === "MATCHED" ? "Matched" : "Exceeded";
+                const baseLabel = status === "SHORTFALL" ? "Gap" : status === "MATCHED" ? "Match" : "Over";
+                const isProvisional = card.quarter === currentQuarter;
+                const label = isProvisional ? `Open ${baseLabel}` : baseLabel;
                 const amount = status === "SHORTFALL" ? card.shortfallAmount : status === "MATCHED" ? card.matchedAmount : card.exceededAmount;
-                const tooltip = status === "MATCHED"
+                const tooltip = `${isProvisional ? "This quarter is in progress; amounts and status are provisional. " : ""}${status === "MATCHED"
                   ? "Matched difference is exactly 0 K USD. It is not the sum of matched customers' Actual. Activate to filter matched Accounts."
-                  : `${label} is summed after each Account is compared within this quarter; excess from another Account is not offset.`;
+                  : `${fullLabel} is summed after each Account is compared within this quarter; excess from another Account is not offset.`}`;
                 const pressed = resultFilter?.quarter === card.quarter && resultFilter.status === status;
                 return <button key={status} type="button" class={`is-${status.toLowerCase()}`} aria-pressed={pressed}
-                  aria-label={`${card.quarter} ${label}: ${formatAmount(amount, "0")} K USD. ${tooltip}`} data-tooltip={tooltip}
+                  aria-label={`${card.quarter} ${fullLabel}: ${formatAmount(amount, "0")} K USD. ${tooltip}`} data-tooltip={tooltip}
                   onClick={() => toggleResultFilter(card.quarter, status)}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong><small>K USD</small></button>;
               })}
             </div>
           </article>;
         })}
-      </section>
-      {resultFilter && <div class="forecast-actual-result-filter" role="status"><span>{resultFilter.quarter} · {resultLabel(resultFilter.status)}</span><button type="button" onClick={() => setResultFilter(null)}>Clear result filter</button></div>}
-
-      <section class="forecast-actual-matrix-shell" aria-label="Account monthly comparison">
-        <div class="forecast-actual-matrix-toolbar">
-          <span class="forecast-actual-unit-note">Amount: K USD</span>
-          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
-            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
-            showBusyLabel={false} compactTimestampButton />
         </div>
-        <div class="forecast-actual-matrix-layout">
+      </section>
+
+      <section class="forecast-actual-matrix-frame" aria-label="Forecast vs Actual monthly table">
+        <section class="forecast-actual-matrix-shell" ref={matrixScrollRef} tabIndex={0} aria-label="Scrollable monthly comparison table">
+          <div class="forecast-actual-matrix-layout">
           <table class="forecast-actual-matrix">
             <thead>
               <tr class="forecast-actual-group-header">
@@ -356,7 +428,50 @@ export const ForecastActualPage = ({ fiscalYear, breadcrumb }: Readonly<{ fiscal
               })}
               {!rows.length && <tr><td class="forecast-actual-empty" colSpan={3 + periods.length * 4}>{resultFilter ? "No accounts match the selected quarter result filter." : "No accounts match the selected filters."}</td></tr>}
             </tbody>
+            <tfoot class="forecast-actual-monthly-totals">
+              <tr>
+                <th colSpan={3}>Monthly Forecast total</th>
+                {periods.flatMap((periodKey) => [
+                  <td key={`${periodKey}-forecast-total`} class="forecast-actual-number is-forecast">{formatAmount(monthlyTotals[periodKey]?.forecast ?? null, "N/A")}</td>,
+                  <td key={`${periodKey}-forecast-total-actual`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-forecast-total-difference`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-forecast-total-status`} aria-hidden="true">—</td>
+                ])}
+              </tr>
+              <tr>
+                <th colSpan={3}>Monthly Actual total</th>
+                {periods.flatMap((periodKey) => [
+                  <td key={`${periodKey}-actual-total-forecast`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-actual-total`} class="forecast-actual-number is-actual">{formatAmount(monthlyTotals[periodKey]?.actual ?? null, "N/A")}</td>,
+                  <td key={`${periodKey}-actual-total-difference`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-actual-total-status`} aria-hidden="true">—</td>
+                ])}
+              </tr>
+              <tr class="is-shortfall">
+                <th colSpan={3}>Difference · Shortfall total</th>
+                {periods.flatMap((periodKey) => [
+                  <td key={`${periodKey}-shortfall-forecast`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-shortfall-actual`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-shortfall`} class="forecast-actual-number is-negative">{formatAmount(monthlyTotals[periodKey]?.shortfall ?? null, "—")}</td>,
+                  <td key={`${periodKey}-shortfall-status`} aria-hidden="true">—</td>
+                ])}
+              </tr>
+              <tr class="is-exceeded">
+                <th colSpan={3}>Difference · Exceeded total</th>
+                {periods.flatMap((periodKey) => [
+                  <td key={`${periodKey}-exceeded-forecast`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-exceeded-actual`} aria-hidden="true">—</td>,
+                  <td key={`${periodKey}-exceeded`} class="forecast-actual-number is-positive">{formatAmount(monthlyTotals[periodKey]?.exceeded ?? null, "—")}</td>,
+                  <td key={`${periodKey}-exceeded-status`} aria-hidden="true">—</td>
+                ])}
+              </tr>
+            </tfoot>
           </table>
+          </div>
+        </section>
+        <div class="forecast-actual-scroll-controls" aria-label="Scroll monthly table">
+          <button type="button" aria-label="Scroll table left" title="Scroll table left" onClick={() => scrollMatrix(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>
+          <button type="button" aria-label="Scroll table right" title="Scroll table right" onClick={() => scrollMatrix(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
         </div>
       </section>
     </div>}

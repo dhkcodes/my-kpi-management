@@ -26,7 +26,7 @@ import { KpiNavigationGuard, KpiSpreadsheetPage } from "./KpiSpreadsheetPage";
 import { ConsumptionRecordsPage } from "./ConsumptionRecordsPage";
 import { ConsumptionAnalysisPage } from "./ConsumptionAnalysisPage";
 import { ForecastActualPage } from "./ForecastActualPage";
-import { AttainmentPage } from "./AttainmentPage";
+
 import { HomeConsumptionOverview } from "./HomeConsumptionOverview";
 import { ProfilePage } from "./ProfilePage";
 import { UsersPage } from "./UsersPage";
@@ -343,7 +343,7 @@ export function Content({
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const canWrite = canWriteRoute(profile, activeRoute);
-  const canWriteForecast = canWriteRoute(profile, getNavigationRoute("attainment"));
+  const canWriteForecast = canWriteRoute(profile, getNavigationRoute("records"));
   const canReadHomeAccounts = canAccessRoute(profile, getNavigationRoute("accounts-workloads"));
   const canReadHomeKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
   const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"));
@@ -447,7 +447,7 @@ export function Content({
   };
   const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} profile={profile} onNavigate={onNavigate} />;
   const isKapPageShellRoute = ["consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
-  const showsFiscalYearPanel = !['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
+  const showsFiscalYearPanel = !['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
 
   return (
     <main id="cockpit" role="main" class={`oj-web-applayout-content kpi-content${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}${isKapPageShellRoute && showsFiscalYearPanel ? " has-fiscal-year-panel" : ""}`}>
@@ -656,9 +656,8 @@ export function Content({
         <ConsumptionAnalysisPage fiscalYear={fiscalYear} fiscalYears={fiscalYears}
           onFiscalYearChange={onFiscalYearChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "forecastActual" ? (
-        <ForecastActualPage fiscalYear={fiscalYear} breadcrumb={pageNavigation} />
-      ) : activeRoute.module === "consumptionAttainment" ? (
-        <AttainmentPage fiscalYear={fiscalYear} canWrite={canWrite} breadcrumb={pageNavigation} />
+        <ForecastActualPage fiscalYear={fiscalYear} fiscalYears={fiscalYears}
+          onFiscalYearChange={onFiscalYearChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
           fiscalYear={fiscalYear}

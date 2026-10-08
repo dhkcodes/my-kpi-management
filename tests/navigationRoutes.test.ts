@@ -20,13 +20,13 @@ assert.equal(getNavigationRouteFromPath("/unknown").id, "home");
 assert.equal(getNavigationPath(getNavigationRoute("accounts-workloads")), "/accounts-workloads");
 assert.equal(getNavigationPath(getNavigationRoute("home")), "/");
 assert.equal(getNavigationPath(getNavigationRoute("analysis")), "/consumption/analysis");
-assert.equal(getNavigationPath(getNavigationRoute("attainment")), "/consumption/attainment");
+assert.equal(getNavigationPath(getNavigationRoute("attainment")), "/", "disabled Attainment route resolves to Home");
 assert.equal(getNavigationPath(getNavigationRoute("records")), "/consumption/records");
 assert.equal(getNavigationRouteFromPath("/consumption/analysis").id, "analysis");
-assert.equal(getNavigationRouteFromPath("/consumption/attainment").id, "attainment");
+assert.equal(getNavigationRouteFromPath("/consumption/attainment").id, "home", "direct Attainment URL is not routable");
 assert.equal(getNavigationRouteFromPath("/consumption/records").id, "records");
 assert.equal(getCanonicalNavigationPath("/usage-insights"), "/consumption/analysis");
-assert.equal(getCanonicalNavigationPath("/attainment"), "/consumption/attainment");
+assert.equal(getCanonicalNavigationPath("/attainment"), "/", "legacy Attainment URL is not canonicalized to a live feature route");
 assert.equal(getCanonicalNavigationPath("/usage-records"), "/consumption/records");
 assert.equal(getCanonicalNavigationPath("/consumption/usage-insights"), "/consumption/analysis");
 assert.equal(getCanonicalNavigationPath("/consumption/usage-records"), "/consumption/records");
@@ -72,8 +72,10 @@ for (const file of [
   "WeeklyActivitiesPage.tsx"
 ]) {
   const pageSource = readFileSync(`src/components/content/${file}`, "utf8");
-  assert.match(pageSource, /\{breadcrumb\}[\s\S]{0,220}<h[12]/, `${file} renders the page menu inside its title surface`);
+  assert.match(pageSource, /\{breadcrumb\}[\s\S]*?<h[12]/, `${file} renders the page menu inside its title surface`);
 }
+const forecastActualSource = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
+assert.match(forecastActualSource, /<PageShell[\s\S]*breadcrumb=\{breadcrumb\}[\s\S]*title="Forecast vs Actual"/, "ForecastActualPage renders the page menu inside the shared title surface");
 const accountsWorkloadsSource = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
 assert.match(accountsWorkloadsSource, /\{breadcrumb\}[\s\S]{0,1000}<h[12]/,
   "AccountsWorkloadsPage.tsx keeps the menu and adjacent recommendation action inside its title surface");

@@ -38,7 +38,7 @@ export const navigationRouteDefinitions: NavigationRouteDefinition[] = [
   { id: "meeting-notes", module: "meetingNotes", pageTitle: "Meeting Notes" },
   { id: "analysis", module: "consumptionAnalysis", pageTitle: "Consumption Analysis", path: "/consumption/analysis" },
   { id: "forecast-actual", module: "forecastActual", pageTitle: "Forecast vs Actual", path: "/consumption/forecast-vs-actual" },
-  { id: "attainment", module: "consumptionAttainment", pageTitle: "Consumption Attainment", path: "/consumption/attainment" },
+
   { id: "records", module: "consumptionRecords", pageTitle: "Consumption Records", path: "/consumption/records" },
   { id: "profile", module: "profile", pageTitle: "Profile" },
   { id: "users", module: "users", pageTitle: "Users" }
@@ -58,7 +58,7 @@ const routeIdsByPath: Record<string, string> = {
   "consumption": "analysis",
   "consumption/analysis": "analysis",
   "consumption/forecast-vs-actual": "forecast-actual",
-  "consumption/attainment": "attainment",
+
   "consumption/records": "records",
   "consumption/usage-insights": "analysis",
   "consumption/usage-records": "records",

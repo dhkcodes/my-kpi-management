@@ -23,7 +23,6 @@ export const assignableMenuPermissionIds = [
   "accounts-workloads",
   "analysis",
   "forecast-actual",
-  "attainment",
   "records"
 ] as const satisfies readonly MenuPermissionId[];
 

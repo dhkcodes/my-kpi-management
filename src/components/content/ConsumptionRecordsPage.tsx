@@ -2003,8 +2003,12 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
                 onClick={() => setShowMtd((current) => !current)}>
                 <span>Show MTD</span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
               </button>
+              <span class="consumption-info-tooltip consumption-mtd-tooltip">
+                <button type="button" class="consumption-info-tooltip__trigger oj-ux-ico-information-s" aria-label="About Show MTD" aria-describedby="recordsShowMtdTooltip"></button>
+                <span id="recordsShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
+              </span>
               {showMtd && currentMtdAppliedDate
-                ? <small class="consumption-mtd-applied-date">MTD 반영 일자 {currentMtdAppliedDate}</small> : null}
+                ? <small class="consumption-mtd-applied-date">Updated on {currentMtdAppliedDate}</small> : null}
             </div>
             <div class="consumption-records-toolbar-activity">
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
@@ -2024,8 +2028,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
           <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false">
             <PageDataProgress busy={recordsActivityBusy} busyLabel={pageBusyLabel} />
             <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
-              <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}>‹</button>
-              <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}>›</button>
+              <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>
+              <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
             </div>
           </div>
           {recordsViewState === "error" ? (

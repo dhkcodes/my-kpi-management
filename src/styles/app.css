@@ -5494,17 +5494,16 @@ h4.weekly-activity-section-label--next-week,
 
 /* Forecast vs Actual quarter-result drilldown. */
 .forecast-actual-total-strip {
-  align-items: center;
-  color: var(--oj-core-text-color-secondary);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: .72rem;
-  gap: .5rem 1rem;
+  display: grid;
+  gap: .4rem;
+  grid-template-columns: repeat(2, minmax(7.75rem, 10.5rem));
 }
-.forecast-actual-total-strip span { align-items: baseline; display: inline-flex; gap: .25rem; }
-.forecast-actual-total-strip strong { color: var(--oj-core-text-color-primary); font-size: .9rem; font-variant-numeric: tabular-nums; }
-.forecast-actual-quarter-cards { display: grid; gap: .65rem; grid-template-columns: repeat(4, minmax(11rem, 1fr)); }
-.forecast-actual-quarter-cards article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; display: grid; gap: .55rem; min-width: 0; padding: .65rem; }
+.forecast-actual-total-strip span { align-items: baseline; background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .08rem .3rem; grid-template-columns: 1fr auto; padding: .42rem .55rem; }
+.forecast-actual-total-strip small { color: var(--oj-core-text-color-secondary); font-size: .62rem; grid-column: 1 / -1; }
+.forecast-actual-total-strip strong { color: var(--oj-core-text-color-primary); font-size: .88rem; font-variant-numeric: tabular-nums; }
+.forecast-actual-total-strip em { color: var(--oj-core-text-color-secondary); font-size: .55rem; font-style: normal; }
+.forecast-actual-quarter-cards { display: grid; gap: .45rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.forecast-actual-quarter-cards article { background: var(--oj-core-bg-color-content); border: 1px solid var(--oj-core-divider-color); border-radius: .5rem; display: grid; gap: .42rem; min-width: 0; padding: .52rem; }
 .forecast-actual-quarter-cards article.is-selected { border-color: var(--oj-core-brand-color-1); box-shadow: inset 0 0 0 1px var(--oj-core-brand-color-1); }
 .forecast-actual-quarter-cards header { align-items: baseline; display: flex; gap: .4rem; justify-content: space-between; }
 .forecast-actual-quarter-cards header > strong { font-size: 1rem; }
@@ -5513,7 +5512,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-quarter-totals span { color: var(--oj-core-text-color-secondary); display: grid; font-size: .65rem; gap: .1rem; }
 .forecast-actual-quarter-totals strong { color: var(--oj-core-text-color-primary); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .forecast-actual-quarter-actions { display: grid; gap: .3rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.forecast-actual-quarter-actions button { align-content: center; background: #f5f6f7; border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; color: var(--oj-core-text-color-primary); cursor: pointer; display: grid; font: inherit; gap: .08rem; min-height: 3.1rem; padding: .3rem; position: relative; text-align: center; }
+.forecast-actual-quarter-actions button { align-content: center; background: #f5f6f7; border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; color: var(--oj-core-text-color-primary); cursor: pointer; display: grid; font: inherit; gap: .08rem; min-height: 2.75rem; min-width: 0; padding: .25rem .15rem; position: relative; text-align: center; }
 .forecast-actual-quarter-actions button:disabled { cursor: default; opacity: .45; }
 .forecast-actual-quarter-actions button:not(:disabled):hover,
 .forecast-actual-quarter-actions button[aria-pressed="true"] { border-color: var(--oj-core-brand-color-1); box-shadow: inset 0 0 0 1px var(--oj-core-brand-color-1); }
@@ -5527,7 +5526,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-result-filter button { background: transparent; border: 0; color: var(--oj-core-brand-color-1); cursor: pointer; font: inherit; padding: .25rem; text-decoration: underline; }
 .forecast-actual-matrix .is-quarter-result { left: 18.5rem; min-width: 7rem; width: 7rem; }
 .forecast-actual-matrix thead .is-quarter-result { background: #dfe8f1; z-index: 11; }
-.forecast-actual-matrix tbody .is-quarter-result { background: #f8fafc; box-shadow: 2px 0 5px rgb(22 43 66 / 10%); position: sticky; text-align: center; z-index: 4; }
+.forecast-actual-matrix tbody .is-quarter-result { background: #f8fafc !important; background-clip: padding-box; box-shadow: 2px 0 5px rgb(22 43 66 / 10%); isolation: isolate; position: sticky; text-align: center; z-index: 6; }
 .forecast-actual-quarter-result { align-items: center; border: 1px solid currentColor; border-radius: .35rem; display: inline-flex; flex-direction: column; font-size: .62rem; gap: .08rem; line-height: 1.15; min-width: 5.7rem; padding: .25rem .3rem; position: relative; }
 .forecast-actual-quarter-result small { font-size: .6rem; font-variant-numeric: tabular-nums; }
 .forecast-actual-quarter-result.is-shortfall { background: #fce8e6; color: #8f2417; }
@@ -5538,11 +5537,11 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-quarter-result.is-partial_actual,
 .forecast-actual-quarter-result.is-future { background: #f0f1f3; color: #5d6470; }
 @media (max-width: 1000px) {
-  .forecast-actual-quarter-cards { grid-template-columns: repeat(2, minmax(11rem, 1fr)); }
+  .forecast-actual-quarter-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .forecast-actual-quarter-cards { display: flex; overflow-x: auto; padding-bottom: .25rem; scroll-snap-type: x proximity; }
-  .forecast-actual-quarter-cards article { flex: 0 0 17rem; scroll-snap-align: start; }
+  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .forecast-actual-quarter-cards { grid-template-columns: minmax(0, 1fr); }
   .forecast-actual-matrix .is-account { min-width: 8.5rem; width: 8.5rem; }
   .forecast-actual-matrix .is-rep { left: 8.5rem; }
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
@@ -6168,14 +6167,29 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .consumption-insights-composition-empty { align-content: start; justify-content: start; padding: .8rem; text-align: left; }
 .kap-page-filter.forecast-actual-toolbar,
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: auto; overflow-y: auto; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: max-content; }
-.forecast-actual-matrix-shell { max-width: none; min-width: 100%; overflow: visible; width: max-content; }
-.forecast-actual-matrix-layout { min-width: 100%; overflow: visible; width: max-content; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: hidden; overflow-y: auto; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 0; width: 100%; }
+.forecast-actual-overview { align-items: stretch; display: grid; gap: .55rem; grid-template-columns: 8.75rem minmax(0, 1fr); }
+.forecast-actual-total-strip { align-content: stretch; display: grid; flex: none; gap: .4rem; grid-template-columns: 1fr; width: auto; }
+.forecast-actual-total-strip > span { min-height: 0; padding: .45rem .55rem; }
+.forecast-actual-quarter-cards { min-width: 0; }
+.forecast-actual-matrix-frame { border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; min-width: 0; overflow: hidden; position: relative; }
+.forecast-actual-matrix-shell { -webkit-overflow-scrolling: touch; border: 0; border-radius: 0; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; touch-action: pan-x pan-y; width: 100%; }
+.forecast-actual-matrix-shell:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: -2px; }
+.forecast-actual-matrix-layout { min-width: 100%; width: max-content; }
 .forecast-actual-matrix .is-quarter-result { left: 17.5rem; }
-.forecast-actual-matrix-toolbar { align-items: center; }
+.forecast-actual-scroll-controls { align-items: center; background: color-mix(in srgb, var(--oj-core-bg-color-content, #fff) 92%, transparent); border: 1px solid var(--oj-core-divider-color); border-radius: 999px; box-shadow: 0 2px 8px rgb(0 0 0 / 14%); display: flex; gap: .15rem; padding: .2rem; position: absolute; right: .65rem; top: .65rem; z-index: 12; }
+.forecast-actual-scroll-controls button { align-items: center; background: var(--oj-core-bg-color-content, #fff); border: 0; border-radius: 50%; color: var(--oj-core-text-color-primary); cursor: pointer; display: inline-flex; height: 2rem; justify-content: center; padding: 0; width: 2rem; }
+.forecast-actual-scroll-controls button:hover { background: var(--oj-core-bg-color-hover, #f1efed); }
+.forecast-actual-scroll-controls button:focus-visible { outline: 2px solid var(--oj-core-focus-border-color); outline-offset: 1px; }
+.forecast-actual-data-toolbar .consumption-mtd-applied-date { white-space: nowrap; }
 @media (max-width: 760px) {
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
+  .forecast-actual-overview { grid-template-columns: minmax(0, 1fr); }
+  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .forecast-actual-total-strip > span { min-width: 0; }
+  .forecast-actual-data-toolbar .consumption-records-toolbar__left { align-items: flex-start; flex-direction: column; gap: 0; }
+  .forecast-actual-scroll-controls { right: .4rem; top: .4rem; }
 }
 .kap-page-shell.consumption-page .kap-page-shell__body { display: flex; flex-direction: column; gap: 0; min-height: 0; }
 .kap-page-shell.consumption-page .consumption-range-bar { background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); padding: .5rem .75rem; }
@@ -6253,4 +6267,129 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 
 @media (prefers-reduced-motion: reduce) {
   .kap-page-shell__scroll { scroll-behavior: auto; }
+}
+
+/* Consumption cross-page alignment (Records is the reference surface). */
+.kap-page-shell.consumption-insights-page .kap-page-shell__body,
+.kap-page-shell.forecast-actual-page .kap-page-shell__body {
+  gap: .325rem;
+}
+.kap-page-shell.forecast-actual-page .forecast-actual-results {
+  gap: .325rem;
+}
+.kap-page-shell.consumption-insights-page .consumption-analysis-toolbar,
+.kap-page-shell.forecast-actual-page .forecast-actual-data-toolbar {
+  align-items: flex-end;
+  min-height: 0;
+}
+.kap-page-shell.consumption-insights-page .consumption-insights-filter--account {
+  flex: 0 0 4rem;
+  max-width: 4rem;
+  min-width: 4rem;
+  width: 4rem;
+}
+
+/* Shared Redwood Light FY selector treatment; outlined chroming remains owned by JET. */
+oj-menu-button.consumption-analysis-fy-button,
+oj-menu-button.forecast-actual-fy-button {
+  --oj-button-outlined-chrome-bg-color: #f4f7f8;
+  --oj-button-outlined-chrome-border-color: #9fb3c1;
+  --oj-button-outlined-chrome-text-color: #29485b;
+  --oj-button-outlined-chrome-bg-color-hover: #eaf1f4;
+  --oj-button-outlined-chrome-border-color-hover: #6f91a7;
+  --oj-button-outlined-chrome-text-color-hover: #17394e;
+  --oj-button-outlined-chrome-bg-color-active: #dce9ef;
+  --oj-button-outlined-chrome-border-color-active: #527d97;
+  --oj-button-outlined-chrome-text-color-active: #12384f;
+  background: #f4f7f8;
+  border-radius: .375rem;
+  color: #29485b;
+  min-width: 5.75rem;
+  white-space: nowrap;
+}
+oj-menu-button.consumption-analysis-fy-button:hover,
+oj-menu-button.forecast-actual-fy-button:hover,
+oj-menu-button.consumption-analysis-fy-button[aria-expanded="true"],
+oj-menu-button.forecast-actual-fy-button[aria-expanded="true"] {
+  background: #eaf1f4;
+  color: #17394e;
+}
+oj-menu-button.consumption-analysis-fy-button:focus-within,
+oj-menu-button.forecast-actual-fy-button:focus-within {
+  border-radius: .375rem;
+  outline: 2px solid #2f6f95;
+  outline-offset: 2px;
+}
+
+/* Records keeps its viewport-fixed behavior while adopting the Forecast vs Actual button language. */
+.consumption-viewport-controls .consumption-scroll-controls button {
+  align-items: center;
+  background: var(--oj-core-bg-color-content, #fff);
+  border: 1px solid var(--oj-core-divider-color);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 14%);
+  color: var(--oj-core-text-color-primary);
+  display: inline-flex;
+  font-size: 1rem;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  width: 2rem;
+}
+.consumption-viewport-controls .consumption-scroll-controls button:hover:not(:disabled) {
+  background: var(--oj-core-bg-color-hover, #f1efed);
+}
+.consumption-viewport-controls .consumption-scroll-controls button:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color);
+  outline-offset: 1px;
+}
+
+/* Forecast vs Actual overlay remains vertically anchored while the matrix passes the viewport. */
+.forecast-actual-matrix-frame {
+  overflow: clip;
+}
+.forecast-actual-scroll-controls {
+  position: sticky;
+  top: calc(50dvh - 1.25rem);
+  float: right;
+  height: max-content;
+  margin: .65rem .65rem -3rem 0;
+}
+
+.forecast-actual-quarter-cards article.is-selected {
+  background: color-mix(in srgb, var(--oj-core-brand-color-1) 6%, var(--oj-core-bg-color-content));
+  cursor: pointer;
+}
+.forecast-actual-quarter-actions button:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color);
+  outline-offset: 1px;
+}
+.forecast-actual-monthly-totals th,
+.forecast-actual-monthly-totals td {
+  background: color-mix(in srgb, var(--oj-core-bg-color-neutral) 72%, var(--oj-core-bg-color-content));
+  border-top: 1px solid var(--oj-core-divider-color);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.forecast-actual-monthly-totals th {
+  left: 0;
+  position: sticky;
+  text-align: left;
+  z-index: 7;
+}
+.forecast-actual-monthly-totals .is-negative { color: #b42318; }
+.forecast-actual-monthly-totals .is-positive { color: #18794e; }
+
+@media (max-width: 760px) {
+  .kap-page-shell.consumption-insights-page .consumption-insights-filter--account {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .forecast-actual-scroll-controls {
+    top: calc(50dvh - 1.25rem);
+    margin-right: .4rem;
+  }
 }
