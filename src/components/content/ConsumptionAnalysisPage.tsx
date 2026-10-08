@@ -489,7 +489,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
-    actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
+    actions={!loading ? <div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
       <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
         title="Export the current Consumption Analysis view as PNG" onojAction={() => void downloadCanvas("png")}>
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Exporting…" : "PNG"}
@@ -499,7 +499,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Exporting…" : "PDF"}
       </oj-button>
       {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
-    </div>}
+    </div> : null}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}
     filters={<PageFilterPanel className="consumption-insights-header-actions" ariaLabel="Consumption Analysis filters">
         <div class="consumption-insights-pillar">

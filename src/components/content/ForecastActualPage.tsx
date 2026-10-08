@@ -52,8 +52,8 @@ const monthLabel = (periodKey: string) => {
 };
 
 type QuarterResultFilter = Readonly<{ quarter: ForecastActualQuarter; status: "SHORTFALL" | "MATCHED" | "EXCEEDED" }>;
-const resultLabel = (status: ForecastActualQuarterStatus) => ({
-  SHORTFALL: "Confirmed Shortfall", MATCHED: "Matched", EXCEEDED: "Exceeded", NO_FORECAST: "N/A",
+const resultLabel = (status: ForecastActualQuarterStatus, inProgress = false) => ({
+  SHORTFALL: inProgress ? "Remaining to Target" : "Confirmed Shortfall", MATCHED: "Matched", EXCEEDED: "Exceeded", NO_FORECAST: "N/A",
   MISSING_ACTUAL: "Actual Pending", PARTIAL_ACTUAL: "Actual Pending", FUTURE: "Actual Pending"
 }[status]);
 const resultTooltip = (result: ForecastActualQuarterResult) => {
@@ -184,7 +184,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   // Preserve the previous result while the next filtered request is in flight.
   // The effect cleanup guards against stale responses replacing newer ones.
   const currentData = data;
-  const contentReady = jetControlsReady && currentData !== null && !loading;
+  const contentReady = jetControlsReady && currentData !== null;
 
   const allPeriods = useMemo(
     () => visibleForecastActualPeriods(currentData?.fullForecastPeriods ?? [], currentData?.rows ?? []),
@@ -426,9 +426,9 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
       </div>
       <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
         <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
-          <span class="forecast-actual-total-card forecast-actual-total-card--actual"><small>Total Actual</small><strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
-            {displayedActualMode === "MTD" && <em class="forecast-actual-total-mtd">MTD included · <mark>{formatAmount(selectedMtdActual, "N/A")}</mark></em>}
-          </span>
+          <span class="forecast-actual-total-card forecast-actual-total-card--actual"><small>Total Actual</small><span class="forecast-actual-total-value"><strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
+            {displayedActualMode === "MTD" && <em class="forecast-actual-total-mtd">(MTD <mark>{formatAmount(selectedMtdActual, "N/A")}</mark>)</em>}
+          </span></span>
           <span class="forecast-actual-total-card forecast-actual-total-card--forecast"><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
         </div>
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
@@ -450,10 +450,10 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
               if (quarter === card.quarter || resultFilter?.quarter === card.quarter) { setQuarter("ALL"); setResultFilter(null); }
               else { setQuarter(card.quarter); setResultFilter(null); }
             }}>
-            <header><strong>{card.quarter}</strong><small class={card.quarter === currentQuarter ? "is-in-progress" : "is-quarter-result"}>{card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
+            <header><strong>{card.quarter}</strong><small class={fiscalYear === currentFiscalYear && card.quarter === currentQuarter ? "is-in-progress" : "is-quarter-result"}>{fiscalYear === currentFiscalYear && card.quarter === currentQuarter ? "In progress" : "Quarter result"}</small></header>
             <div class="forecast-actual-quarter-actions">
               {(["SHORTFALL", "MATCHED", "EXCEEDED"] as const).map((status) => {
-                const isProvisional = card.quarter === currentQuarter;
+                const isProvisional = fiscalYear === currentFiscalYear && card.quarter === currentQuarter;
                 const fullLabel = status === "SHORTFALL" ? (isProvisional ? "Remaining to Target" : "Confirmed Shortfall") : status === "MATCHED" ? "Matched" : "Exceeded";
                 const label = fullLabel;
                 const amount = status === "SHORTFALL" ? card.shortfallAmount : status === "MATCHED" ? card.matchedAmount : card.exceededAmount;
@@ -463,7 +463,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 const pressed = resultFilter?.quarter === card.quarter && resultFilter.status === status;
                 return <button key={status} type="button" class={`is-${status.toLowerCase()}`} aria-pressed={pressed}
                   aria-label={`${card.quarter} ${fullLabel}: ${formatAmount(amount, "0")} K USD. ${tooltip}`} data-tooltip={tooltip}
-                  onClick={(event) => { event.stopPropagation(); toggleResultFilter(card.quarter, status); }}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong><small>K USD</small></button>;
+                  onClick={(event) => { event.stopPropagation(); toggleResultFilter(card.quarter, status); }}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong></button>;
               })}
             </div>
           </article>;
@@ -509,11 +509,11 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                   <th scope="row" class="is-sticky is-account"><strong>{row.account}</strong></th>
                   <td class="is-sticky is-rep"><strong>{row.salesRep || "Unassigned"}</strong></td>
                   <td class="is-sticky is-quarter-result">{quarterResult && <span class={`forecast-actual-quarter-result is-${quarterResult.status.toLowerCase()}`}
-                    title={resultTooltip(quarterResult)} data-tooltip={resultTooltip(quarterResult)} tabIndex={0}><strong>{resultLabel(quarterResult.status)}</strong><small>{quarterResult.relevantAmount === null ? "N/A" : `${formatAmount(quarterResult.relevantAmount)} K`}</small></span>}</td>
+                    title={resultTooltip(quarterResult)} data-tooltip={resultTooltip(quarterResult)} tabIndex={0}><strong>{resultLabel(quarterResult.status, fiscalYear === currentFiscalYear && quarterResult.quarter === currentQuarter)}</strong><small>{quarterResult.relevantAmount === null ? "N/A" : `${formatAmount(quarterResult.relevantAmount)} K`}</small></span>}</td>
                   {periods.flatMap((periodKey) => {
                     const month = monthByPeriod(row, periodKey);
                     if (!month) return [
-                      <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty" title="Forecast has not been entered.">No FCST</td>,
+                      <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty" title="Forecast has not been entered."><span class="forecast-actual-value-badge is-no-forecast">No FCST</span></td>,
                       <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual data is not available for this month."><span class="forecast-actual-value-badge is-pending">Actual Pending</span></td>,
                       <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty" title="Not comparable until both Forecast and Actual are available."><span class="forecast-actual-value-badge is-na">N/A</span></td>,
                       <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual data is not available for this month." data-tooltip="Actual data is not available for this month." aria-label="Actual Pending: Actual data is not available for this month." tabIndex={0}>Actual Pending</span></td>
@@ -526,7 +526,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                       : statusTooltip(assessment.label, assessment.tooltip);
                     const statusLabel = shortStatus(assessment.label);
                     return [
-                      <td key={`${periodKey}-forecast`} class={`forecast-actual-month-value is-forecast ${month.forecastAmount === null ? "is-empty" : "forecast-actual-number"}`} title={month.forecastAmount === null ? "Forecast has not been entered." : "Forecast amount in K USD."}>{month.forecastAmount === null ? "No FCST" : formatAmount(month.forecastAmount)}</td>,
+                      <td key={`${periodKey}-forecast`} class={`forecast-actual-month-value is-forecast ${month.forecastAmount === null ? "is-empty" : "forecast-actual-number"}`} title={month.forecastAmount === null ? "Forecast has not been entered." : "Forecast amount in K USD."}>{month.forecastAmount === null ? <span class="forecast-actual-value-badge is-no-forecast">No FCST</span> : formatAmount(month.forecastAmount)}</td>,
                       <td key={`${periodKey}-actual`} class={`forecast-actual-month-value is-actual ${month.actualAmount === null ? "is-empty" : "forecast-actual-number"} ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualAmount === null ? "Actual data is not available for this month." : month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? <span class="forecast-actual-value-badge is-pending">Actual Pending</span> : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
                       <td key={`${periodKey}-difference`} class={`forecast-actual-month-value is-difference ${assessment.differenceAmount === null ? "is-empty" : "forecast-actual-number"} ${differenceClass}`} title={assessment.tooltip}>{assessment.differenceAmount === null ? <span class="forecast-actual-value-badge is-na">N/A</span> : formatAmount(assessment.differenceAmount)}</td>,
                       <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class={`forecast-actual-status ${statusClass}`} title={statusTooltipText} data-tooltip={statusTooltipText} aria-label={`${statusLabel}: ${statusTooltipText}`} tabIndex={0}>{statusLabel}</span>{assessment.projectedAmount !== null ? <small>Month-end {formatAmount(assessment.projectedAmount)}</small> : null}</td>

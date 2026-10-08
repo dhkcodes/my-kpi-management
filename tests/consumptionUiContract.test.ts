@@ -554,7 +554,7 @@ assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompo
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
 assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
-assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("png"\)[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("pdf"\)/, "PNG and PDF controls use the shared compact heading-action alignment");
+assert.match(insightsPage, /actions=\{!loading \? <div class="consumption-import-actions is-compact"[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("png"\)[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("pdf"\)[\s\S]*: null\}/, "PNG and PDF controls use the shared compact heading-action alignment and stay unmounted during initial loading");
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
 assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
@@ -598,7 +598,8 @@ assert.match(recordsPage, /forecastImportPhase === "preview" \|\| forecastImport
 assert.doesNotMatch(recordsPage, /Forecast CSV Export|exportForecastCsv|exportConsumptionForecastCsv/, "Forecast CSV entry point is absent from the UI");
 assert.match(recordsPage, /Forecast Export/, "Forecast export button omits file-format wording");
 assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Forecast export remains connected to XLSX");
-assert.match(recordsPage, /Import \$\{forecastFileName\}/, "Forecast Import names the current editable FY-quarter template without enforcing it as an upload restriction");
+assert.match(recordsPage, /Import an OCI Consumption Forecast CSV file\./, "Forecast Import tooltip describes the function instead of presenting the generated template name as the last imported file");
+assert.match(recordsPage, /Last Import file: \$\{importMetadata\.forecastSourceFileName \?\? "Not available"\}/, "Forecast Import keeps actual import metadata separate from the function description");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
