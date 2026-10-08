@@ -339,9 +339,15 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   const updateMatrixScrollState = () => {
     const viewport = matrixScrollRef.current;
     if (!viewport) return;
+    const matrix = viewport.querySelector<HTMLElement>(".forecast-actual-matrix");
+    // Sticky leading columns can inflate scrollWidth beyond the table's actual right edge.
+    // Clamp to the rendered table width so the final month ends at the viewport edge.
+    const contentWidth = matrix?.offsetWidth ?? viewport.scrollWidth;
+    const max = Math.max(0, Math.round(contentWidth - viewport.clientWidth));
+    if (viewport.scrollLeft > max) viewport.scrollLeft = max;
     setMatrixScrollState({
       left: Math.round(viewport.scrollLeft),
-      max: Math.max(0, Math.round(viewport.scrollWidth - viewport.clientWidth))
+      max
     });
     updateViewportControls();
   };
