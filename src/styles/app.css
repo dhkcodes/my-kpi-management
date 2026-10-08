@@ -5498,6 +5498,7 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-loading { align-items: center; background: var(--oj-core-bg-color-neutral); border: 1px solid var(--oj-core-divider-color); border-radius: .55rem; color: var(--oj-core-text-color-secondary); display: flex; min-height: 6rem; padding: 1rem; }
 .forecast-actual-value-badge { border: 1px solid currentColor; border-radius: 999px; display: inline-flex; font-size: .68rem; font-weight: 800; justify-content: center; line-height: 1; min-width: 2.75rem; padding: .3rem .5rem; }
 .forecast-actual-value-badge.is-pending { background: #fff7e8; color: #8a5700; }
+.forecast-actual-month-value.is-actual .forecast-actual-value-badge.is-pending { align-items: center; display: inline-grid; grid-template-rows: auto auto; row-gap: .05rem; }
 .forecast-actual-value-badge.is-na { background: #f1f3f5; color: #5f6873; }
 
 /* Forecast vs Actual quarter-result drilldown. */
