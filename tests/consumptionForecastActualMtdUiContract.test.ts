@@ -112,6 +112,8 @@ assert.doesNotMatch(fiscalYearMenuRules, /--oj-menu-item-(?:bg-color-hover|bg-co
 
 const totalValueRules = [...styles.matchAll(/\.forecast-actual-total-value\s*\{([^}]*)\}/gu)];
 const effectiveTotalValueRule = totalValueRules[totalValueRules.length - 1]?.[1] ?? "";
+assert.match(styles, /\.forecast-actual-total-strip\s*>\s*\.forecast-actual-total-value\s*\{[^}]*display:\s*inline-flex/iu,
+  "the inline layout must outrank the generic .forecast-actual-total-strip > span grid rule");
 assert.match(effectiveTotalValueRule, /display:\s*inline-flex/u,
   "the final Total Actual value rule keeps MTD horizontally inline");
 assert.match(effectiveTotalValueRule, /flex-wrap:\s*nowrap/u,
