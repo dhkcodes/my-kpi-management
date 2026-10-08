@@ -6551,8 +6551,6 @@ oj-menu-button.forecast-actual-fy-button[aria-expanded="true"] {
 }
 oj-menu.consumption-analysis-fy-menu {
   --oj-menu-item-text-color: #203f4e;
-  --oj-menu-item-bg-color-focus: #e4eef2;
-  --oj-menu-item-text-color-focus: #173f52;
   background: #edf4f6;
   border-color: #7f9aaa;
   color: #203f4e;
@@ -6779,9 +6777,9 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
 }
 
 /* Consumption design follow-up 4. */
-oj-menu.consumption-analysis-fy-menu {
-  --oj-menu-item-bg-color-focus: #0b607d;
-  --oj-menu-item-text-color-focus: #fff;
+oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
+  --oj-core-bg-color-hover: #0b607d;
+  --oj-menu-item-text-color: #fff;
 }
 .consumption-info-tooltip__trigger,
 .consumption-mtd-control > .consumption-info-tooltip .consumption-info-tooltip__trigger {
@@ -6808,9 +6806,12 @@ oj-menu.consumption-analysis-fy-menu {
 .forecast-actual-total-value {
   align-items: baseline;
   display: inline-flex;
+  flex-wrap: nowrap;
   gap: .3rem;
   justify-content: center;
   left: 50%;
+  max-width: calc(100% - 1rem);
+  min-width: 0;
   position: absolute;
   top: 52%;
   transform: translate(-50%, -50%);
