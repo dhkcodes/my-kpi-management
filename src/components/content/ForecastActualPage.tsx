@@ -108,8 +108,12 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
   const [accountComposing, setAccountComposing] = useState(false);
   const [accountOptionCache, setAccountOptionCache] = useState<string[]>([]);
   const [activeAccountIndex, setActiveAccountIndex] = useState(0);
+  const [matrixScrollState, setMatrixScrollState] = useState({ left: 0, max: 0 });
   const accountComboboxRef = useRef<HTMLDivElement>(null);
+  const pageScrollRef = useRef<HTMLDivElement>(null);
+  const matrixFrameRef = useRef<HTMLDivElement>(null);
   const matrixScrollRef = useRef<HTMLElement>(null);
+  const viewportControlsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSalesRep(""); setAccount(""); setAccountSearch(""); setAccountOptionCache([]); setResultFilter(null);
@@ -279,13 +283,71 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
       </oj-option>}
     </oj-menu>
   </oj-menu-button>;
+  const updateViewportControls = () => {
+    const root = pageScrollRef.current;
+    const frame = matrixFrameRef.current;
+    const controls = viewportControlsRef.current;
+    const viewport = matrixScrollRef.current;
+    if (!root || !frame || !controls || !viewport) return;
+
+    const rootRect = root.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const tableRect = viewport.getBoundingClientRect();
+    const rootTop = Math.max(0, rootRect.top);
+    const rootBottom = Math.min(window.innerHeight, rootRect.bottom);
+    const centerY = (rootTop + rootBottom) / 2;
+    const left = Math.max(rootRect.left, frameRect.left, 0);
+    const right = Math.min(rootRect.right, frameRect.right, window.innerWidth);
+    const centerX = left + Math.max(0, right - left) / 2;
+    const tableVisible = viewport.scrollWidth > viewport.clientWidth + 1
+      && rootBottom > rootTop
+      && tableRect.bottom > rootTop
+      && tableRect.top < rootBottom
+      && centerY >= tableRect.top
+      && centerY <= tableRect.bottom;
+
+    controls.dataset.visible = tableVisible ? "true" : "false";
+    controls.style.setProperty("--consumption-viewport-center-x", `${centerX}px`);
+    controls.style.setProperty("--consumption-viewport-center-y", `${centerY}px`);
+    controls.style.setProperty("--consumption-viewport-left", `${left}px`);
+    controls.style.setProperty("--consumption-viewport-right", `${right}px`);
+  };
+  const updateMatrixScrollState = () => {
+    const viewport = matrixScrollRef.current;
+    if (!viewport) return;
+    setMatrixScrollState({
+      left: Math.round(viewport.scrollLeft),
+      max: Math.max(0, Math.round(viewport.scrollWidth - viewport.clientWidth))
+    });
+    updateViewportControls();
+  };
   const scrollMatrix = (direction: -1 | 1) => {
     const viewport = matrixScrollRef.current;
     if (!viewport) return;
     viewport.scrollBy({ left: direction * Math.max(320, viewport.clientWidth * .78), behavior: "smooth" });
+    window.setTimeout(updateMatrixScrollState, 240);
   };
 
+  useEffect(() => {
+    const root = pageScrollRef.current;
+    const frame = matrixFrameRef.current;
+    const viewport = matrixScrollRef.current;
+    if (!root || !frame || !viewport) return undefined;
+    const update = () => window.requestAnimationFrame(updateMatrixScrollState);
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(root);
+    resizeObserver.observe(frame);
+    resizeObserver.observe(viewport);
+    window.addEventListener("resize", update);
+    update();
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [currentData, periods.length, rows.length]);
+
   return <PageShell className="consumption-insights-page forecast-actual-page" ariaLabelledBy="forecastActualTitle"
+    scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={updateViewportControls}
     breadcrumb={breadcrumb} title="Forecast vs Actual" titleControls={fiscalYearControl} headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
     filters={<PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
@@ -376,8 +438,8 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
         </div>
       </section>
 
-      <section class="forecast-actual-matrix-frame" aria-label="Forecast vs Actual monthly table">
-        <section class="forecast-actual-matrix-shell" ref={matrixScrollRef} tabIndex={0} aria-label="Scrollable monthly comparison table">
+      <section ref={matrixFrameRef} class="forecast-actual-matrix-frame" aria-label="Forecast vs Actual monthly table">
+        <section class="forecast-actual-matrix-shell" ref={matrixScrollRef} tabIndex={0} aria-label="Scrollable monthly comparison table" onScroll={updateMatrixScrollState}>
           <div class="forecast-actual-matrix-layout">
           <table class="forecast-actual-matrix">
             <thead>
@@ -408,18 +470,20 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                     const month = monthByPeriod(row, periodKey);
                     if (!month) return [
                       <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty" title="Forecast has not been entered.">No FCST</td>,
-                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual is not confirmed."><span class="forecast-actual-value-badge is-pending">Pending</span></td>,
+                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual data is not available for this month."><span class="forecast-actual-value-badge is-pending">Pending</span></td>,
                       <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty" title="Not comparable until both Forecast and Actual are available."><span class="forecast-actual-value-badge is-na">N/A</span></td>,
-                      <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual is not confirmed, so Forecast and Actual cannot be compared yet." data-tooltip="Actual is not confirmed, so Forecast and Actual cannot be compared yet." aria-label="Pending: Actual is not confirmed, so Forecast and Actual cannot be compared yet." tabIndex={0}>Pending</span></td>
+                      <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual data is not available for this month." data-tooltip="Actual data is not available for this month." aria-label="Pending: Actual data is not available for this month." tabIndex={0}>Pending</span></td>
                     ];
                     const assessment = assessForecastActualMonth(month);
                     const statusClass = assessment.kind === "FINAL_SHORTFALL" ? "is-shortfall" : assessment.kind === "MTD_SHORTFALL" ? "is-projection-watch" : assessment.kind === "NORMAL" ? "is-on-track" : "is-unavailable";
                     const differenceClass = assessment.differenceAmount === null ? "" : compareExactDecimals(assessment.differenceAmount, "0") < 0 ? "is-negative" : compareExactDecimals(assessment.differenceAmount, "0") > 0 ? "is-positive" : "";
-                    const statusTooltipText = statusTooltip(assessment.label, assessment.tooltip);
+                    const statusTooltipText = month.actualAmount === null
+                      ? "Actual data is not available for this month."
+                      : statusTooltip(assessment.label, assessment.tooltip);
                     const statusLabel = shortStatus(assessment.label);
                     return [
                       <td key={`${periodKey}-forecast`} class={`forecast-actual-month-value is-forecast ${month.forecastAmount === null ? "is-empty" : "forecast-actual-number"}`} title={month.forecastAmount === null ? "Forecast has not been entered." : "Forecast amount in K USD."}>{month.forecastAmount === null ? "No FCST" : formatAmount(month.forecastAmount)}</td>,
-                      <td key={`${periodKey}-actual`} class={`forecast-actual-month-value is-actual ${month.actualAmount === null ? "is-empty" : "forecast-actual-number"} ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualAmount === null ? "Actual is not confirmed." : month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? <span class="forecast-actual-value-badge is-pending">Pending</span> : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
+                      <td key={`${periodKey}-actual`} class={`forecast-actual-month-value is-actual ${month.actualAmount === null ? "is-empty" : "forecast-actual-number"} ${month.actualState === "MTD" ? "is-provisional" : ""}`} title={month.actualAmount === null ? "Actual data is not available for this month." : month.actualState === "MTD" ? "Cumulative MTD Actual; not final" : "Final Actual"}>{month.actualAmount === null ? <span class="forecast-actual-value-badge is-pending">Pending</span> : formatAmount(month.actualAmount)}{month.actualState === "MTD" && month.actualAmount !== null ? <small class="is-mtd-label">MTD</small> : null}</td>,
                       <td key={`${periodKey}-difference`} class={`forecast-actual-month-value is-difference ${assessment.differenceAmount === null ? "is-empty" : "forecast-actual-number"} ${differenceClass}`} title={assessment.tooltip}>{assessment.differenceAmount === null ? <span class="forecast-actual-value-badge is-na">N/A</span> : formatAmount(assessment.differenceAmount)}</td>,
                       <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class={`forecast-actual-status ${statusClass}`} title={statusTooltipText} data-tooltip={statusTooltipText} aria-label={`${statusLabel}: ${statusTooltipText}`} tabIndex={0}>{statusLabel}</span>{assessment.projectedAmount !== null ? <small>Month-end {formatAmount(assessment.projectedAmount)}</small> : null}</td>
                     ];
@@ -430,7 +494,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
             </tbody>
             <tfoot class="forecast-actual-monthly-totals">
               <tr>
-                <th colSpan={3}>Monthly Forecast total</th>
+                <th class="forecast-actual-total-label is-sticky is-account">Monthly Forecast total</th><td class="forecast-actual-total-label-spacer is-sticky is-rep" aria-hidden="true"></td><td class="forecast-actual-total-label-spacer is-sticky is-quarter-result" aria-hidden="true"></td>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-forecast-total`} class="forecast-actual-number is-forecast">{formatAmount(monthlyTotals[periodKey]?.forecast ?? null, "N/A")}</td>,
                   <td key={`${periodKey}-forecast-total-actual`} aria-hidden="true">—</td>,
@@ -439,7 +503,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 ])}
               </tr>
               <tr>
-                <th colSpan={3}>Monthly Actual total</th>
+                <th class="forecast-actual-total-label is-sticky is-account">Monthly Actual total</th><td class="forecast-actual-total-label-spacer is-sticky is-rep" aria-hidden="true"></td><td class="forecast-actual-total-label-spacer is-sticky is-quarter-result" aria-hidden="true"></td>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-actual-total-forecast`} aria-hidden="true">—</td>,
                   <td key={`${periodKey}-actual-total`} class="forecast-actual-number is-actual">{formatAmount(monthlyTotals[periodKey]?.actual ?? null, "N/A")}</td>,
@@ -448,7 +512,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 ])}
               </tr>
               <tr class="is-shortfall">
-                <th colSpan={3}>Difference · Shortfall total</th>
+                <th class="forecast-actual-total-label is-sticky is-account">Difference · Shortfall total</th><td class="forecast-actual-total-label-spacer is-sticky is-rep" aria-hidden="true"></td><td class="forecast-actual-total-label-spacer is-sticky is-quarter-result" aria-hidden="true"></td>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-shortfall-forecast`} aria-hidden="true">—</td>,
                   <td key={`${periodKey}-shortfall-actual`} aria-hidden="true">—</td>,
@@ -457,7 +521,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                 ])}
               </tr>
               <tr class="is-exceeded">
-                <th colSpan={3}>Difference · Exceeded total</th>
+                <th class="forecast-actual-total-label is-sticky is-account">Difference · Exceeded total</th><td class="forecast-actual-total-label-spacer is-sticky is-rep" aria-hidden="true"></td><td class="forecast-actual-total-label-spacer is-sticky is-quarter-result" aria-hidden="true"></td>
                 {periods.flatMap((periodKey) => [
                   <td key={`${periodKey}-exceeded-forecast`} aria-hidden="true">—</td>,
                   <td key={`${periodKey}-exceeded-actual`} aria-hidden="true">—</td>,
@@ -469,9 +533,11 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
           </table>
           </div>
         </section>
-        <div class="forecast-actual-scroll-controls" aria-label="Scroll monthly table">
-          <button type="button" aria-label="Scroll table left" title="Scroll table left" onClick={() => scrollMatrix(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>
-          <button type="button" aria-label="Scroll table right" title="Scroll table right" onClick={() => scrollMatrix(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
+        <div ref={viewportControlsRef} class="consumption-viewport-controls forecast-actual-viewport-controls" data-visible="false">
+          <div class="consumption-scroll-controls" aria-label="Scroll monthly table">
+            <button type="button" aria-label="Scroll table left" title="Scroll table left" disabled={matrixScrollState.left <= 1} onClick={() => scrollMatrix(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>
+            <button type="button" aria-label="Scroll table right" title="Scroll table right" disabled={matrixScrollState.left >= matrixScrollState.max - 1} onClick={() => scrollMatrix(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
+          </div>
         </div>
       </section>
     </div>}

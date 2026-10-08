@@ -343,7 +343,7 @@ export function Content({
 }: Props) {
   const showHome = isHomeRoute(activeRoute);
   const canWrite = canWriteRoute(profile, activeRoute);
-  const canWriteForecast = canWriteRoute(profile, getNavigationRoute("records"));
+  const canWriteForecast = canWriteRoute(profile, getNavigationRoute("attainment"));
   const canReadHomeAccounts = canAccessRoute(profile, getNavigationRoute("accounts-workloads"));
   const canReadHomeKpis = canAccessRoute(profile, getNavigationRoute("kpis-overview"));
   const canReadHomeConsumption = canAccessRoute(profile, getNavigationRoute("analysis"));
