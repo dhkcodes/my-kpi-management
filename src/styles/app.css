@@ -6775,5 +6775,77 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
     flex-basis: 100%; max-width: 100%; min-width: 0; width: 100%;
   }
   .forecast-actual-overview { grid-template-columns: minmax(0, 1fr); }
-  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(6rem, auto); }
+  .forecast-actual-total-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(4.5rem, auto); }
 }
+
+/* Consumption design follow-up 4. */
+oj-menu.consumption-analysis-fy-menu {
+  --oj-menu-item-bg-color-focus: #0b607d;
+  --oj-menu-item-text-color-focus: #fff;
+}
+.consumption-info-tooltip__trigger,
+.consumption-mtd-control > .consumption-info-tooltip .consumption-info-tooltip__trigger {
+  font-size: .46rem;
+  height: .60rem;
+  line-height: .60rem;
+  width: .60rem;
+}
+.consumption-mtd-control > .consumption-info-tooltip,
+.consumption-info-tooltip { margin-top: .10rem; }
+
+/* Filter refreshes keep the existing result surface mounted and compact. */
+.kap-page-shell.forecast-actual-page .kap-page-shell__body,
+.kap-page-shell.forecast-actual-page .forecast-actual-results {
+  align-content: start;
+  align-self: start;
+  flex: 0 0 auto;
+  min-height: 0;
+  width: 100%;
+}
+.forecast-actual-overview { align-items: start; }
+.forecast-actual-total-strip { grid-template-rows: repeat(2, minmax(3.75rem, auto)); }
+.forecast-actual-total-strip > span { padding: .35rem .5rem; }
+.forecast-actual-total-value {
+  align-items: baseline;
+  display: inline-flex;
+  gap: .3rem;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+.forecast-actual-total-value > strong,
+.forecast-actual-total-card--forecast > strong {
+  font-size: .95rem;
+}
+.forecast-actual-total-value > strong {
+  left: auto;
+  position: static;
+  top: auto;
+  transform: none;
+}
+.forecast-actual-total-strip .forecast-actual-total-value .forecast-actual-total-mtd {
+  bottom: auto;
+  font-size: .55rem;
+  left: auto;
+  position: static;
+  transform: none;
+}
+.forecast-actual-quarter-cards article { gap: .3rem; padding: .42rem; }
+.forecast-actual-quarter-actions button strong { font-size: .92rem; }
+.forecast-actual-matrix .forecast-actual-status {
+  line-height: 1.05;
+  max-width: 5.4rem;
+  overflow-wrap: normal;
+  white-space: normal;
+}
+.forecast-actual-value-badge.is-no-forecast {
+  background: #eef3f5;
+  color: #315b6e;
+}
+.forecast-actual-monthly-totals td.forecast-actual-number { text-align: right; }
+.forecast-actual-monthly-totals td:has(.forecast-actual-value-badge) { text-align: center; }
+.consumption-records-toolbar__left { align-items: center; display: inline-flex; flex-wrap: wrap; gap: .45rem; }
+.consumption-records-toolbar__left .consumption-records-count-summary { padding: 0; text-align: left; }

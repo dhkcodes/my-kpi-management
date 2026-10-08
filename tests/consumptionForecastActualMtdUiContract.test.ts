@@ -35,8 +35,10 @@ assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/mo
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
 assert.match(page, /const formatAmount = \(value: string \| null, unavailable = "Unconfirmed"\) => value === null \? unavailable : formatExactKFixed\(value, 2\)/u,
   "amount formatter retains the K unit");
-assert.match(page, /Total Actual<\/small><strong>\{formatAmount\(selectedTotalActual, "N\/A"\)\}<\/strong>/u,
-  "the redundant K USD label and duplicate K suffix are removed");
+assert.match(page, /Total Actual<\/small><span class="forecast-actual-total-value"><strong>\{formatAmount\(selectedTotalActual, "N\/A"\)\}<\/strong>/u,
+  "the redundant K USD label and duplicate K suffix are removed while MTD stays inline with Total Actual");
+assert.doesNotMatch(page, /<small>K USD<\/small>/u,
+  "quarter cards do not render the redundant K USD caption");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
 for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");

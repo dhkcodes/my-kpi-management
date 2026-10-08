@@ -1751,7 +1751,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : "Import an OCI Consumption Forecast CSV file."}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
   const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nLast Import file: ${importMetadata.actualSourceFileName ?? "Not available"}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
@@ -2067,6 +2067,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               <ConsumptionMtdControl checked={showMtd} disabled={dataMode !== "backend" || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
                 onToggle={() => setShowMtd((current) => !current)} tooltipId="records-show-mtd-tooltip" />
+              {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
+                <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
+              </div>}
             </div>
             <div class="consumption-records-toolbar-activity">
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
@@ -2096,9 +2099,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
             </div>
           ) : <>
-        {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
-          <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
-        </div>}
         <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
