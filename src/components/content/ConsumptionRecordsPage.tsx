@@ -2,7 +2,7 @@ import { ComponentChildren, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FiscalYear } from "../../data/kpiMockData";
-import { formatMtdAppliedDate } from "../../data/mtdDate";
+
 import {
   ConsumptionPlan,
   ConsumptionPillar,
@@ -68,6 +68,7 @@ import {
   saveConsumptionForecasts
 } from "../../data/consumptionApi";
 import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
+import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
@@ -177,6 +178,8 @@ const ForecastCompositionTooltip = ({ composition, children }: Readonly<{
   composition: ConsumptionAccountForecast;
   children: ComponentChildren;
 }>) => {
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const [position, setPosition] = useState<ConsumptionTooltipPosition | null>(null);
   if (composition.compositionStatus === "UNCLASSIFIED") return <>{children}</>;
   const unavailable = forecastCompositionUnavailable(composition);
   const accessibleText = unavailable ?? [
@@ -186,17 +189,31 @@ const ForecastCompositionTooltip = ({ composition, children }: Readonly<{
     `Reduction ${composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmountExact === null ? "N/A" : exactCurrency(composition.reductionAmountExact)} (previous Total minus current Total, floored at zero)`,
     `Previous source ${composition.previousSource}${composition.previousAmountExact === null ? "" : ` ${exactCurrency(composition.previousAmountExact)}`}`
   ].join("; ");
-  return <span class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}>
+  const showTooltip = () => {
+    const element = triggerRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const maxWidth = Math.max(240, Math.min(352, window.innerWidth - 16));
+    const left = Math.min(Math.max(8, rect.left + rect.width / 2 - maxWidth / 2), Math.max(8, window.innerWidth - maxWidth - 8));
+    setPosition(rect.bottom + 230 < window.innerHeight
+      ? { left, top: rect.bottom + 8, maxWidth }
+      : { left, bottom: window.innerHeight - rect.top + 8, maxWidth });
+  };
+  const tooltipContent = <>{unavailable ? <>{unavailable}</> : <dl>
+    <div><dt>Total</dt><dd>{exactCurrency(composition.totalAmountExact)}</dd></div>
+    <div><dt>New</dt><dd>{composition.newAmountExact === null ? "N/A" : exactCurrency(composition.newAmountExact)}</dd></div>
+    <div><dt>Expansion</dt><dd>{composition.expansionAmountExact === null ? "N/A" : exactCurrency(composition.expansionAmountExact)}</dd></div>
+    <div><dt>Reduction</dt><dd>{composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmountExact === null ? "N/A" : exactCurrency(composition.reductionAmountExact)}<small>Previous Total − current Total, minimum 0</small></dd></div>
+    <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmountExact === null ? "" : ` · ${exactCurrency(composition.previousAmountExact)}`}</dd></div>
+  </dl>}</>;
+  return <span ref={triggerRef} class="consumption-forecast-tooltip" tabIndex={0} aria-label={accessibleText}
+    onMouseEnter={showTooltip} onMouseLeave={() => setPosition(null)} onFocus={showTooltip} onBlur={() => setPosition(null)}>
     {children}
-    <span class="consumption-forecast-tooltip__content" role="tooltip">
-      {unavailable ? <>{unavailable}</> : <dl>
-        <div><dt>Total</dt><dd>{exactCurrency(composition.totalAmountExact)}</dd></div>
-        <div><dt>New</dt><dd>{composition.newAmountExact === null ? "N/A" : exactCurrency(composition.newAmountExact)}</dd></div>
-        <div><dt>Expansion</dt><dd>{composition.expansionAmountExact === null ? "N/A" : exactCurrency(composition.expansionAmountExact)}</dd></div>
-        <div><dt>Reduction</dt><dd>{composition.reductionStatus === "UNAVAILABLE_PREVIOUS_PERIOD" ? "비교 기준 없음" : composition.reductionAmountExact === null ? "N/A" : exactCurrency(composition.reductionAmountExact)}<small>Previous Total − current Total, minimum 0</small></dd></div>
-        <div><dt>Previous source</dt><dd>{composition.previousSource}{composition.previousAmountExact === null ? "" : ` · ${exactCurrency(composition.previousAmountExact)}`}</dd></div>
-      </dl>}
-    </span>
+    {position && createPortal(<span class="consumption-forecast-tooltip__content is-portal" role="tooltip"
+      style={{ left: `${position.left}px`, top: position.top === undefined ? undefined : `${position.top}px`,
+        bottom: position.bottom === undefined ? undefined : `${position.bottom}px`, maxWidth: `${position.maxWidth}px` }}>
+      {tooltipContent}
+    </span>, document.body)}
   </span>;
 };
 const toApiControlTotals = (controls: readonly { customer: string; values: Readonly<Record<string, number>> }[]): ConsumptionApiControlTotal[] =>
@@ -820,7 +837,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
-  const currentMtdAppliedDate = formatMtdAppliedDate(currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null);
   const forecastImportedDate = formatKstImportDate(importMetadata.forecastImportedAt);
   const actualImportedDate = formatKstImportDate(importMetadata.actualImportedAt);
   const staleMtdPeriods = Object.keys(serverMtdStatuses).filter((period) => serverMtdStatuses[period] === "FINAL_UPLOAD_REQUIRED");
@@ -1712,6 +1728,16 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`}\nImported on ${forecastImportedDate ?? "Not available"}`;
+  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nImported on ${actualImportedDate ?? "Not available"}`;
+
+  if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
+    ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
+    breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
+    busy busyLabel="Loading Consumption Records" activityPosition="custom">
+    <PageDataProgress busy busyLabel="Loading Consumption Records" />
+  </PageShell>;
+
   return (
     <PageShell className="consumption-page" ariaLabelledBy="consumptionTitle"
       rootAttributes={{ "data-fiscal-year": fiscalYear }}
@@ -1724,7 +1750,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             disabled={importActionsDisabled} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={forecastImportActionsDisabled} onChange={(event) => void handleForecastWorkbookFile(event)} />
-          <oj-button class="oj-button-sm" chroming="outlined" title={!canWriteForecast ? "Forecast write permission is required." : `Import ${forecastFileName}`} disabled={forecastImportActionsDisabled} onojAction={() => forecastFileInputRef.current?.click()}>
+          <oj-button class="oj-button-sm" chroming="outlined" title={forecastImportTooltip} disabled={forecastImportActionsDisabled} onojAction={() => forecastFileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Forecast Import
           </oj-button>
@@ -1734,7 +1760,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
             <span slot="startIcon" class="oj-ux-ico-download"></span>
             {isExporting ? "Exporting…" : "Forecast Export"}
           </oj-button>
-          <oj-button class="oj-button-sm" chroming="outlined" title={!canWrite ? "Write permission is required." : undefined} disabled={importActionsDisabled} onojAction={() => fileInputRef.current?.click()}>
+          <oj-button class="oj-button-sm" chroming="outlined" title={actualImportTooltip} disabled={importActionsDisabled} onojAction={() => fileInputRef.current?.click()}>
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
@@ -2015,23 +2041,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
         <div class="consumption-section-heading consumption-table-heading">
           <div class="consumption-records-toolbar" role="toolbar" aria-label="Consumption Records data controls">
             <div class="consumption-records-toolbar__left">
-              <span class="consumption-mtd-control consumption-info-tooltip">
-              <button type="button" role="switch" aria-label="Show MTD" aria-describedby="recordsShowMtdTooltip" aria-checked={showMtd} class="consumption-mtd-switch"
-                disabled={dataMode !== "backend" || !currentMtdPeriod}
-                onClick={() => setShowMtd((current) => !current)}>
-                <span class="consumption-mtd-switch__label">Show MTD<sup aria-hidden="true">!</sup></span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-              </button>
-              <span id="recordsShowMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
-              </span>
-              {showMtd && currentMtdAppliedDate
-                ? <small class="consumption-mtd-applied-date">Updated on {currentMtdAppliedDate}</small> : null}
+              <ConsumptionMtdControl checked={showMtd} disabled={dataMode !== "backend" || !currentMtdPeriod}
+                mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
+                onToggle={() => setShowMtd((current) => !current)} tooltipId="records-show-mtd-tooltip" />
             </div>
             <div class="consumption-records-toolbar-activity">
-              <span class="consumption-import-dates" aria-label="Latest successful import dates">
-                <span>Forecast Imported on {forecastImportedDate ?? "Not available"}</span>
-                <span aria-hidden="true">|</span>
-                <span>Actual Imported on {actualImportedDate ?? "Not available"}</span>
-              </span>
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
                 refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false}
                 compactTimestampButton />

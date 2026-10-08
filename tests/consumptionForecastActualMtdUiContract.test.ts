@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const page = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
 const analysis = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
+const mtdControl = readFileSync("src/components/content/ConsumptionMtdControl.tsx", "utf8");
 const api = readFileSync("src/data/consumptionApi.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
@@ -11,14 +12,20 @@ assert.match(page, /<PageShell[\s\S]*className="consumption-insights-page foreca
 assert.match(page, /PageFilterPanel/u);
 assert.match(page, /PageActivity/u);
 assert.match(page, /PageDataProgress/u);
-assert.match(page, /role="switch"/u);
-assert.match(page, /aria-checked=\{actualMode === "MTD"\}/u);
+assert.match(mtdControl, /role="switch"/u);
+assert.match(mtdControl, /aria-checked=\{checked\}/u);
+assert.match(mtdControl, /disabled=\{disabled\}/u);
+assert.match(mtdControl, /onClick=\{onToggle\}/u);
+assert.equal((mtdControl.match(/role="switch"/gu) ?? []).length, 1);
+assert.match(page, /checked=\{actualMode === "MTD"\}/u);
 assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\}/u);
-assert.match(page, /setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\)/u);
-assert.equal((page.match(/role="switch"/gu) ?? []).length, 1);
+assert.match(page, /mtdAppliedDate=\{mtdAppliedDate\}/u);
+assert.match(page, /onToggle=\{\(\) => \{ setResultFilter\(null\); setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\); \}\}/u);
 assert.match(page, /consumption-pillar-selector[^]*aria-pressed/u, "Pillar uses the same button selector as Consumption Analysis");
-assert.match(page, /role="switch"[^]*displayedActualMode === "MTD" && mtdAppliedDate[^]*consumption-mtd-applied-date[^]*Updated on \{mtdAppliedDate\}/u,
-  "MTD applied date uses the shared Updated on label and stays with the switch");
+assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[^]*Updated on \{updatedOn\}/u,
+  "the shared MTD tooltip derives its Updated on date from the real period metadata");
+assert.match(mtdControl, /aria-describedby=\{tooltipId\}[^]*consumption-info-tooltip__content/u,
+  "only the dedicated information trigger owns the shared MTD tooltip");
 
 assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPeriods \?\? \[\], currentData\?\.rows \?\? \[\]\)/u,
   "months stop at the latest period that has a real Forecast value within the selected scope");
@@ -77,20 +84,21 @@ for (const column of ["is-forecast", "is-actual", "is-difference"]) {
 }
 assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*showBusyLabel=\{false\}[^]*compactTimestampButton/u,
   "Reload and completion time use the same compact table-toolbar activity treatment as Consumption Records");
-assert.match(styles, /--forecast-rep-width:\s*7rem[^}]*--forecast-month-width:\s*5\.5rem/u,
+assert.match(styles, /--forecast-rep-width:\s*7rem/u);
+assert.match(styles, /--forecast-month-width:\s*5\.6rem/u,
   "wide Forecast vs Actual columns are compacted without collapsing content");
 assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*min-width:\s*var\(--forecast-rep-width\)[^}]*width:\s*var\(--forecast-rep-width\)/u,
   "the compact Sales Rep width is applied to the matrix cells");
 assert.match(styles, /\.forecast-actual-matrix \.forecast-actual-period-group[^}]*var\(--forecast-month-width\)[^}]*var\(--forecast-status-width\)/u,
   "period groups consume all compacted leaf-column widths");
-assert.match(page, /forecast-actual-data-toolbar[^]*Show MTD[^]*forecastShowMtdTooltip/u,
-  "Show MTD uses the shared Consumption label and keeps its date and toggle row");
+assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*tooltipId="forecast-show-mtd-tooltip"/u,
+  "Forecast vs Actual wires the shared Show MTD control into its data toolbar");
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);
 assert.match(analysis, /Open Forecast selection excludes FINAL periods\. Forecast for an included MTD period remains shown\. Total removes overlapping Forecast once and uses MTD instead\./u);
-assert.match(analysis, /Updated on \{mtdAppliedDate\}<\/time>/u);
+assert.match(analysis, /<ConsumptionMtdControl[^]*mtdAppliedDate=\{mtdAppliedTimestamp\}/u);
 
 console.log("forecast actual MTD UI contract tests passed");

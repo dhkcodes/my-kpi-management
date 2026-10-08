@@ -5462,17 +5462,25 @@ h4.weekly-activity-section-label--next-week,
 .forecast-actual-mtd-row .consumption-mtd-applied-date { white-space: nowrap; }
 .forecast-actual-summary article { overflow: visible; }
 .forecast-actual-matrix-shell { --forecast-rep-width: 7rem; --forecast-month-width: 5.5rem; --forecast-difference-width: 6.25rem; --forecast-status-width: 6.5rem; }
+.forecast-actual-matrix th,
+.forecast-actual-matrix td { width: auto; }
+.forecast-actual-matrix col.forecast-actual-col-account { width: 10.5rem; }
+.forecast-actual-matrix col.forecast-actual-col-rep { width: var(--forecast-rep-width); }
+.forecast-actual-matrix col.forecast-actual-col-result { width: 7rem; }
+.forecast-actual-matrix col.forecast-actual-col-month { width: var(--forecast-month-width); }
+.forecast-actual-matrix col.forecast-actual-col-difference { width: var(--forecast-difference-width); }
+.forecast-actual-matrix col.forecast-actual-col-status { width: var(--forecast-status-width); }
 .forecast-actual-matrix .is-rep { min-width: var(--forecast-rep-width); text-align: center; width: var(--forecast-rep-width); }
 .forecast-actual-matrix .forecast-actual-period-group {
   min-width: calc((2 * var(--forecast-month-width)) + var(--forecast-difference-width) + var(--forecast-status-width));
   width: calc((2 * var(--forecast-month-width)) + var(--forecast-difference-width) + var(--forecast-status-width));
 }
 .forecast-actual-matrix .forecast-actual-month-subhead,
-.forecast-actual-matrix .forecast-actual-month-value { min-width: var(--forecast-month-width); width: var(--forecast-month-width); }
+.forecast-actual-matrix .forecast-actual-month-value { max-width: var(--forecast-month-width); min-width: var(--forecast-month-width); width: var(--forecast-month-width); }
 .forecast-actual-matrix .forecast-actual-month-subhead.is-difference,
-.forecast-actual-matrix .forecast-actual-month-value.is-difference { min-width: var(--forecast-difference-width); width: var(--forecast-difference-width); }
+.forecast-actual-matrix .forecast-actual-month-value.is-difference { max-width: var(--forecast-difference-width); min-width: var(--forecast-difference-width); width: var(--forecast-difference-width); }
 .forecast-actual-matrix .forecast-actual-month-subhead.is-status,
-.forecast-actual-matrix .forecast-actual-month-value.is-status { min-width: var(--forecast-status-width); width: var(--forecast-status-width); }
+.forecast-actual-matrix .forecast-actual-month-value.is-status { max-width: var(--forecast-status-width); min-width: var(--forecast-status-width); width: var(--forecast-status-width); }
 .forecast-actual-month-value.is-forecast,
 .forecast-actual-month-value.is-actual,
 .forecast-actual-month-value.is-difference { text-align: right; }
@@ -6169,8 +6177,8 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: hidden; overflow-y: auto; }
 .kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 0; width: 100%; }
-.forecast-actual-overview { align-items: stretch; display: grid; gap: .55rem; grid-template-columns: 8.75rem minmax(0, 1fr); }
-.forecast-actual-total-strip { align-content: stretch; display: grid; flex: none; gap: .4rem; grid-template-columns: 1fr; width: auto; }
+.forecast-actual-overview { align-items: stretch; display: grid; gap: .55rem; grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr); }
+.forecast-actual-total-strip { align-content: stretch; display: grid; flex: none; gap: .4rem; grid-template-columns: repeat(2, minmax(0, 1fr)); width: auto; }
 .forecast-actual-total-strip > span { min-height: 0; padding: .45rem .55rem; }
 .forecast-actual-quarter-cards { min-width: 0; }
 .forecast-actual-matrix-frame { border: 1px solid var(--oj-core-divider-color); border-radius: .4rem; min-width: 0; overflow: hidden; position: relative; }
@@ -6479,4 +6487,158 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
 @media (max-width: 760px) {
   .consumption-records-toolbar-activity { align-items: flex-end; flex-basis: 100%; flex-wrap: wrap; }
   .consumption-import-dates { flex: 1 1 100%; justify-content: flex-start; margin: 0; }
+}
+
+/* Consumption design follow-up 3: shared controls and table readability. */
+.consumption-mtd-control { align-items: center; gap: .18rem; }
+.consumption-mtd-switch { min-inline-size: 6.8rem; }
+.consumption-info-tooltip__trigger {
+  border: 1px solid #2f6f95;
+  border-radius: 50%;
+  color: #2f6f95;
+  font: 800 .68rem/1 Arial, sans-serif;
+  height: 1rem;
+  width: 1rem;
+}
+.consumption-info-tooltip__meta {
+  border-top: 1px solid rgb(255 255 255 / 24%);
+  display: block;
+  margin-top: .35rem;
+  padding-top: .35rem;
+}
+/* The tooltip belongs to the info icon only, not the Show MTD switch. */
+.consumption-mtd-control:hover .consumption-info-tooltip__content,
+.consumption-mtd-control:focus-within .consumption-info-tooltip__content {
+  opacity: 0;
+  transform: none;
+  visibility: hidden;
+}
+.consumption-info-tooltip:hover .consumption-info-tooltip__content,
+.consumption-info-tooltip:focus-within .consumption-info-tooltip__content {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+.consumption-info-tooltip__content {
+  /* The control sits near the left edge on all three pages. Anchor the
+     popover's left edge to the icon so its max-width cannot escape the
+     viewport on desktop or mobile. */
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
+/* A darker Redwood-compatible fiscal-year control with a matching menu host. */
+oj-menu-button.consumption-analysis-fy-button,
+oj-menu-button.forecast-actual-fy-button {
+  --oj-button-outlined-chrome-bg-color: #315b6e;
+  --oj-button-outlined-chrome-border-color: #315b6e;
+  --oj-button-outlined-chrome-text-color: #fff;
+  --oj-button-outlined-chrome-bg-color-hover: #244b5e;
+  --oj-button-outlined-chrome-border-color-hover: #244b5e;
+  --oj-button-outlined-chrome-text-color-hover: #fff;
+  --oj-button-outlined-chrome-bg-color-active: #173f52;
+  --oj-button-outlined-chrome-border-color-active: #173f52;
+  --oj-button-outlined-chrome-text-color-active: #fff;
+  background: #315b6e;
+  color: #fff;
+}
+oj-menu-button.consumption-analysis-fy-button:hover,
+oj-menu-button.forecast-actual-fy-button:hover,
+oj-menu-button.consumption-analysis-fy-button[aria-expanded="true"],
+oj-menu-button.forecast-actual-fy-button[aria-expanded="true"] {
+  background: #244b5e;
+  color: #fff;
+}
+oj-menu.consumption-analysis-fy-menu {
+  --oj-menu-item-text-color: #203f4e;
+  --oj-menu-item-bg-color-focus: #e4eef2;
+  --oj-menu-item-text-color-focus: #173f52;
+  background: #edf4f6;
+  border-color: #7f9aaa;
+  color: #203f4e;
+}
+
+/* Keep the three account selectors aligned and wide enough for the reference account. */
+.kap-page-shell.consumption-page .consumption-record-search,
+.kap-page-shell.consumption-insights-page .consumption-insights-filter--account,
+.kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
+  box-sizing: border-box;
+  flex: 1 1 24rem;
+  max-width: 32rem;
+  min-width: min(24rem, 100%);
+  width: min(32rem, 100%);
+}
+.kap-page-shell.consumption-page .consumption-record-search input,
+.kap-page-shell.forecast-actual-page .forecast-actual-account-search,
+.kap-page-shell.forecast-actual-page .forecast-actual-account-search input {
+  min-width: 0;
+  width: 100%;
+}
+
+.forecast-actual-total-strip small {
+  font-size: .72rem;
+  font-weight: 800;
+}
+.forecast-actual-total-strip strong {
+  color: #0b607d;
+  font-size: 1rem;
+  font-weight: 800;
+}
+.forecast-actual-total-strip .forecast-actual-total-mtd {
+  color: var(--oj-core-text-color-secondary);
+  display: block;
+  font-size: .64rem;
+  font-style: normal;
+  grid-column: 1 / -1;
+}
+.forecast-actual-matrix thead th { font-size: .78rem; }
+.forecast-actual-matrix .forecast-actual-group-header th { font-size: .8rem; }
+.forecast-actual-matrix .forecast-actual-subheader th { font-size: .76rem; }
+.forecast-actual-control { font-size: .72rem; line-height: 1.25; }
+.forecast-actual-matrix-shell {
+  --forecast-month-width: 5.6rem;
+  --forecast-difference-width: 6.6rem;
+  --forecast-status-width: 6.2rem;
+}
+.forecast-actual-monthly-totals tr.is-forecast-row > *,
+.forecast-actual-monthly-totals tr.is-forecast-row .forecast-actual-total-label { background: #edf7f9; }
+.forecast-actual-monthly-totals tr.is-actual-row > *,
+.forecast-actual-monthly-totals tr.is-actual-row .forecast-actual-total-label { background: #fff3f1; }
+.forecast-actual-monthly-totals tr.is-shortfall-row > *,
+.forecast-actual-monthly-totals tr.is-shortfall-row .forecast-actual-total-label { background: #f1f4f7; }
+.forecast-actual-monthly-totals tr.is-exceeded-row > *,
+.forecast-actual-monthly-totals tr.is-exceeded-row .forecast-actual-total-label { background: #eef7f2; }
+.forecast-actual-monthly-totals .forecast-actual-total-label {
+  box-shadow: 2px 0 4px rgb(22 43 66 / 9%);
+  left: 0;
+  z-index: 12;
+}
+
+/* Forecast composition popup is portalled to body and positioned against the viewport. */
+.consumption-forecast-tooltip__content.is-portal {
+  bottom: auto;
+  display: block;
+  inset: auto;
+  max-height: calc(100vh - 1rem);
+  overflow: auto;
+  position: fixed;
+  transform: none;
+  width: min(22rem, calc(100vw - 1rem));
+  z-index: 1000;
+}
+
+@media (max-width: 760px) {
+  .kap-page-shell.consumption-page .consumption-record-search,
+  .kap-page-shell.consumption-insights-page .consumption-insights-filter--account,
+  .kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
+    flex-basis: 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .consumption-info-tooltip__content {
+    max-width: calc(100vw - 1rem);
+    right: -.25rem;
+  }
 }

@@ -19,6 +19,7 @@ const pageShell = readFileSync("src/components/common/PageShell.tsx", "utf8");
 const doubleActivation = readFileSync("src/components/common/doubleActivation.ts", "utf8");
 const appBusyOverlay = readFileSync("src/components/AppBusyOverlay.tsx", "utf8");
 const app = readFileSync("src/components/app.tsx", "utf8");
+const mtdControl = readFileSync("src/components/content/ConsumptionMtdControl.tsx", "utf8");
 
 assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
 assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
@@ -114,8 +115,12 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
 
-assert.match(insightsPage, /<oj-menu-button[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}[\s\S]*<oj-menu slot="menu"[\s\S]*onojMenuAction=\{handleFiscalYearMenuAction\}[\s\S]*titleControls=\{fiscalYearControl\}/u,
-  "Analysis renders the official Oracle JET outlined menu button beside the title");
+assert.match(insightsPage, /<oj-menu-button[^>]*class="consumption-analysis-fy-button[^"]*"[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}/u,
+  "Analysis renders the official Oracle JET menu button with the app-owned Redwood FY class");
+assert.match(insightsPage, /<oj-menu[^>]*slot="menu"[^>]*onojMenuAction=\{handleFiscalYearMenuAction\}/u,
+  "Analysis keeps FY selection on the Oracle JET menu action contract");
+assert.match(insightsPage, /titleControls=\{fiscalYearControl\}/u,
+  "Analysis places the FY control beside the page title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
 
@@ -132,10 +137,12 @@ assert.match(styles, /@media \(max-height:\s*520px\)[\s\S]*\.kap-page-shell__hea
 
 assert.match(mtdDate, /toISOString\(\)\.slice\(0, 10\)/,
   "all Consumption screens derive the displayed MTD date from the same UTC timestamp basis");
-assert.match(recordsPage, /formatMtdAppliedDate\(currentMtdPeriod[^\n]+[\s\S]*Updated on \{currentMtdAppliedDate\}/u,
-  "Records shows one compact UTC-basis Updated on date beside the switch");
-assert.match(insightsPage, /role="switch" aria-label="Show MTD"[\s\S]*\{includeMtd && mtdAppliedDate \? <time class="consumption-mtd-applied-date"[\s\S]*>Updated on \{mtdAppliedDate\}<\/time> : null\}[\s\S]*PageActivity/u,
-  "Analysis shows the import batch update date as Updated on YYYY-MM-DD only while Show MTD is enabled");
+assert.match(recordsPage, /<ConsumptionMtdControl[^]*mtdAppliedDate=\{currentMtdPeriod \? serverMtdAsOfByPeriod\[currentMtdPeriod\] : null\}/u,
+  "Records passes the real MTD metadata timestamp to the shared control");
+assert.match(insightsPage, /<ConsumptionMtdControl[^]*mtdAppliedDate=\{mtdAppliedTimestamp\}/u,
+  "Analysis passes its real MTD metadata timestamp to the shared control");
+assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[\s\S]*Updated on \{updatedOn\}/u,
+  "the shared tooltip formats one UTC-basis Updated on date from metadata");
 assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
   "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
 assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
@@ -176,14 +183,16 @@ assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*text-transform:\s*n
   "Analysis Pillar label retains natural capitalization");
 assert.match(styles, /\.consumption-insights-filter\s*\{[^}]*text-transform:\s*none;/s,
   "Analysis Sales Rep and Account labels retain natural capitalization");
-assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar \.consumption-mtd-applied-date\s*\{[^}]*font-size:\s*\.78rem;[^}]*font-weight:\s*600;[^}]*line-height:\s*1;/s,
-  "Analysis update timestamp matches the Reload auxiliary text size, weight, and line height");
+assert.match(styles, /\.consumption-info-tooltip__meta\s*\{[^}]*border-top:[^}]*display:\s*block;[^}]*margin-top:/s,
+  "the shared tooltip gives the real metadata date a distinct final line");
 assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__refresh\s*\{[^}]*font-size:\s*\.78rem;/,
   "the compact Reload control retains the same .78rem font-size reference");
 assert.doesNotMatch(insightsPage, /MTD period \{mtdPeriodLabel\} · as of \{mtdAppliedDate\}/u,
   "Analysis no longer displays the redundant MTD period prefix");
-assert.match(forecastActualPage, /Updated on \{mtdAppliedDate\}/u,
-  "Forecast vs Actual shows the same compact English applied date beside the switch without repeating MTD");
+assert.match(forecastActualPage, /const mtdAppliedDate = useMemo\([\s\S]*month\.actualState === "MTD" && month\.actualAsOf/u,
+  "Forecast vs Actual derives its displayed date from real selected MTD row metadata");
+assert.match(forecastActualPage, /<ConsumptionMtdControl[^]*mtdAppliedDate=\{mtdAppliedDate\}/u,
+  "Forecast vs Actual passes the real MTD timestamp metadata to the shared tooltip");
 assert.doesNotMatch(forecastActualPage, /MTD 반영 일자|반영 일자/u);
 assert.doesNotMatch(recordsPage, /MTD 수집 시각|MTD 입력 기준일/u,
   "Records numeric cells contain numbers only");
@@ -207,7 +216,7 @@ assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
 assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD and includes finalized Actual\. This is not the chart composition share\."/,
   "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
-  "tooltips display immediately for hover, keyboard focus, and touch focus");
+  "tooltips open only from the dedicated information icon wrapper on hover or keyboard focus");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
@@ -253,7 +262,9 @@ assert.match(recordsPage, /error\.status >= 500[\s\S]*서버 오류로 저장하
   "Consumption Records distinguishes server failures from permission and input failures");
 assert.doesNotMatch(spreadsheetPage, /kpi-page-loading__body|Loading KPI Activities data/u, "KPI Activities defers loading UI to the shared app overlay");
 assert.doesNotMatch(attainmentPage, /accounts-workloads-loading|Loading Consumption Attainment/u, "Attainment defers loading UI to the shared app overlay");
-assert.doesNotMatch(recordsPage, /accounts-workloads-loading|Loading Consumption Records/u, "Records defers loading UI to the shared app overlay");
+assert.doesNotMatch(recordsPage, /class="accounts-workloads-loading"/u, "Records removes its independent loading surface");
+assert.match(recordsPage, /if \(dataMode === "loading"\) return <PageShell[\s\S]*<PageDataProgress busy busyLabel="Loading Consumption Records"/u,
+  "Records keeps only the shared progress indicator until the initial workspace is ready");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
 assert.match(homeConsumption, /잠정 MTD 적용/, "Home explains that available MTD remains visible while final Actual is pending");
 assert.match(homeConsumption, />MTD \(잠정\)\{data\.mtdAsOf \? ` · As of \$\{data\.mtdAsOf\}` : ""\}</,
@@ -433,8 +444,9 @@ assert.match(insightsPage, /slice\(-4\)[\s\S]*markerSize:\s*emphasizedTrendPerio
 assert.match(insightsPage, /const trendChart = useMemo\(\(\) => chart\(trendPoints\.map\([\s\S]*value: point\.actualAmount/, "the trend DataProvider retains all six month groups");
 assert.match(insightsPage, /value=\{data\.value \?\? undefined\}/, "missing ACTUAL is passed to JET as an explicit gap rather than removing the month group");
 assert.doesNotMatch(insightsPage, /forecastTrend|Service Composition/, "Insights neither invents a Forecast trend nor Service Composition");
-assert.match(insightsPage, /Account Contribution[\s\S]*Plan Contribution[\s\S]*consumption-insights-contribution-grid/, "Account and Plan contribution render as an approved two-column drilldown");
-assert.match(insightsPage, /ACTUAL ONLY[\s\S]*account\.actualAmountExact[\s\S]*plan\.actualAmountExact/, "both Contribution cards render exact Actual-only amounts");
+assert.match(insightsPage, /consumption-insights-contribution-grid[\s\S]*Account Contribution[\s\S]*Plan Contribution/, "Account and Plan contribution remain an approved two-column drilldown");
+assert.doesNotMatch(insightsPage, /Account → Plan Contribution · ACTUAL ONLY/, "Analysis removes the redundant visible Contribution strapline");
+assert.match(insightsPage, /account\.actualAmountExact[\s\S]*plan\.actualAmountExact/, "both Contribution cards render exact Actual-only amounts");
 assert.match(insightsPage, /contributionPercentText\(account\.percentageExact\)[\s\S]*contributionPercentText\(plan\.percentageExact\)/, "both Contribution cards render nullable exact Actual-only percentages");
 assert.match(insightsPage, /Finalized Actual periods:[^`]+actualPeriods\.join/, "Contribution discloses the exact finalized Actual periods");
 assert.match(insightsPage, /Actual not entered[\s\S]*Actual 0 entered/, "Contribution distinguishes missing Actual from an entered zero");
@@ -466,17 +478,18 @@ assert.match(insightsPage, /selectedMovement\.category === "All" \? <tfoot><tr><
 assert.match(recordsPage, /serverActualTotals === null[\s\S]*전체 합계를 확인할 수 없습니다/, "Records sends missing server totals to the shared action-oriented banner");
 assert.equal(insightsPage.includes("const [includeMtd, setIncludeMtd] = useState(false)"), true, "Include MTD is default OFF");
 assert.equal(insightsPage.includes("includeMtd"), true, "Analysis request includes the MTD mode");
-assert.equal(insightsPage.includes("Show MTD"), true, "Analysis exposes the Show MTD toolbar toggle");
+assert.match(insightsPage, /<ConsumptionMtdControl checked=\{includeMtd\}/u, "Analysis exposes the shared Show MTD toolbar toggle");
 assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
-assert.equal(recordsPage.includes("Show MTD"), true, "Records exposes the Show MTD toggle");
+assert.match(recordsPage, /<ConsumptionMtdControl checked=\{showMtd\}/u, "Records exposes the shared Show MTD toggle");
+assert.equal(mtdControl.includes("Show MTD"), true, "the shared control retains the visible Show MTD label");
 assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
 assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPeriod[\s\S]*serverMtdTotals\[currentMtdPeriod\][\s\S]*actualsExact: \{ \.\.\.displayedActualsExact \}[\s\S]*forecastsExact: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
   "portfolio MTD is represented separately from Forecast and never falls back to the current-period Forecast");
 assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtdsExact[\s\S]*applyConsumptionMtdDisplayOverride\(\s*baseDisplaySeries,\s*currentMtdPeriod,\s*currentMtdExact,\s*showMtd\s*\)/,
   "account and plan MTD use the tested exact-decimal override without being stored or classified as Forecast");
-assert.match(insightsPage, /role="switch"[\s\S]*?aria-checked=\{includeMtd\}[\s\S]*?class="consumption-mtd-switch"/, "Analysis uses an accessible ON\/OFF switch instead of a checkbox");
-assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?role="switch"[\s\S]*?aria-checked=\{showMtd\}[\s\S]*?class="consumption-mtd-switch"[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
+assert.match(mtdControl, /class="consumption-mtd-switch" role="switch" aria-checked=\{checked\}/, "the shared Show MTD control uses an accessible ON\/OFF switch instead of a checkbox");
+assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?<ConsumptionMtdControl checked=\{showMtd\}[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
   "Records places Show MTD at the far left and the stable loading/Refresh slot at the far right");
 const forecastCompositionTooltipSource = recordsPage.slice(
   recordsPage.indexOf("const ForecastCompositionTooltip"),
@@ -741,7 +754,7 @@ assert.match(insightsPage, /aria-label=\{`Change type[^`]+`\}[\s\S]*aria-label=\
 assert.match(styles, /\.consumption-signal-type\.is-above-usual[^}]*#fde6df[\s\S]*\.consumption-signal-type\.is-below-usual[^}]*#e4f0f8[\s\S]*\.consumption-signal-type\.is-new-usage[^}]*#eee7f6/, "Alert type tones follow above, below, and new usage semantics");
 assert.match(insightsPage, /contributionPercentText\(plan\.percentageExact\)\} of \{percentageContext\}[\s\S]*consumption-insights-plan-track[\s\S]*width:\$\{contributionBarWidthChartCoordinate\(plan\.percentageExact\)\}%/, "Plan Contribution uses each exact Plan percentage and projects only the visual track width");
 assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-insights-plan-list[^}]*max-height:\s*25rem[^}]*overflow-y:\s*auto/, "Account and Plan Contribution use equal internal scrolling regions");
-assert.doesNotMatch(recordsPage, /consumption-records-loading|Loading Consumption Records/u, "Records footer uses the shared app loading overlay instead of a local status");
+assert.doesNotMatch(recordsPage, /class="consumption-records-loading"/u, "Records footer has no independent loading status surface");
 assert.match(recordsPage, /<div class=\{`consumption-load-more[^>]*>[\s\S]*Showing\s*<strong class="consumption-records-count-value">\{loadedAccountCount\}<\/strong>\s*of\s*<strong class="consumption-records-count-value">\{recordsTotalAccounts\}<\/strong>\s*accounts/,
   "Records always reserves its Load More and highlighted Showing footer");
 assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
@@ -789,7 +802,7 @@ assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|
   "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 
 assert.match(forecastActualPage, /Quarter[\s\S]*Pillar[\s\S]*Sales Rep[\s\S]*Account/, "Forecast vs Actual exposes the required filter cascade");
-assert.match(forecastActualPage, /aria-label="Show MTD"[\s\S]*aria-checked=\{actualMode === "MTD"\}/,
+assert.match(forecastActualPage, /<ConsumptionMtdControl checked=\{actualMode === "MTD"\}/u,
   "Forecast vs Actual exposes the shared MTD switch");
 assert.match(forecastActualPage, /Final shortfall[\s\S]*Projected MTD shortfall[\s\S]*Accounts/,
   "summary cards show deduplicated problem-account counts and the current account scope");
@@ -865,14 +878,10 @@ assert.match(forecastActualPage, /Actual data is not available for this month\./
 assert.doesNotMatch(forecastActualPage, /Actual is not confirmed\./,
   "Pending no longer conflates absent Actual with MTD confirmation");
 
-assert.doesNotMatch(forecastActualPage, /class="forecast-actual-total-label" colSpan=\{3\}/,
-  "monthly total labels do not span across sticky identity columns");
-assert.match(forecastActualPage, /class="forecast-actual-total-label is-sticky is-account"/,
-  "monthly total labels own the Account sticky column");
-assert.match(forecastActualPage, /class="forecast-actual-total-label-spacer is-sticky is-rep"/,
-  "monthly totals reserve the Sales Rep sticky column");
-assert.match(forecastActualPage, /class="forecast-actual-total-label-spacer is-sticky is-quarter-result"/,
-  "monthly totals reserve the Result sticky column");
+assert.match(forecastActualPage, /<th colSpan=\{3\} class="forecast-actual-total-label is-sticky">Monthly Forecast total<\/th>/,
+  "monthly total labels merge Account, Sales Rep, and Q Result into one sticky cell");
+assert.doesNotMatch(forecastActualPage, /forecast-actual-total-label-spacer/,
+  "monthly totals no longer render separate sticky spacer cells");
 
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-analysis-toolbar,[\s\S]*?\.kap-page-shell\.forecast-actual-page \.forecast-actual-data-toolbar\s*\{[\s\S]*?min-height:\s*2\.75rem;/,
   "mobile Analysis and Forecast toolbars use the Records 44px rhythm");

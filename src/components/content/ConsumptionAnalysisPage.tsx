@@ -2,7 +2,7 @@ import { ComponentChildren, h } from "preact";
 import { useEffect, useId, useMemo, useRef, useState } from "preact/hooks";
 import { beginAppBusy } from "../../app/appBusy";
 import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
-import { formatMtdAppliedDate } from "../../data/mtdDate";
+
 import {
   ConsumptionAnalysis,
   ConsumptionAnalysisAlert,
@@ -43,6 +43,7 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
 
@@ -353,7 +354,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     shortDesc: `${point.periodKey} ACTUAL ${point.actualAmountExact === null ? "N/A" : formatExactKFixed(point.actualAmountExact)}`
   }))), [emphasizedTrendPeriods, trendPoints]);
   const mtdAppliedTimestamp = analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf;
-  const mtdAppliedDate = formatMtdAppliedDate(mtdAppliedTimestamp);
+
   const currentFiscalYear = getLatestFiscalYear();
   const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
   const adjacentFiscalYears = fiscalYears
@@ -369,7 +370,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button oj-button-sm" chroming="outlined"
     aria-label={`Selected fiscal year ${fiscalYear}`}>
     {fiscalYear}
-    <oj-menu slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
+    <oj-menu class="consumption-analysis-fy-menu" slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
       {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
         {year === currentFiscalYear ? `${year} · Current` : year}
       </oj-option>)}
@@ -551,16 +552,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </PageFilterPanel>}>
     <div class="consumption-records-toolbar consumption-analysis-toolbar" role="toolbar" aria-label="Consumption Analysis data controls" data-html2canvas-ignore="true">
       <div class="consumption-records-toolbar__left">
-        <span class="consumption-mtd-control consumption-info-tooltip">
-          <button type="button" role="switch" aria-label="Show MTD" aria-checked={includeMtd} aria-describedby="showMtdTooltip"
-            disabled={loading || !analysis.currentMtdAvailable} class="consumption-mtd-switch"
-            onClick={() => { setLoading(true); setIncludeMtd((current) => !current); }}>
-            <span class="consumption-mtd-switch__label">Show MTD<sup aria-hidden="true">!</sup></span><span class="consumption-mtd-switch__track" aria-hidden="true"><span></span></span>
-          </button>
-          <span id="showMtdTooltip" class="consumption-info-tooltip__content" role="tooltip">MTD is the latest provisional month-to-date actual for the current open period.</span>
-        </span>
-        {includeMtd && mtdAppliedDate ? <time class="consumption-mtd-applied-date" dateTime={mtdAppliedTimestamp ?? undefined}
-          title={mtdAppliedTimestamp ?? undefined}>Updated on {mtdAppliedDate}</time> : null}
+        <ConsumptionMtdControl checked={includeMtd} disabled={loading || !analysis.currentMtdAvailable}
+          mtdAppliedDate={mtdAppliedTimestamp}
+          onToggle={() => { setLoading(true); setIncludeMtd((current) => !current); }}
+          tooltipId="analysis-show-mtd-tooltip" />
       </div>
       <div class="consumption-records-toolbar-activity">
         <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={!!exporting}
@@ -611,7 +606,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </section>
 
     <section class="kpi-panel consumption-insights-composition" aria-labelledby="forecastCompositionTitle">
-      <div class="consumption-section-heading"><div><span class="kpi-section-label">Entered and derived Forecast signals · K USD</span><h2 id="forecastCompositionTitle">Forecast signals by quarter</h2></div></div>
+      <div class="consumption-section-heading"><div><span class="kpi-section-label">Entered and derived Forecast signals</span><h2 id="forecastCompositionTitle">Forecast signals by quarter</h2></div></div>
       <div class="consumption-insights-composition-grid" data-quarter-count={analysis.movementBridge.length}>
         <div class="consumption-insights-composition-chart" data-quarter-count={analysis.movementBridge.length}>
           <div class="consumption-insights-composition-legend" aria-label="Forecast signal categories">
@@ -684,7 +679,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </section>
 
     <section class="consumption-insights-contribution" aria-label="Account to Plan contribution">
-      <span class="kpi-section-label">Account Contribution → Plan Contribution · ACTUAL ONLY</span>
       <div class="consumption-insights-contribution-grid">
         <section class="kpi-panel" aria-labelledby="accountContributionTitle"><div class="consumption-section-heading"><div><h2 id="accountContributionTitle">Account Contribution <InfoTooltip id="accountContributionTooltip" label="Explain Account Contribution coverage" text={`${selectedContextLabel} · ${contributionPeriodLabel}`} /></h2></div></div>
           <div class="consumption-insights-contribution-list">{topAccounts.map((account) => <button type="button" key={account.account}
