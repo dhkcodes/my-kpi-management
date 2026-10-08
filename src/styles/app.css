@@ -6151,10 +6151,10 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-shell.consumption-insights-page .kap-page-shell__body { gap: .75rem; }
 .kap-page-filter.forecast-actual-toolbar,
 .kap-page-filter.consumption-insights-header-actions { justify-content: flex-start; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: auto; overflow-y: auto; }
-.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 100%; width: 100%; }
-.forecast-actual-matrix-shell { max-width: none; min-width: 100%; overflow: visible; width: max-content; }
-.forecast-actual-matrix-layout { min-width: 100%; overflow: visible; width: max-content; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__scroll { overflow-x: hidden; overflow-y: auto; }
+.kap-page-shell.forecast-actual-page .kap-page-shell__inner { min-width: 0; width: 100%; }
+.forecast-actual-matrix-shell { max-width: 100%; min-width: 0; overflow-x: auto; width: 100%; }
+.forecast-actual-matrix-layout { min-width: 100%; width: max-content; }
 .forecast-actual-matrix .is-quarter-result { left: 17.5rem; }
 .forecast-actual-matrix-toolbar { align-items: center; border-bottom: 0; justify-content: flex-end; }
 .forecast-actual-matrix-shell { border: 0; border-radius: 0; }
