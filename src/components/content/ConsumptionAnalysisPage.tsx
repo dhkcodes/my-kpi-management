@@ -557,10 +557,12 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           onToggle={() => { setLoading(true); setIncludeMtd((current) => !current); }}
           tooltipId="analysis-show-mtd-tooltip" />
       </div>
-      <div class="consumption-records-toolbar-activity">
-        <PageActivity busy={false} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
-          onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
-      </div>
+      {!loading && (
+        <div class="consumption-records-toolbar-activity">
+          <PageActivity busy={false} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
+            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
+        </div>
+      )}
     </div>
     <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
