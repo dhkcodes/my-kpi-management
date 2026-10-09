@@ -6690,7 +6690,7 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
 .kap-page-shell.consumption-insights-page .consumption-insights-combobox,
 .kap-page-shell.consumption-insights-page .consumption-insights-candidates { width: 100%; }
 
-.forecast-actual-overview { grid-template-columns: minmax(9rem, 10.5rem) minmax(0, 1fr); }
+.forecast-actual-overview { grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); }
 .forecast-actual-total-strip {
   align-self: stretch;
   display: grid;
@@ -6867,7 +6867,7 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .fiscal-year-selector__chevron { color: #55616c; margin-left: auto; }
 .fiscal-year-selector__popover {
   background: #fff; border: 1px solid #d7ddd9; border-radius: .55rem; box-shadow: 0 .75rem 1.8rem rgba(20,35,27,.18);
-  min-width: 15rem; padding: .45rem; position: absolute; right: 0; top: calc(100% + .4rem); z-index: 1200;
+  min-width: 15rem; padding: .45rem; position: fixed; z-index: 1200;
 }
 .fiscal-year-selector__header { align-items: center; display: flex; justify-content: space-between; padding: .25rem .35rem .45rem .55rem; }
 .fiscal-year-selector__header strong { color: #26322c; font-size: .83rem; }
@@ -6902,6 +6902,28 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-month-value.is-actual.is-empty { text-align: right; }
 .forecast-actual-month-value.is-actual .forecast-actual-value-badge.is-pending {
   align-items: center; display: inline-grid; justify-items: center; margin-inline: auto; text-align: center;
+}
+.kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
+  align-content: start;
+  align-self: flex-end;
+  flex: 0 1 32rem;
+  max-width: 32rem;
+  min-height: 0;
+  width: min(32rem, 100%);
+}
+.forecast-actual-total-value {
+  position: static;
+  margin-left: auto;
+  text-align: right;
+  transform: none;
+}
+.forecast-actual-month-value {
+  justify-content: flex-end;
+  text-align: right;
+}
+.forecast-actual-month-value.is-status {
+  justify-content: center;
+  text-align: center;
 }
 @media (max-width: 760px) {
   .forecast-actual-toolbar-summary { align-items: flex-start; }

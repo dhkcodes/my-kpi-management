@@ -20,6 +20,7 @@ const doubleActivation = readFileSync("src/components/common/doubleActivation.ts
 const appBusyOverlay = readFileSync("src/components/AppBusyOverlay.tsx", "utf8");
 const app = readFileSync("src/components/app.tsx", "utf8");
 const mtdControl = readFileSync("src/components/content/ConsumptionMtdControl.tsx", "utf8");
+const fiscalYearSelector = readFileSync("src/components/common/FiscalYearSelector.tsx", "utf8");
 
 assert.match(pageShell, /export function PageShell/, "the reusable page shell is exported independently from Consumption Records");
 assert.match(pageShell, /breadcrumb[\s\S]*actions[\s\S]*filters[\s\S]*children/, "the common shell exposes structural slots instead of Records-specific content");
@@ -401,7 +402,7 @@ assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/
 assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*id: "records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
-assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
+assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*canWrite=\{canWrite\}/, "Consumption Records renders the preserved editable workspace without global FY coupling");
 assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis and Forecast vs Actual selectors and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
@@ -795,16 +796,17 @@ assert.match(
 assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
 assert.doesNotMatch(recordsPage, /Actual Control 최신 조회 실패|records-control-confirmation|Actual Export가 차단|consumption-control-warning/,
   "Records rendering and export messaging do not depend on Control MATCH or Control refresh warnings");
-assert.match(recordsPage, /<FiscalYearSelector selected=\{fiscalYear\}[\s\S]*onFiscalYearChange\(year\)/,
-  "Records exposes the same interactive fiscal-year selector as the other Consumption pages");
-assert.match(content, /<ConsumptionRecordsPage[\s\S]*key=\{fiscalYear\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
-  "a Records fiscal-year change remounts the page and reloads data for the selected year");
-assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q1`\)/,
-  "Records starts its query at the selected fiscal year's first quarter");
-assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q4`\)/,
-  "Records ends its query at the selected fiscal year's final quarter");
-assert.match(recordsPage, /loadRecordsPage\(false, \{[\s\S]*fromQuarter: `\$\{fiscalYear\}-Q1`[\s\S]*toQuarter: `\$\{fiscalYear\}-Q4`/,
-  "Records loads the selected fiscal year instead of an unscoped quarter range");
+assert.doesNotMatch(recordsPage, /FiscalYearSelector|onFiscalYearChange/,
+  "Records keeps its original Quarter-range scope and does not add a page-level FY selector");
+assert.doesNotMatch(content, /<ConsumptionRecordsPage[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
+  "the shared content router does not inject the out-of-scope FY change callback into Records");
+assert.match(recordsPage, /useState\(""\)/,
+  "Records starts with an unscoped Quarter range so the server can resolve its default period");
+assert.match(recordsPage, /recordsQueryRef = useRef<RecordsQuery>\(\{[\s\S]*fromQuarter:\s*""[\s\S]*toQuarter:\s*""/,
+  "Records preserves the server-resolved default range contract in its initial query ref");
+assert.doesNotMatch(content, /<ConsumptionRecordsPage[\s\S]*key=\{fiscalYear\}/,
+  "global FY changes do not remount the Quarter-scoped Records page");
+
 assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|Actual \{exactCurrency\(variance\.actualAmountExact\)\} · Final/,
   "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 
@@ -817,6 +819,27 @@ assert.doesNotMatch(forecastActualPage, /Full-period summary|FINAL periods only/
   "misleading mixed-period summary columns are removed from the monthly matrix");
 assert.match(forecastActualPage, /<span class="forecast-actual-value-badge is-pending"><span>Actual<\/span><span>Pending<\/span><\/span>[\s\S]*N\/A/, "the table-only Actual Pending badge renders as two explicit lines and stays distinct from N/A");
 assert.match(styles, /\.forecast-actual-month-value\.is-actual \.forecast-actual-value-badge\.is-pending\s*\{[^}]*display:\s*inline-grid[^}]*\}/, "only Actual cells force the pending badge onto two visual rows");
+assert.match(styles, /\.forecast-actual-total-value\s*\{[^}]*position:\s*static[^}]*margin-left:\s*auto[^}]*text-align:\s*right/, "summary values stay in normal flex flow and cannot overlap their labels");
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-search-panel\s*\{[^}]*align-content:\s*start[^}]*align-self:\s*flex-end[^}]*flex:\s*0 1 32rem[^}]*max-width:\s*32rem[^}]*min-height:\s*0/, "the Account search container keeps its natural height while retaining wider responsive input space");
+assert.match(styles, /\.forecast-actual-month-value\s*\{[^}]*text-align:\s*right/, "month amounts align to the right edge of their cells");
+assert.match(styles, /\.forecast-actual-month-value\.is-status\s*\{[^}]*justify-content:\s*center[^}]*text-align:\s*center/, "status-only cells and badges stay centered independently of amount cells");
+assert.doesNotMatch(insightsPage, /YoY same-period ACTUAL contribution · K USD/, "the Analysis Growth / Reduction label removes only the duplicated K USD suffix");
+assert.match(fiscalYearSelector, /setBrowseCenter\(\(center\) => fiscalYear\(yearNumber\(center\) \+ offset\)\)/,
+  "FY navigation uses a functional state update so rapid taps cannot collapse onto a stale center year");
+assert.match(fiscalYearSelector, /onPointerUp[\s\S]*pointerType === "mouse"[\s\S]*preventDefault/,
+  "FY controls provide an immediate non-mouse pointer path for WebKit touch input");
+assert.match(fiscalYearSelector, /addEventListener\("pointerdown", close, true\)/,
+  "FY outside dismissal observes pointer input in capture phase instead of mouse-only events");
+assert.match(fiscalYearSelector, /event\.key === "Escape"[\s\S]*closeAndRestoreFocus\(\)/,
+  "the FY popup closes with Escape");
+assert.match(fiscalYearSelector, /const closeAndRestoreFocus[\s\S]*triggerRef\.current\?\.focus\(\)/,
+  "closing after a keyboard or selection action restores focus to the FY trigger");
+assert.match(fiscalYearSelector, /querySelector<HTMLButtonElement>\('\[aria-checked="true"\]'\)[\s\S]*focus\(\)/,
+  "opening the FY popup moves focus to the selected year");
+assert.match(fiscalYearSelector, /getBoundingClientRect\(\)/,
+  "the FY popup derives viewport coordinates from its trigger");
+assert.match(styles, /\.fiscal-year-selector__popover\s*\{[^}]*position:\s*fixed/,
+  "the FY popup is viewport-positioned so page overflow cannot clip it");
 assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
 assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");

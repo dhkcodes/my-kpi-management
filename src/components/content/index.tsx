@@ -660,9 +660,6 @@ export function Content({
           onFiscalYearChange={onFiscalYearChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "consumptionRecords" ? (
         <ConsumptionRecordsPage
-          key={fiscalYear}
-          fiscalYear={fiscalYear}
-          onFiscalYearChange={onFiscalYearChange}
           canWrite={canWrite}
           canWriteForecast={canWriteForecast}
           onNavigationGuardChange={onKpiNavigationGuardChange}
