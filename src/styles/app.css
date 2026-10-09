@@ -6903,6 +6903,9 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-month-value.is-actual .forecast-actual-value-badge.is-pending {
   align-items: center; display: inline-grid; justify-items: center; margin-inline: auto; text-align: center;
 }
+.kap-page-shell.forecast-actual-page .kap-page-filter.forecast-actual-toolbar {
+  flex: 0 0 auto;
+}
 .kap-page-shell.forecast-actual-page .kap-page-shell__body {
   align-content: start;
   grid-auto-rows: max-content;
