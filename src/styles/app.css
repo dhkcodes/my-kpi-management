@@ -6896,6 +6896,14 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-total-strip span { align-items: baseline; background: transparent; border: 0; border-radius: 0; display: inline-flex; gap: .42rem; min-height: 0; padding: 0; }
 .forecast-actual-total-strip small { color: #5f6a64; font-size: .68rem; grid-column: auto; letter-spacing: .02em; }
 .forecast-actual-total-strip strong { color: #16663e; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.forecast-actual-total-strip small,
+.forecast-actual-total-strip strong {
+  left: auto;
+  max-width: none;
+  position: static;
+  top: auto;
+  transform: none;
+}
 .forecast-actual-total-strip em { color: #5f6a64; display: inline; font-size: .67rem; font-style: normal; }
 .forecast-actual-total-strip mark { background: transparent; color: #a45122; font-weight: 800; }
 .forecast-actual-quarter-actions button strong { font-size: .86rem; }
