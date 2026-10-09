@@ -1443,7 +1443,11 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     input.value = "";
     if (files.length < 1) return;
     if (files.length > 8) {
-      setImportError("Select 1 to 8 CSV or XLSX files.");
+      setImportError("Select 1 to 8 Excel (.xlsx) files.");
+      return;
+    }
+    if (files.some((file) => !file.name.toLocaleLowerCase().endsWith(".xlsx"))) {
+      setImportError("Actual Import accepts Excel (.xlsx) files only. CSV is not supported.");
       return;
     }
     if (hasDraftChanges || dataMode === "loading" || isSaving || exportingRef.current || importPhase !== "idle") return;
@@ -1751,8 +1755,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : "Import an OCI Consumption Forecast CSV file."}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
-  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import ACTUAL data from CSV or Excel"}\nLast Import file: ${importMetadata.actualSourceFileName ?? "Not available"}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : "Import Forecast data from an Excel (.xlsx) file."}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
+  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import Actual data from Excel (.xlsx) files."}\nLast Import file: ${importMetadata.actualSourceFileName ?? "Not available"}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
     ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
@@ -1769,7 +1773,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
       busy={pageBusy} busyLabel={pageBusyLabel}
       activityPosition="custom"
       actions={<div class="consumption-import-actions is-compact">
-          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
+          <input ref={fileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple
             disabled={importActionsDisabled} onChange={(event) => void handleActualFiles(event)} />
           <input ref={forecastFileInputRef} class="consumption-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={forecastImportActionsDisabled} onChange={(event) => void handleForecastWorkbookFile(event)} />

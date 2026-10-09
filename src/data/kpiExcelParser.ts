@@ -1,4 +1,5 @@
-export type FiscalYear = "FY26" | "FY27" | "FY28";
+type FiscalYearDigit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+export type FiscalYear = `FY${FiscalYearDigit}${FiscalYearDigit}`;
 export type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
 export type WorkloadStage = "onboarded" | "validated" | "identified";
 

@@ -159,8 +159,8 @@ assert.match(page, /setHierarchy\(\(current\) =>[\s\S]*accounts: \[/,
   "multiple new AW rows remain in hierarchy state until saved or cancelled");
 assert.match(page, /<oj-input-date/,
   "opportunity date editing uses the Oracle JET calendar");
-assert.match(page, /targetOptionsFor[\s\S]*fiscalYear - 1} Q3[\s\S]*fiscalYear \+ 1} Q2/,
-  "Target Quarter offers previous FY H2, current FY and next FY H1");
+assert.match(page, /buildTargetOptions[\s\S]*const targetOptions = buildTargetOptions\(\)/,
+  "Target Quarter uses the Seoul-time fiscal-quarter window helper");
 assert.match(page, /Save the parent AW before adding opportunities/);
 assert.doesNotMatch(page, /notes: draft\.deal\.notes/,
   "opportunity Notes is excluded from the editor and save payload");

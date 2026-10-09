@@ -83,7 +83,7 @@ export type ConsumptionForecastVariance = Readonly<{ account: string; normalized
 export type ConsumptionApiControlTotal = Readonly<{
   account: string; periodKey: string; controlAmount: number; detailAmount: number | null;
   controlAmountExact?: string; detailAmountExact?: string | null;
-  matchStatus: "MATCH" | "MISMATCH" | "STALE_CONTROL" | "NO_DETAIL" | "MANUAL_FORECAST";
+  matchStatus: "MATCH" | "MISMATCH" | "STALE_CONTROL" | "UNVERIFIED_CURRENT_ACTUAL" | "NO_DETAIL" | "MANUAL_FORECAST";
   pillar: ConsumptionPillar;
   actualState: "FINAL" | "MTD";
 }>;
@@ -405,7 +405,7 @@ const expectedSignalGrade = (amount: number, percent: number | null): Consumptio
 
 const amountStatuses = new Set<ConsumptionAmountSplit["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE"]);
 const quarterAmountStatuses = new Set<ConsumptionAnalysisQuarter["status"]>(["ACTUAL", "FORECAST", "MIXED", "INCOMPLETE", "NOT_OPEN"]);
-const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "STALE_CONTROL", "NO_DETAIL", "MANUAL_FORECAST"]);
+const controlMatchStatuses = new Set<ConsumptionApiControlTotal["matchStatus"]>(["MATCH", "MISMATCH", "STALE_CONTROL", "UNVERIFIED_CURRENT_ACTUAL", "NO_DETAIL", "MANUAL_FORECAST"]);
 const malformedAnalysis = (): never => { throw new Error("Malformed Consumption analysis response"); };
 const hasValidYoyResult = (amount: unknown, percent: unknown, status: unknown, reason: unknown): boolean => {
   if (!isNonEmptyString(status) || !isNullableFiniteNumber(amount) || !isNullableFiniteNumber(percent)

@@ -30,6 +30,7 @@ import {
 } from "../../data/accountsWorkloadsApi";
 import { FxRateRecord } from "../../data/kpiConfigurationApi";
 import { createOpportunitySaveLock } from "./opportunitySaveLock";
+import { targetOptionsFor as buildTargetOptions } from "./opportunityQuarterWindow";
 import {
   correlateLegacyOpportunityResults,
   SubmittedOpportunityWrite,
@@ -170,14 +171,7 @@ const isDealDraftChanged = (draft: DealDraft) => {
       String(draft.deal[field] ?? "") !== String(draft.original?.[field] ?? ""),
   );
 };
-const currentFiscalYear = (today = new Date()) =>
-  (today.getMonth() >= 5 ? today.getFullYear() + 1 : today.getFullYear()) % 100;
-export const targetOptionsFor = (fiscalYear = currentFiscalYear()) => [
-  `FY${fiscalYear - 1} Q3`, `FY${fiscalYear - 1} Q4`,
-  `FY${fiscalYear} Q1`, `FY${fiscalYear} Q2`, `FY${fiscalYear} Q3`, `FY${fiscalYear} Q4`,
-  `FY${fiscalYear + 1} Q1`, `FY${fiscalYear + 1} Q2`,
-];
-const targetOptions = targetOptionsFor();
+const targetOptions = buildTargetOptions();
 const emptyWorkload = (id: number, name = "", salesRep: string | null = null): AccountWorkload => ({
   id,
   versionNo: 0,

@@ -115,10 +115,10 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
 
-assert.match(insightsPage, /<oj-menu-button[^>]*class="consumption-analysis-fy-button[^"]*"[^>]*chroming="outlined"[^>]*>[\s\S]*\{fiscalYear\}/u,
-  "Analysis renders the official Oracle JET menu button with the app-owned Redwood FY class");
-assert.match(insightsPage, /<oj-menu[^>]*slot="menu"[^>]*onojMenuAction=\{handleFiscalYearMenuAction\}/u,
-  "Analysis keeps FY selection on the Oracle JET menu action contract");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) onFiscalYearChange\(year\); \}\} \/>/u,
+  "Analysis renders the shared fiscal-year picker beside the title");
+assert.match(insightsPage, /const fiscalYearControl = <FiscalYearSelector/u,
+  "Analysis keeps fiscal-year selection in the app-owned picker contract");
 assert.match(insightsPage, /titleControls=\{fiscalYearControl\}/u,
   "Analysis places the FY control beside the page title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
@@ -145,14 +145,10 @@ assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[\s\S]
   "the shared tooltip formats one UTC-basis Updated on date from metadata");
 assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
   "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
-assert.match(insightsPage, /adjacentFiscalYears\.map[\s\S]*year === currentFiscalYear \? `\$\{year\} · Current` : year[\s\S]*Earlier FYs…[\s\S]*earlierFiscalYears\.map/u,
-  "the JET fiscal-year menu keeps current and adjacent years visible with older years in an Earlier FYs submenu");
-assert.match(insightsPage, /const handleFiscalYearMenuAction[\s\S]*event\.detail\.selectedValue[\s\S]*fiscalYears\.includes\(year\)[\s\S]*onFiscalYearChange\(year\)/,
-  "the JET fiscal-year menu accepts only loaded FY values and preserves the existing FY selection callback");
-assert.doesNotMatch(insightsPage, /handleFiscalYearMenuKeyDown/,
-  "the native JET menu owns keyboard navigation rather than a custom key handler");
-assert.doesNotMatch(insightsPage, /role="menuitemradio"|consumption-analysis-fy-earlier/u,
-  "Analysis no longer maintains a custom ARIA menu implementation");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) onFiscalYearChange\(year\); \}\} \/>/u,
+  "Analysis delegates fiscal-year browsing and selection to the shared picker");
+assert.doesNotMatch(insightsPage, /handleFiscalYearMenuAction|handleFiscalYearMenuKeyDown/u,
+  "Analysis no longer maintains the legacy JET fiscal-year menu handlers");
 assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
   "Analysis removes the Current FY prose and native FY select");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear,[^}]*salesRep: selectedSalesRep,[^}]*pillar: selectedPillar,[^}]*includeMtd \}\)/,
@@ -411,7 +407,8 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumption
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
 assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
-assert.match(insightsPage, /\{!loading && \([\s\S]*<PageActivity busy=\{false\}[\s\S]*refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*\)\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis suppresses the reload control during initial loading while retaining only the centered progress indicator");
+assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading keeps only the centered progress indicator");
+assert.match(insightsPage, /<PageActivity busy=\{loading\} busyLabel="Refreshing analysis" refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis keeps Reload mounted and disabled while refreshing existing results");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
@@ -523,8 +520,9 @@ assert.doesNotMatch(insightsPage, /display\.detail|display\.duplicateWarning|con
 assert.match(recordsPage, /ariaLabelledBy="consumptionTitle"[\s\S]*title="Consumption Records"/, "data-management leaf uses the approved name through the common shell");
 assert.match(recordsPage, /breadcrumb={breadcrumb}[\s\S]*title="Consumption Records"[\s\S]*headingSpacing="compact"/, "Consumption Records supplies its breadcrumb and title through the compact shared masthead without a redundant eyebrow");
 assert.doesNotMatch(recordsPage, /consumption-summary-cards|Consumption Change Alerts & Trend|id="consumptionSignalInbox"/, "Consumption Records does not duplicate the Insights charts");
-assert.match(recordsPage, /accept="\.csv,\.xlsx,text\/csv,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/, "Actual Import accepts CSV and XLSX files");
-assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, "Actual Import accepts multiple CSV or XLSX files");
+assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/, "Actual Import accepts only supported Excel workbooks");
+assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, "Actual Import accepts multiple Excel files");
+assert.match(recordsPage, /Actual Import accepts Excel \(\.xlsx\) files only\. CSV is not supported\./, "Actual Import rejects CSV before upload");
 assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
 assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files, preview/, "multipart preview retains the exact selected File objects and lets filenames own pillar detection");
 assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL", pendingImport\.preview\)/, "multipart apply reuses the retained files and validated preview mapping as one cross-pillar atomic set");
@@ -554,7 +552,8 @@ assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompo
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
 assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
-assert.match(insightsPage, /actions=\{!loading \? <div class="consumption-import-actions is-compact"[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("png"\)[\s\S]*class="oj-button-sm"[\s\S]*downloadCanvas\("pdf"\)[\s\S]*: null\}/, "PNG and PDF controls use the shared compact heading-action alignment and stay unmounted during initial loading");
+assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>;/, "Initial Analysis loading renders only the loading shell without export controls");
+assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("png"\)[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("pdf"\)[\s\S]*<\/div>\}/, "PNG and PDF controls stay mounted for completed Analysis data and disable during refresh or export");
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
 assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
@@ -598,7 +597,7 @@ assert.match(recordsPage, /forecastImportPhase === "preview" \|\| forecastImport
 assert.doesNotMatch(recordsPage, /Forecast CSV Export|exportForecastCsv|exportConsumptionForecastCsv/, "Forecast CSV entry point is absent from the UI");
 assert.match(recordsPage, /Forecast Export/, "Forecast export button omits file-format wording");
 assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Forecast export remains connected to XLSX");
-assert.match(recordsPage, /Import an OCI Consumption Forecast CSV file\./, "Forecast Import tooltip describes the function instead of presenting the generated template name as the last imported file");
+assert.match(recordsPage, /Import Forecast data from an Excel \(\.xlsx\) file\./, "Forecast Import tooltip describes the Excel-only function instead of presenting the generated template name as the last imported file");
 assert.match(recordsPage, /Last Import file: \$\{importMetadata\.forecastSourceFileName \?\? "Not available"\}/, "Forecast Import keeps actual import metadata separate from the function description");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
