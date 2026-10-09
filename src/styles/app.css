@@ -2842,6 +2842,9 @@ h4.weekly-activity-section-label--next-week,
 .consumption-sales-movement-columns h3 { color: var(--kpi-muted); font-size: .75rem; margin: 0 0 .45rem; text-transform: uppercase; }
 .consumption-sales-movement-columns button, .consumption-sales-attention-list button { align-items: center; background: transparent; border: 0; border-bottom: 1px solid var(--oj-core-divider-color); color: inherit; cursor: pointer; display: flex; gap: .75rem; justify-content: space-between; padding: .55rem 0; text-align: left; width: 100%; }
 .consumption-sales-movement-columns button:hover, .consumption-sales-attention-list button:hover { background: var(--oj-core-bg-color-hover); }
+.consumption-sales-comparison-guide { color: var(--kpi-muted); font-size: .78rem; margin: 0 0 .7rem; }
+.consumption-sales-movement-values { align-items: flex-end; display: flex; flex: 0 0 auto; flex-direction: column; gap: .1rem; text-align: right; }
+.consumption-sales-movement-values small { color: var(--kpi-muted); font-size: .68rem; font-weight: 500; white-space: nowrap; }
 .consumption-sales-attention-list button { align-items: start; display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, .85fr); }
 .consumption-sales-attention-list button > span { display: grid; gap: .15rem; min-width: 0; }
 .consumption-sales-attention-list button > span:last-child { text-align: right; }

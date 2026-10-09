@@ -243,6 +243,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const declineAccounts = useMemo(() => [...(analysis?.accounts ?? [])]
     .filter((account) => account.actualGrowthAmountExact !== null && compareExactDecimals(account.actualGrowthAmountExact, "0") < 0)
     .sort((left, right) => compareExactDecimals(left.actualGrowthAmountExact!, right.actualGrowthAmountExact!)).slice(0, 5), [analysis]);
+  const comparisonUnavailableAccounts = useMemo(() => (analysis?.accounts ?? [])
+    .filter((account) => account.yoyComparisonStatus === "PRIOR_PERIOD_NOT_PROVIDED"), [analysis]);
   const attentionAccounts = useMemo(() => (analysis?.accounts ?? [])
     .filter((account) => account.attentionReasons.length > 0)
     .sort((left, right) => compareExactDecimals(right.actualAmountExact, left.actualAmountExact)), [analysis]);
@@ -635,9 +637,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
 
     <section class="consumption-sales-account-review" aria-label="Sales Account growth and attention">
       <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">YoY same-period ACTUAL contribution</span><h2>Account Growth / Reduction</h2></div></div>
+        {comparisonUnavailableAccounts.length > 0 && <p class="consumption-sales-comparison-guide">YoY comparison unavailable: {comparisonUnavailableAccounts.length} Account{comparisonUnavailableAccounts.length === 1 ? "" : "s"} excluded because prior same-period FINAL Actual was not provided.</p>}
         <div class="consumption-sales-movement-columns">
-          <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No growing Accounts.</p>}</div>
-          <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No Accounts with YoY reduction.</p>}</div>
+          <div><h3>Growth</h3>{growthAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><span class="consumption-sales-movement-values"><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong><small>Current {formatExactKFixed(account.actualAmountExact)} · Prior {formatExactKFixed(account.priorActualAmountExact)} · {account.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : percentageTextExact(account.actualGrowthPercentExact, true)}</small></span></button>)}{growthAccounts.length === 0 && <p class="consumption-empty-state">No comparable Accounts with YoY growth.</p>}</div>
+          <div><h3>Reduction</h3>{declineAccounts.map((account) => <button type="button" key={account.account} onClick={() => selectAccountContext(account.account)}><span>{account.account}</span><span class="consumption-sales-movement-values"><strong>{formatExactKFixed(account.actualGrowthAmountExact!)}</strong><small>Current {formatExactKFixed(account.actualAmountExact)} · Prior {formatExactKFixed(account.priorActualAmountExact)} · {percentageTextExact(account.actualGrowthPercentExact, true)}</small></span></button>)}{declineAccounts.length === 0 && <p class="consumption-empty-state">No comparable Accounts with YoY reduction.</p>}</div>
         </div>
       </section>
       <section class="kpi-panel consumption-sales-account-card"><div class="consumption-section-heading"><div><span class="kpi-section-label">Reason-based review</span><h2>Attention Accounts <InfoTooltip id="attentionAccountsTooltip" label="Explain Attention Accounts coverage" text={attentionCoverageLabel} /></h2></div></div>

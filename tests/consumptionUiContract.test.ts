@@ -159,6 +159,12 @@ assert.match(insightsPage, /id="consumptionSalesRepContext"[\s\S]*id="consumptio
   "Sales Rep and Account filters remain present after the layout move");
 assert.match(insightsPage, /downloadCanvas\("png"\)[\s\S]*downloadCanvas\("pdf"\)/,
   "PNG and PDF exports remain present after the layout move");
+assert.match(insightsPage, /YoY same-period ACTUAL contribution<\/span>[\s\S]*<h2>Account Growth \/ Reduction<\/h2>/,
+  "the requested YoY contribution title omits the obsolete K USD suffix");
+assert.match(insightsPage, /Current \{formatExactKFixed\(account\.actualAmountExact\)\}[\s\S]*Prior \{formatExactKFixed\(account\.priorActualAmountExact\)\}[\s\S]*rate N\/A/,
+  "Growth and Reduction rows expose current, prior, and an explicit non-calculable rate for prior zero");
+assert.match(insightsPage, /YoY comparison unavailable:[\s\S]*prior same-period FINAL Actual was not provided/,
+  "contexts without prior comparison data show a distinct guidance message");
 assert.doesNotMatch(insightsPage, /useEffect\(\(\) => \{[\s\S]{0,900}setSelected(?:Pillar|SalesRep|AccountContext)[\s\S]{0,900}\}, \[fiscalYear\]\)/,
   "FY changes do not reset the current Analysis filter view before reloading the selected year");
 assert.match(pageShell, /titleControls\?: ComponentChildren[\s\S]*kap-page-shell__title-row[\s\S]*kap-page-shell__title-controls/,

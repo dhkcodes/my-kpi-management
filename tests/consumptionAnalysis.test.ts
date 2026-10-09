@@ -64,6 +64,7 @@ const analysis = {
   accounts: [{
     account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 600, status: "MIXED", percentage: 100,
     actualEntryStatus: "PROVIDED", priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
+    yoyComparisonStatus: "AVAILABLE", yoyUnavailableReason: null,
     forecastEntryStatus: "ENTERED", attentionReasons: ["Recent actual above usual"],
     workloads: [{
       workload: "Database", actualAmount: 600, forecastAmount: 400, totalAmount: 600, status: "MIXED", percentage: 100,
@@ -115,6 +116,8 @@ void (async () => {
   assert.deepEqual(decoded.periodCoverage, analysis.periodCoverage);
   assert.equal(decoded.salesRepOverview[0].yoyComparisonStatus, "AVAILABLE");
   assert.equal(decoded.accounts[0].forecastEntryStatus, "ENTERED");
+  assert.equal(decoded.accounts[0].yoyComparisonStatus, "AVAILABLE",
+    "Account YoY comparison status survives decoding for Growth/Reduction display");
   assert.equal(decoded.accounts[0].totalAmountExact, "600",
     "Actual-only Account contribution accepts the deployed wire total");
   assert.equal(decoded.accounts[0].workloads[0].totalAmountExact, "600",

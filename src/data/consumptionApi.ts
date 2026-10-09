@@ -663,6 +663,8 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
       || percentage === undefined || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
       || !priorActualAmount || actualGrowthAmount === undefined || actualGrowthPercent === undefined
+      || !isNonEmptyString(account.yoyComparisonStatus)
+      || (account.yoyUnavailableReason !== null && !isNonEmptyString(account.yoyUnavailableReason))
       || !["MISSING", "ZERO", "ENTERED"].includes(String(account.forecastEntryStatus))
       || !Array.isArray(account.attentionReasons) || !account.attentionReasons.every(isNonEmptyString)
       || !Array.isArray(account.workloads)) return malformedAnalysis();
@@ -677,7 +679,9 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     return { ...split, account: account.account, salesRep: account.salesRep, percentageExact: percentage?.exact ?? null,
       actualEntryStatus: account.actualEntryStatus,
       priorActualAmountExact: priorActualAmount.exact, actualGrowthAmountExact: actualGrowthAmount?.exact ?? null,
-      actualGrowthPercentExact: actualGrowthPercent?.exact ?? null, forecastEntryStatus: account.forecastEntryStatus,
+      actualGrowthPercentExact: actualGrowthPercent?.exact ?? null,
+      yoyComparisonStatus: account.yoyComparisonStatus, yoyUnavailableReason: account.yoyUnavailableReason,
+      forecastEntryStatus: account.forecastEntryStatus,
       attentionReasons: account.attentionReasons, workloads } as ConsumptionAnalysisAccount;
   });
   if (new Set(accounts.map((account) => account.account)).size !== accounts.length) return malformedAnalysis();
