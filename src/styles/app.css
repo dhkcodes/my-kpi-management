@@ -6906,6 +6906,13 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .kap-page-shell.forecast-actual-page .kap-page-filter.forecast-actual-toolbar {
   flex: 0 0 auto;
 }
+.kap-page-shell.forecast-actual-page .forecast-actual-overview {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+.kap-page-shell.forecast-actual-page .forecast-actual-quarter-cards {
+  width: 100%;
+}
 .kap-page-shell.forecast-actual-page .kap-page-shell__body {
   align-content: start;
   grid-auto-rows: max-content;
