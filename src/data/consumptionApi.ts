@@ -321,15 +321,6 @@ const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "W
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const hasUnambiguousForecastIdentity = (
-  group: Readonly<{ account: string; normalizedAccount: string }>,
-  groups: ReadonlyArray<Readonly<{ account: string; normalizedAccount: string }>>,
-  forecasts: readonly ConsumptionAccountForecast[],
-): boolean => {
-  const matchingGroups = groups.filter((candidate) => candidate.normalizedAccount === group.normalizedAccount);
-  return matchingGroups.length === 1
-    && forecasts.some((forecast) => forecast.normalizedAccount === group.normalizedAccount);
-};
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const isNonNegativeFiniteNumber = (value: unknown): value is number => isFiniteNumber(value) && value >= 0;
 const isNullableFiniteNumber = (value: unknown): value is number | null => value === null || isFiniteNumber(value);
@@ -1158,10 +1149,6 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
   const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"), query.pillar === undefined ? undefined : pillar);
-  if (rawGroups.some((group) => group.plans.length === 0
-    && !hasUnambiguousForecastIdentity(group, rawGroups, workspace.accountForecasts))) {
-    throw new Error("Malformed Consumption forecast-only records group");
-  }
   let planOffset = 0;
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);

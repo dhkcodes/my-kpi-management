@@ -193,9 +193,11 @@ void (async () => {
     ],
     totalAccounts: 2, nextOffset: 2, hasMore: false
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"ambiguous-account-page"' } });
-  await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
-    sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 }), /Malformed Consumption forecast-only records group/,
-  "normalized whitespace fallback cannot merge two distinct raw Account names");
+  const distinctIdentityRecords = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
+    sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 });
+  assert.deepEqual(distinctIdentityRecords.accountGroups.map((group) => [group.account, group.normalizedAccount]), [
+    ["A B", "A B"], ["A  B", "A  B"]
+  ], "server identities keep distinct raw Account names separate even when one group has no forecast rows");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     selectedPillar: "ALL", etag: '"negative-composition"', lastBatchId: 7,
