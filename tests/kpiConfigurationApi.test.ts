@@ -65,7 +65,12 @@ async function run() {
   assert.equal(loadedFx?.rateValue, 1380.5);
 
   const missingFx = await fetchFxRate("FY29", async () => response({ code: "FX_RATE_NOT_FOUND", message: "not registered" }, 404));
-  assert.equal(missingFx, null, "404 means the rate is unregistered, not an invented zero value");
+  assert.equal(missingFx, null, "explicit FX_RATE_NOT_FOUND means the rate is unregistered, not an invented zero value");
+  await assert.rejects(
+    () => fetchFxRate("FY29", async () => response({ code: "NOT_FOUND", message: "route not found" }, 404)),
+    /route not found/,
+    "an unrelated route or proxy 404 must not be hidden as an unregistered rate"
+  );
   await assert.rejects(
     () => fetchFxRate("FY29", async () => response({ code: "UPSTREAM_FAILURE" }, 503)),
     /Configuration API request failed \(503\)/
