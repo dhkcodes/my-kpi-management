@@ -39,6 +39,8 @@ assert.match(page, /Total Actual<\/small>[\s\S]*<strong>\{formatAmount\(selected
   "the redundant K USD label and duplicate K suffix are removed while MTD stays inline with Total Actual");
 assert.doesNotMatch(page, /<small>K USD<\/small>/u,
   "quarter cards do not render the redundant K USD caption");
+assert.doesNotMatch(page, /`\$\{formatAmount\(quarterResult\.relevantAmount\)\} K`/u,
+  "quarter-result rows do not append a second K unit to the formatted amount");
 assert.match(page, /colSpan=\{4\} class="forecast-actual-period-group"/u, "each month owns four columns");
 for (const label of ["Forecast", "Actual", "Difference", "Status"]) assert.match(page, new RegExp(`forecast-actual-month-subhead[^\\n]*${label}`, "u"));
 assert.match(page, /assessForecastActualMonth\(month\)/u, "Difference and status use the explicit month assessment contract");

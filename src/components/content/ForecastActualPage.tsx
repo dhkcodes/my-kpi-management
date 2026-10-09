@@ -486,7 +486,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                   <th scope="row" class="is-sticky is-account"><strong>{row.account}</strong></th>
                   <td class="is-sticky is-rep"><strong>{row.salesRep || "Unassigned"}</strong></td>
                   <td class="is-sticky is-quarter-result">{quarterResult && <span class={`forecast-actual-quarter-result is-${quarterResult.status.toLowerCase()}`}
-                    title={resultTooltip(quarterResult)} data-tooltip={resultTooltip(quarterResult)} tabIndex={0}><strong>{resultLabel(quarterResult.status, fiscalYear === currentFiscalYear && quarterResult.quarter === currentQuarter)}</strong><small>{quarterResult.relevantAmount === null ? "N/A" : `${formatAmount(quarterResult.relevantAmount)} K`}</small></span>}</td>
+                    title={resultTooltip(quarterResult)} data-tooltip={resultTooltip(quarterResult)} tabIndex={0}><strong>{resultLabel(quarterResult.status, fiscalYear === currentFiscalYear && quarterResult.quarter === currentQuarter)}</strong><small>{quarterResult.relevantAmount === null ? "N/A" : formatAmount(quarterResult.relevantAmount)}</small></span>}</td>
                   {periods.flatMap((periodKey) => {
                     const month = monthByPeriod(row, periodKey);
                     if (!month) return [
