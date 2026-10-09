@@ -598,7 +598,10 @@ assert.doesNotMatch(recordsPage, /Forecast CSV Export|exportForecastCsv|exportCo
 assert.match(recordsPage, /Forecast Export/, "Forecast export button omits file-format wording");
 assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, "Forecast export remains connected to XLSX");
 assert.match(recordsPage, /Import Forecast data from an Excel \(\.xlsx\) file\./, "Forecast Import tooltip describes the Excel-only function instead of presenting the generated template name as the last imported file");
-assert.match(recordsPage, /Last Import file: \$\{importMetadata\.forecastSourceFileName \?\? "Not available"\}/, "Forecast Import keeps actual import metadata separate from the function description");
+assert.match(recordsPage, /importMetadata\.forecastSourceFileName \? `\\nLast Import file: \$\{importMetadata\.forecastSourceFileName\}` : ""/,
+  "Forecast Import hides a filename line when no source filename exists");
+assert.match(styles, /\.fiscal-year-selector__row:hover \{ background: #0B607D; color: #fff; \}/,
+  "the common fiscal-year option uses the requested teal hover and white text");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
@@ -789,14 +792,18 @@ assert.match(
 );
 
 assert.match(recordsPage, /page\.controlTotals/, "the records page must retain actual control rows returned by the API");
-assert.match(recordsPage, /actualControlRefreshState === "ready"[\s\S]*matchStatus !== "MATCH"/, "only a completed latest query can produce a Control mismatch warning from screen state");
-assert.match(recordsPage, /actualControlsRequiringConfirmation[\s\S]*actualControlRefreshState === "ready"[\s\S]*actualControlTotals\.filter/,
-  "inline Actual cells must not reuse stale Control warnings while a replacement query is loading or failed");
-assert.match(recordsPage, /actualControlRefreshState === "failed"[\s\S]*Actual Control 최신 조회 실패[\s\S]*금액 불일치로 판정하지 않았습니다[\s\S]*서버에서 최신 Control과 Detail을 다시 검증/,
-  "a failed latest-Control query is distinct from a monetary mismatch and leaves server export validation authoritative");
-assert.match(recordsPage, /control\.account[\s\S]*control\.periodKey[\s\S]*control\.pillar[\s\S]*control\.actualState[\s\S]*Control[\s\S]*Detail[\s\S]*reason/,
-  "Control warnings identify Account, month, Pillar, Actual state, amounts, and reason");
-assert.match(recordsPage, /Control[\s\S]*Detail[\s\S]*확인 필요/, "a stale control must show both amounts and the confirmation-required state");
+assert.doesNotMatch(recordsPage, /Actual Control 최신 조회 실패|records-control-confirmation|Actual Export가 차단|consumption-control-warning/,
+  "Records rendering and export messaging do not depend on Control MATCH or Control refresh warnings");
+assert.match(recordsPage, /<FiscalYearSelector selected=\{fiscalYear\}[\s\S]*onFiscalYearChange\(year\)/,
+  "Records exposes the same interactive fiscal-year selector as the other Consumption pages");
+assert.match(content, /<ConsumptionRecordsPage[\s\S]*key=\{fiscalYear\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
+  "a Records fiscal-year change remounts the page and reloads data for the selected year");
+assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q1`\)/,
+  "Records starts its query at the selected fiscal year's first quarter");
+assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q4`\)/,
+  "Records ends its query at the selected fiscal year's final quarter");
+assert.match(recordsPage, /loadRecordsPage\(false, \{[\s\S]*fromQuarter: `\$\{fiscalYear\}-Q1`[\s\S]*toQuarter: `\$\{fiscalYear\}-Q4`/,
+  "Records loads the selected fiscal year instead of an unscoped quarter range");
 assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|Actual \{exactCurrency\(variance\.actualAmountExact\)\} · Final/,
   "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 

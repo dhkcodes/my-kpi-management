@@ -153,13 +153,13 @@ void (async () => {
         previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
         compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
       forecastVariances: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "ALL", actualAmount: null, forecastAmount: null, varianceAmount: null, variancePercent: null, completeness: "INCOMPLETE" }],
-      accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
+      accountGroups: [{ account: "Forecast   Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"forecast-only-page"' } });
   };
   const forecastOnlyPage = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
     sort: "ACCOUNT", direction: "ASC", offset: 11, limit: 10 });
   assert.deepEqual(forecastOnlyPage.accountGroups, [{
-    account: "Forecast Only",
+    account: "Forecast   Only",
     plans: [],
     totals: { actualByPeriod: {}, appliedForecastByPeriod: {}, outlookByPeriod: {}, incompletePeriods: [] },
   }]);
@@ -177,6 +177,21 @@ void (async () => {
     previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
     compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE"
   }, "Consumption Records preserves every forecast-composition field supplied by the backend");
+
+  runtime.fetch = async () => new Response(JSON.stringify({
+    selectedPillar: "ALL", etag: '"ambiguous-account-page"', lastBatchId: 7,
+    currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
+    editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder, controlTotals: [],
+    accountForecasts: [{ account: "A B", normalizedAccount: "A B", periodKey: "FY27-OCT", pillar: "DP",
+      amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
+      previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
+      compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
+    forecastVariances: [], accountGroups: [{ account: "A B", plans: [] }, { account: "A  B", plans: [] }],
+    totalAccounts: 2, nextOffset: 2, hasMore: false
+  }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"ambiguous-account-page"' } });
+  await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
+    sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 }), /Malformed Consumption forecast-only records group/,
+  "normalized whitespace fallback cannot merge two distinct raw Account names");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     selectedPillar: "ALL", etag: '"negative-composition"', lastBatchId: 7,

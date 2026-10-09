@@ -1,7 +1,7 @@
 import { ComponentChildren, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { FiscalYear } from "../../data/kpiMockData";
+import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 
 import {
   ConsumptionPlan,
@@ -72,6 +72,7 @@ import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -449,13 +450,14 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
 
 type Props = Readonly<{
   fiscalYear: FiscalYear;
+  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
   canWrite: boolean;
   canWriteForecast: boolean;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast, onNavigationGuardChange, breadcrumb }: Props) {
+export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrite, canWriteForecast, onNavigationGuardChange, breadcrumb }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -481,8 +483,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [serverSignals, setServerSignals] = useState<ConsumptionSignal[] | null>(null);
   const [conflictRows, setConflictRows] = useState<ConflictRow[]>([]);
   const [conflictWorkspace, setConflictWorkspace] = useState<ConsumptionApiWorkspace | null>(null);
-  const [fromQuarter, setFromQuarter] = useState("");
-  const [toQuarter, setToQuarter] = useState("");
+  const [fromQuarter, setFromQuarter] = useState(`${fiscalYear}-Q1`);
+  const [toQuarter, setToQuarter] = useState(`${fiscalYear}-Q4`);
   const [displayQuarterOrder, setDisplayQuarterOrder] = useState<string[]>([]);
   const [availableQuarterOptions, setAvailableQuarterOptions] = useState<string[]>([]);
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
@@ -551,7 +553,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const appliedSearchRef = useRef("");
   const searchComposingRef = useRef(false);
   const recordsLoadingRef = useRef(false);
-  const recordsQueryRef = useRef<RecordsQuery>({ fromQuarter: "", toQuarter: "", search: "", pillar: "ALL" });
+  const recordsQueryRef = useRef<RecordsQuery>({
+    fromQuarter: `${fiscalYear}-Q1`, toQuarter: `${fiscalYear}-Q4`, search: "", pillar: "ALL"
+  });
   const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
   const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals) || draftForecastCompositions.size > 0;
   const hasDraftChanges = hasControlDraftChanges;
@@ -798,7 +802,9 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
   useEffect(() => {
     let active = true;
-    void loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, "ALL", "initial")
+    void loadRecordsPage(false, {
+      fromQuarter: `${fiscalYear}-Q1`, toQuarter: `${fiscalYear}-Q4`, search: ""
+    }, "ALL", "initial")
       .then(() => undefined)
       .catch((error) => {
       if (!active) return;
@@ -1147,11 +1153,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     const control = controlRecord(controls, account, month);
     return control ? control.controlAmountExact ?? String(control.controlAmount) : undefined;
   };
-  const actualControlsRequiringConfirmation = (account: string, month: string) =>
-    actualControlRefreshState === "ready"
-      ? actualControlTotals.filter((control) =>
-          control.account === account && control.periodKey === month && control.matchStatus !== "MATCH")
-      : [];
 
   const updateControlForecast = (account: string, month: string, valueExact: string | null) => {
     recordsRequestGeneration.current++;
@@ -1702,12 +1703,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
               </ForecastCompositionTooltip> : <span>{exactCurrency(valueExact ?? "0")}{dirty && <small>draft</small>}</span>}
             </td>;
           }
-          const controlWarnings = accountLevel ? actualControlsRequiringConfirmation(series.customer, month) : [];
           return <td key={key} class="consumption-value-cell" data-readonly={actual ? "actual" : "plan-actual"}>
             {value === null ? "—" : currency.format(value)}
-            {controlWarnings.map((control) => <small key={controlKey(control)} class="consumption-control-warning">
-              {control.pillar} Control {currency.format(control.controlAmount)} · Detail {control.detailAmount === null ? "—" : currency.format(control.detailAmount)} · 확인 필요
-            </small>)}
           </td>;
         }),
         <td key={`${series.id}-${quarter}-total`} class={`consumption-value-cell consumption-quarter-total${forecastQuarter ? " is-forecast" : ""}`}>
@@ -1727,19 +1724,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
-  if (actualControlRefreshState === "failed") pageMessages.push({ id: "records-control-load-failed", severity: "error", summary: "Actual Control 최신 조회 실패", detail: "금액 불일치로 판정하지 않았습니다. 다시 조회해 주세요. Actual Export는 서버에서 최신 Control과 Detail을 다시 검증합니다.", persistence: "sticky" });
-  const controlsRequiringConfirmation = actualControlRefreshState === "ready"
-    ? actualControlTotals.filter((control) => control.matchStatus !== "MATCH")
-    : [];
-  if (controlsRequiringConfirmation.length > 0) {
-    const examples = controlsRequiringConfirmation.slice(0, 3).map((control) => {
-      const reason = control.matchStatus === "NO_DETAIL" ? "현재 Detail 없음" : control.matchStatus === "STALE_CONTROL" ? "유효 상태 불일치" : "금액 불일치";
-      const detail = control.detailAmountExact ?? (control.detailAmount === null ? "없음" : String(control.detailAmount));
-      return `${control.account} · ${control.periodKey} · ${control.pillar}/${control.actualState} · Control ${control.controlAmountExact ?? control.controlAmount} · Detail ${detail} · ${reason}`;
-    });
-    const remainder = controlsRequiringConfirmation.length > examples.length ? ` 외 ${controlsRequiringConfirmation.length - examples.length}건` : "";
-    pageMessages.push({ id: "records-control-confirmation", severity: "warning", summary: "Actual Control 확인 필요", detail: `${examples.join(" | ")}${remainder}. 최신 Control과 현재 Detail을 확인하기 전에는 Actual Export가 차단됩니다.`, persistence: "sticky" });
-  }
+
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
   const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting
     || importPhase !== "idle" || forecastImportPhase !== "idle";
@@ -1755,12 +1740,15 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     : importPhase === "previewing" || forecastImportPhase === "previewing" ? "Validating import"
       : importPhase === "applying" || forecastImportPhase === "applying" ? "Applying import"
         : dataMode === "loading" ? "Loading records" : "Refreshing records";
-  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : "Import Forecast data from an Excel (.xlsx) file."}\nLast Import file: ${importMetadata.forecastSourceFileName ?? "Not available"}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
-  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import Actual data from Excel (.xlsx) files."}\nLast Import file: ${importMetadata.actualSourceFileName ?? "Not available"}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
+  const forecastImportTooltip = `${!canWriteForecast ? "Forecast write permission is required." : "Import Forecast data from an Excel (.xlsx) file."}${importMetadata.forecastSourceFileName ? `\nLast Import file: ${importMetadata.forecastSourceFileName}` : ""}\nLast Import time: ${forecastImportedDate ? `${forecastImportedDate} KST` : "Not available"}`;
+  const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import Actual data from Excel (.xlsx) files."}${importMetadata.actualSourceFileName ? `\nLast Import file: ${importMetadata.actualSourceFileName}` : ""}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
+
+  const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={getLatestFiscalYear()}
+    onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
     ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
-    breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
+    breadcrumb={breadcrumb} title="Consumption Records" titleControls={fiscalYearControl} headingSpacing="compact"
     busy busyLabel="Loading Consumption Records" activityPosition="custom">
     <PageDataProgress busy busyLabel="Loading Consumption Records" />
   </PageShell>;
@@ -1769,7 +1757,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
     <PageShell className="consumption-page" ariaLabelledBy="consumptionTitle"
       rootAttributes={{ "data-fiscal-year": fiscalYear }}
       scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={handlePageScroll}
-      breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
+      breadcrumb={breadcrumb} title="Consumption Records" titleControls={fiscalYearControl} headingSpacing="compact"
       busy={pageBusy} busyLabel={pageBusyLabel}
       activityPosition="custom"
       actions={<div class="consumption-import-actions is-compact">
