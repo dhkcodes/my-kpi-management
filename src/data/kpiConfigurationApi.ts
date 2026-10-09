@@ -122,7 +122,7 @@ export const fetchFxRate = async (year: FiscalYear, fetchImpl: FetchLike = fetch
   if (!parsed) throw new Error("Malformed FX Rate API response");
   return parsed;
   } catch (error) {
-    if (error instanceof KpiConfigurationApiError && error.status === 404) return null;
+    if (error instanceof KpiConfigurationApiError && error.status === 404 && error.code === "FX_RATE_NOT_FOUND") return null;
     throw error;
   }
 };
