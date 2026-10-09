@@ -90,6 +90,7 @@ export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
   account: string; salesRep: string; percentageExact: string | null;
   actualEntryStatus: "PROVIDED" | "MISSING";
   priorActualAmountExact: string; actualGrowthAmountExact: string | null; actualGrowthPercentExact: string | null;
+  yoyComparisonStatus: string; yoyUnavailableReason: string | null;
   forecastEntryStatus: "MISSING" | "ZERO" | "ENTERED";
   attentionReasons: readonly string[];
   workloads: readonly ConsumptionAnalysisWorkload[];
