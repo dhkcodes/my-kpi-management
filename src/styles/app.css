@@ -6851,3 +6851,57 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-monthly-totals td:has(.forecast-actual-value-badge) { text-align: center; }
 .consumption-records-toolbar__left { align-items: center; display: inline-flex; flex-wrap: wrap; gap: .45rem; }
 .consumption-records-toolbar__left .consumption-records-count-summary { padding: 0; text-align: left; }
+/* 2026-10 Consumption interaction refinements */
+.fiscal-year-selector { position: relative; }
+.fiscal-year-selector__trigger {
+  align-items: center; background: #fff; border: 1px solid #69747f; border-radius: .35rem;
+  color: #182027; cursor: pointer; display: inline-flex; font: inherit; font-weight: 700;
+  gap: .55rem; min-height: 2rem; min-width: 5.75rem; padding: .25rem .65rem;
+}
+.fiscal-year-selector__trigger:hover,
+.fiscal-year-selector__trigger:focus-visible,
+.fiscal-year-selector__trigger[aria-expanded="true"] { border-color: #2f6f4e; box-shadow: 0 0 0 2px rgba(47,111,78,.18); outline: 0; }
+.fiscal-year-selector__chevron { color: #55616c; margin-left: auto; }
+.fiscal-year-selector__popover {
+  background: #fff; border: 1px solid #d7ddd9; border-radius: .55rem; box-shadow: 0 .75rem 1.8rem rgba(20,35,27,.18);
+  min-width: 15rem; padding: .45rem; position: absolute; right: 0; top: calc(100% + .4rem); z-index: 1200;
+}
+.fiscal-year-selector__header { align-items: center; display: flex; justify-content: space-between; padding: .25rem .35rem .45rem .55rem; }
+.fiscal-year-selector__header strong { color: #26322c; font-size: .83rem; }
+.fiscal-year-selector__navigation { display: inline-flex; gap: .18rem; }
+.fiscal-year-selector__navigation button {
+  align-items: center; background: transparent; border: 0; border-radius: .3rem; color: #46544c; cursor: pointer;
+  display: inline-flex; font-size: 1.1rem; height: 1.8rem; justify-content: center; width: 1.8rem;
+}
+.fiscal-year-selector__navigation button:hover,
+.fiscal-year-selector__navigation button:focus-visible { background: #edf6f0; color: #1f6a42; outline: none; }
+.fiscal-year-selector__row {
+  align-items: center; background: transparent; border: 0; border-radius: .35rem; color: #27332d; cursor: pointer;
+  display: grid; font: inherit; grid-template-columns: 1.15rem 1fr auto; min-height: 2.45rem; padding: .35rem .6rem; text-align: left; width: 100%;
+}
+.fiscal-year-selector__row:hover { background: #f1f7f3; color: #225f3e; }
+.fiscal-year-selector__row.is-selected { background: #e3f2e8; color: #17623b; font-weight: 750; }
+.fiscal-year-selector__radio { border: 1.5px solid #748078; border-radius: 50%; height: .85rem; position: relative; width: .85rem; }
+.fiscal-year-selector__row.is-selected .fiscal-year-selector__radio { border-color: #20804d; }
+.fiscal-year-selector__row.is-selected .fiscal-year-selector__radio::after { background: #20804d; border-radius: 50%; content: ""; inset: .16rem; position: absolute; }
+.fiscal-year-selector__current { color: #5b6961; font-size: .69rem; font-weight: 600; }
+
+.forecast-actual-toolbar-summary { align-items: center; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: .75rem 1.5rem; min-width: 0; }
+.forecast-actual-total-strip { align-items: baseline; display: flex; flex: 1 1 24rem; flex-wrap: wrap; gap: .45rem 1.6rem; grid-template-columns: none; width: auto; }
+.forecast-actual-total-strip > span,
+.forecast-actual-total-strip span { align-items: baseline; background: transparent; border: 0; border-radius: 0; display: inline-flex; gap: .42rem; min-height: 0; padding: 0; }
+.forecast-actual-total-strip small { color: #5f6a64; font-size: .68rem; grid-column: auto; letter-spacing: .02em; }
+.forecast-actual-total-strip strong { color: #16663e; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.forecast-actual-total-strip em { color: #5f6a64; display: inline; font-size: .67rem; font-style: normal; }
+.forecast-actual-total-strip mark { background: transparent; color: #a45122; font-weight: 800; }
+.forecast-actual-quarter-actions button strong { font-size: .86rem; }
+.forecast-actual-month-value.is-actual.is-empty { text-align: right; }
+.forecast-actual-month-value.is-actual .forecast-actual-value-badge.is-pending {
+  align-items: center; display: inline-grid; justify-items: center; margin-inline: auto; text-align: center;
+}
+@media (max-width: 760px) {
+  .forecast-actual-toolbar-summary { align-items: flex-start; }
+  .forecast-actual-total-strip { flex-basis: 100%; gap: .3rem 1rem; }
+  .forecast-actual-total-strip > span { flex-wrap: wrap; }
+  .fiscal-year-selector__popover { left: 0; right: auto; }
+}

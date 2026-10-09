@@ -35,7 +35,7 @@ assert.doesNotMatch(page, /forecast-actual-period-note/u, "the verbose FY/ALL/mo
 assert.doesNotMatch(page, /Full-period summary/u, "the misleading full-period summary header is removed");
 assert.match(page, /const formatAmount = \(value: string \| null, unavailable = "Unconfirmed"\) => value === null \? unavailable : formatExactKFixed\(value, 2\)/u,
   "amount formatter retains the K unit");
-assert.match(page, /Total Actual<\/small><span class="forecast-actual-total-value"><strong>\{formatAmount\(selectedTotalActual, "N\/A"\)\}<\/strong>/u,
+assert.match(page, /Total Actual<\/small>[\s\S]*<strong>\{formatAmount\(selectedTotalActual, "N\/A"\)\}<\/strong>/u,
   "the redundant K USD label and duplicate K suffix are removed while MTD stays inline with Total Actual");
 assert.doesNotMatch(page, /<small>K USD<\/small>/u,
   "quarter cards do not render the redundant K USD caption");
@@ -100,28 +100,12 @@ assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*to
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
-const fiscalYearFocusRule = styles.match(/\.consumption-analysis-fy-menu \.oj-menu-item:not\(\.oj-disabled\)\.oj-focus\s*\{([^}]*)\}/u)?.[1] ?? "";
-assert.match(fiscalYearFocusRule, /--oj-core-bg-color-hover:\s*#0b607d/iu,
-  "the live JET popup focus state receives the requested FY hover background");
-assert.match(fiscalYearFocusRule, /--oj-menu-item-text-color:\s*#fff(?:fff)?/iu,
-  "the live JET popup focus state receives white text");
-const fiscalYearMenuRules = [...styles.matchAll(/oj-menu\.consumption-analysis-fy-menu[^\{]*\{([^}]*)\}/gu)]
-  .map((match) => match[1]).join("\n");
-assert.doesNotMatch(fiscalYearMenuRules, /--oj-menu-item-(?:bg-color-hover|bg-color-focus|text-color-hover|text-color-focus)/u,
-  "unsupported JET menu custom properties must not masquerade as a hover implementation");
-
-const totalValueRules = [...styles.matchAll(/\.forecast-actual-total-value\s*\{([^}]*)\}/gu)];
-const effectiveTotalValueRule = totalValueRules[totalValueRules.length - 1]?.[1] ?? "";
-assert.match(styles, /\.forecast-actual-total-strip\s+\.forecast-actual-total-value\s*\{[^}]*display:\s*inline-flex/iu,
-  "the matching descendant selector must outrank the generic .forecast-actual-total-strip span grid rule");
-assert.match(effectiveTotalValueRule, /display:\s*inline-flex/u,
-  "the final Total Actual value rule keeps MTD horizontally inline");
-assert.match(effectiveTotalValueRule, /flex-wrap:\s*nowrap/u,
-  "the Total Actual amount and MTD do not stack at the compact card width");
-assert.match(effectiveTotalValueRule, /align-items:\s*baseline/u,
-  "the amount and existing-size MTD label share a readable baseline");
-assert.doesNotMatch(effectiveTotalValueRule, /grid-template-columns|display:\s*(?:inline-)?grid/u,
-  "a later compact-card override must not put Total Actual MTD back on a second row");
+assert.match(styles, /\.fiscal-year-selector__row:hover\s*\{[^}]*background:\s*#f1f7f3[^}]*color:\s*#225f3e/u,
+  "the custom fiscal-year picker applies the requested green hover colors");
+assert.match(styles, /\.forecast-actual-total-strip\s*\{[^}]*display:\s*flex/iu,
+  "Total Actual and Forecast remain in the Show MTD toolbar row");
+assert.match(styles, /\.forecast-actual-total-strip > span,[\s\S]*\.forecast-actual-total-strip span\s*\{[^}]*align-items:\s*baseline[^}]*display:\s*inline-flex/iu,
+  "the amount and MTD label share an inline baseline");
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);

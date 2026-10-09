@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { KeyboardEvent } from "preact/compat";
 import "ojs/ojprogress-circle";
 import "ojs/ojbutton";
-import "ojs/ojmenu";
-import "ojs/ojoption";
-import type { ojMenu } from "ojs/ojmenu";
+
 import { fetchForecastActualComparison, type ForecastActualComparison, type ForecastActualMode, type ForecastActualRow } from "../../data/consumptionApi";
 import { consumptionPillarOptions, type ConsumptionPillar } from "../../data/consumptionData";
 import {
@@ -23,6 +21,7 @@ import { addExactDecimals, compareExactDecimals, formatExactKFixed } from "../..
 import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 
 const formatAmount = (value: string | null, unavailable = "Unconfirmed") => value === null ? unavailable : formatExactKFixed(value, 2);
@@ -282,31 +281,8 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     .filter((value): value is string => value !== null)
     .reduce((total, value) => addExactDecimals(total, value), "0");
   const currentFiscalYear = getLatestFiscalYear();
-  const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
-  const adjacentFiscalYears = fiscalYears
-    .filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
-    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
-  const earlierFiscalYears = fiscalYears
-    .filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
-    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
-  const handleFiscalYearMenuAction = (event: ojMenu.ojMenuAction) => {
-    const year = String(event.detail.selectedValue) as FiscalYear;
-    if (fiscalYears.includes(year) && year !== fiscalYear) onFiscalYearChange(year);
-  };
-  const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button forecast-actual-fy-button oj-button-sm" chroming="outlined"
-    aria-label={`Selected fiscal year ${fiscalYear}`}>
-    {fiscalYear}
-    <oj-menu class="consumption-analysis-fy-menu" slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
-      {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
-        {year === currentFiscalYear ? `${year} · Current` : year}
-      </oj-option>)}
-      {earlierFiscalYears.length > 0 && <oj-option>Earlier FYs…
-        <oj-menu>
-          {earlierFiscalYears.map((year) => <oj-option key={year} value={year}>{year}</oj-option>)}
-        </oj-menu>
-      </oj-option>}
-    </oj-menu>
-  </oj-menu-button>;
+  const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
+    className="forecast-actual-fy-button" onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
   const updateViewportControls = () => {
     const root = pageScrollRef.current;
     const frame = matrixFrameRef.current;
@@ -412,11 +388,18 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
 
     {contentReady && currentData && <div class="forecast-actual-results" aria-busy="false">
       <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
-        <div class="consumption-records-toolbar__left">
+        <div class="consumption-records-toolbar__left forecast-actual-toolbar-summary">
           <ConsumptionMtdControl checked={actualMode === "MTD"} disabled={loading || !currentData?.currentMtdAvailable}
             mtdAppliedDate={mtdAppliedTimestamp}
             onToggle={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}
             tooltipId="forecast-show-mtd-tooltip" />
+          <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
+            <span class="forecast-actual-total-text forecast-actual-total-text--actual"><small>Total Actual</small>
+              <strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
+              {displayedActualMode === "MTD" && <em>(includes MTD <mark>{formatAmount(selectedMtdActual, "N/A")}</mark>)</em>}
+            </span>
+            <span class="forecast-actual-total-text forecast-actual-total-text--forecast"><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
+          </div>
         </div>
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
@@ -424,13 +407,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
             showBusyLabel={false} compactTimestampButton />
         </div>
       </div>
-      <section class="forecast-actual-overview" aria-label="Selected scope totals and quarter results">
-        <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
-          <span class="forecast-actual-total-card forecast-actual-total-card--actual"><small>Total Actual</small><span class="forecast-actual-total-value"><strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
-            {displayedActualMode === "MTD" && <em class="forecast-actual-total-mtd">(MTD <mark>{formatAmount(selectedMtdActual, "N/A")}</mark>)</em>}
-          </span></span>
-          <span class="forecast-actual-total-card forecast-actual-total-card--forecast"><small>Total Forecast</small><strong>{formatAmount(selectedTotalForecast, "N/A")}</strong></span>
-        </div>
+      <section class="forecast-actual-overview" aria-label="Quarter results">
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
           return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}

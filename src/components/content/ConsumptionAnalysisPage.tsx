@@ -35,14 +35,12 @@ import {
 import "ojs/ojprogress-circle";
 import "ojs/ojchart";
 import "ojs/ojbutton";
-import "ojs/ojmenu";
-import "ojs/ojoption";
 import type { ojChart } from "ojs/ojchart";
-import type { ojMenu } from "ojs/ojmenu";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
@@ -356,31 +354,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const mtdAppliedTimestamp = analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf;
 
   const currentFiscalYear = getLatestFiscalYear();
-  const currentFiscalYearNumber = Number(currentFiscalYear.slice(2));
-  const adjacentFiscalYears = fiscalYears
-    .filter((year) => Math.abs(Number(year.slice(2)) - currentFiscalYearNumber) <= 1)
-    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
-  const earlierFiscalYears = fiscalYears
-    .filter((year) => Number(year.slice(2)) < currentFiscalYearNumber - 1)
-    .sort((left, right) => Number(right.slice(2)) - Number(left.slice(2)));
-  const handleFiscalYearMenuAction = (event: ojMenu.ojMenuAction) => {
-    const year = String(event.detail.selectedValue) as FiscalYear;
-    if (fiscalYears.includes(year) && year !== fiscalYear) onFiscalYearChange(year);
-  };
-  const fiscalYearControl = <oj-menu-button class="consumption-analysis-fy-button oj-button-sm" chroming="outlined"
-    aria-label={`Selected fiscal year ${fiscalYear}`}>
-    {fiscalYear}
-    <oj-menu class="consumption-analysis-fy-menu" slot="menu" aria-label="Select fiscal year" onojMenuAction={handleFiscalYearMenuAction}>
-      {adjacentFiscalYears.map((year) => <oj-option key={year} value={year}>
-        {year === currentFiscalYear ? `${year} · Current` : year}
-      </oj-option>)}
-      {earlierFiscalYears.length > 0 && <oj-option>Earlier FYs…
-        <oj-menu>
-          {earlierFiscalYears.map((year) => <oj-option key={year} value={year}>{year}</oj-option>)}
-        </oj-menu>
-      </oj-option>}
-    </oj-menu>
-  </oj-menu-button>;
+  const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
+    onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
@@ -391,7 +366,6 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
-    onRefresh={refreshAnalysis}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
     <PageDataProgress busy={loading} busyLabel="Loading data" />
   </PageShell>;
@@ -489,7 +463,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
-    actions={!loading ? <div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
+    actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
       <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
         title="Export the current Consumption Analysis view as PNG" onojAction={() => void downloadCanvas("png")}>
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Exporting…" : "PNG"}
@@ -499,7 +473,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Exporting…" : "PDF"}
       </oj-button>
       {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
-    </div> : null}
+    </div>}
     messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}
     filters={<PageFilterPanel className="consumption-insights-header-actions" ariaLabel="Consumption Analysis filters">
         <div class="consumption-insights-pillar">
@@ -557,12 +531,10 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           onToggle={() => { setLoading(true); setIncludeMtd((current) => !current); }}
           tooltipId="analysis-show-mtd-tooltip" />
       </div>
-      {!loading && (
         <div class="consumption-records-toolbar-activity">
-          <PageActivity busy={false} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
+          <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
             onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
-      )}
     </div>
     <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
