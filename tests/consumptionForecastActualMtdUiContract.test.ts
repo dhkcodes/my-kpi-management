@@ -100,8 +100,8 @@ assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*to
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
-assert.match(styles, /\.fiscal-year-selector__row:hover\s*\{[^}]*background:\s*#f1f7f3[^}]*color:\s*#225f3e/u,
-  "the custom fiscal-year picker applies the requested green hover colors");
+assert.match(styles, /\.fiscal-year-selector__row:hover\s*\{[^}]*background:\s*#0B607D[^}]*color:\s*#fff/u,
+  "the custom fiscal-year picker applies the requested teal hover colors");
 assert.match(styles, /\.forecast-actual-total-strip\s*\{[^}]*display:\s*flex/iu,
   "Total Actual and Forecast remain in the Show MTD toolbar row");
 assert.match(styles, /\.forecast-actual-total-strip > span,[\s\S]*\.forecast-actual-total-strip span\s*\{[^}]*align-items:\s*baseline[^}]*display:\s*inline-flex/iu,

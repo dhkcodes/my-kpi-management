@@ -147,7 +147,8 @@ async function run() {
   assert.match(pageSource, /saveError instanceof AccountsWorkloadsApiError/, "structured batch errors are rendered without clearing the draft");
   assert.match(pageSource, /setSaveErrors\([\s\S]{0,120}saveError instanceof AccountsWorkloadsApiError/, "draft edits survive save errors");
   assert.doesNotMatch(pageSource, /Clone Previous FY|clone-preview/, "FY clone UI is removed");
-  assert.match(contentSource, /accountsWorkloads[\s\S]{0,120}accountManagementOverview[\s\S]{0,120}kpi-fiscal-year-panel/, "AW route omits the fiscal-year control");
+  assert.match(contentSource, /showsFiscalYearPanel = !\[[^\]]*'accountsWorkloads'[^\]]*\]\.includes\(activeRoute\.module\)/,
+    "AW route omits the fiscal-year control");
 
   console.log("FY-independent AW-only frontend and Consumption candidate contracts passed");
 }

@@ -21,16 +21,13 @@ const pngDimensions = (path: string) => {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 };
 
-for (const variant of ["gold", "purple", "blue", "coral"]) {
-  const relative = `styles/images/kap-header-${variant}.png`;
-  const iconRelative = `styles/images/kap-header-${variant}-icon.png`;
-  assert.match(brand, new RegExp(relative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${variant} KAP header variant is selectable`);
-  assert.equal(existsSync(join(root, "src", relative)), true, `${variant} KAP image exists`);
-  assert.deepEqual(pngDimensions(join(root, "src", relative)), { width: 1600, height: 300 }, `${variant} uses the new full logo artwork`);
-  assert.match(brand, new RegExp(iconRelative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${variant} mobile icon follows the selected variant`);
-  assert.equal(existsSync(join(root, "src", iconRelative)), true, `${variant} mobile icon exists`);
-  assert.deepEqual(pngDimensions(join(root, "src", iconRelative)), { width: 315, height: 300 }, `${variant} icon is cropped from the new artwork`);
-}
+const relative = "styles/images/kap-header-terracotta.png";
+const iconRelative = "styles/images/kap-header-terracotta-icon.png";
+assert.match(brand, /KAP_TERRACOTTA_LOGO[\s\S]*variant: "terracotta"/, "the KAP header is locked to terracotta branding");
+assert.equal(existsSync(join(root, "src", relative)), true, "terracotta KAP image exists");
+assert.deepEqual(pngDimensions(join(root, "src", relative)), { width: 1600, height: 300 }, "terracotta uses the full logo artwork");
+assert.equal(existsSync(join(root, "src", iconRelative)), true, "terracotta mobile icon exists");
+assert.deepEqual(pngDimensions(join(root, "src", iconRelative)), { width: 315, height: 300 }, "terracotta icon is cropped from the artwork");
 
 class SharedStorage {
   readonly values = new Map<string, string>();
@@ -40,22 +37,22 @@ class SharedStorage {
 }
 
 const storage = new SharedStorage();
-assert.equal(startNewKapHeaderLoginSession(storage, 0.3).variant, "purple", "new login selects a variant");
-assert.equal(getOrCreateKapHeaderLogo(storage, 0.99).variant, "purple", "refresh and token refresh retain the login-session variant");
+assert.equal(startNewKapHeaderLoginSession(storage).variant, "terracotta", "new login selects terracotta");
+assert.equal(getOrCreateKapHeaderLogo(storage).variant, "terracotta", "refresh and token refresh retain terracotta");
 const sameSessionTab = storage;
-assert.equal(getOrCreateKapHeaderLogo(sameSessionTab, 0.55).variant, "purple", "tabs sharing the auth session use the same variant");
+assert.equal(getOrCreateKapHeaderLogo(sameSessionTab).variant, "terracotta", "tabs sharing the auth session use terracotta");
 clearKapHeaderLoginSession(storage);
 assert.equal(storage.getItem(KAP_HEADER_VARIANT_STORAGE_KEY), null, "logout or expiry clears the brand state");
-assert.equal(startNewKapHeaderLoginSession(storage, 0.55).variant, "blue", "re-login performs a fresh selection");
-assert.equal(selectKapHeaderLogo(0.99).variant, "coral", "all random buckets remain reachable");
-assert.equal([...storage.values.values()].every((value) => ["gold", "purple", "blue", "coral"].includes(value)), true, "storage contains only a public variant name");
+assert.equal(startNewKapHeaderLoginSession(storage).variant, "terracotta", "re-login remains on the fixed brand");
+assert.equal(selectKapHeaderLogo().variant, "terracotta", "selection is deterministic");
+assert.equal([...storage.values.values()].every((value) => value === "terracotta"), true, "storage contains only the public fixed variant name");
 assert.doesNotMatch(KAP_HEADER_VARIANT_STORAGE_KEY, /token|cookie|secret|user|login/i, "storage key exposes no auth identity or secret");
 
 assert.match(header, /useState\(getOrCreateKapHeaderLogo\)/, "header restores the login-session selection");
 assert.match(header, /window\.addEventListener\("storage", syncBrandAcrossTabs\)/, "open tabs converge on the shared session selection");
 assert.match(header, /<source media="\(max-width: 720px\)" srcSet=\{selectedKapHeaderLogo\.iconSrc\}/, "mobile renders the selected variant's icon crop");
-assert.match(header, /src=\{selectedKapHeaderLogo\.src\} alt="KAP"/, "desktop renders the selected full logo with the KAP accessible name");
-assert.doesNotMatch(header, /KAP_HEADER_LOGOS\.map\(/, "all four KAP variants are not rendered together");
+assert.match(header, /src=\{selectedKapHeaderLogo\.src\} alt="Know the pulse, Act on it\. Perform\."/, "desktop renders the full logo with the complete accessible name");
+assert.doesNotMatch(brand, /Math\.random|gold|purple|blue|coral/, "legacy random variants cannot re-enter the brand path");
 assert.match(header, /data-variant=\{selectedKapHeaderLogo\.variant\}/, "rendered variant is observable for runtime verification");
 assert.match(header, /class="kpi-header__oracle-logo" src="styles\/images\/oracle_logo\.svg"/, "existing Oracle logo asset is rendered independently");
 assert.match(header, /<div class="kpi-header__brand"[\s\S]*<\/picture>\s*<img class="kpi-header__oracle-logo"[\s\S]*<\/div>/, "Oracle sits beside KAP inside the brand lockup");
