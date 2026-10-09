@@ -490,7 +490,7 @@ export function Content({
         </button>}
       </section>}
 
-      {!canWrite && ["kpiPage", "weeklyActivities", "calendar", "meetingNotes", "consumptionAttainment"].includes(activeRoute.module) && (
+      {!canWrite && ["kpiPage", "weeklyActivities", "calendar", "meetingNotes"].includes(activeRoute.module) && (
         <div class="accounts-workloads-source-status" role="status"><strong>Read-only access.</strong> Write permission is required to add, edit, delete, save, clone, restore, or import data.</div>
       )}
 

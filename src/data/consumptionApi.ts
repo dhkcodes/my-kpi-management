@@ -102,7 +102,7 @@ export type ConsumptionRecordsTotals = Readonly<{
   mtdAsOfByPeriod?: Readonly<Record<string, string>>;
 }>;
 export type ConsumptionRecordsPage = Omit<ConsumptionApiWorkspace, "signals" | "controlTotalCount"> & Readonly<{
-  accountGroups: ReadonlyArray<Readonly<{ account: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
+  accountGroups: ReadonlyArray<Readonly<{ account: string; normalizedAccount: string; plans: ConsumptionPlan[]; totals: ConsumptionRecordsTotals }>>;
   totals: ConsumptionRecordsTotals;
   totalAccounts: number; nextOffset: number; hasMore: boolean;
 }>;
@@ -321,18 +321,14 @@ const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "W
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const normalizedAccountKey = (value: string): string => value.trim().replace(/\s+/g, " ").toUpperCase();
-
 const hasUnambiguousForecastIdentity = (
-  groupAccount: string,
-  groupAccounts: readonly string[],
+  group: Readonly<{ account: string; normalizedAccount: string }>,
+  groups: ReadonlyArray<Readonly<{ account: string; normalizedAccount: string }>>,
   forecasts: readonly ConsumptionAccountForecast[],
 ): boolean => {
-  if (forecasts.some((forecast) => forecast.account === groupAccount)) return true;
-  const key = normalizedAccountKey(groupAccount);
-  const matchingGroups = new Set(groupAccounts.filter((account) => normalizedAccountKey(account) === key));
-  const matchingForecastAccounts = new Set(forecasts.filter((forecast) => forecast.normalizedAccount === key).map((forecast) => forecast.account));
-  return matchingGroups.size === 1 && matchingForecastAccounts.size === 1;
+  const matchingGroups = groups.filter((candidate) => candidate.normalizedAccount === group.normalizedAccount);
+  return matchingGroups.length === 1
+    && forecasts.some((forecast) => forecast.normalizedAccount === group.normalizedAccount);
 };
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const isNonNegativeFiniteNumber = (value: unknown): value is number => isFiniteNumber(value) && value >= 0;
@@ -1152,26 +1148,25 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
   }
   const rawGroups = raw.accountGroups.map((value) => {
     if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption records response");
-    const group = value as { account?: unknown; plans?: unknown; totals?: unknown };
-    if (!isNonEmptyString(group.account) || !Array.isArray(group.plans)
+    const group = value as { account?: unknown; normalizedAccount?: unknown; plans?: unknown; totals?: unknown };
+    if (!isNonEmptyString(group.account) || !isNonEmptyString(group.normalizedAccount) || !Array.isArray(group.plans)
       || group.plans.some((plan) => typeof plan !== "object" || plan === null || (plan as Record<string, unknown>).account !== group.account)) {
       throw new Error("Malformed Consumption records response");
     }
-    return { account: group.account, plans: group.plans, totals: decodeRecordsTotals(group.totals) };
+    return { account: group.account, normalizedAccount: group.normalizedAccount, plans: group.plans, totals: decodeRecordsTotals(group.totals) };
   });
   if (new Set(rawGroups.map((group) => group.account)).size !== rawGroups.length) throw new Error("Malformed Consumption records response");
   if (!Array.isArray(raw.controlTotals)) throw new Error("Malformed Consumption records response");
   const workspace = parseWorkspace({ ...raw, plans: rawGroups.flatMap((group) => group.plans), signals: [] }, response.headers.get("ETag"), query.pillar === undefined ? undefined : pillar);
-  const groupAccounts = rawGroups.map((group) => group.account);
   if (rawGroups.some((group) => group.plans.length === 0
-    && !hasUnambiguousForecastIdentity(group.account, groupAccounts, workspace.accountForecasts))) {
+    && !hasUnambiguousForecastIdentity(group, rawGroups, workspace.accountForecasts))) {
     throw new Error("Malformed Consumption forecast-only records group");
   }
   let planOffset = 0;
   const accountGroups = rawGroups.map((group) => {
     const plans = workspace.plans.slice(planOffset, planOffset + group.plans.length);
     planOffset += group.plans.length;
-    return { account: group.account, plans, totals: group.totals };
+    return { account: group.account, normalizedAccount: group.normalizedAccount, plans, totals: group.totals };
   });
   return { selectedPillar: workspace.selectedPillar, etag: workspace.etag, lastBatchId: workspace.lastBatchId, plans: workspace.plans, controlTotals: workspace.controlTotals,
     currentFiscalMonth: workspace.currentFiscalMonth, fromQuarter: workspace.fromQuarter, toQuarter: workspace.toQuarter,

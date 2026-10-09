@@ -51,7 +51,8 @@ assert.match(pageShell, /kap-page-activity__control-slot[\s\S]*busy \?[\s\S]*oj-
 assert.match(styles, /\.kap-page-activity__control-slot\s*\{[^}]*min-width:[^}]*width:/s,
   "the circle and Refresh control share a fixed-size slot");
 assert.match(appBusyOverlay, /oj-progress-bar[\s\S]*value=\{-1\}/, "route-entry fallback is a thin indeterminate JET bar rather than a floating Loading box");
-assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing|role="dialog"|aria-modal/, "route entry has no legacy or renamed full-screen loading box");
+assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing/, "route entry has no legacy or renamed full-screen loading box");
+assert.match(appBusyOverlay, /role="dialog" aria-modal="true"/, "the thin fallback bar still exposes the blocking state accessibly");
 assert.match(pageShell, /export function PageDataProgress/, "the shared shell exports the reusable data-area progress indicator");
 assert.match(pageShell, /PageDataProgress[\s\S]*if \(!busy\) return null/,
   "the progress element unmounts completely after its shared busy lifecycle ends");

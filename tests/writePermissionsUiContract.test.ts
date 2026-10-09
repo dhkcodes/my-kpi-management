@@ -10,7 +10,7 @@ const weekly = read("src/components/content/WeeklyActivitiesPage.tsx");
 const calendar = read("src/components/content/CalendarPage.tsx");
 const meetingNotes = read("src/components/content/MeetingNotesPage.tsx");
 const accounts = read("src/components/content/AccountsWorkloadsPage.tsx");
-const attainment = read("src/components/content/AttainmentPage.tsx");
+
 const records = read("src/components/content/ConsumptionRecordsPage.tsx");
 const homeConsumption = read("src/components/content/HomeConsumptionOverview.tsx");
 
@@ -18,14 +18,13 @@ assert.match(content, /const canWrite = canWriteRoute\(profile, activeRoute\)/,
   "the active route permission is resolved once and passed to content pages");
 assert.match(content, /Read-only access\.[\s\S]*Write permission is required/,
   "read-only users receive a visible permission explanation");
-assert.match(content, /\["kpiPage", "weeklyActivities", "calendar", "meetingNotes", "consumptionAttainment"\]\.includes\(activeRoute\.module\)/,
+assert.match(content, /\["kpiPage", "weeklyActivities", "calendar", "meetingNotes"\]\.includes\(activeRoute\.module\)/,
   "read-only banner covers editable pages and remains omitted on Accounts & Workloads and Consumption Records");
 assert.match(content, /<KpiSpreadsheetPage[\s\S]{0,180}canWrite=\{canWrite\}/);
 assert.match(content, /<AccountsWorkloadsPage[\s\S]{0,180}canWrite=\{canWrite\}/);
 assert.match(content, /<WeeklyActivitiesPage[^>]*canWrite=\{canWrite\}/);
 assert.match(content, /<CalendarPage[^>]*canWrite=\{canWrite\}/);
 assert.match(content, /<MeetingNotesPage[^>]*canWrite=\{canWrite\}/);
-assert.match(content, /<AttainmentPage[^>]*canWrite=\{canWrite\}/);
 assert.match(content, /<ConsumptionRecordsPage[\s\S]{0,160}canWrite=\{canWrite\}/);
 assert.match(content, /canReadHomeAccounts[\s\S]*accounts-workloads[\s\S]*canReadHomeAccounts && <AccountsWorkloadsPulseV2/,
   "home Accounts & Workloads is visible when that shared-data menu is readable");
@@ -48,7 +47,7 @@ assert.match(content, /\) : canEditKpiGuide \? \(/,
 assert.match(content, /id="kpiGuideEditButton"/,
   "KPI Guide retains the Admin edit action");
 
-for (const [name, source] of [["KPI", kpi], ["Weekly", weekly], ["Calendar", calendar], ["Meeting Notes", meetingNotes], ["Accounts", accounts], ["Attainment", attainment], ["Records", records]] as const) {
+for (const [name, source] of [["KPI", kpi], ["Weekly", weekly], ["Calendar", calendar], ["Meeting Notes", meetingNotes], ["Accounts", accounts], ["Records", records]] as const) {
   assert.match(source, /canWrite: boolean/, `${name} accepts explicit write capability`);
   assert.match(source, /Write permission is required/, `${name} guards mutation handlers and explains denial`);
 }
@@ -62,8 +61,8 @@ assert.match(accounts, /disabled=\{!canWrite \|\| saving\}[\s\S]{0,180}onClick=\
   "Accounts save is disabled for read-only users and routes through confirmation");
 assert.match(accounts, /!canWrite && <div[^>]*>Read-only access\. Write permission is required/,
   "read-only Accounts users receive a visible permission explanation");
-assert.match(records, /disabled=\{!canWrite \|\| hasDraftChanges[\s\S]*handleCsvFiles/,
-  "actual import file input is disabled without write permission");
+assert.match(records, /const importActionsDisabled = !canWrite \|\| hasDraftChanges[\s\S]*disabled=\{importActionsDisabled\}[\s\S]*handleActualFiles/,
+  "actual import file input is disabled without write permission or while drafts are present");
 assert.match(records, /applyPendingImport[\s\S]{0,180}if \(!canWrite\)/,
   "import Apply rechecks permission at the handler boundary");
 assert.match(records, /saveForecasts[\s\S]{0,180}if \(!canWrite\)[\s\S]{0,180}forecast changes were kept/,
