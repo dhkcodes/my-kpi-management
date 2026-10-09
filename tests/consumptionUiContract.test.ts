@@ -402,7 +402,7 @@ assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/
 assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*id: "records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
-assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Records renders the preserved editable workspace");
+assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*canWrite=\{canWrite\}/, "Consumption Records renders the preserved editable workspace without global FY coupling");
 assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis and Forecast vs Actual selectors and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
@@ -800,12 +800,13 @@ assert.doesNotMatch(recordsPage, /FiscalYearSelector|onFiscalYearChange/,
   "Records keeps its original Quarter-range scope and does not add a page-level FY selector");
 assert.doesNotMatch(content, /<ConsumptionRecordsPage[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "the shared content router does not inject the out-of-scope FY change callback into Records");
-assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q1`\)/,
-  "Records starts its query at the selected fiscal year's first quarter");
-assert.match(recordsPage, /useState\(`\$\{fiscalYear\}-Q4`\)/,
-  "Records ends its query at the selected fiscal year's final quarter");
-assert.match(recordsPage, /loadRecordsPage\(false, \{[\s\S]*fromQuarter: `\$\{fiscalYear\}-Q1`[\s\S]*toQuarter: `\$\{fiscalYear\}-Q4`/,
-  "Records loads the selected fiscal year instead of an unscoped quarter range");
+assert.match(recordsPage, /useState\(""\)/,
+  "Records starts with an unscoped Quarter range so the server can resolve its default period");
+assert.match(recordsPage, /recordsQueryRef = useRef<RecordsQuery>\(\{[\s\S]*fromQuarter:\s*""[\s\S]*toQuarter:\s*""/,
+  "Records preserves the server-resolved default range contract in its initial query ref");
+assert.doesNotMatch(content, /<ConsumptionRecordsPage[\s\S]*key=\{fiscalYear\}/,
+  "global FY changes do not remount the Quarter-scoped Records page");
+
 assert.doesNotMatch(recordsPage, /Account Actual minus preserved Final Forecast|Actual \{exactCurrency\(variance\.actualAmountExact\)\} · Final/,
   "Consumption Records does not render Actual-versus-Final comparison copy inside amount cells");
 
@@ -829,6 +830,16 @@ assert.match(fiscalYearSelector, /onPointerUp[\s\S]*pointerType === "mouse"[\s\S
   "FY controls provide an immediate non-mouse pointer path for WebKit touch input");
 assert.match(fiscalYearSelector, /addEventListener\("pointerdown", close, true\)/,
   "FY outside dismissal observes pointer input in capture phase instead of mouse-only events");
+assert.match(fiscalYearSelector, /event\.key === "Escape"[\s\S]*closeAndRestoreFocus\(\)/,
+  "the FY popup closes with Escape");
+assert.match(fiscalYearSelector, /const closeAndRestoreFocus[\s\S]*triggerRef\.current\?\.focus\(\)/,
+  "closing after a keyboard or selection action restores focus to the FY trigger");
+assert.match(fiscalYearSelector, /querySelector<HTMLButtonElement>\('\[aria-checked="true"\]'\)[\s\S]*focus\(\)/,
+  "opening the FY popup moves focus to the selected year");
+assert.match(fiscalYearSelector, /getBoundingClientRect\(\)/,
+  "the FY popup derives viewport coordinates from its trigger");
+assert.match(styles, /\.fiscal-year-selector__popover\s*\{[^}]*position:\s*fixed/,
+  "the FY popup is viewport-positioned so page overflow cannot clip it");
 assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
 assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");

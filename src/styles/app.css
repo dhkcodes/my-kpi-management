@@ -6867,7 +6867,7 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .fiscal-year-selector__chevron { color: #55616c; margin-left: auto; }
 .fiscal-year-selector__popover {
   background: #fff; border: 1px solid #d7ddd9; border-radius: .55rem; box-shadow: 0 .75rem 1.8rem rgba(20,35,27,.18);
-  min-width: 15rem; padding: .45rem; position: absolute; right: 0; top: calc(100% + .4rem); z-index: 1200;
+  min-width: 15rem; padding: .45rem; position: fixed; z-index: 1200;
 }
 .fiscal-year-selector__header { align-items: center; display: flex; justify-content: space-between; padding: .25rem .35rem .45rem .55rem; }
 .fiscal-year-selector__header strong { color: #26322c; font-size: .83rem; }

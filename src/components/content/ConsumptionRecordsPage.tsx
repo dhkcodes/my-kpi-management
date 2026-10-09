@@ -1,7 +1,6 @@
 import { ComponentChildren, h } from "preact";
 import { createPortal } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { FiscalYear } from "../../data/kpiMockData";
 
 import {
   ConsumptionPlan,
@@ -448,14 +447,13 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
 };
 
 type Props = Readonly<{
-  fiscalYear: FiscalYear;
   canWrite: boolean;
   canWriteForecast: boolean;
   onNavigationGuardChange: (guard: KpiNavigationGuard | null, hasUnsavedChanges: boolean) => void;
   breadcrumb?: ComponentChildren;
 }>;
 
-export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast, onNavigationGuardChange, breadcrumb }: Props) {
+export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigationGuardChange, breadcrumb }: Props) {
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [savedPlans, setSavedPlans] = useState<ConsumptionPlan[]>([]);
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
@@ -480,8 +478,8 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const [serverSignals, setServerSignals] = useState<ConsumptionSignal[] | null>(null);
   const [conflictRows, setConflictRows] = useState<ConflictRow[]>([]);
   const [conflictWorkspace, setConflictWorkspace] = useState<ConsumptionApiWorkspace | null>(null);
-  const [fromQuarter, setFromQuarter] = useState(`${fiscalYear}-Q1`);
-  const [toQuarter, setToQuarter] = useState(`${fiscalYear}-Q4`);
+  const [fromQuarter, setFromQuarter] = useState("");
+  const [toQuarter, setToQuarter] = useState("");
   const [displayQuarterOrder, setDisplayQuarterOrder] = useState<string[]>([]);
   const [availableQuarterOptions, setAvailableQuarterOptions] = useState<string[]>([]);
   const [editablePeriodIds, setEditablePeriodIds] = useState<Set<string>>(() => new Set());
@@ -551,7 +549,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const searchComposingRef = useRef(false);
   const recordsLoadingRef = useRef(false);
   const recordsQueryRef = useRef<RecordsQuery>({
-    fromQuarter: `${fiscalYear}-Q1`, toQuarter: `${fiscalYear}-Q4`, search: "", pillar: "ALL"
+    fromQuarter: "", toQuarter: "", search: "", pillar: "ALL"
   });
   const loadMoreRecordsRef = useRef<() => Promise<ConsumptionRecordsPage | undefined>>(async () => undefined);
   const hasControlDraftChanges = !controlValuesEqual(savedControlTotals, draftControlTotals) || draftForecastCompositions.size > 0;
@@ -791,7 +789,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   useEffect(() => {
     let active = true;
     void loadRecordsPage(false, {
-      fromQuarter: `${fiscalYear}-Q1`, toQuarter: `${fiscalYear}-Q4`, search: ""
+      fromQuarter: "", toQuarter: "", search: ""
     }, "ALL", "initial")
       .then(() => undefined)
       .catch((error) => {
@@ -1732,7 +1730,7 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
   const actualImportTooltip = `${!canWrite ? "Write permission is required." : "Import Actual data from Excel (.xlsx) files."}${importMetadata.actualSourceFileName ? `\nLast Import file: ${importMetadata.actualSourceFileName}` : ""}\nLast Import time: ${actualImportedDate ? `${actualImportedDate} KST` : "Not available"}`;
 
   if (dataMode === "loading") return <PageShell className="consumption-page consumption-initial-state"
-    ariaLabelledBy="consumptionTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
+    ariaLabelledBy="consumptionTitle"
     breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
     busy busyLabel="Loading Consumption Records" activityPosition="custom">
     <PageDataProgress busy busyLabel="Loading Consumption Records" />
@@ -1740,7 +1738,6 @@ export function ConsumptionRecordsPage({ fiscalYear, canWrite, canWriteForecast,
 
   return (
     <PageShell className="consumption-page" ariaLabelledBy="consumptionTitle"
-      rootAttributes={{ "data-fiscal-year": fiscalYear }}
       scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={handlePageScroll}
       breadcrumb={breadcrumb} title="Consumption Records" headingSpacing="compact"
       busy={pageBusy} busyLabel={pageBusyLabel}
