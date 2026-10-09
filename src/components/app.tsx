@@ -23,7 +23,7 @@ import {
   isKpiActivitiesRoute,
   NavigationRouteDefinition
 } from "./navigationRoutes";
-import { fiscalYearData, fiscalYears as fallbackFiscalYears, FiscalYear, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
+import { fiscalYears as fallbackFiscalYears, FiscalYear, getFiscalYearDataset, getLatestFiscalYear, navItems, NavigationItem } from "../data/kpiMockData";
 import { AccountWorkloadMetadata, AccountWorkloadRow, getAccountWorkloadMetadata } from "../data/accountsWorkloadsMockData";
 import {
   AccountsWorkloadsDataSource,
@@ -261,7 +261,11 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       setFxLoading(true);
       setFxError("");
       void fetchFxRate(fiscalYear)
-        .then((rate) => { if (active) setFxRate(rate); })
+        .then((rate) => {
+          if (!active) return;
+          setFxRate(rate);
+          if (rate === null) setFxError("FX Rate is not registered for this Fiscal Year.");
+        })
         .catch((error) => { if (active) setFxError(error instanceof Error ? error.message : "FX Rate API request failed."); })
         .finally(() => { if (active) setFxLoading(false); });
       return () => { active = false; };
@@ -274,7 +278,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
       setKpiDatasetLoading(true);
       setKpiDatasetError("");
       void listKpiSummary(fiscalYear)
-        .then((summary) => { if (active) setLiveKpiDataset(buildLiveFiscalYearDataset(summary, fiscalYearData[fiscalYear])); })
+        .then((summary) => { if (active) setLiveKpiDataset(buildLiveFiscalYearDataset(summary, getFiscalYearDataset(fiscalYear))); })
         .catch((error) => { if (active) setKpiDatasetError(error instanceof Error ? error.message : "KPI Overview API request failed."); })
         .finally(() => { if (active) setKpiDatasetLoading(false); });
       return () => { active = false; };
@@ -631,6 +635,8 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     };
 
     const isKapPageShellRoute = ["consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
+    const accountsWorkloadsRowsForFiscalYear = accountsWorkloadsRows[fiscalYear] ?? [];
+    const fiscalYearDataset = getFiscalYearDataset(fiscalYear);
 
     return (
       <div id="appContainer" class={`oj-web-applayout-page kpi-shell${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}`}>
@@ -695,7 +701,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           <Content
             activeRoute={activeRoute}
             profile={profile}
-            accountsWorkloadsRows={accountsWorkloadsRows[fiscalYear]}
+            accountsWorkloadsRows={accountsWorkloadsRowsForFiscalYear}
             accountsWorkloadsHierarchy={accountsWorkloadsHierarchy}
             accountsWorkloadsAsOf={accountsWorkloadsAsOf}
             accountsWorkloadsDataSource={accountsWorkloadsDataSource}
@@ -704,12 +710,12 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             accountsWorkloadsDraftActive={accountsWorkloadsDraftActive}
             weeklyActivitiesDraftActive={weeklyActivitiesDraftActive}
             kpiWriteActive={kpiWriteActive}
-            accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRows[fiscalYear].length > 0)}
+            accountsWorkloadsDatasetAvailable={!accountsWorkloadsLoading && !accountsWorkloadsLoadError && (fiscalYear === accountWorkloadMetadata.fiscalYear || accountsWorkloadsRowsForFiscalYear.length > 0)}
             accountsWorkloadsLoading={accountsWorkloadsLoading}
             accountsWorkloadsRefreshing={accountsWorkloadsRefreshing}
             onAccountsWorkloadsRefresh={() => void handleAccountsWorkloadsRefresh()}
             accountWorkloadMetadata={accountWorkloadMetadata}
-            dataset={fiscalYearData[fiscalYear]}
+            dataset={fiscalYearDataset}
             kpiDataset={liveKpiDataset}
             kpiDatasetLoading={kpiDatasetLoading}
             kpiDatasetError={kpiDatasetError}
@@ -738,7 +744,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
             onCloseGuide={() => setGuideOpen(false)}
             onOpenGuide={() => setGuideOpen(true)}
             onAccountsWorkloadsRowsChange={async (rows, permanentDeleteIds, draftFxRate) => {
-              const savedRows = accountsWorkloadsRows[fiscalYear];
+              const savedRows = accountsWorkloadsRowsForFiscalYear;
               if (accountsWorkloadsDataSource !== "api") {
                 const localRows = applyPermanentDeletesLocally(rows, permanentDeleteIds);
                 const localResult = { items: localRows, total: localRows.length, ...(draftFxRate ? { fxRate: draftFxRate } : {}) };

@@ -107,7 +107,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
             {(["ALL", "DP", "OCI"] as const).map((option) => <button type="button" class={pillar === option ? "is-active" : ""}
               aria-pressed={pillar === option} onClick={() => setPillar(option)}>{option === "ALL" ? "All" : option}</button>)}
           </div>
-          <span class="home-consumption__fy">{fiscalYear} · K USD</span>
+          <span class="home-consumption__fy">{fiscalYear}</span>
         </div>
       </div>
 

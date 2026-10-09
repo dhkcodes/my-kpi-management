@@ -124,6 +124,11 @@ async function run() {
 
   const pageSource = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
   const contentSource = readFileSync("src/components/content/index.tsx", "utf8");
+  const appSource = readFileSync("src/components/app.tsx", "utf8");
+  assert.match(appSource, /const accountsWorkloadsRowsForFiscalYear = accountsWorkloadsRows\[fiscalYear\] \?\? \[\];/,
+    "a browsable empty FY must resolve to an empty row set instead of throwing during render");
+  assert.doesNotMatch(appSource, /accountsWorkloadsRows\[fiscalYear\]\.length/,
+    "render-time FY availability must not dereference an absent year directly");
   assert.match(pageSource, /fetchAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /saveAccountsWorkloadsHierarchy/);
   assert.match(pageSource, /fetchForecastCandidates/);

@@ -63,6 +63,12 @@ const workbookSeeds: WorkbookSeed[] = fiscalYears.map((fiscalYear) => ({
 export const fiscalYearData: Record<FiscalYear, FiscalYearDataset> = workbookSeeds.reduce((result, seed) => {
   result[seed.fiscalYear] = calculateFiscalYearDataset(parseWorkbookSeed(seed)); return result;
 }, {} as Record<FiscalYear, FiscalYearDataset>);
+export const getFiscalYearDataset = (fiscalYear: FiscalYear): FiscalYearDataset =>
+  fiscalYearData[fiscalYear] ?? calculateFiscalYearDataset(parseWorkbookSeed({
+    fiscalYear,
+    sourceWorkbook: "empty-fiscal-year",
+    rows: []
+  }));
 export const getLatestFiscalYear = (): FiscalYear => currentFiscalYear();
 
 export const kpiNavItems: NavigationItem[] = [
