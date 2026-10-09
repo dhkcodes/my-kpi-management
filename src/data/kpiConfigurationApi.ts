@@ -115,11 +115,16 @@ export const updateKpiGuide = async (guide: KpiGuideRecord, fetchImpl: FetchLike
   return parsed;
 };
 
-export const fetchFxRate = async (year: FiscalYear, fetchImpl: FetchLike = fetch): Promise<FxRateRecord> => {
+export const fetchFxRate = async (year: FiscalYear, fetchImpl: FetchLike = fetch): Promise<FxRateRecord | null> => {
+  try {
   const payload = await requestJson(fetchImpl, `${apiBase()}/fx-rates?fiscalYear=${encodeURIComponent(year)}&fromCurrency=USD&toCurrency=KRW`);
   const parsed = parseFx(payload);
   if (!parsed) throw new Error("Malformed FX Rate API response");
   return parsed;
+  } catch (error) {
+    if (error instanceof KpiConfigurationApiError && error.status === 404) return null;
+    throw error;
+  }
 };
 
 export const updateFxRate = async (fx: FxRateRecord, fetchImpl: FetchLike = fetch): Promise<FxRateRecord> => {

@@ -62,7 +62,14 @@ async function run() {
 
   const loadedFx = await fetchFxRate("FY27", fetchImpl);
   assert.equal(calls[2].url, "/api/v1/fx-rates?fiscalYear=FY27&fromCurrency=USD&toCurrency=KRW");
-  assert.equal(loadedFx.rateValue, 1380.5);
+  assert.equal(loadedFx?.rateValue, 1380.5);
+
+  const missingFx = await fetchFxRate("FY29", async () => response({ code: "FX_RATE_NOT_FOUND", message: "not registered" }, 404));
+  assert.equal(missingFx, null, "404 means the rate is unregistered, not an invented zero value");
+  await assert.rejects(
+    () => fetchFxRate("FY29", async () => response({ code: "UPSTREAM_FAILURE" }, 503)),
+    /Configuration API request failed \(503\)/
+  );
 
   const savedFx = await updateFxRate({ ...fx, rateValue: 1390 }, fetchImpl);
   assert.equal(calls[3].url, "/api/v1/fx-rates/9");
