@@ -19,34 +19,48 @@ export function FiscalYearSelector({ selected, current, onSelect, className = ""
   const [open, setOpen] = useState(false);
   const [browseCenter, setBrowseCenter] = useState(current);
   const rootRef = useRef<HTMLDivElement>(null);
+  const lastNonMousePointerAtRef = useRef(0);
   const years = useMemo(() => fiscalYearWindow(browseCenter), [browseCenter]);
 
   useEffect(() => {
     if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    const close = (event: PointerEvent) => {
+      const path = event.composedPath();
+      if (!rootRef.current || (!path.includes(rootRef.current) && !rootRef.current.contains(event.target as Node))) setOpen(false);
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
   }, [open]);
 
-  const move = (offset: number) => setBrowseCenter(fiscalYear(yearNumber(browseCenter) + offset));
+  const move = (offset: number) => setBrowseCenter((center) => fiscalYear(yearNumber(center) + offset));
+  const activate = (action: () => void) => ({
+    onPointerUp: (event: PointerEvent) => {
+      if (event.pointerType === "mouse") return;
+      lastNonMousePointerAtRef.current = performance.now();
+      event.preventDefault();
+      action();
+    },
+    onClick: () => {
+      if (performance.now() - lastNonMousePointerAtRef.current < 750) return;
+      action();
+    }
+  });
   return <div ref={rootRef} class={`fiscal-year-selector ${className}`.trim()}>
     <button type="button" class="fiscal-year-selector__trigger" aria-haspopup="dialog" aria-expanded={open}
-      aria-label={`Selected fiscal year ${selected}`} onClick={() => setOpen((value) => !value)}>
+      aria-label={`Selected fiscal year ${selected}`} {...activate(() => setOpen((value) => !value))}>
       <span>{selected}</span><span class="fiscal-year-selector__chevron" aria-hidden="true">⌄</span>
     </button>
     {open && <div class="fiscal-year-selector__popover" role="dialog" aria-label="Select fiscal year">
       <header class="fiscal-year-selector__header"><strong>Fiscal Year</strong>
         <span class="fiscal-year-selector__navigation">
-          <button type="button" aria-label="Show earlier fiscal years" onClick={() => move(-1)}>‹</button>
-          <button type="button" aria-label="Show later fiscal years" onClick={() => move(1)}>›</button>
+          <button type="button" aria-label="Show earlier fiscal years" {...activate(() => move(-1))}>‹</button>
+          <button type="button" aria-label="Show later fiscal years" {...activate(() => move(1))}>›</button>
         </span>
       </header>
       <div class="fiscal-year-selector__options" role="radiogroup" aria-label="Fiscal year">
         {years.map((year) => <button key={year} type="button" role="radio" aria-checked={selected === year}
           class={`fiscal-year-selector__row ${selected === year ? "is-selected" : ""}`.trim()}
-          onClick={() => { onSelect(year); setOpen(false); }}>
+          {...activate(() => { onSelect(year); setOpen(false); })}>
           <span class="fiscal-year-selector__radio" aria-hidden="true"><span /></span>
           <span class="fiscal-year-selector__label">{year}</span>
           {year === current && <span class="fiscal-year-selector__current">Current</span>}

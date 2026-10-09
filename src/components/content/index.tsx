@@ -662,7 +662,6 @@ export function Content({
         <ConsumptionRecordsPage
           key={fiscalYear}
           fiscalYear={fiscalYear}
-          onFiscalYearChange={onFiscalYearChange}
           canWrite={canWrite}
           canWriteForecast={canWriteForecast}
           onNavigationGuardChange={onKpiNavigationGuardChange}
