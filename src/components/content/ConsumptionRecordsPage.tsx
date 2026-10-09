@@ -463,8 +463,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrit
   const [draftPlans, setDraftPlans] = useState<ConsumptionPlan[]>([]);
   const [savedControlTotals, setSavedControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
   const [draftControlTotals, setDraftControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
-  const [actualControlTotals, setActualControlTotals] = useState<ConsumptionApiControlTotal[]>([]);
-  const [actualControlRefreshState, setActualControlRefreshState] = useState<"loading" | "ready" | "failed">("loading");
+
   const [forecastVariances, setForecastVariances] = useState<ConsumptionForecastVariance[]>([]);
   const [accountForecasts, setAccountForecasts] = useState<ConsumptionAccountForecast[]>([]);
   const [draftForecastCompositions, setDraftForecastCompositions] = useState<Map<string, ForecastCompositionDraft>>(() => new Map());
@@ -595,7 +594,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrit
     setRecordAccountNames(adoptedAccountNames);
     setSavedControlTotals(cloneControlTotals(forecastControls));
     setDraftControlTotals(cloneControlTotals(forecastControls));
-    setActualControlTotals(cloneControlTotals(workspace.controlTotals.filter((control) => control.matchStatus !== "MANUAL_FORECAST")));
+
     setForecastVariances([...workspace.forecastVariances]);
     setAccountForecasts([...workspace.accountForecasts]);
     setDraftForecastCompositions(new Map());
@@ -627,7 +626,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrit
   ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
-    if (!append) setActualControlRefreshState("loading");
+
     recordsLoadingRef.current = true;
     setRecordsLoadingPhase(loadingPhase);
     const generation = ++recordsRequestGeneration.current;
@@ -715,13 +714,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrit
       setDraftControlTotals(preserveDrafts
         ? mergeRefreshedControlsWithDrafts(refreshedControls, savedControlTotalsRef.current, draftControlTotalsRef.current)
         : cloneControlTotals(refreshedControls));
-      setActualControlTotals((current) => {
-        const keyed = new Map((append ? current : []).map((control) => [controlKey(control), control]));
-        page.controlTotals.filter((control) => control.matchStatus !== "MANUAL_FORECAST")
-          .forEach((control) => keyed.set(controlKey(control), { ...control }));
-        return [...keyed.values()];
-      });
-      if (!append) setActualControlRefreshState("ready");
+
       setForecastVariances((current) => append ? [...current, ...page.forecastVariances] : [...page.forecastVariances]);
       setAccountForecasts((current) => {
         const keyed = new Map((append ? current : []).map((forecast) => [`${forecast.account}::${forecast.periodKey}::${forecast.pillar}`, forecast]));
@@ -786,10 +779,7 @@ export function ConsumptionRecordsPage({ fiscalYear, onFiscalYearChange, canWrit
       return page;
     } catch (error) {
       if (generation !== recordsRequestGeneration.current) return;
-      if (!append) {
-        setActualControlTotals([]);
-        setActualControlRefreshState("failed");
-      }
+
       throw error;
     } finally {
       if (generation === recordsRequestGeneration.current) {

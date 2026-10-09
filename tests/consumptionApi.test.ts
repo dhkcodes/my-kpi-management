@@ -119,7 +119,7 @@ void (async () => {
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
       controlTotals: payload.controlTotals,
-      accountGroups: [{ account: "A", plans: payload.plans, totals: {
+      accountGroups: [{ account: "A", normalizedAccount: "A", plans: payload.plans, totals: {
         actualByPeriod: { "FY27-AUG": 100 }, appliedForecastByPeriod: { "FY27-OCT": 20 },
         outlookByPeriod: { "FY27-AUG": 100, "FY27-OCT": 20 }, incompletePeriods: ["FY27-SEP"]
       } }], totalAccounts: 11, nextOffset: 11, hasMore: false,
@@ -153,13 +153,14 @@ void (async () => {
         previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
         compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
       forecastVariances: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", periodKey: "FY27-OCT", pillar: "ALL", actualAmount: null, forecastAmount: null, varianceAmount: null, variancePercent: null, completeness: "INCOMPLETE" }],
-      accountGroups: [{ account: "Forecast   Only", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
+      accountGroups: [{ account: "Forecast   Only", normalizedAccount: "FORECAST ONLY", plans: [] }], totalAccounts: 12, nextOffset: 12, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"forecast-only-page"' } });
   };
   const forecastOnlyPage = await fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
     sort: "ACCOUNT", direction: "ASC", offset: 11, limit: 10 });
   assert.deepEqual(forecastOnlyPage.accountGroups, [{
     account: "Forecast   Only",
+    normalizedAccount: "FORECAST ONLY",
     plans: [],
     totals: { actualByPeriod: {}, appliedForecastByPeriod: {}, outlookByPeriod: {}, incompletePeriods: [] },
   }]);
@@ -186,7 +187,10 @@ void (async () => {
       amount: 25, totalAmount: 25, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
       previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
       compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
-    forecastVariances: [], accountGroups: [{ account: "A B", plans: [] }, { account: "A  B", plans: [] }],
+    forecastVariances: [], accountGroups: [
+      { account: "A B", normalizedAccount: "A B", plans: [] },
+      { account: "A  B", normalizedAccount: "A  B", plans: [] }
+    ],
     totalAccounts: 2, nextOffset: 2, hasMore: false
   }), { status: 200, headers: { "Content-Type": "application/json", ETag: '"ambiguous-account-page"' } });
   await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
@@ -201,7 +205,7 @@ void (async () => {
       amount: 25, totalAmount: -1, newAmount: 5, expansionAmount: 7, baseAmount: 13, reductionAmount: 2,
       previousAmount: 15, previousSource: "PRIOR_QUARTER_ACTUAL", reductionStatus: "AVAILABLE",
       compositionStatus: "CLASSIFIED", version: 1, status: "DRAFT", completeness: "COMPLETE" }],
-    forecastVariances: [], accountGroups: [{ account: "Forecast Only", plans: [] }], totalAccounts: 1, nextOffset: 1, hasMore: false
+    forecastVariances: [], accountGroups: [{ account: "Forecast Only", normalizedAccount: "FORECAST ONLY", plans: [] }], totalAccounts: 1, nextOffset: 1, hasMore: false
   }), { status: 200, headers: { "Content-Type": "application/json" } });
   await assert.rejects(() => fetchConsumptionRecords({ fromQuarter: "FY26-Q1", toQuarter: "FY27-Q1", search: "",
     sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10 }), /Malformed Consumption account forecast/,
@@ -253,7 +257,7 @@ void (async () => {
       currentFiscalMonth: payload.currentFiscalMonth, fromQuarter: payload.fromQuarter, toQuarter: payload.toQuarter,
       editablePeriodIds: payload.editablePeriodIds, displayQuarterOrder: payload.displayQuarterOrder,
       controlTotals: payload.controlTotals,
-      accountGroups: [{ account: "A", plans: payload.plans }], totalAccounts: 1, nextOffset: 1, hasMore: false
+      accountGroups: [{ account: "A", normalizedAccount: "A", plans: payload.plans }], totalAccounts: 1, nextOffset: 1, hasMore: false
     }), { status: 200, headers: { "Content-Type": "application/json", ETag: '\"default-range\"' } });
   };
   const defaultRangeRecords = await fetchConsumptionRecords({ fromQuarter: "", toQuarter: "", search: "",

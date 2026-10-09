@@ -64,7 +64,7 @@ void (async () => {
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/records?fromQuarter=&toQuarter=&search=&sort=ACCOUNT&direction=ASC&offset=0&limit=10&pillar=DP");
-    return new Response(JSON.stringify({ ...workspace, accountGroups: [{ account: "A", plans: workspace.plans }],
+    return new Response(JSON.stringify({ ...workspace, accountGroups: [{ account: "A", normalizedAccount: "A", plans: workspace.plans }],
       totalAccounts: 1, nextOffset: 1, hasMore: false }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const records = await fetchConsumptionRecords({ fromQuarter: "", toQuarter: "", search: "", sort: "ACCOUNT", direction: "ASC", offset: 0, limit: 10, pillar: "DP" });
