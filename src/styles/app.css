@@ -6904,8 +6904,11 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   align-items: center; display: inline-grid; justify-items: center; margin-inline: auto; text-align: center;
 }
 .kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
-  flex: 1 1 24rem;
+  align-content: start;
+  align-self: flex-end;
+  flex: 0 1 32rem;
   max-width: 32rem;
+  min-height: 0;
   width: min(32rem, 100%);
 }
 .forecast-actual-total-value {
