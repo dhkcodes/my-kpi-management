@@ -18,7 +18,7 @@ assert.doesNotMatch(app, /logoutUser\(\)\.finally/, "failed logout cannot appear
 assert.match(app, /addEventListener\("popstate", keepLoginAtHomePath\)/, "Back remains guarded after logout");
 assert.match(login, /<b>K<\/b>now the pulse, <b>A<\/b>ct on it\. <b>P<\/b>erform\./, "login, activation, and password-reset views emphasize K·A·P in the approved product name");
 assert.match(login, /startNewKapHeaderLoginSession[\s\S]*loginBrand\.iconSrc/, "login and authenticated header share the KAP logo");
-assert.match(brand, /variant: "terracotta"[\s\S]*kap-header-terracotta\.png[\s\S]*kap-header-terracotta-icon\.png/,
+assert.match(brand, /variant: "terracotta"[\s\S]*kap-header-terracotta-redwood-v1\.png[\s\S]*kap-header-terracotta-redwood-v1-icon\.png/,
   "header, mobile K symbol, and login use the designated terracotta artwork");
 assert.doesNotMatch(brand, /Math\.random|gold|purple|blue|coral/, "branding is fixed and never changes randomly");
 assert.doesNotMatch(login, /My KPI &amp; Account Planner/);
