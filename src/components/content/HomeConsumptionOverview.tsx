@@ -30,6 +30,12 @@ const periodRange = (periods: readonly string[]) => {
   if (periods.length === 1) return periods[0];
   return `${periods[0]} – ${periods[periods.length - 1]}`;
 };
+const OPEN_FORECAST_TOOLTIP = "Open Forecast excludes FINAL periods. When MTD Actual is available for an included period, FY Expected removes overlapping Forecast once and uses MTD Actual instead.";
+const MTD_TOOLTIP = "MTD Actual is cumulative month-to-date usage and is not final. It remains visible until finalized Actual is uploaded; finalized Actual then takes priority.";
+const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip home-consumption__info-tooltip">
+  <button type="button" class="consumption-info-tooltip__trigger" aria-label={label} aria-describedby={id}>!</button>
+  <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
+</span>;
 const alertLabel = (type: string) => type.split("_").map((token) => token.charAt(0) + token.slice(1).toLowerCase()).join(" ");
 const quarterForPeriod = (periodKey: string) => {
   const month = periodKey.split("-")[1];
@@ -123,12 +129,12 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
         <>
           <div class="home-consumption__coverage" role="note">
             <span><i class="home-consumption__legend home-consumption__legend--actual"></i>Actual {periodRange(data.actualPeriods)}</span>
-            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD (잠정){data.mtdAsOf ? ` · As of ${data.mtdAsOf}` : ""}</span>}
-            <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Forecast {periodRange(data.forecastPeriods)}</span>
+            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD <InfoTooltip id="homeMtdCoverageTooltip" label="Explain MTD Actual" text={MTD_TOOLTIP} />{data.mtdAsOf ? ` · As of ${data.mtdAsOf}` : ""}</span>}
+            <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Open Forecast {periodRange(data.forecastPeriods)}</span>
           </div>
           {data.finalUploadRequiredPeriods.length > 0 && (
             <p class="home-consumption__mtd-guidance" role="note">
-              <strong>잠정 MTD 적용</strong> · {data.finalUploadRequiredPeriods.join(", ")}은 확정 Actual 업로드 전까지 가용한 MTD를 표시하며, 업로드 후 확정값을 우선 적용합니다.
+              <strong>MTD Actual applied</strong> · {data.finalUploadRequiredPeriods.join(", ")} remains provisional until finalized Actual is uploaded. Finalized Actual takes priority after upload.
             </p>
           )}
 
@@ -139,9 +145,9 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
               <small>{periodRange(data.actualPeriods)}</small>
             </article>
             <article>
-              <span>FY Expected</span>
+              <span>FY Expected <InfoTooltip id="homeFyExpectedTooltip" label="Explain FY Expected" text={OPEN_FORECAST_TOOLTIP} /></span>
               <strong>{formatAmountK(data.expectedAmountExact)}</strong>
-              <small>Actual + Forecast</small>
+              <small>Actual + Open Forecast</small>
             </article>
             <article>
               <span>Actual YoY</span>
@@ -190,7 +196,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                       </div>
                       <div class="home-consumption__quarter-values">
                         {showActual && <span>Actual <strong>{formatAmountK(quarter.actualAmountExact)}</strong></span>}
-                        {showMtd && <span>MTD (잠정) <strong>{formatAmountK(mtdAmountExact)}</strong></span>}
+                        {showMtd && <span>MTD <InfoTooltip id={`homeQuarterMtdTooltip-${quarter.quarter}`} label={`Explain ${quarter.quarter} MTD Actual`} text={MTD_TOOLTIP} /> <strong>{formatAmountK(mtdAmountExact)}</strong></span>}
                         <span>Forecast <strong>{formatAmountK(quarter.forecastAmountExact)}</strong></span>
                       </div>
                     </div>
@@ -229,7 +235,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
               <div><h3>Tentative Monthly Consumption</h3></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
-                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd"></i>MTD (잠정)</span>}
+                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd"></i>MTD <InfoTooltip id="homeMonthlyMtdTooltip" label="Explain monthly MTD Actual" text={MTD_TOOLTIP} /></span>}
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
               </div>
             </div>
@@ -272,7 +278,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                       {y !== null && (
                         <>
                           <circle class={`home-consumption__monthly-dot home-consumption__monthly-dot--${month.kind.toLowerCase()}`} cx={x} cy={y} r={5}>
-                            <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}: ${formatAmountK(month.amountExact)}`}</title>
+                            <title>{`${month.periodKey} ${month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD Actual" : "Forecast"}: ${formatAmountK(month.amountExact)}`}</title>
                           </circle>
                           <text class="home-consumption__monthly-value" x={x} y={Math.max(18, y - 12)}>
                             {formatAmountK(month.amountExact)}
@@ -304,7 +310,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                 {data.months.flatMap((month) => [
                   <tr key={`${month.periodKey}-${month.kind}`}>
                     <th scope="row">{month.periodKey}</th>
-                    <td>{month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD (잠정)" : "Forecast"}</td>
+                    <td>{month.kind === "ACTUAL" ? "Actual" : month.kind === "MTD" ? "MTD Actual" : "Forecast"}</td>
                     <td>{month.amountExact === null ? "Unavailable" : formatAmountK(month.amountExact)}</td>
                     <td>{month.incomplete ? "Partial or incomplete" : "Complete"}</td>
                   </tr>,

@@ -3438,6 +3438,9 @@ h4.weekly-activity-section-label--next-week,
   overflow-x: auto;
   scrollbar-width: none;
 }
+/* The toolbar's first borderless button has internal inline padding. Pull the
+   breadcrumb surface left so its visible first letter aligns with page titles. */
+.kap-page-shell__masthead > .kpi-page-menu { margin-inline-start: -.75rem; }
 .kpi-page-menu::-webkit-scrollbar { display: none; }
 .kpi-page-menu oj-toolbar {
   display: inline-flex;
@@ -6121,7 +6124,7 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-activity__completed-at { color: var(--kpi-muted); font-size: .7rem; font-variant-numeric: tabular-nums; line-height: 1; padding-bottom: .08rem; white-space: nowrap; }
 .kap-page-activity__status { align-items: flex-end; display: inline-flex; flex: 0 0 auto; gap: .4rem; min-height: 1.25rem; visibility: hidden; }
 .kap-page-activity__status.is-active { visibility: visible; }
-.kap-page-activity__progress { height: 1.25rem; width: 1.25rem; }
+.kap-page-activity__progress { display: block; flex: 0 0 auto; height: 1.25rem; line-height: 1; overflow: visible; width: 1.25rem; }
 .kap-page-data-progress { left: 50%; max-width: calc(100% - 2rem); opacity: 0; pointer-events: none; position: absolute; top: 50%; transform: translate(-50%, -50%); visibility: hidden; width: min(20rem, 52%); z-index: 3; }
 .kap-page-data-progress.is-active { opacity: 1; visibility: visible; }
 .kap-page-data-progress oj-progress-bar { display: block; width: 100%; }
@@ -6133,8 +6136,8 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-activity.is-compact-timestamp { align-items: center; min-height: 2.5rem; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__control-slot { align-items: center; min-width: 0; width: auto; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__refresh { font-size: .78rem; font-weight: 700; min-height: 2.25rem; white-space: nowrap; }
-.kap-page-activity.is-compact-timestamp .kap-page-activity__start-icon { align-items: center; display: inline-flex; height: 1rem; justify-content: center; width: 1rem; }
-.kap-page-activity.is-compact-timestamp .kap-page-activity__progress { height: 1rem; width: 1rem; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__start-icon { align-items: center; display: inline-flex; height: 1.125rem; justify-content: center; line-height: 1; overflow: visible; width: 1.125rem; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__progress { height: .9rem; width: .9rem; }
 .kap-page-activity__separator { color: var(--kpi-border-strong, #8b8580); margin-inline: .25rem; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__completed-at { color: inherit; font-size: inherit; padding: 0; }
 .kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
@@ -6170,8 +6173,15 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-mtd-applied-date { font-size: .78rem; font-weight: 600; line-height: 1; }
 .kap-page-shell.consumption-insights-page .kap-page-shell__body { gap: .325rem; }
 .consumption-info-tooltip { display: inline-flex; position: relative; vertical-align: middle; }
+.consumption-insights-legend .consumption-info-tooltip,
+.home-consumption__info-tooltip { align-self: flex-start; margin-left: -.08rem; position: relative; top: -.18rem; vertical-align: super; }
+.home-consumption__coverage > span,
+.home-consumption__metrics article > span,
+.home-consumption__quarter-values > span,
+.home-consumption__monthly-legend > span { align-items: center; display: inline-flex; }
 /* Shared KPI panels clip decorative overflow; tooltip panels must allow the popup to escape. */
-.consumption-insights-page .kpi-panel:has(.consumption-info-tooltip) { overflow: visible; }
+.consumption-insights-page .kpi-panel:has(.consumption-info-tooltip),
+.home-consumption:has(.consumption-info-tooltip) { overflow: visible; }
 .consumption-mtd-control { align-items: center; display: inline-flex; position: relative; }
 .consumption-info-tooltip__trigger { align-items: center; background: transparent; border: 0; color: var(--oj-link-text-color, #0066cc); cursor: help; display: inline-flex; font-size: .85rem; height: 1.15rem; justify-content: center; margin: 0 .1rem; padding: 0; width: 1.15rem; }
 .consumption-info-tooltip__trigger:focus-visible { border-radius: 50%; outline: 2px solid var(--oj-core-focus-border-color, #0572ce); outline-offset: 1px; }
@@ -6979,15 +6989,15 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .fiscal-year-selector__trigger:hover,
 .fiscal-year-selector__trigger:active,
 .fiscal-year-selector__trigger[aria-expanded="true"] {
-  background: #eef7f4;
-  border-color: #7ea89d;
+  background: #fdf1ef;
+  border-color: #c58f88;
   color: #182027;
 }
 
 .fiscal-year-selector__trigger:focus-visible {
-  background: #f7fbfa;
-  border-color: #2d6f62;
-  box-shadow: 0 0 0 2px rgba(45, 111, 98, .22);
+  background: #fff7f5;
+  border-color: #b85c50;
+  box-shadow: 0 0 0 2px rgba(184, 92, 80, .2);
   color: #182027;
   outline: none;
 }
@@ -6998,33 +7008,38 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .fiscal-year-selector__navigation button:hover,
 .fiscal-year-selector__navigation button:active,
 .fiscal-year-selector__navigation button:focus-visible {
-  background: #eef7f4;
+  background: #fdf1ef;
   color: #182027;
 }
 
 .fiscal-year-selector__nav:focus-visible,
 .fiscal-year-selector__navigation button:focus-visible {
-  box-shadow: 0 0 0 2px rgba(45, 111, 98, .22);
+  box-shadow: 0 0 0 2px rgba(184, 92, 80, .2);
   outline: none;
 }
 
 .fiscal-year-selector__row:hover,
 .fiscal-year-selector__row:active,
 .fiscal-year-selector__row:focus-visible {
-  background: #eef7f4;
+  background: #fdf1ef;
   color: #182027;
 }
 
 .fiscal-year-selector__row:focus-visible {
-  box-shadow: inset 0 0 0 2px rgba(45, 111, 98, .42);
+  box-shadow: inset 0 0 0 2px rgba(184, 92, 80, .38);
   outline: none;
 }
 
 .fiscal-year-selector__row.is-selected {
-  background: #eef7f4;
-  box-shadow: inset .2rem 0 0 #2d6f62;
+  background: #f9e6e2;
+  box-shadow: inset .2rem 0 0 #b85c50;
   color: #182027;
 }
+.fiscal-year-selector__row.is-selected .fiscal-year-selector__radio { border-color: #b85c50; }
+.fiscal-year-selector__row.is-selected .fiscal-year-selector__radio::after { background: #b85c50; }
+.fiscal-year-selector__trigger:hover .fiscal-year-selector__chevron,
+.fiscal-year-selector__trigger:focus-visible .fiscal-year-selector__chevron,
+.fiscal-year-selector__trigger[aria-expanded="true"] .fiscal-year-selector__chevron { color: #8f3f36; }
 
 @media (min-width: 601px) {
   .forecast-actual-total-strip small,
