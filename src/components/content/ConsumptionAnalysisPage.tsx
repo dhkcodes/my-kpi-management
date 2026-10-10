@@ -146,7 +146,8 @@ const InsightsDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consumpti
   return <span class="consumption-data-center" aria-label={`Data center count ${display.primary}`}><span>DC {display.primary}</span></span>;
 };
 
-export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{ fiscalYear: FiscalYear; fiscalYears: readonly FiscalYear[]; onFiscalYearChange: (fiscalYear: FiscalYear) => void; breadcrumb?: ComponentChildren }>) {
+export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: ComponentChildren }>) {
+  const [fiscalYear, setFiscalYear] = useState<FiscalYear>(() => getLatestFiscalYear());
   const [selectedPillar, setSelectedPillar] = useState<ConsumptionPillar>("ALL");
   const [includeMtd, setIncludeMtd] = useState(false);
   const [selectedSalesRep, setSelectedSalesRep] = useState("");
@@ -364,7 +365,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
 
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
-    onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
+    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];

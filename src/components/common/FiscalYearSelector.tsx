@@ -1,5 +1,7 @@
 import { h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
+import "ojs/ojfilmstrip";
+import type { FilmStripElement } from "ojs/ojfilmstrip";
 import type { FiscalYear } from "../../data/kpiMockData";
 
 const yearNumber = (year: FiscalYear) => Number(year.slice(2));
@@ -10,103 +12,70 @@ export const fiscalYearWindow = (center: FiscalYear): readonly FiscalYear[] => {
   return [fiscalYear(value - 1), center, fiscalYear(value + 1)];
 };
 
+const displayFiscalYear = (year: FiscalYear) => `FY ${year.slice(2)}`;
+
+const Arrow = ({ direction }: Readonly<{ direction: "previous" | "next" }>) => (
+  <svg class="fiscal-year-selector__chevron" viewBox="0 0 12 20" aria-hidden="true" focusable="false">
+    <path d={direction === "previous" ? "M8.5 3.5 3.25 10l5.25 6.5" : "M3.5 3.5 8.75 10 3.5 16.5"} />
+  </svg>
+);
+
 export function FiscalYearSelector({ selected, current, onSelect, className = "" }: Readonly<{
   selected: FiscalYear;
   current: FiscalYear;
   onSelect: (year: FiscalYear) => void;
   className?: string;
 }>) {
-  const [open, setOpen] = useState(false);
-  const [browseCenter, setBrowseCenter] = useState(current);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const lastNonMousePointerAtRef = useRef(0);
-  const [popoverPosition, setPopoverPosition] = useState({ left: 8, top: 8 });
-  const years = useMemo(() => fiscalYearWindow(browseCenter), [browseCenter]);
-
-  const updatePopoverPosition = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const width = 240;
-    const estimatedHeight = 224;
-    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-    const top = rect.bottom + estimatedHeight + 8 <= window.innerHeight
-      ? rect.bottom + 6
-      : Math.max(8, rect.top - estimatedHeight - 6);
-    setPopoverPosition({ left, top });
-  };
+  const stripRef = useRef<FilmStripElement | null>(null);
+  const navigationLockedRef = useRef(false);
+  const years = useMemo(() => fiscalYearWindow(selected), [selected]);
 
   useEffect(() => {
-    if (!open) return;
-    const close = (event: PointerEvent) => {
-      const path = event.composedPath();
-      if (!rootRef.current || (!path.includes(rootRef.current) && !rootRef.current.contains(event.target as Node))) setOpen(false);
-    };
-    const reposition = () => updatePopoverPosition();
-    const focusFrame = window.requestAnimationFrame(() => {
-      popoverRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
-    });
-    document.addEventListener("pointerdown", close, true);
-    window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener("pointerdown", close, true);
-      window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
-    };
-  }, [open]);
+    const frame = window.requestAnimationFrame(() => stripRef.current?.refresh());
+    return () => window.cancelAnimationFrame(frame);
+  }, [selected]);
 
-  const closeAndRestoreFocus = () => {
-    setOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
-  };
-  const move = (offset: number) => setBrowseCenter((center) => fiscalYear(yearNumber(center) + offset));
-  const activate = (action: () => void) => ({
-    onPointerUp: (event: PointerEvent) => {
-      if (event.pointerType === "mouse") return;
-      lastNonMousePointerAtRef.current = performance.now();
-      event.preventDefault();
-      action();
-    },
-    onClick: () => {
-      if (performance.now() - lastNonMousePointerAtRef.current < 750) return;
-      action();
-    }
-  });
-  return <div ref={rootRef} class={`fiscal-year-selector ${className}`.trim()}
-    onKeyDown={(event) => {
-      if (event.key === "Escape" && open) {
-        event.preventDefault();
-        closeAndRestoreFocus();
+  const navigate = async (offset: -1 | 1) => {
+    if (navigationLockedRef.current) return;
+    navigationLockedRef.current = true;
+    const fallback = fiscalYear(yearNumber(selected) + offset);
+    try {
+      const model = stripRef.current?.getPagingModel();
+      if (!model) {
+        onSelect(fallback);
+        return;
       }
-    }}>
-    <button ref={triggerRef} type="button" class="fiscal-year-selector__trigger" aria-haspopup="dialog" aria-expanded={open}
-      aria-label={`Selected fiscal year ${selected}`} {...activate(() => setOpen((value) => {
-        if (!value) updatePopoverPosition();
-        return !value;
-      }))}>
-      <span>{selected}</span><span class="fiscal-year-selector__chevron" aria-hidden="true">⌄</span>
+      const targetPage = model.getPage() + offset;
+      await model.setPage(targetPage);
+    } catch {
+      onSelect(fallback);
+    } finally {
+      window.setTimeout(() => { navigationLockedRef.current = false; }, 80);
+    }
+  };
+
+  return <div class={`fiscal-year-selector ${className}`.trim()} data-current-fiscal-year={current}>
+    <button type="button" class="fiscal-year-selector__nav is-previous"
+      aria-label={`Previous fiscal year from ${displayFiscalYear(selected)}`}
+      onClick={() => void navigate(-1)}>
+      <Arrow direction="previous" />
     </button>
-    {open && <div ref={popoverRef} class="fiscal-year-selector__popover" role="dialog" aria-label="Select fiscal year"
-      style={{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }}>
-      <header class="fiscal-year-selector__header"><strong>Fiscal Year</strong>
-        <span class="fiscal-year-selector__navigation">
-          <button type="button" class="fiscal-year-selector__nav" aria-label="Show earlier fiscal years" {...activate(() => move(-1))}>‹</button>
-          <button type="button" class="fiscal-year-selector__nav" aria-label="Show later fiscal years" {...activate(() => move(1))}>›</button>
-        </span>
-      </header>
-      <div class="fiscal-year-selector__options" role="radiogroup" aria-label="Fiscal year">
-        {years.map((year) => <button key={year} type="button" role="radio" aria-checked={selected === year}
-          class={`fiscal-year-selector__row ${selected === year ? "is-selected" : ""}`.trim()}
-          {...activate(() => { onSelect(year); closeAndRestoreFocus(); })}>
-          <span class="fiscal-year-selector__radio" aria-hidden="true"><span /></span>
-          <span class="fiscal-year-selector__label">{year}</span>
-          {year === current && <span class="fiscal-year-selector__current">Current</span>}
-        </button>)}
-      </div>
-    </div>}
+    <div class="fiscal-year-selector__viewport">
+      <oj-film-strip ref={stripRef} class="fiscal-year-selector__filmstrip"
+        arrowVisibility="hidden" arrowPlacement="overlay" orientation="horizontal" looping="off"
+        maxItemsPerPage={1} currentItem={{ id: selected }}
+        translations={{ labelAccFilmStrip: "Fiscal year", labelAccArrowPreviousPage: "Previous fiscal year", labelAccArrowNextPage: "Next fiscal year" }}
+        oncurrentItemChanged={(event) => {
+          const next = event.detail.value.id as FiscalYear | undefined;
+          if (next && next !== selected && years.includes(next)) onSelect(next);
+        }}>
+        {years.map((year) => <div id={year} key={year} class="fiscal-year-selector__item">{displayFiscalYear(year)}</div>)}
+      </oj-film-strip>
+    </div>
+    <button type="button" class="fiscal-year-selector__nav is-next"
+      aria-label={`Next fiscal year from ${displayFiscalYear(selected)}`}
+      onClick={() => void navigate(1)}>
+      <Arrow direction="next" />
+    </button>
   </div>;
 }

@@ -89,12 +89,10 @@ const latestMtdAppliedTimestamp = (comparison: ForecastActualComparison): string
   return timestamps[timestamps.length - 1]?.value ?? null;
 };
 
-export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange, breadcrumb }: Readonly<{
-  fiscalYear: FiscalYear;
-  fiscalYears: readonly FiscalYear[];
-  onFiscalYearChange: (fiscalYear: FiscalYear) => void;
+export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   breadcrumb?: ComponentChildren;
 }>) => {
+  const [fiscalYear, setFiscalYear] = useState<FiscalYear>(() => getLatestFiscalYear());
   const [quarter, setQuarter] = useState("ALL");
   const [pillar, setPillar] = useState<ConsumptionPillar>("ALL");
   const [actualMode, setActualMode] = useState<ForecastActualMode>("FINAL");
@@ -282,7 +280,7 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
     .reduce((total, value) => addExactDecimals(total, value), "0");
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
-    className="forecast-actual-fy-button" onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
+    className="forecast-actual-fy-button" onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
   const updateViewportControls = () => {
     const root = pageScrollRef.current;
     const frame = matrixFrameRef.current;
