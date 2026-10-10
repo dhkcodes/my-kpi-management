@@ -88,6 +88,7 @@ export type ConsumptionAnalysisWorkload = ConsumptionAmountSplit & Readonly<{
 }>;
 export type ConsumptionAnalysisAccount = ConsumptionAmountSplit & Readonly<{
   account: string; salesRep: string; percentageExact: string | null;
+  forecastOverlapAmountExact: string; coveredExpectedAmountExact: string;
   actualEntryStatus: "PROVIDED" | "MISSING";
   priorActualAmountExact: string; actualGrowthAmountExact: string | null; actualGrowthPercentExact: string | null;
   yoyComparisonStatus: string; yoyUnavailableReason: string | null;

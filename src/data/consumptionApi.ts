@@ -657,11 +657,15 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
   const accounts: ConsumptionAnalysisAccount[] = raw.accounts.map((value) => {
     const split = parseContributionAmountSplit(value); const account = value as Record<string, unknown>;
     const percentage = decodeNullableExactDecimal(account.percentage);
+    const forecastOverlap = decodeExactDecimal(account.forecastOverlapAmount);
+    const coveredExpected = decodeExactDecimal(account.coveredExpectedAmount);
     const priorActualAmount = decodeExactDecimal(account.priorActualAmount);
     const actualGrowthAmount = decodeNullableExactDecimal(account.actualGrowthAmount);
     const actualGrowthPercent = decodeNullableExactDecimal(account.actualGrowthPercent);
     if (!isNonEmptyString(account.account) || !isNonEmptyString(account.salesRep)
-      || percentage === undefined || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
+      || percentage === undefined || !forecastOverlap || !coveredExpected
+      || compareExactDecimals(forecastOverlap.exact, "0") < 0
+      || !["PROVIDED", "MISSING"].includes(String(account.actualEntryStatus))
       || !priorActualAmount || actualGrowthAmount === undefined || actualGrowthPercent === undefined
       || !isNonEmptyString(account.yoyComparisonStatus)
       || (account.yoyUnavailableReason !== null && !isNonEmptyString(account.yoyUnavailableReason))
@@ -677,6 +681,7 @@ const parseConsumptionAnalysis = (value: unknown): ConsumptionAnalysis => {
     });
     if (new Set(workloads.map((workload) => workload.workload)).size !== workloads.length) return malformedAnalysis();
     return { ...split, account: account.account, salesRep: account.salesRep, percentageExact: percentage?.exact ?? null,
+      forecastOverlapAmountExact: forecastOverlap.exact, coveredExpectedAmountExact: coveredExpected.exact,
       actualEntryStatus: account.actualEntryStatus,
       priorActualAmountExact: priorActualAmount.exact, actualGrowthAmountExact: actualGrowthAmount?.exact ?? null,
       actualGrowthPercentExact: actualGrowthPercent?.exact ?? null,
@@ -1173,7 +1178,15 @@ export const fetchConsumptionAnalysis = async (query: ConsumptionAnalysisQuery):
   const parameters = new URLSearchParams({ fiscalYear: query.fiscalYear, search: query.search, account: query.account, salesRep: query.salesRep ?? "" });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
   if (query.includeMtd !== undefined) parameters.set("includeMtd", String(query.includeMtd));
-  const { payload } = await request(`/consumption/analysis?${parameters}`, undefined, query.pillar, true);
+  const { payload } = await request(`/consumption/analysis?${parameters}`, undefined, query.pillar, true, [
+    "actualAmount", "forecastAmount", "totalAmount", "forecastOverlapAmount", "coveredExpectedAmount",
+    "percentage", "priorActualAmount", "actualGrowthAmount", "actualGrowthPercent",
+    "priorForecastAmount", "priorTotalAmount", "qoqChangeAmount", "qoqChangePercent",
+    "amount", "baselineMedian", "changeAmount", "changePercent", "openingAmount", "closingAmount",
+    "netGrowthAmount", "classifiedGrowthAmount", "reconciliationAmount", "totalForecastAmount",
+    "newAmount", "expansionAmount", "reductionAmount", "netMovementAmount", "fyExpectedAmount",
+    "topThreeConcentrationPercent"
+  ]);
   const decoded = parseConsumptionAnalysis(payload);
   const expectedPriorFiscalYear = `FY${String((Number(query.fiscalYear.slice(2)) + 99) % 100).padStart(2, "0")}`;
   if (decoded.selectedPillar !== pillar || decoded.fiscalYear !== query.fiscalYear || decoded.priorFiscalYear !== expectedPriorFiscalYear) return malformedAnalysis();

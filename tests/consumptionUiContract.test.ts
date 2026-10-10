@@ -217,17 +217,17 @@ assert.match(insightsPage, /forecastExposureExact = calculateOpenForecastExposur
   "Open Forecast exposure uses the executable exact-decimal calculation covered by consumptionData tests");
 assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
   "Open Forecast exposure renders the calculated percentage-point value with one percent sign");
-assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD and includes finalized Actual\. This is not the chart composition share\."/,
+assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast\. This is not the chart composition share\."/,
   "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
   "tooltips open only from the dedicated information icon wrapper on hover or keyboard focus");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
-assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(account\.coveredExpectedAmountExact\)\}/,
   "entered Open Forecast and covered-period expected use separate fields without changing contribution totals");
 assert.match(insightsPage, /Forecast missing · Covered-period expected unavailable/,
   "missing Forecast remains distinct and does not fabricate an expected amount");
-assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactKFixed\(addExactDecimals\(account\.actualAmountExact, account\.forecastAmountExact\)\)\}/,
+assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} \(entered as 0\) · Covered-period expected \{formatExactKFixed\(account\.coveredExpectedAmountExact\)\}/,
   "an explicit zero Open Forecast remains distinct while showing the covered-period sum");
 assert.doesNotMatch(insightsPage, /FY Expected/, "partial-year coverage is never presented as a full-year expectation");
 assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.consumption-sales-attention-list button\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*\}/,
@@ -588,6 +588,12 @@ assert.match(styles, /@media \(min-width: 1101px\)[\s\S]*composition-grid \{[^}]
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\)[^}]*height: 18\.5rem[^}]*[\s\S]*data-quarter-count="1"[^}]*height: 13rem[^}]*[\s\S]*data-quarter-count="2"[^}]*height: 14\.5rem[^}]*[\s\S]*data-quarter-count="3"[^}]*height: 16\.5rem/, "mobile Forecast legend precedes a quarter-count-sized plot without the inherited fixed 24rem gap");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
 assert.match(insightsPage, /Forecast signals by quarter/);
+assert.match(insightsPage, /coveredPeriodConsumptionTooltip/);
+assert.match(insightsPage, /MTD adds .* to Actual\. After excluding .* already covered by Forecast, covered-period Expected increases by/);
+assert.match(insightsPage, /account\.coveredExpectedAmountExact/);
+assert.doesNotMatch(insightsPage, /<span class=\{statusTone\(plan\.status\)\}>\{plan\.status\}<\/span>/);
+assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress[\s\S]*position: fixed/);
+assert.match(insightsPage, /The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, />\s*Forecast Import\s*</, "Forecast import button omits file-format wording");
 assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/,

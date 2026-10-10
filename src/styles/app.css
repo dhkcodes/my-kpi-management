@@ -6125,6 +6125,9 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-data-progress { left: 50%; max-width: calc(100% - 2rem); opacity: 0; pointer-events: none; position: absolute; top: 50%; transform: translate(-50%, -50%); visibility: hidden; width: min(20rem, 52%); z-index: 3; }
 .kap-page-data-progress.is-active { opacity: 1; visibility: visible; }
 .kap-page-data-progress oj-progress-bar { display: block; width: 100%; }
+/* Consumption Analysis keeps the existing progress style centered in the visible viewport while its body scrolls. */
+.consumption-insights-page .kap-page-data-progress { left: 50vw; position: fixed; top: 50vh; z-index: 40; }
+.consumption-covered-period-title { align-items: center; display: inline-flex; gap: .12rem; }
 .kap-page-activity__control-slot { align-items: flex-end; display: inline-flex; justify-content: flex-end; min-width: 2.75rem; width: 2.75rem; }
 .kap-page-activity__control-slot .kap-page-activity__status { visibility: visible; }
 .kap-page-activity.is-compact-timestamp { align-items: center; min-height: 2.5rem; }
