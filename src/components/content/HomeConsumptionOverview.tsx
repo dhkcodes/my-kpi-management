@@ -1,5 +1,6 @@
 import { h } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   fetchConsumptionAnalysis,
   fetchConsumptionRecords,
@@ -32,10 +33,93 @@ const periodRange = (periods: readonly string[]) => {
 };
 const OPEN_FORECAST_TOOLTIP = "Open Forecast excludes FINAL periods. When MTD Actual is available for an included period, FY Expected removes overlapping Forecast once and uses MTD Actual instead.";
 const MTD_TOOLTIP = "MTD Actual is cumulative month-to-date usage and is not final. It remains visible until finalized Actual is uploaded; finalized Actual then takes priority.";
-const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip home-consumption__info-tooltip">
-  <button type="button" class="consumption-info-tooltip__trigger" aria-label={label} aria-describedby={id}>!</button>
-  <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
-</span>;
+type HomeTooltipPosition = Readonly<{ left: number; top: number; width: number }>;
+const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const [position, setPosition] = useState<HomeTooltipPosition | null>(null);
+
+  const clearScheduledClose = () => {
+    if (closeTimerRef.current === null || typeof window === "undefined") return;
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  };
+  const constrainToViewport = () => {
+    const tooltip = tooltipRef.current;
+    if (!tooltip || typeof window === "undefined") return;
+    const rect = tooltip.getBoundingClientRect();
+    const margin = 8;
+    setPosition((current) => {
+      if (!current) return current;
+      const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+      const top = Math.min(maxTop, Math.max(margin, current.top));
+      return top === current.top ? current : { ...current, top };
+    });
+  };
+
+  const updatePosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === "undefined") return;
+    const rect = trigger.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(320, Math.max(160, window.innerWidth - margin * 2));
+    const left = Math.min(window.innerWidth - width - margin, Math.max(margin, rect.left + rect.width / 2 - width / 2));
+    const estimatedHeight = 96;
+    const top = rect.top >= estimatedHeight + margin
+      ? Math.max(margin, rect.top - estimatedHeight - margin)
+      : Math.min(window.innerHeight - margin, rect.bottom + margin);
+    setPosition({ left, top, width });
+  };
+  const open = () => {
+    clearScheduledClose();
+    updatePosition();
+  };
+  const close = () => {
+    clearScheduledClose();
+    setPosition(null);
+  };
+  const scheduleClose = () => {
+    clearScheduledClose();
+    if (typeof window === "undefined") return;
+    closeTimerRef.current = window.setTimeout(close, 100);
+  };
+
+  useEffect(() => {
+    if (!position || typeof window === "undefined") return;
+    let frame = window.requestAnimationFrame(constrainToViewport);
+    const reposition = () => {
+      updatePosition();
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(constrainToViewport);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [position !== null]);
+
+  useEffect(() => () => clearScheduledClose(), []);
+
+  return <span class="consumption-info-tooltip home-consumption__info-tooltip">
+    <button ref={triggerRef} type="button" class="consumption-info-tooltip__trigger" aria-label={label}
+      aria-describedby={position ? id : undefined} aria-expanded={Boolean(position)}
+      onMouseEnter={open} onMouseLeave={scheduleClose} onFocus={open} onBlur={close}
+      onClick={() => position ? close() : open()}>!</button>
+    {position && typeof document !== "undefined" && createPortal(
+      <span ref={tooltipRef} id={id} class="consumption-info-tooltip__content home-consumption__info-tooltip-content is-portal"
+        style={{ position: "fixed", left: `${position.left}px`, top: `${position.top}px`, width: `${position.width}px` }} role="tooltip"
+        onMouseEnter={clearScheduledClose} onMouseLeave={scheduleClose}>{text}</span>,
+      document.body
+    )}
+  </span>;
+};
 const alertLabel = (type: string) => type.split("_").map((token) => token.charAt(0) + token.slice(1).toLowerCase()).join(" ");
 const quarterForPeriod = (periodKey: string) => {
   const month = periodKey.split("-")[1];

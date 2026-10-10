@@ -121,6 +121,11 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
     const [fiscalYear, setFiscalYear] = useState<FiscalYear>(getLatestFiscalYear());
     const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>(fallbackFiscalYears);
     const fiscalYearRef = useRef(fiscalYear);
+    const resetFiscalYearForRoute = () => {
+      const currentFiscalYear = getLatestFiscalYear();
+      fiscalYearRef.current = currentFiscalYear;
+      setFiscalYear(currentFiscalYear);
+    };
     const [selectedNavigationId, setSelectedNavigationId] = useState(initialRoute.id);
 
     const [activeRoute, setActiveRoute] = useState<NavigationRouteDefinition>(initialRoute);
@@ -427,6 +432,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           activeRouteRef.current = fallbackRoute;
           activeRouteModuleRef.current = fallbackRoute.module;
           activeLocationHrefRef.current = fallbackHref;
+          resetFiscalYearForRoute();
           setActiveRoute(fallbackRoute);
           setSelectedNavigationId(fallbackRoute.id);
           return;
@@ -460,6 +466,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           activeRouteRef.current = route;
           activeRouteModuleRef.current = route.module;
           setSelectedNavigationId(route.id);
+          resetFiscalYearForRoute();
           setActiveRoute(route);
         };
         if (!isConfirmedKpiRetry && destinationChanged && kpiNavigationGuardRef.current) {
@@ -532,6 +539,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         destinationHref
       );
       if (!destinationChanged) {
+        resetFiscalYearForRoute();
         onAccepted?.();
         return;
       }
@@ -544,6 +552,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
         activeRouteRef.current = route;
         activeRouteModuleRef.current = route.module;
         setSelectedNavigationId(navigationId);
+        resetFiscalYearForRoute();
         setActiveRoute(route);
         historyIndexRef.current += 1;
         window.history.pushState(withHistoryIndex({ routeId: route.id }, historyIndexRef.current), "", getNavigationPath(route));

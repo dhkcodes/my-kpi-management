@@ -2110,7 +2110,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
                             onClick={() => toggleAccount(account.customer)}>
                             <span class="consumption-leading">
                               <span class="consumption-disclosure-slot"><span class={expanded ? "oj-ux-ico-chevron-down" : "oj-ux-ico-chevron-right"} aria-hidden="true"></span></span>
-                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} /></span>
+                              <span class="consumption-leading-copy"><ConsumptionTruncatedText text={account.customer} focusable={false} />
+                              <small class="consumption-account-plan-count">Plans: {visiblePlanCount}</small></span>
                             </span>
                           </button>
                         ) : singlePlan ? (

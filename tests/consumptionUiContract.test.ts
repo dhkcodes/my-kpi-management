@@ -106,8 +106,10 @@ assert.match(styles, /\.consumption-records-toolbar__left\s*\{[^}]*border:\s*0;[
   "Show MTD keeps its borderless switch and aligns with the table's inner content line");
 assert.doesNotMatch(recordsPage, /Account \/ Plan Consumption|consumption-table-plan-count/,
   "the old table title and plan-count summary stay removed");
+assert.match(recordsPage, /const visiblePlanCount = countUniqueConsumptionPlans\(account\.plans\)[\s\S]*visiblePlanCount > 1[^]*<small class="consumption-account-plan-count">Plans: \{visiblePlanCount\}<\/small>/u,
+  "multi-plan account rows show the unique count from the currently filtered record payload");
 assert.doesNotMatch(recordsPage, /visible Plans|Account Forecast ·/,
-  "account rows omit the secondary plan-count copy");
+  "account rows keep obsolete plan-count wording removed");
 assert.match(app, /kap-auth-checking__surface[\s\S]*<Footer \/>/,
   "the authentication frame reserves the same root and fixed-footer geometry before the page mounts");
 assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/s,
@@ -125,6 +127,24 @@ assert.match(insightsPage, /titleControls=\{fiscalYearControl\}/u,
   "Analysis places the FY control beside the page title");
 assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
   "Analysis wires FY selection through the existing route state");
+assert.match(app, /const resetFiscalYearForRoute = \(\) => \{[^}]*getLatestFiscalYear\(\)[^}]*setFiscalYear/u,
+  "route changes reset the page-owned FY selection to the current fiscal year");
+assert.equal((app.match(/resetFiscalYearForRoute\(\);/g) ?? []).length, 4,
+  "normal navigation, active-page re-entry, browser history navigation, and access fallback all reset FY");
+assert.match(app, /if \(!destinationChanged\) \{\s*resetFiscalYearForRoute\(\);\s*onAccepted\?\.\(\);\s*return;/u,
+  "re-entering the active page also resets its fiscal year to the current FY");
+assert.match(homeConsumption, /createPortal[\s\S]*position:\s*"fixed"[\s\S]*role="tooltip"/u,
+  "Home Consumption info tooltips render against the viewport rather than a clipping card ancestor");
+assert.match(homeConsumption, /const tooltip = tooltipRef\.current;[\s\S]*tooltip\.getBoundingClientRect\(\)[\s\S]*window\.innerHeight - rect\.height - margin/u,
+  "Home Consumption tooltips clamp their measured height to the viewport rather than assuming a fixed height");
+assert.match(styles, /\.home-consumption__info-tooltip-content\.is-portal\s*\{[^}]*color:\s*#fff;[^}]*z-index:\s*1000;/s,
+  "Home tooltip copy has explicit high-contrast text and a top-layer portal stacking rule");
+assert.match(styles, /\.home-consumption__info-tooltip-content\.is-portal\s*\{[^}]*overflow:\s*auto;[^}]*pointer-events:\s*auto;/s,
+  "a constrained portal tooltip remains pointer and touch scrollable");
+assert.match(styles, /\.kap-page-shell\.consumption-page \.kap-page-shell__title-row > h1,\s*\.kap-page-shell\.consumption-insights-page \.kap-page-shell__title-row > h1,\s*\.kap-page-shell\.forecast-actual-page \.kap-page-shell__title-row > h1\s*\{[^}]*inset-inline-start:\s*\.5rem;/s,
+  "Analysis, FVA, and Records titles share the Show MTD eight-pixel left inset");
+assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-page \.kap-page-shell__title-row,[\s\S]{0,220}padding-inline-start:\s*\.5rem;/s,
+  "title alignment does not move the adjacent fiscal-year controls");
 
 assert.match(styles, /\.kap-page-shell\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\)/s,
   "PageShell constrains its content row so tall mobile pages scroll internally instead of expanding beneath the fixed footer");
