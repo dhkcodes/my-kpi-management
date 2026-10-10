@@ -7026,6 +7026,13 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   color: #182027;
 }
 
+@media (min-width: 601px) {
+  .forecast-actual-total-strip small,
+  .forecast-actual-total-strip strong {
+    line-height: 2rem;
+  }
+}
+
 @media (max-width: 600px) {
   .forecast-actual-data-toolbar {
     display: grid;
