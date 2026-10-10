@@ -270,17 +270,16 @@ assert.doesNotMatch(recordsPage, /class="accounts-workloads-loading"/u, "Records
 assert.match(recordsPage, /if \(dataMode === "loading"\) return <PageShell[\s\S]*<PageDataProgress busy busyLabel="Loading Consumption Records"/u,
   "Records keeps only the shared progress indicator until the initial workspace is ready");
 assert.doesNotMatch(recordsPage, /All-account totals are unavailable|ALL Forecast is read-only|Forecast is edited once per Account/, "Records removes distributed technical guidance");
-assert.match(homeConsumption, /잠정 MTD 적용/, "Home explains that available MTD remains visible while final Actual is pending");
-assert.match(homeConsumption, />MTD \(잠정\)\{data\.mtdAsOf \? ` · As of \$\{data\.mtdAsOf\}` : ""\}</,
-  "Home labels current-month MTD separately and preserves its basis date");
+assert.match(homeConsumption, /MTD Actual applied/, "Home explains that available MTD remains visible while final Actual is pending");
+assert.match(homeConsumption, /homeMtdCoverageTooltip/, "Home labels current-month MTD with an English information tooltip and preserves its basis date");
 assert.match(homeConsumption, /const showActual = data\.actualPeriods\.some[\s\S]*const showMtd = mtd\?\.amountExact !== null && mtd\?\.amountExact !== undefined;/,
   "Quarterly display uses period coverage for confirmed Actual and independently renders available MTD");
 assert.doesNotMatch(homeConsumption, /Separate values|Actual periods are closed results|Partial or incomplete source coverage|MTD \(잠정\) is provisional|Current-month MTD is provisional|Actual and Forecast remain separate/,
   "Home removes the requested explanatory copy and orphaned footnotes");
 assert.match(homeConsumption, /home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd/,
   "the MTD legend uses a point rather than a line");
-assert.match(homeConsumption, /month\.kind === "ACTUAL" \? "Actual" : month\.kind === "MTD" \? "MTD \(잠정\)" : "Forecast"/,
-  "the accessible monthly chart never classifies MTD as Actual");
+assert.match(homeConsumption, /month\.kind === "ACTUAL" \? "Actual" : month\.kind === "MTD" \? "MTD Actual" : "Forecast"/,
+  "the accessible monthly chart never classifies MTD as finalized Actual");
 assert.doesNotMatch(attainmentPage, /Closed months use Actual|fiscal-period completeness|unopened-period status|complete full-year outlook/i, "Attainment removes standing implementation disclaimers");
 
 assert.match(recordsPage,

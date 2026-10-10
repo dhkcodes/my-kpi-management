@@ -82,7 +82,7 @@ export function PageActivity({
     return (
       <div class={`kap-page-activity is-compact-timestamp${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
         <span ref={refreshSlotRef} class="kap-page-activity__control-slot">
-          <oj-button class="kap-page-activity__refresh oj-button-sm" chroming="outlined" disabled={!onRefresh || refreshDisabled || busy}
+          <oj-button key={busy ? "busy" : "ready"} class="kap-page-activity__refresh oj-button-sm" chroming="outlined" disabled={!onRefresh || refreshDisabled || busy}
             aria-label={busy ? `${busyLabel}; Reload` : "Reload"} title={refreshTitle}>
             <span slot="startIcon" class="kap-page-activity__start-icon">
               {busy
