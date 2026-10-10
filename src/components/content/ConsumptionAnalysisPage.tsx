@@ -48,6 +48,13 @@ import { jsPDF } from "jspdf";
 const chartCurrencyK = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** Ratio displays use two percentage-point decimals and decimal HALF_UP rounding. */
 const PERCENT_DISPLAY_PRECISION = 2;
+const formatExactPlain = (amountExact: string) => {
+  const negative = amountExact.startsWith("-");
+  const unsigned = negative ? amountExact.slice(1) : amountExact;
+  const [integer, fraction] = unsigned.split(".");
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative ? "-" : ""}${grouped}${fraction ? `.${fraction}` : ""}`;
+};
 const signedCurrencyExact = (amountExact: string | null) => amountExact === null ? "N/A"
   : `${compareExactDecimals(amountExact, "0") > 0 ? "+" : ""}${formatExactKFixed(amountExact, 2)}`;
 const percentageTextExact = (percentageExact: string | null, signed = false) => percentageExact === null ? "N/A"
@@ -73,7 +80,7 @@ const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MTD_COLOR = "#b56a3b";
 const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
-const OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal. The denominator is covered-period total minus provisional MTD and includes finalized Actual. This is not the chart composition share.";
+const OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal. The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast. This is not the chart composition share.";
 const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip">
   <button type="button" class="consumption-info-tooltip__trigger" aria-label={label} aria-describedby={id}>!</button>
   <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
@@ -395,6 +402,9 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
   const displayedActualAmountExact = analysis.portfolio.actualAmountExact;
   const actualLabel = includeMtd && analysis.mtdSummary !== null
     ? `Actual (includes MTD ${formatExactKFixed(analysis.mtdSummary.amountExact, 2)})` : "Actual";
+  const coveredPeriodConsumptionTooltip = includeMtd && analysis.mtdSummary !== null
+    ? `MTD adds ${formatExactPlain(analysis.mtdSummary.amountExact)} to Actual. After excluding ${formatExactPlain(analysis.portfolio.forecastOverlapAmountExact)} already covered by Forecast, covered-period Expected increases by ${formatExactPlain(subtractExactDecimals(analysis.mtdSummary.amountExact, analysis.portfolio.forecastOverlapAmountExact))}.`
+    : "MTD is off. Covered-period Expected includes finalized Actual and Forecast only.";
 
   const compositionTotals = selectedMovementAccounts.reduce((total, account) => ({
     totalForecastAmountExact: addExactDecimals(total.totalForecastAmountExact, account.totalForecastAmountExact),
@@ -556,7 +566,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
     </section>
 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
-      <article class="kpi-panel"><span>{analysis.fiscalYear} covered-period consumption</span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel tooltipId="coveredPeriodForecastTooltip" /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
+      <article class="kpi-panel"><span class="consumption-covered-period-title">{analysis.fiscalYear} covered-period consumption <InfoTooltip id="coveredPeriodConsumptionTooltip" label="Explain covered-period consumption" text={coveredPeriodConsumptionTooltip} /></span><strong>{formatExactKFixed(analysis.portfolio.totalAmountExact)}</strong><small><span class="consumption-metric is-actual">{actualLabel} {formatExactKFixed(displayedActualAmountExact)}</span><span aria-hidden="true"> · </span><span class="consumption-metric is-forecast"><OpenForecastLabel tooltipId="coveredPeriodForecastTooltip" /> {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span></small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
       <article class="kpi-panel"><span><OpenForecastLabel tooltipId="forecastExposureTooltip" tooltipText={OPEN_FORECAST_EXPOSURE_TOOLTIP} /> exposure</span><strong>{forecastExposureExact}%</strong><small><span class="consumption-metric is-forecast">{formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span> of selected total</small></article>
       <article class="kpi-panel"><span>Change alerts</span><strong>{analysis.alerts.length}</strong><small><span class="consumption-metric is-critical">{analysis.alerts.filter((alert) => alert.grade === "CRITICAL").length} critical</span><span aria-hidden="true"> · </span><span class="consumption-metric is-high">{analysis.alerts.filter((alert) => alert.grade === "HIGH").length} high</span></small></article>
@@ -649,8 +659,8 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           <span class="consumption-sales-attention-amounts"><strong>Actual {formatExactKFixed(account.actualAmountExact)}</strong><small>{account.forecastEntryStatus === "MISSING"
             ? "Forecast missing · Covered-period expected unavailable"
             : account.forecastEntryStatus === "ZERO"
-              ? <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>
-              : <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} · Covered-period expected {formatExactKFixed(addExactDecimals(account.actualAmountExact, account.forecastAmountExact))}</>}</small></span>
+              ? <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} (entered as 0) · Covered-period expected {formatExactKFixed(account.coveredExpectedAmountExact)}</>
+              : <><OpenForecastLabel /> {formatExactKFixed(account.forecastAmountExact)} · Covered-period expected {formatExactKFixed(account.coveredExpectedAmountExact)}</>}</small></span>
         </button>)}{attentionAccounts.length === 0 && <p class="consumption-empty-state">No Accounts require attention for this context.</p>}</div>
       </section>
     </section>
@@ -665,7 +675,7 @@ export function ConsumptionAnalysisPage({ fiscalYear, fiscalYears, onFiscalYearC
           </button>)}</div>
         </section>
         <section class="kpi-panel" aria-labelledby="planContributionTitle"><div class="consumption-section-heading"><div><h2 id="planContributionTitle">Plan Contribution <InfoTooltip id="planContributionTooltip" label="Explain Plan Contribution coverage" text={`${selectedAccount?.account ?? "Select an Account"} · ${contributionPeriodLabel}`} /></h2></div></div>
-          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong><span class={statusTone(plan.status)}>{plan.status}</span></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentageExact)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentageExact)} of ${percentageContext}; ACTUAL ${formatExactKFixed(plan.actualAmountExact)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidthChartCoordinate(plan.percentageExact)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {formatExactKFixed(plan.actualAmountExact)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmountExact)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
+          <div class="consumption-insights-plan-list">{selectedPlans.map(({ workload, plan, percentageContext }) => <article key={plan.serverPlanId}><div><strong>{plan.endUser}</strong></div><small>{!isUnmappedConsumptionLabel(workload) && <><b>{workload}</b> · </>}Plan {plan.planId} · <InsightsDataCenter plan={plan} selectedPillar={analysis.selectedPillar} /> · {contributionPercentText(plan.percentageExact)} of {percentageContext}</small><div class="consumption-insights-plan-track" aria-label={`${contributionPercentText(plan.percentageExact)} of ${percentageContext}; ACTUAL ${formatExactKFixed(plan.actualAmountExact)}`}><div class="consumption-insights-split-bar" style={`width:${contributionBarWidthChartCoordinate(plan.percentageExact)}%`}><i class="is-actual" style="width:100%"></i></div></div><span>ACTUAL {formatExactKFixed(plan.actualAmountExact)} · {actualEntryText(plan.actualEntryStatus, plan.actualAmountExact)}</span></article>)}{selectedPlans.length === 0 && <p class="consumption-empty-state">No Plan contribution is available.</p>}</div>
         </section>
       </div>
     </section>

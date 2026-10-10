@@ -62,7 +62,8 @@ const analysis = {
     changePercent: 150, reason: "Actual usage exceeded its recent baseline."
   }],
   accounts: [{
-    account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, totalAmount: 600, status: "MIXED", percentage: 100,
+    account: "Acme", salesRep: "Rep A", actualAmount: 600, forecastAmount: 400, forecastOverlapAmount: 0,
+    coveredExpectedAmount: 1000, totalAmount: 600, status: "MIXED", percentage: 100,
     actualEntryStatus: "PROVIDED", priorActualAmount: 500, actualGrowthAmount: 100, actualGrowthPercent: 20,
     yoyComparisonStatus: "AVAILABLE", yoyUnavailableReason: null,
     forecastEntryStatus: "ENTERED", attentionReasons: ["Recent actual above usual"],
@@ -120,6 +121,10 @@ void (async () => {
     "Account YoY comparison status survives decoding for Growth/Reduction display");
   assert.equal(decoded.accounts[0].totalAmountExact, "600",
     "Actual-only Account contribution accepts the deployed wire total");
+  assert.equal(decoded.accounts[0].forecastOverlapAmountExact, "0",
+    "Account overlap remains exact for covered-period auditing");
+  assert.equal(decoded.accounts[0].coveredExpectedAmountExact, "1000",
+    "Account covered expected remains exact and is not recomputed by the UI");
   assert.equal(decoded.accounts[0].workloads[0].totalAmountExact, "600",
     "Actual-only Workload contribution accepts the deployed wire total");
   assert.equal(decoded.accounts[0].workloads[0].plans[0].totalAmountExact, "600",

@@ -72,10 +72,15 @@ void (async () => {
 
   runtime.fetch = async (input) => {
     assert.equal(String(input), "http://unit.test/api/v1/consumption/analysis?fiscalYear=FY27&search=&account=&salesRep=&pillar=OCI");
-    return new Response(JSON.stringify(analysis), { status: 200, headers: { "Content-Type": "application/json" } });
+    const exactAnalysisPayload = JSON.stringify(analysis)
+      .replace('"actualAmount":0', '"actualAmount":9007199254740993.125')
+      .replace('"totalAmount":0', '"totalAmount":9007199254740993.125');
+    return new Response(exactAnalysisPayload, { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const decodedAnalysis = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "", pillar: "OCI" });
   assert.equal(decodedAnalysis.selectedPillar, "OCI");
+  assert.equal(decodedAnalysis.portfolio.actualAmountExact, "9007199254740993.125");
+  assert.equal(decodedAnalysis.portfolio.totalAmountExact, "9007199254740993.125");
 
   runtime.fetch = async () => new Response(JSON.stringify({
     ...workspace,
