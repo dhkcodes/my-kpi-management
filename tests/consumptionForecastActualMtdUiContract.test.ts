@@ -102,12 +102,22 @@ assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*to
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
-assert.match(styles, /\.fiscal-year-selector__row:hover\s*\{[^}]*background:\s*#0B607D[^}]*color:\s*#fff/u,
-  "the custom fiscal-year picker applies the requested teal hover colors");
+assert.match(styles, /\.fiscal-year-selector__trigger:hover,[\s\S]*\.fiscal-year-selector__trigger\[aria-expanded="true"\]\s*\{[^}]*background:\s*#eef7f4[^}]*color:\s*#182027/u,
+  "opening or selecting the fiscal-year trigger preserves the light visual treatment");
+assert.match(styles, /\.fiscal-year-selector__trigger:focus-visible[^}]*box-shadow:\s*0 0 0 2px/iu,
+  "the light fiscal-year treatment retains a visible keyboard focus indicator");
 assert.match(styles, /\.forecast-actual-total-strip\s*\{[^}]*display:\s*flex/iu,
   "Total Actual and Forecast remain in the Show MTD toolbar row");
+assert.match(styles, /\.forecast-actual-data-toolbar\s*\{[^}]*align-items:\s*center/iu,
+  "Show MTD, totals and Reload are vertically centered in one toolbar row");
 assert.match(styles, /\.forecast-actual-total-strip > span,[\s\S]*\.forecast-actual-total-strip span\s*\{[^}]*align-items:\s*baseline[^}]*display:\s*inline-flex/iu,
   "the amount and MTD label share an inline baseline");
+assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-no-forecast/iu,
+  "No FCST is wrapped by a full-cell centering container");
+assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-pending/iu,
+  "Actual Pending is wrapped by a full-cell centering container");
+assert.match(styles, /\.forecast-actual-cell-center\s*\{[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*width:\s*100%/iu,
+  "status badge containers center the badge itself across the complete cell");
 
 assert.match(api, /mtdAsOf:\s*string \| null/u);
 assert.match(analysis, /analysis\?\.mtdAsOf \?\? analysis\?\.mtdSummary\?\.asOf/u);

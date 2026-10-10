@@ -113,8 +113,8 @@ const periodRows = [row("A", [
 ])];
 assert.deepEqual(
   visibleForecastActualPeriods(["FY27-MAY", "FY27-DEC", "FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG"], periodRows),
-  ["FY27-MAY", "FY27-DEC", "FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG", "FY27-JUL", "FY27-JUN"],
-  "The complete server fiscal calendar remains visible; value-only row periods are merged and entered zero is retained"
+  ["FY27-NOV", "FY27-OCT", "FY27-SEP", "FY27-AUG", "FY27-JUL", "FY27-JUN"],
+  "future calendar months after the latest value are hidden; value-only row periods are merged and entered zero is retained"
 );
 assert.deepEqual(
   visibleForecastActualPeriods([], [row("Actual only", [
@@ -124,6 +124,13 @@ assert.deepEqual(
   ])]),
   ["FY27-JUL", "FY27-JUN"],
   "Q1 remains visible without Forecast, explicit zero stays distinct from missing Actual"
+);
+assert.deepEqual(
+  visibleForecastActualPeriods(["FY27-JUN", "FY27-JUL", "FY27-AUG"], [row("No values", [
+    month({ periodKey: "FY27-JUN", forecastAmount: null, actualAmount: null, actualState: null })
+  ])]),
+  [],
+  "a fiscal year with neither Forecast nor Actual does not expose future empty months"
 );
 
 const totals = summarizeForecastActualActuals([
