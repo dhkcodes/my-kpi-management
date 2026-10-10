@@ -490,9 +490,9 @@ export const ForecastActualPage = ({ fiscalYear, fiscalYears, onFiscalYearChange
                   {periods.flatMap((periodKey) => {
                     const month = monthByPeriod(row, periodKey);
                     if (!month) return [
-                      <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty" title="Forecast has not been entered."><span class="forecast-actual-value-badge is-no-forecast">No FCST</span></td>,
-                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty" title="Actual data is not available for this month."><span class="forecast-actual-value-badge is-pending"><span>Actual</span><span>Pending</span></span></td>,
-                      <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty" title="Not comparable until both Forecast and Actual are available."><span class="forecast-actual-value-badge is-na">N/A</span></td>,
+                      <td key={`${periodKey}-forecast`} class="forecast-actual-month-value is-forecast is-empty has-status-badge" title="Forecast has not been entered."><span class="forecast-actual-cell-center"><span class="forecast-actual-value-badge is-no-forecast">No FCST</span></span></td>,
+                      <td key={`${periodKey}-actual`} class="forecast-actual-month-value is-actual is-empty has-status-badge" title="Actual data is not available for this month."><span class="forecast-actual-cell-center"><span class="forecast-actual-value-badge is-pending"><span>Actual</span><span>Pending</span></span></span></td>,
+                      <td key={`${periodKey}-difference`} class="forecast-actual-month-value is-difference is-empty has-status-badge" title="Not comparable until both Forecast and Actual are available."><span class="forecast-actual-cell-center"><span class="forecast-actual-value-badge is-na">N/A</span></span></td>,
                       <td key={`${periodKey}-status`} class="forecast-actual-month-value is-status forecast-actual-status-cell"><span class="forecast-actual-status is-unavailable" title="Actual data is not available for this month." data-tooltip="Actual data is not available for this month." aria-label="Actual Pending: Actual data is not available for this month." tabIndex={0}>Actual Pending</span></td>
                     ];
                     const assessment = assessForecastActualMonth(month);
