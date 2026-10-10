@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const page = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
 const analysis = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const mtdControl = readFileSync("src/components/content/ConsumptionMtdControl.tsx", "utf8");
+const fiscalYearSelector = readFileSync("src/components/common/FiscalYearSelector.tsx", "utf8");
 const api = readFileSync("src/data/consumptionApi.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
 
@@ -106,10 +107,30 @@ assert.match(styles, /\.fiscal-year-selector__trigger:hover,[\s\S]*\.fiscal-year
   "opening or selecting the fiscal-year trigger preserves the light visual treatment");
 assert.match(styles, /\.fiscal-year-selector__trigger:focus-visible[^}]*box-shadow:\s*0 0 0 2px/iu,
   "the light fiscal-year treatment retains a visible keyboard focus indicator");
+assert.match(styles, /\.fiscal-year-selector__trigger,[\s\S]*\.fiscal-year-selector__nav,[\s\S]*\.fiscal-year-selector__row\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent/iu,
+  "touch interaction cannot leave a browser tap highlight on any fiscal-year control");
+assert.equal((fiscalYearSelector.match(/class="fiscal-year-selector__nav"/gu) ?? []).length, 2,
+  "both fiscal-year range navigation buttons receive the shared light-state class");
+assert.match(styles, /\.fiscal-year-selector__nav:hover,[\s\S]*\.fiscal-year-selector__navigation button:focus-visible\s*\{[^}]*background:\s*#eef7f4/iu,
+  "fiscal-year navigation controls stay light for hover, press, and keyboard focus across deployed and updated markup");
+assert.match(styles, /\.fiscal-year-selector__row:hover,[\s\S]*\.fiscal-year-selector__row:active,[\s\S]*\.fiscal-year-selector__row:focus-visible\s*\{[^}]*background:\s*#eef7f4/iu,
+  "fiscal-year options stay light for hover, press, and keyboard focus");
+assert.match(styles, /\.fiscal-year-selector__row\.is-selected\s*\{[^}]*background:\s*#eef7f4[^}]*box-shadow:/iu,
+  "the selected fiscal year stays light while remaining visibly distinct");
+assert.doesNotMatch(styles, /\.fiscal-year-selector__(?:trigger|nav|row)[^\{]*\{[^}]*background:\s*#(?:006b54|004f3f|0b6b57)/iu,
+  "no fiscal-year interaction state uses the former dark teal background");
 assert.match(styles, /\.forecast-actual-total-strip\s*\{[^}]*display:\s*flex/iu,
   "Total Actual and Forecast remain in the Show MTD toolbar row");
-assert.match(styles, /\.forecast-actual-data-toolbar\s*\{[^}]*align-items:\s*center/iu,
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-data-toolbar\s*\{[^}]*align-items:\s*center/iu,
   "Show MTD, totals and Reload are vertically centered in one toolbar row");
+assert.match(styles, /@media\s*\(max-width:\s*600px\)[\s\S]*\.forecast-actual-data-toolbar\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto[^}]*align-items:\s*center/iu,
+  "mobile portrait gives Show MTD, totals, and Reload independent centered grid columns");
+assert.match(styles, /@media\s*\(max-width:\s*600px\)[\s\S]*\.forecast-actual-toolbar-summary\s*\{[^}]*display:\s*contents/iu,
+  "mobile portrait lets the totals bundle align against the complete toolbar row rather than a wrapped summary column");
+assert.match(styles, /@media\s*\(max-width:\s*600px\)[\s\S]*\.forecast-actual-total-strip\s*\{[^}]*align-self:\s*center[^}]*justify-self:\s*center/iu,
+  "the mobile totals bundle itself is centered within the full toolbar row");
+assert.match(styles, /@media\s*\(max-width:\s*600px\)[\s\S]*\.forecast-actual-data-toolbar \.kap-page-activity\s*\{[^}]*align-self:\s*center[^}]*justify-self:\s*end[^}]*width:\s*auto/iu,
+  "the real PageActivity element remains centered in the same mobile grid row");
 assert.match(styles, /\.forecast-actual-total-strip > span,[\s\S]*\.forecast-actual-total-strip span\s*\{[^}]*align-items:\s*baseline[^}]*display:\s*inline-flex/iu,
   "the amount and MTD label share an inline baseline");
 assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-no-forecast/iu,
