@@ -133,6 +133,10 @@ assert.match(styles, /@media\s*\(max-width:\s*600px\)[\s\S]*\.forecast-actual-da
   "the real PageActivity element remains centered in the same mobile grid row");
 assert.match(styles, /\.forecast-actual-total-strip > span,[\s\S]*\.forecast-actual-total-strip span\s*\{[^}]*align-items:\s*baseline[^}]*display:\s*inline-flex/iu,
   "the amount and MTD label share an inline baseline");
+assert.match(styles, /@media\s*\(min-width:\s*601px\)[\s\S]*\.forecast-actual-total-strip small,[\s\S]*\.forecast-actual-total-strip strong\s*\{[^}]*line-height:\s*2rem/iu,
+  "wide-row totals use the Show MTD control height as their typographic line box, not a positional offset");
+assert.doesNotMatch(styles, /@media\s*\(min-width:\s*601px\)[\s\S]*\.forecast-actual-total-strip (?:small|strong)\s*\{[^}]*(?:transform|top|translate|margin-top):/iu,
+  "wide-row visible alignment is not implemented with an unexplained positional correction");
 assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-no-forecast/iu,
   "No FCST is wrapped by a full-cell centering container");
 assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-pending/iu,
