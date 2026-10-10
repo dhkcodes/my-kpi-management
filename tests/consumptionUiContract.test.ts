@@ -614,8 +614,8 @@ assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, 
 assert.match(recordsPage, /Import Forecast data from an Excel \(\.xlsx\) file\./, "Forecast Import tooltip describes the Excel-only function instead of presenting the generated template name as the last imported file");
 assert.match(recordsPage, /importMetadata\.forecastSourceFileName \? `\\nLast Import file: \$\{importMetadata\.forecastSourceFileName\}` : ""/,
   "Forecast Import hides a filename line when no source filename exists");
-assert.match(styles, /\.fiscal-year-selector__row:hover \{ background: #0B607D; color: #fff; \}/,
-  "the common fiscal-year option uses the requested teal hover and white text");
+assert.match(styles, /\.fiscal-year-selector__row:hover,[\s\S]*\.fiscal-year-selector__row:active,[\s\S]*\.fiscal-year-selector__row:focus-visible \{ background: #eef7f4; color: #182027; \}/,
+  "the common fiscal-year option keeps hover, press, and focus states light");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");

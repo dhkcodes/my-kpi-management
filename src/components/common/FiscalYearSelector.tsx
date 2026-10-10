@@ -94,8 +94,8 @@ export function FiscalYearSelector({ selected, current, onSelect, className = ""
       style={{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }}>
       <header class="fiscal-year-selector__header"><strong>Fiscal Year</strong>
         <span class="fiscal-year-selector__navigation">
-          <button type="button" aria-label="Show earlier fiscal years" {...activate(() => move(-1))}>‹</button>
-          <button type="button" aria-label="Show later fiscal years" {...activate(() => move(1))}>›</button>
+          <button type="button" class="fiscal-year-selector__nav" aria-label="Show earlier fiscal years" {...activate(() => move(-1))}>‹</button>
+          <button type="button" class="fiscal-year-selector__nav" aria-label="Show later fiscal years" {...activate(() => move(1))}>›</button>
         </span>
       </header>
       <div class="fiscal-year-selector__options" role="radiogroup" aria-label="Fiscal year">

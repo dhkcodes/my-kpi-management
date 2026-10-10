@@ -6883,20 +6883,25 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   display: inline-flex; font-size: 1.1rem; height: 1.8rem; justify-content: center; width: 1.8rem;
 }
 .fiscal-year-selector__navigation button:hover,
-.fiscal-year-selector__navigation button:focus-visible { background: #0B607D; color: #fff; outline: none; }
+.fiscal-year-selector__navigation button:active,
+.fiscal-year-selector__navigation button:focus-visible { background: #eef7f4; color: #182027; outline: none; }
 .fiscal-year-selector__row {
   align-items: center; background: transparent; border: 0; border-radius: .35rem; color: #27332d; cursor: pointer;
   display: grid; font: inherit; grid-template-columns: 1.15rem 1fr auto; min-height: 2.45rem; padding: .35rem .6rem; text-align: left; width: 100%;
 }
-.fiscal-year-selector__row:hover { background: #0B607D; color: #fff; }
-.fiscal-year-selector__row:hover .fiscal-year-selector__current { color: #fff; }
+.fiscal-year-selector__row:hover,
+.fiscal-year-selector__row:active,
+.fiscal-year-selector__row:focus-visible { background: #eef7f4; color: #182027; }
+.fiscal-year-selector__row:hover .fiscal-year-selector__current,
+.fiscal-year-selector__row:active .fiscal-year-selector__current,
+.fiscal-year-selector__row:focus-visible .fiscal-year-selector__current { color: #5b6961; }
 .fiscal-year-selector__row.is-selected { background: #e3f2e8; color: #17623b; font-weight: 750; }
 .fiscal-year-selector__radio { border: 1.5px solid #748078; border-radius: 50%; height: .85rem; position: relative; width: .85rem; }
 .fiscal-year-selector__row.is-selected .fiscal-year-selector__radio { border-color: #20804d; }
 .fiscal-year-selector__row.is-selected .fiscal-year-selector__radio::after { background: #20804d; border-radius: 50%; content: ""; inset: .16rem; position: absolute; }
 .fiscal-year-selector__current { color: #5b6961; font-size: .69rem; font-weight: 600; }
 
-.forecast-actual-data-toolbar { align-items: center; }
+.kap-page-shell.forecast-actual-page .forecast-actual-data-toolbar { align-items: center; }
 .forecast-actual-toolbar-summary { align-items: center; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: .75rem 1.5rem; min-width: 0; }
 .forecast-actual-total-strip { align-items: baseline; display: flex; flex: 1 1 24rem; flex-wrap: wrap; gap: .45rem 1.6rem; grid-template-columns: none; width: auto; }
 .forecast-actual-total-strip > span,
@@ -6961,4 +6966,100 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   .forecast-actual-total-strip { flex-basis: 100%; gap: .3rem 1rem; }
   .forecast-actual-total-strip > span { flex-wrap: wrap; }
   .fiscal-year-selector__popover { left: 0; right: auto; }
+}
+
+/* Keep every pointer, touch, selection, and focus state light; use outlines/accents for state instead. */
+.fiscal-year-selector__trigger,
+.fiscal-year-selector__nav,
+.fiscal-year-selector__navigation button,
+.fiscal-year-selector__row {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fiscal-year-selector__trigger:hover,
+.fiscal-year-selector__trigger:active,
+.fiscal-year-selector__trigger[aria-expanded="true"] {
+  background: #eef7f4;
+  border-color: #7ea89d;
+  color: #182027;
+}
+
+.fiscal-year-selector__trigger:focus-visible {
+  background: #f7fbfa;
+  border-color: #2d6f62;
+  box-shadow: 0 0 0 2px rgba(45, 111, 98, .22);
+  color: #182027;
+  outline: none;
+}
+
+.fiscal-year-selector__nav:hover,
+.fiscal-year-selector__nav:active,
+.fiscal-year-selector__nav:focus-visible,
+.fiscal-year-selector__navigation button:hover,
+.fiscal-year-selector__navigation button:active,
+.fiscal-year-selector__navigation button:focus-visible {
+  background: #eef7f4;
+  color: #182027;
+}
+
+.fiscal-year-selector__nav:focus-visible,
+.fiscal-year-selector__navigation button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(45, 111, 98, .22);
+  outline: none;
+}
+
+.fiscal-year-selector__row:hover,
+.fiscal-year-selector__row:active,
+.fiscal-year-selector__row:focus-visible {
+  background: #eef7f4;
+  color: #182027;
+}
+
+.fiscal-year-selector__row:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(45, 111, 98, .42);
+  outline: none;
+}
+
+.fiscal-year-selector__row.is-selected {
+  background: #eef7f4;
+  box-shadow: inset .2rem 0 0 #2d6f62;
+  color: #182027;
+}
+
+@media (max-width: 600px) {
+  .forecast-actual-data-toolbar {
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .forecast-actual-toolbar-summary {
+    display: contents;
+  }
+
+  .forecast-actual-total-strip {
+    align-items: flex-start;
+    align-self: center;
+    flex: none;
+    flex-direction: column;
+    gap: .3rem;
+    justify-self: center;
+    min-width: 0;
+  }
+
+  .forecast-actual-total-strip > span {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .forecast-actual-data-toolbar .kap-page-activity {
+    align-self: center;
+    flex: none;
+    justify-self: end;
+    min-width: 0;
+    width: auto;
+  }
 }
