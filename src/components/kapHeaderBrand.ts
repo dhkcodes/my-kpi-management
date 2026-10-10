@@ -2,8 +2,8 @@ export const KAP_HEADER_VARIANT_STORAGE_KEY = "kap.header.variant.v2";
 
 export const KAP_TERRACOTTA_LOGO = {
   variant: "terracotta",
-  src: "styles/images/kap-header-terracotta.png",
-  iconSrc: "styles/images/kap-header-terracotta-icon.png"
+  src: "styles/images/kap-header-terracotta-redwood-v1.png",
+  iconSrc: "styles/images/kap-header-terracotta-redwood-v1-icon.png"
 } as const;
 
 export const KAP_HEADER_LOGOS = [KAP_TERRACOTTA_LOGO] as const;
