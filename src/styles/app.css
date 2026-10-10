@@ -6652,8 +6652,16 @@ oj-menu.consumption-analysis-fy-menu {
     width: 100%;
   }
   .consumption-info-tooltip__content {
-    max-width: calc(100vw - 1rem);
-    right: -.25rem;
+    bottom: .5rem;
+    left: .5rem;
+    max-height: calc(100vh - 1rem);
+    max-width: none;
+    overflow: auto;
+    position: fixed;
+    right: .5rem;
+    top: auto;
+    width: auto;
+    z-index: 1000;
   }
 }
 
