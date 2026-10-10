@@ -116,6 +116,8 @@ assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value
   "No FCST is wrapped by a full-cell centering container");
 assert.match(page, /class="forecast-actual-cell-center"[^]*forecast-actual-value-badge is-pending/iu,
   "Actual Pending is wrapped by a full-cell centering container");
+assert.ok((page.match(/class="forecast-actual-cell-center"/gu) ?? []).length >= 6,
+  "both absent-month and partial-month state badges use the whole-cell centering wrapper");
 assert.match(styles, /\.forecast-actual-cell-center\s*\{[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*width:\s*100%/iu,
   "status badge containers center the badge itself across the complete cell");
 
