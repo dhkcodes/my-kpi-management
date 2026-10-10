@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -21,11 +22,16 @@ const pngDimensions = (path: string) => {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 };
 
-const relative = "styles/images/kap-header-terracotta.png";
-const iconRelative = "styles/images/kap-header-terracotta-icon.png";
+const relative = "styles/images/kap-header-terracotta-redwood-v1.png";
+const iconRelative = "styles/images/kap-header-terracotta-redwood-v1-icon.png";
 assert.match(brand, /KAP_TERRACOTTA_LOGO[\s\S]*variant: "terracotta"/, "the KAP header is locked to terracotta branding");
 assert.equal(existsSync(join(root, "src", relative)), true, "terracotta KAP image exists");
 assert.deepEqual(pngDimensions(join(root, "src", relative)), { width: 1600, height: 300 }, "terracotta uses the full logo artwork");
+assert.equal(
+  createHash("sha256").update(readFileSync(join(root, "src", relative))).digest("hex"),
+  "257ba9b2c421f66fcdc68909183a500db642b4c7c16dcf962f71a1fe517153c7",
+  "desktop and login branding uses the approved Presentation Lead artwork byte-for-byte"
+);
 assert.equal(existsSync(join(root, "src", iconRelative)), true, "terracotta mobile icon exists");
 assert.deepEqual(pngDimensions(join(root, "src", iconRelative)), { width: 315, height: 300 }, "terracotta icon is cropped from the artwork");
 
