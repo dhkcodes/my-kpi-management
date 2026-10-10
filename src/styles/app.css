@@ -6866,10 +6866,10 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 }
 .fiscal-year-selector__trigger:hover,
 .fiscal-year-selector__trigger:focus-visible,
-.fiscal-year-selector__trigger[aria-expanded="true"] { background: #0B607D; border-color: #0B607D; box-shadow: 0 0 0 2px rgba(11,96,125,.18); color: #fff; outline: 0; }
+.fiscal-year-selector__trigger[aria-expanded="true"] { background: #eef7f4; border-color: #20804d; box-shadow: 0 0 0 2px rgba(32,128,77,.18); color: #182027; outline: 0; }
 .fiscal-year-selector__trigger:hover .fiscal-year-selector__chevron,
 .fiscal-year-selector__trigger:focus-visible .fiscal-year-selector__chevron,
-.fiscal-year-selector__trigger[aria-expanded="true"] .fiscal-year-selector__chevron { color: #fff; }
+.fiscal-year-selector__trigger[aria-expanded="true"] .fiscal-year-selector__chevron { color: #315b4a; }
 .fiscal-year-selector__chevron { color: #55616c; margin-left: auto; }
 .fiscal-year-selector__popover {
   background: #fff; border: 1px solid #d7ddd9; border-radius: .55rem; box-shadow: 0 .75rem 1.8rem rgba(20,35,27,.18);
@@ -6896,6 +6896,7 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .fiscal-year-selector__row.is-selected .fiscal-year-selector__radio::after { background: #20804d; border-radius: 50%; content: ""; inset: .16rem; position: absolute; }
 .fiscal-year-selector__current { color: #5b6961; font-size: .69rem; font-weight: 600; }
 
+.forecast-actual-data-toolbar { align-items: center; }
 .forecast-actual-toolbar-summary { align-items: center; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: .75rem 1.5rem; min-width: 0; }
 .forecast-actual-total-strip { align-items: baseline; display: flex; flex: 1 1 24rem; flex-wrap: wrap; gap: .45rem 1.6rem; grid-template-columns: none; width: auto; }
 .forecast-actual-total-strip > span,
@@ -6917,6 +6918,8 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .forecast-actual-month-value.is-actual .forecast-actual-value-badge.is-pending {
   align-items: center; display: inline-grid; justify-items: center; margin-inline: auto; text-align: center;
 }
+.forecast-actual-month-value.has-status-badge { text-align: center; vertical-align: middle; }
+.forecast-actual-cell-center { align-items: center; display: flex; justify-content: center; width: 100%; }
 .kap-page-shell.forecast-actual-page .kap-page-filter.forecast-actual-toolbar {
   flex: 0 0 auto;
 }
@@ -6954,7 +6957,7 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   text-align: center;
 }
 @media (max-width: 760px) {
-  .forecast-actual-toolbar-summary { align-items: flex-start; }
+  .forecast-actual-toolbar-summary { align-items: center; }
   .forecast-actual-total-strip { flex-basis: 100%; gap: .3rem 1rem; }
   .forecast-actual-total-strip > span { flex-wrap: wrap; }
   .fiscal-year-selector__popover { left: 0; right: auto; }

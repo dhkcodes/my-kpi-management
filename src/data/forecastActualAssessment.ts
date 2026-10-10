@@ -308,7 +308,10 @@ export const visibleForecastActualPeriods = (
   rows.forEach((row) => row.months.forEach((item) => {
     if (item.forecastAmount !== null || item.actualAmount !== null) periodsWithValues.add(item.periodKey);
   }));
-  return forecastActualPeriodsLatestFirst([...new Set([...fullPeriods, ...periodsWithValues])]);
+  if (!periodsWithValues.size) return [];
+  const periodsLatestFirst = forecastActualPeriodsLatestFirst([...new Set([...fullPeriods, ...periodsWithValues])]);
+  const latestValueIndex = periodsLatestFirst.findIndex((periodKey) => periodsWithValues.has(periodKey));
+  return latestValueIndex < 0 ? [] : periodsLatestFirst.slice(latestValueIndex);
 };
 
 const addNullable = (current: string | null, value: string): string => current === null ? value : addExactDecimals(current, value);
