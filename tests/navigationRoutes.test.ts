@@ -65,7 +65,6 @@ for (const file of [
   "AttainmentPage.tsx",
   "ConsumptionAnalysisPage.tsx",
   "ConsumptionRecordsPage.tsx",
-  "KpiSpreadsheetPage.tsx",
   "MyCustomers360Page.tsx",
   "ProfilePage.tsx",
   "UsersPage.tsx",
@@ -74,6 +73,9 @@ for (const file of [
   const pageSource = readFileSync(`src/components/content/${file}`, "utf8");
   assert.match(pageSource, /\{breadcrumb\}[\s\S]*?<h[12]/, `${file} renders the page menu inside its title surface`);
 }
+const kpiSpreadsheetSource = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
+assert.match(kpiSpreadsheetSource, /<PageShell[\s\S]*breadcrumb=\{breadcrumb\}[\s\S]*title=\{activeTab/,
+  "KpiSpreadsheetPage renders the page menu inside the shared title surface");
 const forecastActualSource = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
 assert.match(forecastActualSource, /<PageShell[\s\S]*breadcrumb=\{breadcrumb\}[\s\S]*title="Forecast vs Actual"/, "ForecastActualPage renders the page menu inside the shared title surface");
 const accountsWorkloadsSource = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");

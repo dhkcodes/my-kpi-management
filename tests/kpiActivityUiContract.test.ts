@@ -127,7 +127,7 @@ assert.match(page, /<colgroup>[\s\S]*columnLayout\.widths\[field\.key\]/);
 assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/);
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*min-width:\s*100%[^}]*width:\s*max-content/, "KPI tables fill the available panel while retaining horizontal overflow on narrow screens");
 assert.match(page, /\}, \[activeTab, fields, pageLoading\]\);/, "column widths are recalculated after the loading view mounts the table host");
-assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== fiscalYear[\s\S]*if \(fiscalYearChanged\)[\s\S]*setPageLoading\(true\)/, "same-FY post-save refresh keeps the mounted table and dialog host intact");
+assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== fiscalYear[\s\S]*setPageLoading\(true\)[\s\S]*if \(fiscalYearChanged\)[\s\S]*setRows\(\[\]\)/, "same-FY refresh shows standard progress while keeping mounted rows and dialog host intact");
 assert.match(page, /const settleDialogClosed = useCallback[\s\S]*await busyContext\.whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*await busyContext\.whenReady\(\)/, "all chained KPI dialogs settle their JET BusyContext before another modal or route action starts");
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*var\(--kap-grid-header-ink\)/,
   "KPI header titles use the calm slate token instead of red");

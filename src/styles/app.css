@@ -5568,16 +5568,12 @@ h4.weekly-activity-section-label--next-week,
   .forecast-actual-matrix .is-quarter-result { left: 15.5rem; }
 }
 
-/* Reserve the application footer and scroll only each workspace's data surface. */
-.kpi-content:has(.kpi-spreadsheet-page),
+/* Reserve the application footer and scroll only the legacy attainment workspace.
+   KPI spreadsheets now use the common viewport-bound PageShell contract below. */
 .kpi-content:has(.attainment-page) {
   height: calc(100dvh - 4rem - var(--kpi-footer-reserved-height) - 3rem);
   min-height: 0;
   overflow: hidden;
-}
-.kpi-content:has(.kpi-spreadsheet-page) {
-  align-content: stretch;
-  grid-template-rows: max-content max-content minmax(0, 1fr);
 }
 .kpi-spreadsheet-page {
   display: flex;
@@ -5700,7 +5696,6 @@ h4.weekly-activity-section-label--next-week,
   .kpi-overview-filtered-activities td,
   .kpi-overview-portfolio th,
   .kpi-overview-portfolio td { padding-block: .2rem; }
-  .kpi-content:has(.kpi-spreadsheet-page),
   .kpi-content:has(.attainment-page) { height: calc(100dvh - 4.5rem - var(--kpi-footer-reserved-height) - 1.5rem); }
 }
 
@@ -6157,6 +6152,33 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); border-radius: var(--kpi-panel-radius); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
 .kap-page-shell__body { display: grid; flex: 1 0 auto; gap: .75rem; min-height: 0; min-width: 0; }
 
+/* KPI-only PageShell adoption. Consumption remains frozen and unchanged. */
+.kap-page-shell.kpi-spreadsheet-page {
+  border-radius: var(--oj-core-border-radius-md, .2rem);
+  padding: 0;
+}
+.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__inner { gap: .375rem; }
+.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__body {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: .375rem;
+  min-width: 0;
+  width: 100%;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-sheet-tabs { flex: 0 0 auto; margin: 0; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-scroll-area { min-height: 0; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-grid-cell { touch-action: pan-x pan-y pinch-zoom; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading .kap-page-activity,
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right .kap-page-activity { margin-left: auto; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading .kap-page-activity__control-slot,
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading .kap-page-activity__refresh,
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right .kap-page-activity__control-slot,
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right .kap-page-activity__refresh {
+  min-width: 0;
+  width: auto;
+}
+
 /* Consumption Records is the first adopter; legacy nested scrolling is replaced by shell scrolling. */
 .kap-page-shell.consumption-page { display: block; padding: 0; }
 .kap-page-shell.consumption-page .kap-page-shell__inner { gap: 0; }
@@ -6262,6 +6284,31 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
   .kap-page-shell__scroll { -webkit-overflow-scrolling: touch; scrollbar-gutter: auto; }
   .kap-page-shell__heading { align-items: stretch; flex-direction: column; gap: .55rem; }
   .kap-page-shell__title-row { align-items: flex-start; }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-sheet-tabs {
+    flex: 0 0 auto;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-sheet-tabs > button { flex: 0 0 auto; }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right {
+    flex: 0 0 auto;
+    margin-left: auto;
+    width: auto;
+  }
+  .kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading {
+    align-items: center;
+    flex-direction: row;
+    gap: .5rem;
+  }
 
   .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar { align-items: flex-end; flex-wrap: nowrap; }
   .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar__left { padding-inline-start: 0; }
@@ -7208,7 +7255,8 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 }
 
 .kpi-shell:has(.consumption-insights-page) .kpi-footer,
-.kpi-shell:has(.consumption-page) .kpi-footer {
+.kpi-shell:has(.consumption-page) .kpi-footer,
+.kpi-shell:has(.kpi-spreadsheet-page) .kpi-footer {
   border-radius: .2rem;
   overflow: hidden;
 }

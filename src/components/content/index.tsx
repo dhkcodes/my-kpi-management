@@ -446,8 +446,8 @@ export function Content({
     onOpenAccountWorkloads(account);
   };
   const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} profile={profile} onNavigate={onNavigate} />;
-  const isKapPageShellRoute = ["consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
-  const showsFiscalYearPanel = !['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
+  const isKapPageShellRoute = ["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
+  const showsFiscalYearPanel = !['profile', 'users', 'kpiPage', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
 
   return (
     <main id="cockpit" role="main" class={`oj-web-applayout-content kpi-content${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}${isKapPageShellRoute && showsFiscalYearPanel ? " has-fiscal-year-panel" : ""}`}>
@@ -621,6 +621,7 @@ export function Content({
         <KpiSpreadsheetPage fiscalYear={fiscalYear} routeId={activeRoute.id}
           canWrite={canWrite}
           guideDataFiscalYear={guideDataFiscalYear} guideRecords={guideRecords} guideLoading={guideLoading} guideError={guideError}
+          onFiscalYearChange={onFiscalYearChange} onOpenGuide={onOpenGuide}
           onNavigate={onNavigate} onNavigationGuardChange={onKpiNavigationGuardChange}
           onWriteStateChange={onKpiWriteStateChange} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "accountManagementOverview" ? (
