@@ -6951,6 +6951,22 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   box-shadow: inset 0 2px 3px rgba(12, 9, 7, .42), inset 0 -1px 0 rgba(255, 244, 224, .05);
   transform: translateY(1px);
 }
+.fiscal-year-selector__nav:disabled {
+  background: linear-gradient(145deg, #37312b, #2d2925);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 224, .06);
+  color: rgba(243, 229, 209, .38);
+  cursor: default;
+  transform: none;
+}
+.fiscal-year-selector__nav:disabled:hover,
+.fiscal-year-selector__nav:disabled:active {
+  background: linear-gradient(145deg, #37312b, #2d2925);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 224, .06);
+  transform: none;
+}
+.fiscal-year-selector[data-disabled="true"] .fiscal-year-selector__filmstrip {
+  color: rgba(246, 234, 216, .72);
+}
 .fiscal-year-selector__nav:focus-visible {
   outline: 2px solid #f6ead8;
   outline-offset: 2px;

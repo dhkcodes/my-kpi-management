@@ -280,7 +280,8 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
     .reduce((total, value) => addExactDecimals(total, value), "0");
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
-    className="forecast-actual-fy-button" onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
+    className="forecast-actual-fy-button" disabled={loading}
+    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
   const updateViewportControls = () => {
     const root = pageScrollRef.current;
     const frame = matrixFrameRef.current;

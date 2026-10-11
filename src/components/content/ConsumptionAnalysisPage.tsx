@@ -365,7 +365,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
 
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
-    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
+    disabled={loading} onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
   const messages: ConsumptionMessage[] = error
     ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
     : [];
