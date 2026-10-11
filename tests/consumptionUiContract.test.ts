@@ -285,8 +285,8 @@ assert.match(insightsPage, /`Refreshing \$\{fiscalYear\}; showing \$\{analysis\.
   "the refresh state identifies both requested and still-visible completed FY data");
 assert.match(insightsPage, /"data-response-fiscal-year": analysis\.fiscalYear/,
   "the Analysis data region exposes its completed FY for browser race verification");
-assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*left:\s*50vw;[^}]*position:\s*fixed;[^}]*top:\s*50vh;/s,
-  "an Analysis FY refresh indicator retains the established viewport-centered position");
+assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*left:\s*50vw;[^}]*position:\s*fixed;[^}]*top:\s*var\(--consumption-viewport-center-y,\s*50vh\);/s,
+  "Analysis and Forecast vs Actual use the Records visible-root viewport-center coordinate");
 assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;[^}]*position:\s*fixed;[^}]*transform:\s*translate\(-50%,\s*-50%\);/s,
   "Analysis keeps the viewport-centered progress track without the generic floating white card");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
@@ -1001,6 +1001,14 @@ assert.doesNotMatch(insightsPage, /class="consumption-analysis-data-controls"/,
   "Analysis does not introduce a new progress-positioning wrapper around the toolbar");
 assert.doesNotMatch(styles, /\.consumption-analysis-data-controls \.kap-page-data-progress/,
   "Analysis does not relocate progress to the data-control bottom");
+assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*top:\s*var\(--consumption-viewport-center-y,\s*50vh\)/s,
+  "Analysis and Forecast vs Actual anchor progress to the Records viewport-center coordinate");
+assert.match(insightsPage, /scrollElementRef=\{\(element\) => \{ pageScrollRef\.current = element; \}\}/,
+  "Analysis observes the same root page scroller used to place the Records progress indicator");
+assert.match(insightsPage, /const viewportCenterY = \(visibleTop \+ visibleBottom\) \/ 2;[\s\S]*--consumption-viewport-center-y/,
+  "Analysis computes the same visible-root viewport center as Records rather than relying on mobile vh units");
+assert.match(insightsPage, /resizeObserver\.observe\(root\);[\s\S]{0,700}\}, \[analysisResponse\]\);/,
+  "Analysis installs its viewport-center observer after the loaded PageShell exposes the root scroller");
 assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*row-gap:\s*0;/s,
   "mobile Records keeps Show MTD\/count and Reload in one control row instead of reserving a false second-row gap");
 assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar-activity\s*\{[^}]*flex-basis:\s*auto;[^}]*flex-wrap:\s*nowrap;/s,

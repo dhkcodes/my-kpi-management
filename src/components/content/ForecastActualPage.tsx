@@ -307,6 +307,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
       && centerY <= tableRect.bottom;
 
     controls.dataset.visible = tableVisible ? "true" : "false";
+    root.style.setProperty("--consumption-viewport-center-y", `${centerY}px`);
     controls.style.setProperty("--consumption-viewport-center-x", `${centerX}px`);
     controls.style.setProperty("--consumption-viewport-center-y", `${centerY}px`);
     controls.style.setProperty("--consumption-viewport-left", `${left}px`);
@@ -345,10 +346,14 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
     resizeObserver.observe(frame);
     resizeObserver.observe(viewport);
     window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
     update();
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
     };
   }, [currentData, periods.length, rows.length]);
 
