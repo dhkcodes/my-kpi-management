@@ -1708,7 +1708,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   if (importError) pageMessages.push({ id: "records-operation-error", severity: "error", summary: "요청을 처리하지 못했습니다.", detail: "기존 데이터와 마지막 완료 시각을 유지합니다. 입력 내용을 확인한 뒤 다시 시도해 주세요." });
   if (rangeInitialized && rangeTouched && !rangeValid) pageMessages.push({ id: "records-range", severity: "warning", summary: "조회기간을 확인해 주세요.", detail: "시작 분기는 종료 분기보다 늦을 수 없습니다." });
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
-  if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
+  if (dataMode === "backend" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
 
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));

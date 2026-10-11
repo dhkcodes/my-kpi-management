@@ -971,6 +971,8 @@ assert.match(recordsPage, /const contentReady = dataMode === "backend" && lastDa
   "Records routes a failed initial or empty-state retry inline, but a refresh failure with completed data only to the floating operation banner");
 assert.doesNotMatch(recordsPage, /setDataMode\("error"\);\s*setImportError/,
   "Records does not duplicate an initial load failure in the floating operation banner");
+assert.match(recordsPage, /if \(dataMode === "backend" && serverActualTotals === null\) pageMessages\.push\(\{ id: "records-total"/,
+  "Records suppresses derived floating total warnings while the initial backend load is unavailable");
 assert.match(insightsPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
   "Analysis uses the named Data Control Bar");
 assert.match(forecastActualPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
