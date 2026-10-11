@@ -987,7 +987,7 @@ assert.match(styles, /\.kap-data-control-bar\s*\{[^}]*align-items:\s*center[^}]*
   "the shared Data Control Bar defines its cross-page alignment contract");
 assert.match(styles, /\.app-message-region\.is-inline\s*\{[^}]*position:\s*static[^}]*width:\s*100%/s,
   "page-load errors remain in the document flow instead of overlaying content");
-assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*?\.kap-data-control-bar\s*\{[^}]*flex-wrap:\s*wrap/s,
-  "mobile Data Control Bars wrap activity controls instead of clipping Reload outside the viewport");
+assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*?\.kap-page-shell\.forecast-actual-page \.kap-data-control-bar\s*\{[^}]*flex-wrap:\s*wrap/s,
+  "mobile Data Control Bars use a scoped, high-specificity wrap contract instead of clipping Reload outside the viewport");
 
 console.log("consumptionUiContract tests passed");

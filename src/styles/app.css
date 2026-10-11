@@ -7168,7 +7168,10 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .kpi-shell:has(.kap-page-shell) .kpi-footer { margin-block-start: var(--kap-footer-gap); }
 
 @media (max-width: 760px) {
-  .kap-data-control-bar { flex-wrap: wrap; gap: .375rem; }
+  .kap-data-control-bar { gap: .375rem; }
+  .kap-page-shell.consumption-page .kap-data-control-bar,
+  .kap-page-shell.consumption-insights-page .kap-data-control-bar,
+  .kap-page-shell.forecast-actual-page .kap-data-control-bar { flex-wrap: wrap; }
   .kap-data-control-bar > * { max-width: 100%; min-width: 0; }
   .kap-data-control-bar .kap-page-activity__refresh { height: 2.75rem; min-height: 2.75rem; }
   .kpi-shell.is-kap-page-shell-route .kpi-footer,
