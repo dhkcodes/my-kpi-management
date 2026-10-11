@@ -51,14 +51,14 @@ assert.doesNotMatch(pageShell, /consumption|records/i, "the common shell contain
 assert.match(styles, /\.kap-page-shell__inner\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/, "the common shell keeps breadcrumb, heading, and filters top-aligned instead of stretching grid rows");
 assert.match(styles, /\.kap-page-shell__body\s*\{[^}]*flex:\s*1 0 auto/, "unused shell height is assigned to the page body");
 assert.match(appBusyOverlay, /data-app-busy-surface[\s\S]*MutationObserver/, "the fallback loader reacts when an inline page loading surface mounts during route entry");
-assert.match(pageShell, /kap-page-activity__control-slot[\s\S]*busy \?[\s\S]*oj-progress-circle[\s\S]*:\s*<oj-button/s,
-  "one reserved control slot swaps the loading circle for the original Refresh button without layout movement");
-assert.match(styles, /\.kap-page-activity__control-slot\s*\{[^}]*min-width:[^}]*width:/s,
-  "the circle and Refresh control share a fixed-size slot");
-assert.match(styles, /\.kap-page-activity__control-slot\s*\{[^}]*min-height:\s*2\.25rem[^}]*min-width:\s*2\.25rem[^}]*width:\s*2\.25rem/s,
-  "the activity slot preserves the approved 36px icon geometry in idle and busy states");
-assert.match(styles, /\.kap-page-activity__refresh\s*\{[^}]*min-height:\s*2\.25rem[^}]*width:\s*2\.25rem/s,
-  "the visible Reload icon button uses the same 36px geometry as its reserved slot");
+assert.match(pageShell, /if \(compactTimestampButton\)[\s\S]*<oj-button key=\{busy \? "busy" : "ready"\}[\s\S]*chroming="outlined"[\s\S]*<span slot="startIcon"[\s\S]*busy[\s\S]*oj-progress-circle[\s\S]*oj-ux-ico-refresh[\s\S]*kap-page-activity__separator[\s\S]*formatKstTime\(lastCompletedAt\)/,
+  "the restored compact control keeps icon or spinner and HH:mm:ss inside one outlined button");
+assert.match(styles, /\.kap-page-activity\.is-compact-timestamp\s*\{[^}]*align-items:\s*center[^}]*min-height:\s*2\.5rem/s,
+  "the restored compact activity keeps the established button row geometry");
+assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__control-slot\s*\{[^}]*align-items:\s*center[^}]*min-width:\s*0[^}]*width:\s*auto/s,
+  "the restored timestamp button owns its intrinsic width instead of an icon-only slot width");
+assert.match(styles, /\.kap-page-activity\.is-compact-timestamp \.kap-page-activity__refresh\s*\{[^}]*min-height:\s*2\.25rem[^}]*width:\s*auto/s,
+  "the restored combined control keeps its compact height while overriding the icon-only fixed width");
 assert.match(appBusyOverlay, /oj-progress-bar[\s\S]*value=\{-1\}/, "route-entry fallback is a thin indeterminate JET bar rather than a floating Loading box");
 assert.doesNotMatch(appBusyOverlay, /oj-progress-circle|<span>Loading<\/span>|Processing/, "route entry has no legacy or renamed full-screen loading box");
 assert.match(appBusyOverlay, /role="dialog" aria-modal="true"/, "the thin fallback bar still exposes the blocking state accessibly");
@@ -255,18 +255,22 @@ assert.match(styles, /\.kap-data-control-bar\s*\{(?=[^}]*min-width:\s*0;)(?=[^}]
   "Data Control Bar keeps only non-visual containment needed by the named component");
 assert.doesNotMatch(styles, /\.kap-data-control-bar\s*\{[^}]*(?:min-height|padding|margin|gap|align-items|justify-content):/s,
   "Data Control Bar does not override the pre-commonization page-specific height, alignment or spacing");
-assert.doesNotMatch(insightsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
-  "Analysis keeps completion time and Reload as separate controls");
-assert.doesNotMatch(forecastActualPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
-  "Forecast vs Actual keeps completion time and Reload as separate controls");
-assert.doesNotMatch(recordsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
-  "Records keeps completion time and Reload as separate controls");
+assert.match(insightsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Analysis restores completion time inside the original compact Reload button");
+assert.match(forecastActualPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Forecast vs Actual restores completion time inside the original compact Reload button");
+assert.match(recordsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Records restores completion time inside the original compact Reload button");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page,\s*\.kap-page-shell\.forecast-actual-page,\s*\.kap-page-shell\.consumption-page\s*\{[^}]*border-radius:\s*var\(--oj-core-border-radius-md, \.2rem\);/s,
   "only the three Consumption root containers use the same small radius as their grids");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select\s*\{(?=[^}]*padding-inline-start:\s*\.65rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
   "Analysis keeps its original text inset while adopting the shared right arrow inset");
 assert.match(styles, /\.forecast-actual-toolbar select,\s*\.consumption-range-bar select\s*\{(?=[^}]*padding-inline-start:\s*\.65rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
   "FVA and Records native selects use the shared inset and arrow geometry without glyph-specific pixel offsets");
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-search-panel\s*\{(?=[^}]*flex:\s*0 1 18\.75rem;)(?=[^}]*max-width:\s*18\.75rem;)(?=[^}]*width:\s*min\(18\.75rem, 100%\);)[^}]*\}/s,
+  "FVA Account keeps the established 18.75rem desktop width instead of the superseded 32rem rule");
+assert.doesNotMatch(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-search-panel\s*\{[^}]*(?:max-width|width|flex):[^}]*32rem/s,
+  "FVA Account does not regress to the oversized 32rem desktop field");
 assert.doesNotMatch(styles, /\.forecast-actual-toolbar input[^}]*background-position|\.consumption-insights-filter input[^}]*background-position/s,
   "Account search inputs are excluded from select-arrow styling");
 assert.match(insightsPage, /const analysis = analysisResponse;/,
@@ -281,8 +285,10 @@ assert.match(insightsPage, /`Refreshing \$\{fiscalYear\}; showing \$\{analysis\.
   "the refresh state identifies both requested and still-visible completed FY data");
 assert.match(insightsPage, /"data-response-fiscal-year": analysis\.fiscalYear/,
   "the Analysis data region exposes its completed FY for browser race verification");
-assert.match(styles, /\.consumption-analysis-data-controls \.kap-page-data-progress\s*\{[^}]*position:\s*absolute;[^}]*transform:\s*none;/s,
-  "an Analysis FY refresh indicator remains anchored inside the data-control area without viewport translation");
+assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*left:\s*50vw;[^}]*position:\s*fixed;[^}]*top:\s*50vh;/s,
+  "an Analysis FY refresh indicator retains the established viewport-centered position");
+assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;[^}]*position:\s*fixed;[^}]*transform:\s*translate\(-50%,\s*-50%\);/s,
+  "Analysis keeps the viewport-centered progress track without the generic floating white card");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(account\.coveredExpectedAmountExact\)\}/,
@@ -477,7 +483,7 @@ assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]
 assert.match(insightsPage, /const analysis = analysisResponse;/, "Analysis keeps the last completed response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
 assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading keeps only the centered progress indicator");
-assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*showBusyLabel=\{false\} shortVisibleTimestamp[\s\S]*<PageDataProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis keeps an icon-only Reload slot while exposing the detailed partial-refresh state accessibly");
+assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*compactTimestampButton[\s\S]*<PageDataProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis restores one compact icon-or-spinner and timestamp button while exposing the detailed partial-refresh state accessibly");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.doesNotMatch(insightsPage, /setAnalysis\(null\)/, "a failed FY transition preserves the last completed response while rendering a floating error");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
@@ -900,7 +906,7 @@ assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.kap-page-filter\.
 assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-overview\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*width:\s*100%/, "the quarter-card overview uses the full available row instead of retaining an empty summary column");
 assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-quarter-cards\s*\{[^}]*width:\s*100%/, "the quarter-card group balances all four cards across the available width");
 assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.kap-page-shell__body\s*\{[^}]*align-content:\s*start[^}]*grid-auto-rows:\s*max-content/, "FVA rows keep content height instead of stretching when the filtered result set is small");
-assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-search-panel\s*\{[^}]*align-content:\s*start[^}]*align-self:\s*flex-end[^}]*flex:\s*0 1 32rem[^}]*max-width:\s*32rem[^}]*min-height:\s*0/, "the Account search container keeps its natural height while retaining wider responsive input space");
+assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-search-panel\s*\{[^}]*align-content:\s*start[^}]*align-self:\s*flex-end[^}]*flex:\s*0 1 18\.75rem[^}]*max-width:\s*18\.75rem[^}]*min-height:\s*0/, "the Account search container keeps its natural height and the established Analysis-aligned desktop width");
 assert.match(styles, /\.forecast-actual-month-value\s*\{[^}]*text-align:\s*right/, "month amounts align to the right edge of their cells");
 assert.match(styles, /\.forecast-actual-month-value\.is-status\s*\{[^}]*justify-content:\s*center[^}]*text-align:\s*center/, "status-only cells and badges stay centered independently of amount cells");
 assert.doesNotMatch(insightsPage, /YoY same-period ACTUAL contribution · K USD/, "the Analysis Growth / Reduction label removes only the duplicated K USD suffix");
@@ -946,8 +952,8 @@ assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecord
   "the authenticated shell opts into the shared viewport layout before the child surface mounts");
 assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
-assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}showBusyLabel=\{false\}[\s\S]{0,80}shortVisibleTimestamp \/>/,
-  "Records keeps the reusable icon-only Reload and separate timestamp controls");
+assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}compactTimestampButton \/>/,
+  "Records restores the reusable one-button icon-or-spinner and timestamp control");
 assert.doesNotMatch(recordsPage, /labeledRefreshButton/, "Records does not opt back into the labeled Reload regression");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,
   "the legacy Actual CSV export action is hidden without deleting its underlying export function");
@@ -987,16 +993,18 @@ assert.match(forecastActualPage, /Actual data is not available for this month\./
 assert.doesNotMatch(forecastActualPage, /Actual is not confirmed\./,
   "Pending no longer conflates absent Actual with MTD confirmation");
 
-assert.doesNotMatch(insightsPage, /labeledRefreshButton/, "Analysis keeps the icon-only Reload control");
-assert.doesNotMatch(forecastActualPage, /labeledRefreshButton/, "Forecast vs Actual keeps the icon-only Reload control");
-assert.match(insightsPage, /<PageActivity[\s\S]{0,300}showBusyLabel=\{false\}[\s\S]{0,120}shortVisibleTimestamp/,
-  "Analysis exposes its busy label accessibly without rendering long refresh text beside the time");
-assert.match(insightsPage, /class="consumption-analysis-data-controls"[\s\S]*<DataControlBar[\s\S]*<PageDataProgress busy=\{loading\}/,
-  "Analysis anchors the thin progress indicator to the data controls without adding a grid row");
-assert.match(styles, /\.consumption-analysis-data-controls\s*\{[^}]*position:\s*relative/s,
-  "the Analysis progress anchor owns the positioning context");
-assert.match(styles, /\.consumption-analysis-data-controls \.kap-page-data-progress\s*\{[^}]*background:\s*transparent[^}]*transform:\s*none/s,
-  "the Analysis progress is a thin in-body indicator rather than a translated white loading box");
+assert.doesNotMatch(insightsPage, /labeledRefreshButton|shortVisibleTimestamp/, "Analysis uses the restored compact timestamp button without text or timestamp separation");
+assert.doesNotMatch(forecastActualPage, /labeledRefreshButton|shortVisibleTimestamp/, "Forecast vs Actual uses the restored compact timestamp button without text or timestamp separation");
+assert.match(insightsPage, /<PageActivity[\s\S]{0,300}compactTimestampButton[\s\S]*<\/DataControlBar>\s*<PageDataProgress busy=\{loading\}/,
+  "Analysis restores the established progress placement after the data-control row");
+assert.doesNotMatch(insightsPage, /class="consumption-analysis-data-controls"/,
+  "Analysis does not introduce a new progress-positioning wrapper around the toolbar");
+assert.doesNotMatch(styles, /\.consumption-analysis-data-controls \.kap-page-data-progress/,
+  "Analysis does not relocate progress to the data-control bottom");
+assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*row-gap:\s*0;/s,
+  "mobile Records keeps Show MTD\/count and Reload in one control row instead of reserving a false second-row gap");
+assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar-activity\s*\{[^}]*flex-basis:\s*auto;[^}]*flex-wrap:\s*nowrap;/s,
+  "mobile Records does not force the Reload activity onto a full-width second row");
 
 assert.match(insightsPage, /const ALL_ACCOUNTS = "All Accounts";/, "Analysis removes Total from the default Account text");
 assert.match(forecastActualPage, /<option value="">All Sales Reps<\/option>/, "Forecast vs Actual uses the shared Sales Rep default text");
@@ -1053,8 +1061,8 @@ assert.match(styles, /--kap-consumption-control-height:\s*2\.15rem/,
   "Consumption compact control height is a reusable 2.15rem token");
 assert.doesNotMatch(styles, /\.consumption-pillar-selector button\s*\{[^}]*2\.25rem/s,
   "Pillar controls no longer retain the old 2.25rem height");
-assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-page \.kap-page-activity__refresh\s*\{[^}]*min-height:\s*2\.75rem/s,
-  "mobile Records does not retain the commonization-era forced 44px Reload height");
+assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*\.kap-page-shell\.consumption-page \.kap-page-activity__refresh\s*\{[^}]*min-height:\s*2\.75rem/s,
+  "mobile Records restores the established larger compact Reload button height");
 assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*\.consumption-analysis-toolbar \.consumption-records-toolbar__left\s*\{[^}]*padding-inline-start:\s*0/s,
   "mobile Analysis removes only the overflowing left inset instead of forcing Data Control Bar wrapping");
 assert.match(styles, /\.kap-page-filter\s*\{[^}]*border-radius:\s*var\(--kpi-panel-radius\)/s,

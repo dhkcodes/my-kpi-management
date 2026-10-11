@@ -542,7 +542,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         </div>
         </div>
     </PageFilterPanel>}>
-    <div class="consumption-analysis-data-controls">
     <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar" ariaLabel="Consumption Analysis data controls">
       <div class="consumption-records-toolbar__left">
         <ConsumptionMtdControl checked={includeMtd} disabled={loading || !analysis.currentMtdAvailable}
@@ -552,11 +551,10 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
       </div>
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={loading || !!exporting}
-            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} shortVisibleTimestamp />
+            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
     </DataControlBar>
     <PageDataProgress busy={loading} busyLabel={refreshStatusLabel} />
-    </div>
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>

@@ -414,7 +414,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
             onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
-            showBusyLabel={false} shortVisibleTimestamp />
+            compactTimestampButton />
         </div>
       </DataControlBar>
       <section class="forecast-actual-overview" aria-label="Quarter results">

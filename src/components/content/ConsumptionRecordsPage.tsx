@@ -2068,8 +2068,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             </div>
             <div class="consumption-records-toolbar-activity">
               <PageActivity busy={recordsActivityBusy} busyLabel={pageBusyLabel} onRefresh={refreshRecords}
-                refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false}
-                shortVisibleTimestamp />
+                refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt}
+                compactTimestampButton />
             </div>
           </DataControlBar>
           {hasDraftChanges && (

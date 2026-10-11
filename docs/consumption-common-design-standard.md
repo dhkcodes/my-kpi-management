@@ -44,7 +44,8 @@ Native Sales Rep/Account controls use the Analysis reference typography (`Arial`
 - Analysis, FVA and Records native selects use the same `.65rem` start inset. Per-validation-string pixel offsets are prohibited; align the actual font family, size, weight and color instead.
 - All three pages' native select arrows use `background-position: right .55rem center` and `padding-inline-end: 1.75rem`.
 - Sales Rep defaults to `All Sales Reps`; Account defaults to `All Accounts`.
-- FVA Sales Rep and Account controls match the Analysis typography and desktop width rules; both become full width at `720px` and below.
+- Active-default Quarter, Sales Rep and Account fields use the shared white content background and primary text color. Disabled and focus visuals are separate states and must not leak into the active default state.
+- FVA Sales Rep and Account controls match the Analysis typography and desktop width rules. Sales Rep remains content-sized; Analysis/FVA/Records Account fields keep the established `18.75rem` desktop bound and become full width at `720px` and below.
 - Account search inputs share the native field typography and neutral colors but remain excluded from select-arrow rules.
 
 ## 5. Explanation icons
@@ -63,16 +64,17 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 - The common component owns only the name, wrapper and `role="toolbar"` semantics.
 - It does not impose `align-items`, `justify-content`, gap, margin, padding, min-height or wrapping.
 - Existing page-specific classes own layout and overflow prevention.
-- Desktop measured height after restoration: Analysis `40px`, FVA `40px`, Records `40px`.
-- Mobile measured height: Analysis `40px`; FVA and Records retain only their existing responsive wrapping needed to avoid overflow.
-- Commonization-added `2.25rem`/`2.75rem` Reload host heights, extra padding/gap and forced wrapping are prohibited.
+- Spacing is accepted from rendered visible edges: filter/search outer border bottom → visible Reload button top, then visible Reload button bottom → first result/table outer border top.
+- Preserve each page and breakpoint's pre-commonization values. Do not force upper and lower gaps to match, and do not turn one observed button height into a new fixed standard.
+- FVA keeps `Show MTD` and Reload in the same approved row.
+- Records mobile also keeps Show MTD/count and Reload in one toolbar row when they fit. Do not reserve a `100%` activity flex-basis that forces Reload onto a second row; that combination produced a misleading `45.19px` filter-to-Reload gap (`5.19px` lead-in + `32px` Show MTD row + `8px` row gap).
 
 ### Activity controls
 
-- Last-success timestamp (`HH:mm:ss`) and Reload are separate elements; the full KST timestamp remains in the Reload tooltip.
-- Reload is an icon-only, borderless JET button with a `36px` reserved slot. `aria-label` and tooltip retain the accessible action and full KST timestamp.
-- The visible timestamp must not be embedded in the Reload button.
-- Busy state replaces the icon in the same `36px` slot. The detailed busy text remains accessible but visually hidden so it cannot overlap or increase the toolbar height.
+- Reload uses the established `compactTimestampButton`: one outlined JET button containing the Reload icon (or the same-slot spinner while busy), internal divider, and completed time.
+- The visible timestamp stays inside the button. No external timestamp DOM or visible `Reload` / `Refreshing` string is added.
+- `aria-label`, accessible status and tooltip retain the action and full KST timestamp.
+- Idle and busy states preserve the same rendered button box, timestamp position, toolbar height and Show MTD alignment.
 - Completion time changes only after a successful load. A failed operation retains both successful data and timestamp.
 
 ## 7. Analysis refresh policy
@@ -81,7 +83,9 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 - A later FY/filter refresh keeps the last completed data and page shell mounted.
 - The FY selector remains disabled while its request is in flight, preserving the existing selection-lock policy.
 - When the requested FY differs from the displayed response FY, the accessible status states both values: `Refreshing FYxx; showing FYyy until complete`.
-- The progress indicator is a transparent, thin bar absolutely anchored under the Analysis Data Control Bar. It has no white loading box, viewport-fixed position or horizontal translation and adds no grid row.
+- The progress indicator uses viewport-centered coordinates (`left: 50vw; top: 50vh`) only for Analysis FY partial refresh. The actual indicator node is a direct child of the page body and uses `transform: translate(-50%, -50%)`; no transformed ancestor participates in that positioning.
+- The Analysis-specific rule neutralizes the generic floating progress card (`background: transparent`, no border, radius, shadow or padding), so only the thin progress track is visible. The shell and last successful result stay mounted; no white loading box or top-left displacement is allowed.
+- Do not place the indicator inside `.consumption-analysis-data-controls`: the `3dec372` combination of an absolute `.consumption-analysis-data-controls .kap-page-data-progress` rule with the generic transform was the control-bar relocation regression. Fixed positioning itself was not the root cause.
 - Request-generation checks remain in place so a stale response cannot overwrite the latest valid request.
 
 ## 8. Error handling
@@ -121,6 +125,6 @@ Minimum release checks:
 3. `npm run test:consumption-browser`
 4. `git diff --check`
 5. `npx ojet build --release`
-6. Authenticated desktop Chromium `1440 × 1000` and iPhone-size WebKit `390 × 844` review of Home and all three Consumption routes. If real iPhone Safari or local WebKit runtime is unavailable, report that limitation explicitly; Chromium mobile is supplementary evidence only.
+6. Authenticated desktop Chromium `1440 × 1000`, desktop Playwright WebKit, and `390 × 844` WebKit mobile emulation review of Home and all three Consumption routes. Containerized Playwright WebKit is not real iPhone Safari; report that distinction explicitly.
 7. Analysis partial-refresh probe confirms previous response remains visible, FY selection is locked, visible status identifies requested/displayed FY, and the completed response replaces it.
 8. No production data mutation; Import Apply remains out of scope.

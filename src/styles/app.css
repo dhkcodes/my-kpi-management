@@ -6142,15 +6142,27 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-data-progress { left: 50%; max-width: calc(100% - 2rem); opacity: 0; pointer-events: none; position: absolute; top: 50%; transform: translate(-50%, -50%); visibility: hidden; width: min(20rem, 52%); z-index: 3; }
 .kap-page-data-progress.is-active { opacity: 1; visibility: visible; }
 .kap-page-data-progress oj-progress-bar { display: block; width: 100%; }
-/* Consumption Analysis keeps the existing progress style centered in the visible viewport while its body scrolls. */
-.consumption-insights-page .kap-page-data-progress { left: 50vw; position: fixed; top: 50vh; z-index: 40; }
+/* Analysis refreshes only the FY data region. Keep the thin progress track at
+   the viewport center without inheriting the generic floating white card. */
+.consumption-insights-page .kap-page-data-progress {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  left: 50vw;
+  padding: 0;
+  position: fixed;
+  top: 50vh;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+}
 .consumption-covered-period-title { align-items: center; display: inline-flex; gap: .12rem; }
 .kap-page-activity__control-slot { align-items: center; display: inline-flex; justify-content: center; min-height: 2.25rem; min-width: 2.25rem; width: 2.25rem; }
 .kap-page-activity__refresh { align-items: center; display: inline-flex; min-height: 2.25rem; min-width: 2.25rem; width: 2.25rem; }
 .kap-page-activity__control-slot .kap-page-activity__status { visibility: visible; }
 .kap-page-activity.is-compact-timestamp { align-items: center; min-height: 2.5rem; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__control-slot { align-items: center; min-width: 0; width: auto; }
-.kap-page-activity.is-compact-timestamp .kap-page-activity__refresh { font-size: .78rem; font-weight: 700; min-height: 2.25rem; white-space: nowrap; }
+.kap-page-activity.is-compact-timestamp .kap-page-activity__refresh { font-size: .78rem; font-weight: 700; min-height: 2.25rem; white-space: nowrap; width: auto; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__start-icon { align-items: center; display: inline-flex; height: 1.125rem; justify-content: center; line-height: 1; overflow: visible; width: 1.125rem; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__progress { height: .9rem; width: .9rem; }
 .kap-page-activity__separator { color: var(--kpi-border-strong, #8b8580); margin-inline: .25rem; }
@@ -6284,6 +6296,7 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
   .kap-page-shell.consumption-page .consumption-import-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; width: 100%; }
   .kap-page-shell.consumption-page .consumption-import-actions oj-button { min-width: 0; width: 100%; }
   .kap-page-shell.consumption-page .consumption-import-actions.is-compact oj-button { min-height: 2.75rem; }
+  .kap-page-shell.consumption-page .kap-page-activity__refresh { min-height: 2.75rem; }
 
   .kap-page-shell.consumption-page .consumption-table-panel { margin-top: .325rem; }
   .kap-page-shell.consumption-page .kap-page-activity { justify-content: flex-end; }
@@ -7041,10 +7054,10 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
   align-content: start;
   align-self: flex-end;
-  flex: 0 1 32rem;
-  max-width: 32rem;
+  flex: 0 1 18.75rem;
+  max-width: 18.75rem;
   min-height: 0;
-  width: min(32rem, 100%);
+  width: min(18.75rem, 100%);
 }
 .forecast-actual-total-value {
   position: static;
@@ -7158,21 +7171,6 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   padding-inline-start: .65rem;
 }
 
-.consumption-analysis-data-controls { position: relative; }
-.consumption-analysis-data-controls .kap-page-data-progress {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  inset: auto 0 -.3rem;
-  max-width: none;
-  padding: 0;
-  position: absolute;
-  transform: none;
-  width: 100%;
-  z-index: 2;
-}
-.consumption-analysis-data-controls .kap-page-data-progress oj-progress-bar { width: 100%; }
 
 /* Match the established Analysis native-field style without per-string pixel nudges. */
 .consumption-insights-filter > select,
@@ -7202,11 +7200,23 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 @media (max-width: 720px) {
   .forecast-actual-sales-rep,
   .forecast-actual-sales-rep select,
-  .forecast-actual-search-panel {
+  .kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
     flex: 1 1 100%;
     max-width: none;
     min-width: 0;
     width: 100%;
+  }
+
+  /* Records has enough horizontal room for Show MTD/count and Reload. Do not
+     force Reload onto a second 100%-wide row, which created a false 45px gap. */
+  .kap-page-shell.consumption-page .consumption-records-toolbar {
+    align-items: center;
+    flex-wrap: nowrap;
+    row-gap: 0;
+  }
+  .kap-page-shell.consumption-page .consumption-records-toolbar-activity {
+    flex-basis: auto;
+    flex-wrap: nowrap;
   }
 }
 
