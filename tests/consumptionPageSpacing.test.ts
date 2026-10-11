@@ -12,7 +12,10 @@ assert.match(analysis, /className="consumption-insights-page"/,
 assert.match(forecast, /className="consumption-insights-page forecast-actual-page"/,
   "Forecast vs Actual must use the shared consumption insights shell class");
 assert.match(styles,
-  /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-\.375rem/s,
-  "Analytics and Forecast vs Actual must reduce only the 12px masthead-to-filter gap by 6px to match the Records-standard 6px boundary");
+  /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__inner\s*\{[^}]*gap:\s*\.375rem/s,
+  "Analytics and Forecast vs Actual must use the Records-standard six-pixel rhythm from masthead through the data toolbar");
+assert.doesNotMatch(styles,
+  /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-/s,
+  "Consumption insights spacing must not be hidden with a filter-only negative margin");
 
 console.log("consumption page spacing contract passed");

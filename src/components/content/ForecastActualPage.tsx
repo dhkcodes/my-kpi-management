@@ -373,20 +373,20 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
           onClick={() => { if (option.value === pillar) return; setPillar(option.value); setSalesRep(""); resetAccountScope(); }}>{option.label}</button>)}
       </div></div>
       <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setResultFilter(null); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
-      <label class="forecast-actual-control">Sales Rep<select id="forecastActualSalesRep" value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccountScope(); }}><option value="">All</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
+      <label class="forecast-actual-control forecast-actual-sales-rep">Sales Rep<select id="forecastActualSalesRep" value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccountScope(); }}><option value="">All Sales Reps</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
       <div class="forecast-actual-control forecast-actual-search-panel">
         <label htmlFor="forecastActualAccountSearch">Account</label>
         <div class="consumption-insights-combobox forecast-actual-account-search" ref={accountComboboxRef}>
           <input id="forecastActualAccountSearch" type="search" role="combobox" aria-autocomplete="list" aria-expanded={accountSearchOpen} aria-controls="forecastActualAccountOptions"
             aria-activedescendant={accountSearchOpen ? `forecast-actual-account-option-${activeAccountIndex}` : undefined}
-            value={accountSearchOpen ? accountSearch : (account || "All")}
+            value={accountSearchOpen ? accountSearch : (account || "All Accounts")}
             onFocus={(event) => { setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
             onClick={(event) => { setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
             onInput={(event) => { setAccountSearch(event.currentTarget.value); setAccount(""); setAccountSearchOpen(true); setActiveAccountIndex(0); setResultFilter(null); }}
             onCompositionStart={() => setAccountComposing(true)} onCompositionEnd={(event) => { setAccountComposing(false); setAccountSearch(event.currentTarget.value); }} onKeyDown={handleAccountKeyDown} />
           {account && <button type="button" class="consumption-insights-clear" aria-label="Clear selected account" onClick={() => chooseAccount("")}>Clear</button>}
           {accountSearchOpen && <div id="forecastActualAccountOptions" class="consumption-insights-options" role="listbox">
-            <button id="forecast-actual-account-option-0" type="button" role="option" aria-selected={!account} class={activeAccountIndex === 0 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount("")}><strong>All accounts</strong><small>전체 Account 보기</small></button>
+            <button id="forecast-actual-account-option-0" type="button" role="option" aria-selected={!account} class={activeAccountIndex === 0 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount("")}><strong>All Accounts</strong><small>전체 Account 보기</small></button>
             {filteredAccountOptions.map((value, index) => <button key={value} id={`forecast-actual-account-option-${index + 1}`} type="button" role="option" aria-selected={account === value} class={activeAccountIndex === index + 1 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount(value)}><strong>{value}</strong></button>)}
             {!filteredAccountOptions.length && <p>No matching accounts.</p>}
           </div>}
@@ -414,7 +414,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
             onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
-            showBusyLabel={false} labeledRefreshButton shortVisibleTimestamp />
+            showBusyLabel={false} shortVisibleTimestamp />
         </div>
       </DataControlBar>
       <section class="forecast-actual-overview" aria-label="Quarter results">

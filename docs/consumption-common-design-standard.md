@@ -23,7 +23,7 @@ Exceptions:
 | `--kap-consumption-control-height` | `2.15rem` | Existing Account/search inputs, From/To selects, relevant selects and Pillar buttons |
 | `--kpi-panel-radius` | `var(--oj-core-border-radius-md, .2rem)` | Search/filter panels and subtle panel radius |
 
-Typography is unchanged. Existing Redwood/JET colors, disabled states, focus rings, busy indicators and message severity tokens remain authoritative.
+Native Sales Rep/Account controls use the Analysis reference typography (`Arial`, `.72rem`, `400`) and neutral Redwood/JET background, border and primary text colors. Existing disabled states, focus rings, busy indicators and message severity tokens remain authoritative.
 
 ## 3. Root container, fixed regions and scrolling
 
@@ -32,6 +32,7 @@ Typography is unchanged. Existing Redwood/JET colors, disabled states, focus rin
 - Wide tables may retain their own horizontal scrolling, but must not introduce a second page-level vertical scrollbar.
 - The three Consumption `.kap-page-shell` roots alone use `var(--oj-core-border-radius-md, .2rem)`, measured at approximately `3.2px`; the previous commonization value measured approximately `12px`.
 - Commonization must not add a global footer margin. Existing shell/layout flow owns footer spacing.
+- The Footer on these three routes alone uses the grid-level small radius `.2rem`; its content and spacing remain unchanged.
 
 ## 4. Heading, search and filter alignment
 
@@ -40,9 +41,11 @@ Typography is unchanged. Existing Redwood/JET colors, disabled states, focus rin
 - Desktop filter layout remains wrapped flex with existing page-specific alignment.
 - Mobile remains the existing page-specific single-column/responsive layout.
 - Control height is `2.15rem`.
-- Analysis native select keeps `.65rem`; FVA and Records use `calc(.65rem + 1px)` to compensate for their different rendered font/glyph bearing. The acceptance criterion is the measured visible text start from the control's left border—not equality of CSS declarations—at desktop and mobile.
+- Analysis, FVA and Records native selects use the same `.65rem` start inset. Per-validation-string pixel offsets are prohibited; align the actual font family, size, weight and color instead.
 - All three pages' native select arrows use `background-position: right .55rem center` and `padding-inline-end: 1.75rem`.
-- Account search inputs retain their existing appearance and are excluded from select-arrow rules.
+- Sales Rep defaults to `All Sales Reps`; Account defaults to `All Accounts`.
+- FVA Sales Rep and Account controls match the Analysis typography and desktop width rules; both become full width at `720px` and below.
+- Account search inputs share the native field typography and neutral colors but remain excluded from select-arrow rules.
 
 ## 5. Explanation icons
 
@@ -67,9 +70,9 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 ### Activity controls
 
 - Last-success timestamp (`HH:mm:ss`) and Reload are separate elements; the full KST timestamp remains in the Reload tooltip.
-- Reload uses `chroming="outlined"`, `oj-button-sm`, refresh icon and visible `Reload` label; measured button height is `36px`.
+- Reload is an icon-only, borderless JET button with a `36px` reserved slot. `aria-label` and tooltip retain the accessible action and full KST timestamp.
 - The visible timestamp must not be embedded in the Reload button.
-- Busy state uses the existing JET progress indicator in the same activity region.
+- Busy state replaces the icon in the same `36px` slot. The detailed busy text remains accessible but visually hidden so it cannot overlap or increase the toolbar height.
 - Completion time changes only after a successful load. A failed operation retains both successful data and timestamp.
 
 ## 7. Analysis refresh policy
@@ -77,8 +80,8 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 - Initial load may use the initial page loading state.
 - A later FY/filter refresh keeps the last completed data and page shell mounted.
 - The FY selector remains disabled while its request is in flight, preserving the existing selection-lock policy.
-- When the requested FY differs from the displayed response FY, visible status states both values: `Refreshing FYxx; showing FYyy until complete`.
-- The progress indicator is part of the Analysis data region; it does not replace the full page.
+- When the requested FY differs from the displayed response FY, the accessible status states both values: `Refreshing FYxx; showing FYyy until complete`.
+- The progress indicator is a transparent, thin bar absolutely anchored under the Analysis Data Control Bar. It has no white loading box, viewport-fixed position or horizontal translation and adds no grid row.
 - Request-generation checks remain in place so a stale response cannot overwrite the latest valid request.
 
 ## 8. Error handling
@@ -118,6 +121,6 @@ Minimum release checks:
 3. `npm run test:consumption-browser`
 4. `git diff --check`
 5. `npx ojet build --release`
-6. Authenticated desktop `1440 × 1000` and mobile `390 × 844` review of Home and all three Consumption routes.
+6. Authenticated desktop Chromium `1440 × 1000` and iPhone-size WebKit `390 × 844` review of Home and all three Consumption routes. If real iPhone Safari or local WebKit runtime is unavailable, report that limitation explicitly; Chromium mobile is supplementary evidence only.
 7. Analysis partial-refresh probe confirms previous response remains visible, FY selection is locked, visible status identifies requested/displayed FY, and the completed response replaces it.
 8. No production data mutation; Import Apply remains out of scope.

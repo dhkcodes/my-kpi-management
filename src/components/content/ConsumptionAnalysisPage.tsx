@@ -90,7 +90,7 @@ const OpenForecastLabel = ({ tooltipId, tooltipText = OPEN_FORECAST_TOOLTIP }: R
   return <span>Open Forecast <InfoTooltip id={tooltipId ?? `openForecastTooltip-${generatedId}`} label="Explain Open Forecast" text={tooltipText} /></span>;
 };
 const MOVEMENT_COLORS = { New: "#2f7d32", Expansion: "#2f6f9f", Reduction: "#b94a48" } as const;
-const ALL_ACCOUNTS = "All Accounts Total";
+const ALL_ACCOUNTS = "All Accounts";
 const COMPOSITION_CATEGORIES: readonly ForecastCompositionCategory[] = ["All", "New", "Expansion", "Reduction"];
 type InsightChartPoint = Readonly<{
   id: string;
@@ -542,6 +542,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         </div>
         </div>
     </PageFilterPanel>}>
+    <div class="consumption-analysis-data-controls">
     <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar" ariaLabel="Consumption Analysis data controls">
       <div class="consumption-records-toolbar__left">
         <ConsumptionMtdControl checked={includeMtd} disabled={loading || !analysis.currentMtdAvailable}
@@ -551,10 +552,11 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
       </div>
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={loading || !!exporting}
-            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} labeledRefreshButton shortVisibleTimestamp />
+            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false} shortVisibleTimestamp />
         </div>
     </DataControlBar>
     <PageDataProgress busy={loading} busyLabel={refreshStatusLabel} />
+    </div>
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>

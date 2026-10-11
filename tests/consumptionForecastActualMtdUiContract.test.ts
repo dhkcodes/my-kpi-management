@@ -89,8 +89,10 @@ assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center
 for (const column of ["is-forecast", "is-actual", "is-difference"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-value\\.${column}[^}]*text-align:\\s*right`, "u"), `${column} values are right aligned`);
 }
-assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*lastCompletedAt=\{lastCompletedAt\}[^]*showBusyLabel=\{false\} labeledRefreshButton shortVisibleTimestamp \/>/u,
-  "the labeled Reload button and completion time keep the pre-commonization separate table-toolbar treatment");
+assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*lastCompletedAt=\{lastCompletedAt\}[^]*showBusyLabel=\{false\} shortVisibleTimestamp \/>/u,
+  "the icon-only Reload action and completion time keep separate table-toolbar treatment");
+assert.doesNotMatch(page, /labeledRefreshButton/u,
+  "Forecast vs Actual does not render the regressed Reload text label");
 assert.doesNotMatch(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*compactTimestampButton/u,
   "Forecast vs Actual does not recombine completion time into the Reload button");
 assert.match(styles, /--forecast-rep-width:\s*7rem/u);
