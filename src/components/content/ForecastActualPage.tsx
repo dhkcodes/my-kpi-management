@@ -20,9 +20,10 @@ import { compareForecastActualRows, type ForecastActualSortDirection, type Forec
 import { addExactDecimals, compareExactDecimals, formatExactKFixed } from "../../data/exactDecimal";
 import { FiscalYear, getLatestFiscalYear } from "../../data/kpiMockData";
 
-import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
+import { ConsumptionMessageBanner, type ConsumptionMessage } from "./ConsumptionMessageBanner";
 
 const formatAmount = (value: string | null, unavailable = "Unconfirmed") => value === null ? unavailable : formatExactKFixed(value, 2);
 const renderTotalAmount = (value: string | null) => value === null
@@ -351,10 +352,21 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
     };
   }, [currentData, periods.length, rows.length]);
 
+  const errorMessages: ConsumptionMessage[] = error ? [{
+    id: "forecast-actual-load",
+    severity: "error",
+    summary: contentReady ? "데이터를 새로 고치지 못했습니다." : "Forecast vs Actual을 표시할 수 없습니다.",
+    detail: contentReady ? "기존 데이터와 마지막 완료 시각을 유지합니다. Reload로 다시 시도해 주세요." : "Retry를 선택해 다시 시도해 주세요.",
+    persistence: "sticky"
+  }] : [];
+
   return <PageShell className="consumption-insights-page forecast-actual-page" ariaLabelledBy="forecastActualTitle"
     scrollElementRef={(element) => { pageScrollRef.current = element; }} onScroll={updateViewportControls}
     breadcrumb={breadcrumb} title="Forecast vs Actual" titleControls={fiscalYearControl} headingSpacing="compact"
     activityPosition="custom" busy={loading} busyLabel="Loading Forecast vs Actual results"
+    messages={<ConsumptionMessageBanner messages={errorMessages} placement={contentReady ? "floating" : "inline"}
+      onRetry={!contentReady ? () => setRefreshNonce((value) => value + 1) : undefined} retryDisabled={loading}
+      onClose={() => setError("")} />}
     filters={contentReady ? <PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
       <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
         {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={pillar === option.value}
@@ -382,11 +394,10 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
       </div>
     </PageFilterPanel> : undefined}>
 
-    {error && <div class="consumption-inline-error" role="alert"><strong>Unable to load comparison</strong><span>{error}</span></div>}
     <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual" />
 
     {contentReady && currentData && <div class="forecast-actual-results" aria-busy="false">
-      <div class="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" role="toolbar" aria-label="Forecast vs Actual data controls">
+      <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" ariaLabel="Forecast vs Actual data controls">
         <div class="consumption-records-toolbar__left forecast-actual-toolbar-summary">
           <ConsumptionMtdControl checked={actualMode === "MTD"} disabled={loading || !currentData?.currentMtdAvailable}
             mtdAppliedDate={mtdAppliedTimestamp}
@@ -405,7 +416,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
             onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
             showBusyLabel={false} compactTimestampButton />
         </div>
-      </div>
+      </DataControlBar>
       <section class="forecast-actual-overview" aria-label="Quarter results">
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {

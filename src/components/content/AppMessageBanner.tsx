@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import type { MessageBannerItem } from "@oracle/oraclejet-preact/UNSAFE_MessageBanner";
 import "oj-c/message-banner";
+import "ojs/ojbutton";
 
 export type AppMessage = MessageBannerItem & Readonly<{
   id: string;
@@ -13,10 +14,20 @@ export type AppMessage = MessageBannerItem & Readonly<{
 const shouldPersist = (message: AppMessage) =>
   message.persistence === "sticky" || (message.persistence !== "auto" && message.severity === "error");
 
-export function AppMessageBanner({ messages, onClose, ariaLabel = "Application notifications" }: Readonly<{
+export function AppMessageBanner({
+  messages,
+  onClose,
+  ariaLabel = "Application notifications",
+  placement = "floating",
+  onRetry,
+  retryDisabled = false
+}: Readonly<{
   messages: readonly AppMessage[];
   onClose?: (messageId: string) => void;
   ariaLabel?: string;
+  placement?: "floating" | "inline";
+  onRetry?: () => void;
+  retryDisabled?: boolean;
 }>) {
   const timersRef = useRef(new Map<string, number>());
   const uniqueMessages = useMemo(() => {
@@ -54,8 +65,11 @@ export function AppMessageBanner({ messages, onClose, ariaLabel = "Application n
   }, []);
 
   if (uniqueMessages.length === 0) return null;
-  return <div class="app-message-region" aria-label={ariaLabel}>
+  return <div class={`app-message-region${placement === "inline" ? " is-inline" : ""}`} aria-label={ariaLabel} data-message-placement={placement}>
     <oj-c-message-banner data={data} type="section"
       onojClose={(event: CustomEvent<{ key: string }>) => onClose?.(String(event.detail.key))}></oj-c-message-banner>
+    {placement === "inline" && onRetry && <div class="app-message-region__actions">
+      <oj-button chroming="outlined" disabled={retryDisabled} onojAction={onRetry}>Retry</oj-button>
+    </div>}
   </div>;
 }

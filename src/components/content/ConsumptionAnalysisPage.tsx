@@ -39,7 +39,7 @@ import type { ojChart } from "ojs/ojchart";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
-import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import html2canvasPro = require("html2canvas-pro");
@@ -366,9 +366,10 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
     disabled={loading} onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
-  const messages: ConsumptionMessage[] = error
-    ? [{ id: "analysis-load", severity: "error", summary: "데이터를 불러오지 못했습니다.", detail: "잠시 후 다시 시도해 주세요." }]
-    : [];
+  const messages: ConsumptionMessage[] = [
+    ...(error ? [{ id: "analysis-load", severity: "error" as const, summary: "데이터를 새로 고치지 못했습니다.", detail: "기존 데이터와 마지막 완료 시각을 유지합니다. Reload로 다시 시도해 주세요." }] : []),
+    ...(exportError ? [{ id: "analysis-export", severity: "error" as const, summary: "내보내지 못했습니다.", detail: "현재 화면은 유지됩니다. 잠시 후 다시 시도해 주세요." }] : [])
+  ];
   const refreshAnalysis = () => {
     setLoading(true);
     setRefreshTrigger((current) => current + 1);
@@ -376,7 +377,8 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
-    messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}>
+    messages={<ConsumptionMessageBanner messages={messages} placement="inline" onRetry={refreshAnalysis}
+      retryDisabled={loading} onClose={() => setError("")} />}>
     <PageDataProgress busy={loading} busyLabel="Loading data" />
   </PageShell>;
 
@@ -485,9 +487,11 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         title="Export the current Consumption Analysis view as PDF" onojAction={() => void downloadCanvas("pdf")}>
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Exporting…" : "PDF"}
       </oj-button>
-      {exportError && <span class="consumption-export-error" role="alert">{exportError}</span>}
     </div>}
-    messages={<ConsumptionMessageBanner messages={messages} onClose={() => setError("")} />}
+    messages={<ConsumptionMessageBanner messages={messages} onClose={(messageId) => {
+      if (messageId === "analysis-export") setExportError("");
+      if (messageId === "analysis-load") setError("");
+    }} />}
     filters={<PageFilterPanel className="consumption-insights-header-actions" ariaLabel="Consumption Analysis filters">
         <div class="consumption-insights-pillar">
           <span>Pillar</span>
@@ -537,7 +541,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         </div>
         </div>
     </PageFilterPanel>}>
-    <div class="consumption-records-toolbar consumption-analysis-toolbar" role="toolbar" aria-label="Consumption Analysis data controls" data-html2canvas-ignore="true">
+    <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar" ariaLabel="Consumption Analysis data controls">
       <div class="consumption-records-toolbar__left">
         <ConsumptionMtdControl checked={includeMtd} disabled={loading || !analysis.currentMtdAvailable}
           mtdAppliedDate={mtdAppliedTimestamp}
@@ -548,7 +552,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
           <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
             onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
-    </div>
+    </DataControlBar>
     <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">

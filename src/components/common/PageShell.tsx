@@ -37,6 +37,21 @@ export function PageFilterPanel({ children, className = "", ariaLabel = "Search 
   return <section class={`kap-page-filter${className ? ` ${className}` : ""}`} aria-label={ariaLabel}>{children}</section>;
 }
 
+type DataControlBarProps = {
+  children: ComponentChildren;
+  className?: string;
+  ariaLabel?: string;
+};
+
+/**
+ * Shared control row between search/filter controls and the primary data grid.
+ * Owns Show MTD, reload/busy state and last-success metadata without owning page data.
+ */
+export function DataControlBar({ children, className = "", ariaLabel = "Data controls" }: DataControlBarProps) {
+  return <div class={`kap-data-control-bar${className ? ` ${className}` : ""}`} role="toolbar" aria-label={ariaLabel}
+    data-html2canvas-ignore="true">{children}</div>;
+}
+
 type PageActivityProps = Pick<PageShellProps, "busy" | "busyLabel" | "onRefresh" | "refreshDisabled"> & {
   lastCompletedAt?: Date | null;
   showBusyLabel?: boolean;

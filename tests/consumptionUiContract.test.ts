@@ -638,7 +638,7 @@ assert.doesNotMatch(fiscalYearSelector, /fiscal-year-selector__row|aria-expanded
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
-assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;[\s\S]*\.consumption-range-bar select[^}]*height: 2\.25rem;[^}]*min-height: 2\.25rem;/, "Pillar buttons and adjacent quarter controls share an exact responsive height");
+assert.match(styles, /\.consumption-pillar-selector button \{[^}]*height: var\(--kap-consumption-control-height\);[^}]*min-height: var\(--kap-consumption-control-height\);[\s\S]*\.consumption-range-bar select[^}]*height: var\(--kap-consumption-control-height\);[^}]*min-height: var\(--kap-consumption-control-height\);/, "Pillar buttons and adjacent quarter controls share the exact 2.15rem token height");
 assert.match(recordsPage, /consumption-record-search__submit[\s\S]*aria-label="Apply filters and search"[\s\S]*onClick=\{\(\) => void submitRecordsQuery\(\)\}/, "filter-and-search uses an input-adjacent native icon button");
 assert.doesNotMatch(recordsPage, /class=\{?`?consumption-range-apply/,
   "Consumption removes the standalone Apply button");
@@ -705,10 +705,12 @@ assert.ok(recordsPage.includes('class="consumption-records-count-summary"')
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /recordsReplacementLoading = recordsLoadingPhase === "initial" \|\| recordsLoadingPhase === "query"/, "initial and replacement queries share an explicit non-table loading gate");
 assert.match(recordsPage, /recordsViewState = resolveConsumptionRecordsViewState\([\s\S]*recordsReplacementLoading, dataMode, recordsQueryError, renderedRecordAccounts\.length\)/, "Records distinguishes loading, error, empty, and ready states from completed request data");
-assert.match(recordsPage, /consumption-table-panel[\s\S]*consumption-table-content[\s\S]*recordsViewState === "error"[\s\S]*Unable to load Consumption Records/,
-  "the table panel remains mounted through replacement loading and renders errors inside the stable data region");
+assert.match(recordsPage, /consumption-table-panel[\s\S]*consumption-table-content[\s\S]*recordsViewState !== "error"/,
+  "the table panel remains mounted while failed initial content is withheld from the data region");
+assert.doesNotMatch(recordsPage, /Unable to load Consumption Records/,
+  "Records does not duplicate the shared inline load error inside the table panel");
 assert.match(recordsPage, /recordsViewState === "empty" &&[\s\S]*No Consumption Records match the selected range and filters\./, "the empty copy is reachable only from the completed empty state");
-assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*setRecordsQueryError\(message\)/, "replacement queries clear and set their own request error state without presenting stale counts");
+assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*setRecordsQueryError\(contentReady \? "" : message\)/, "replacement queries clear request errors and only replace content when no completed data is available");
 assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
@@ -792,7 +794,7 @@ assert.match(styles, /\.consumption-insights-contribution-list, \.consumption-in
 assert.doesNotMatch(recordsPage, /class="consumption-records-loading"/u, "Records footer has no independent loading status surface");
 assert.match(recordsPage, /<div class="consumption-records-count-summary"[^>]*>[\s\S]*\{loadedAccountCount\}[\s\S]*Accounts[\s\S]*\{loadedPlanCount\}[\s\S]*Plans/,
   "Records shows one centered Account and Plan count summary after the complete list loads");
-assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*2\.25rem[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*2\.25rem/, "range, search, and stable native Apply controls share height and padding rhythm");
+assert.match(styles, /\.consumption-range-bar select, \.consumption-range-bar input[^}]*height:\s*var\(--kap-consumption-control-height\)[^}]*padding:[^;}]+[\s\S]*\.consumption-range-apply[^}]*height:\s*var\(--kap-consumption-control-height\)/, "range, search, and stable native Apply controls share the compact control-height token and padding rhythm");
 assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Records uses the full Accounts & Workloads loader instead of flashing an initializing Apply control");
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
 assert.match(styles, /\.consumption-range-apply:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--oj-core-focus-border-color, #0572ce\)[^}]*outline-offset:\s*2px/, "Apply retains a distinct accessible focus ring without replacing its fill color");
@@ -953,5 +955,37 @@ assert.match(styles, /\.forecast-actual-data-toolbar \.consumption-records-toolb
   "mobile Forecast toolbar keeps its metadata in the Records row rhythm");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body,[\s\S]*?\.kap-page-shell\.forecast-actual-page \.kap-page-shell__body\s*\{[\s\S]*?gap:\s*\.375rem;/,
   "mobile Analysis and Forecast content spacing matches Records");
+
+// Consumption shared design standard: compact controls, error semantics, and the named Data Control Bar.
+assert.match(pageShell, /export function DataControlBar[\s\S]*kap-data-control-bar[\s\S]*role="toolbar"/,
+  "the common shell exports the named Data Control Bar primitive");
+assert.match(sharedMessageBanner, /placement\?:\s*"floating"\s*\|\s*"inline"[\s\S]*app-message-region[^\n]*is-inline[\s\S]*Retry/,
+  "the shared JET message banner supports in-flow load errors with Retry as well as floating operation errors");
+assert.match(insightsPage, /placement="inline"[\s\S]*onRetry=\{refreshAnalysis\}/,
+  "Analysis initial-load failure uses the shared inline JET error banner with Retry");
+assert.match(forecastActualPage, /placement=\{contentReady \? "floating" : "inline"\}[\s\S]*onRetry=\{[^}]*setRefreshNonce/,
+  "Forecast vs Actual classifies no-content failures as inline and preserved-content failures as floating");
+assert.match(recordsPage, /dataMode === "fallback"[\s\S]*placement="inline"[\s\S]*onRetry=\{refreshRecords\}/,
+  "Records uses the shared inline JET error banner when backend data is unavailable");
+assert.match(recordsPage, /const contentReady = dataMode === "backend" && lastDataLoadedAt !== null;[\s\S]*setRecordsQueryError\(contentReady \? "" : message\);[\s\S]*setImportError\(contentReady \? message : ""\);/,
+  "Records routes a failed initial or empty-state retry inline, but a refresh failure with completed data only to the floating operation banner");
+assert.doesNotMatch(recordsPage, /setDataMode\("error"\);\s*setImportError/,
+  "Records does not duplicate an initial load failure in the floating operation banner");
+assert.match(insightsPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
+  "Analysis uses the named Data Control Bar");
+assert.match(forecastActualPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
+  "Forecast vs Actual uses the named Data Control Bar");
+assert.match(recordsPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
+  "Records uses the named Data Control Bar");
+assert.match(styles, /--kap-consumption-control-height:\s*2\.15rem/,
+  "Consumption compact control height is a reusable 2.15rem token");
+assert.doesNotMatch(styles, /\.consumption-pillar-selector button\s*\{[^}]*2\.25rem/s,
+  "Pillar controls no longer retain the old 2.25rem height");
+assert.match(styles, /\.kap-page-filter\s*\{[^}]*border-radius:\s*var\(--kpi-panel-radius\)/s,
+  "search/filter containers reuse the grid-panel radius token");
+assert.match(styles, /\.kap-data-control-bar\s*\{[^}]*align-items:\s*center[^}]*justify-content:\s*space-between/s,
+  "the shared Data Control Bar defines its cross-page alignment contract");
+assert.match(styles, /\.app-message-region\.is-inline\s*\{[^}]*position:\s*static[^}]*width:\s*100%/s,
+  "page-load errors remain in the document flow instead of overlaying content");
 
 console.log("consumptionUiContract tests passed");

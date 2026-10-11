@@ -30,6 +30,11 @@
   --kap-grid-draft-bg: #fff7ed;
   --kap-grid-draft-ink: #5f3b12;
   --kap-grid-draft-line: #b3366f;
+  --kpi-panel-radius: var(--oj-core-border-radius-md, .2rem);
+  --kap-consumption-control-height: 2.15rem;
+  --kap-data-control-gap: .5rem;
+  --kap-section-gap: .375rem;
+  --kap-footer-gap: .75rem;
 }
 
 body {
@@ -2434,7 +2439,7 @@ h4.weekly-activity-section-label--next-week,
 .consumption-pillar-selector { align-items: center; display: inline-flex; gap: .2rem; margin-top: .4rem; }
 .consumption-range-pillar { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
 .consumption-range-pillar .consumption-pillar-selector { margin-top: 0; }
-.consumption-pillar-selector button { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 750; height: 2.25rem; min-height: 2.25rem; padding: .3rem .65rem; }
+.consumption-pillar-selector button { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 750; height: var(--kap-consumption-control-height); min-height: var(--kap-consumption-control-height); padding: .3rem .65rem; }
 .consumption-pillar-selector button[aria-pressed="true"] { background: var(--kpi-surface-alt); border-color: var(--kpi-brand); color: var(--kpi-brand); }
 .consumption-pillar-selector button:disabled { cursor: not-allowed; opacity: .55; }
 .consumption-data-center { align-items: center; display: inline-flex; flex-wrap: wrap; gap: .25rem; }
@@ -2453,8 +2458,8 @@ h4.weekly-activity-section-label--next-week,
 .consumption-import-hard-conflict ul { margin: .45rem 0 0; padding-left: 1.25rem; }
 .consumption-range-bar { align-items: end; background: #f8f6f4; border: 1px solid var(--kpi-border); display: flex; flex-wrap: wrap; column-gap: .75rem; padding: .5rem .75rem; row-gap: .5rem; }
 .consumption-range-bar label, .consumption-account-selector { color: var(--kpi-muted); display: grid; font-size: .72rem; font-weight: 800; gap: .2rem; }
-.consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: 2.25rem; min-height: 2.25rem; padding: .35rem .6rem; }
-.consumption-range-apply { -webkit-tap-highlight-color: transparent; background: var(--kpi-brand); border: 1px solid var(--kpi-brand); box-sizing: border-box; color: #fff; cursor: pointer; font: inherit; font-weight: 750; height: 2.25rem; min-height: 2.25rem; padding: .35rem .9rem; touch-action: manipulation; }
+.consumption-range-bar select, .consumption-range-bar input, .consumption-account-selector input, .consumption-account-selector select { background: #fff; border: 1px solid var(--kpi-border); box-sizing: border-box; color: var(--kpi-ink); font: inherit; height: var(--kap-consumption-control-height); min-height: var(--kap-consumption-control-height); padding: .35rem .6rem; }
+.consumption-range-apply { -webkit-tap-highlight-color: transparent; background: var(--kpi-brand); border: 1px solid var(--kpi-brand); box-sizing: border-box; color: #fff; cursor: pointer; font: inherit; font-weight: 750; height: var(--kap-consumption-control-height); min-height: var(--kap-consumption-control-height); padding: .35rem .9rem; touch-action: manipulation; }
 .consumption-range-apply:hover,
 .consumption-range-apply:active,
 .consumption-range-apply:focus-visible,
@@ -2587,7 +2592,7 @@ h4.weekly-activity-section-label--next-week,
   .consumption-page__header h1 { margin: 0; }
   .consumption-range-bar { padding: .4rem .65rem; }
   .consumption-range-bar select,
-  .consumption-range-bar input { min-height: 2.25rem; padding-block: .35rem; }
+  .consumption-range-bar input { min-height: var(--kap-consumption-control-height); padding-block: .35rem; }
   .consumption-table-panel { min-height: 0; overflow: hidden; padding: 0; }
   .consumption-table-content { min-height: 0; }
   .consumption-table-scroll { min-height: 0; min-width: 0; overflow-x: auto; overflow-y: auto; }
@@ -6149,7 +6154,7 @@ h4.weekly-activity-section-label--next-week,
 .kap-page-activity.is-compact-timestamp .kap-page-activity__progress { height: .9rem; width: .9rem; }
 .kap-page-activity__separator { color: var(--kpi-border-strong, #8b8580); margin-inline: .25rem; }
 .kap-page-activity.is-compact-timestamp .kap-page-activity__completed-at { color: inherit; font-size: inherit; padding: 0; }
-.kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
+.kap-page-filter { align-items: end; background: var(--kpi-surface-alt, #f8f6f4); border: 1px solid var(--kpi-border); border-radius: var(--kpi-panel-radius); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; width: 100%; }
 .kap-page-shell__body { display: grid; flex: 1 0 auto; gap: .75rem; min-height: 0; min-width: 0; }
 
 /* Consumption Records is the first adopter; legacy nested scrolling is replaced by shell scrolling. */
@@ -6175,7 +6180,7 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .consumption-insights-filter input { font-size: .72rem; }
 .kap-page-shell.consumption-insights-page .consumption-insights-filter select,
 .kap-page-shell.consumption-insights-page .consumption-insights-filter input,
-.kap-page-shell.consumption-insights-page .consumption-insights-pillar button { box-sizing: border-box; height: 2.25rem; min-height: 2.25rem; }
+.kap-page-shell.consumption-insights-page .consumption-insights-pillar button { box-sizing: border-box; height: var(--kap-consumption-control-height); min-height: var(--kap-consumption-control-height); }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar { align-items: center; min-height: 2.5rem; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar__left { padding-inline-start: .5rem; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar-activity { margin-left: auto; }
@@ -7102,4 +7107,69 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
     min-width: 0;
     width: auto;
   }
+}
+
+/* Consumption shared design standard: Analysis, Forecast vs Actual and Records only. */
+.kap-page-shell.consumption-page .consumption-range-bar select,
+.kap-page-shell.consumption-page .consumption-range-bar input,
+.kap-page-shell.consumption-page .consumption-range-apply,
+.kap-page-shell.consumption-page .consumption-pillar-selector button,
+.kap-page-shell.consumption-insights-page .consumption-insights-filter select,
+.kap-page-shell.consumption-insights-page .consumption-insights-filter input,
+.kap-page-shell.consumption-insights-page .consumption-insights-pillar button,
+.kap-page-shell.forecast-actual-page .forecast-actual-control select,
+.kap-page-shell.forecast-actual-page .forecast-actual-search-panel input,
+.kap-page-shell.forecast-actual-page .forecast-actual-pillar .consumption-pillar-selector button {
+  height: var(--kap-consumption-control-height);
+  min-height: var(--kap-consumption-control-height);
+}
+
+.kap-data-control-bar {
+  align-items: center;
+  display: flex;
+  gap: var(--kap-data-control-gap);
+  justify-content: space-between;
+  margin-block: var(--kap-section-gap) .325rem;
+  min-height: 2.25rem;
+  min-width: 0;
+  width: 100%;
+}
+.kap-data-control-bar.consumption-records-toolbar { align-items: center; }
+.kap-data-control-bar .kap-page-activity__refresh {
+  height: 2.25rem;
+  min-height: 2.25rem;
+}
+
+.app-message-region.is-inline {
+  inset: auto;
+  position: static;
+  width: 100%;
+  z-index: auto;
+}
+.app-message-region.is-inline .app-message-region__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: .375rem;
+}
+.app-message-region.is-inline .app-message-region__actions oj-button {
+  min-height: var(--kap-consumption-control-height);
+}
+
+.consumption-info-tooltip__trigger,
+.forecast-actual-info-trigger {
+  height: 1.15rem;
+  margin-inline: .1rem;
+  min-height: 1.15rem;
+  min-width: 1.15rem;
+  width: 1.15rem;
+}
+
+.kpi-shell.is-kap-page-shell-route .kpi-footer,
+.kpi-shell:has(.kap-page-shell) .kpi-footer { margin-block-start: var(--kap-footer-gap); }
+
+@media (max-width: 760px) {
+  .kap-data-control-bar { gap: .375rem; }
+  .kap-data-control-bar .kap-page-activity__refresh { height: 2.75rem; min-height: 2.75rem; }
+  .kpi-shell.is-kap-page-shell-route .kpi-footer,
+  .kpi-shell:has(.kap-page-shell) .kpi-footer { margin-block-start: .5rem; }
 }

@@ -70,7 +70,7 @@ import { KpiNavigationGuard } from "./KpiSpreadsheetPage";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
-import { PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
+import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
 import "ojs/ojbutton";
 import "ojs/ojchart";
@@ -825,7 +825,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         setDataMode("fallback");
       } else {
         setDataMode("error");
-        setImportError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
+        setRecordsQueryError(error instanceof Error ? error.message : "Consumption backend could not be loaded.");
       }
     });
     return () => { active = false; recordsRequestGeneration.current++; };
@@ -1088,8 +1088,9 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     } catch (error) {
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
       const message = error instanceof Error ? error.message : "Consumption Records could not be loaded.";
-      setRecordsQueryError(message);
-      setImportError(message);
+      const contentReady = dataMode === "backend" && lastDataLoadedAt !== null;
+      setRecordsQueryError(contentReady ? "" : message);
+      setImportError(contentReady ? message : "");
     } finally {
       if (activeRecordsQueryRef.current?.generation === actionGeneration) activeRecordsQueryRef.current = null;
       if (actionGeneration === recordsQueryActionGeneration.current) setRangeLoading(false);
@@ -1704,14 +1705,20 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   };
 
   const pageMessages: ConsumptionMessage[] = [];
-  if (dataMode === "fallback") pageMessages.push({ id: "records-fallback", severity: "warning", summary: "운영 데이터를 불러오지 못해 예시 데이터를 표시합니다.", detail: "실제 업무에는 사용하지 마세요.", persistence: "sticky" });
-  if (importError) pageMessages.push({ id: "records-operation-error", severity: "error", summary: "요청을 처리하지 못했습니다.", detail: "입력 내용을 확인한 뒤 다시 시도해 주세요." });
+  if (importError) pageMessages.push({ id: "records-operation-error", severity: "error", summary: "요청을 처리하지 못했습니다.", detail: "기존 데이터와 마지막 완료 시각을 유지합니다. 입력 내용을 확인한 뒤 다시 시도해 주세요." });
   if (rangeInitialized && rangeTouched && !rangeValid) pageMessages.push({ id: "records-range", severity: "warning", summary: "조회기간을 확인해 주세요.", detail: "시작 분기는 종료 분기보다 늦을 수 없습니다." });
   if (hasDraftChanges) pageMessages.push({ id: "records-draft", severity: "info", summary: "변경 내용을 저장하거나 취소해 주세요.", detail: "그 후 조회조건을 변경할 수 있습니다." });
   if (dataMode !== "loading" && serverActualTotals === null) pageMessages.push({ id: "records-total", severity: "warning", summary: "전체 합계를 확인할 수 없습니다.", detail: "현재 표에 불러온 값만 표시됩니다.", persistence: "sticky" });
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
 
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
+  const recordsLoadMessages: ConsumptionMessage[] = dataMode === "fallback" || recordsViewState === "error" ? [{
+    id: "records-load",
+    severity: "error",
+    summary: "Consumption Records 운영 데이터를 표시할 수 없습니다.",
+    detail: dataMode === "fallback" ? "예시 데이터는 실제 업무에 사용하지 마세요. Retry를 선택해 다시 시도해 주세요." : "기존 데이터와 마지막 완료 시각을 유지합니다. Retry를 선택해 다시 시도해 주세요.",
+    persistence: "sticky"
+  }] : [];
   const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting
     || importPhase !== "idle" || forecastImportPhase !== "idle";
   const forecastImportActionsDisabled = !canWriteForecast || hasDraftChanges || dataMode !== "backend"
@@ -1768,14 +1775,18 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             {isExporting ? "Exporting…" : "Actual Export"}
           </oj-button>
         </div>}
-      messages={<ConsumptionMessageBanner messages={visiblePageMessages}
+      messages={<>
+        <ConsumptionMessageBanner messages={recordsLoadMessages} placement="inline" onRetry={refreshRecords}
+          retryDisabled={recordsActivityBusy} />
+        <ConsumptionMessageBanner messages={visiblePageMessages}
         onClose={(messageId) => {
           if (messageId === "records-operation-error") {
             setImportError("");
             return;
           }
           setDismissedMessageIds((current) => new Set(current).add(messageId));
-        }} />}
+        }} />
+      </>}
       filters={<PageFilterPanel className="consumption-range-bar" ariaLabel="Consumption quarter range">
         <div class="consumption-range-pillar">
           <span>Pillar</span>
@@ -2036,7 +2047,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       <section ref={tablePanelRef} class={`kpi-panel consumption-table-panel${recordsViewState === "error" ? " consumption-table-panel--error" : ""}`} aria-label="Consumption Records data">
 
         <div class="consumption-section-heading consumption-table-heading">
-          <div class="consumption-records-toolbar" role="toolbar" aria-label="Consumption Records data controls">
+          <DataControlBar className="consumption-records-toolbar" ariaLabel="Consumption Records data controls">
             <div class="consumption-records-toolbar__left">
               <ConsumptionMtdControl checked={showMtd} disabled={dataMode !== "backend" || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
@@ -2050,7 +2061,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
                 refreshDisabled={recordsActivityBusy || hasDraftChanges} lastCompletedAt={lastDataLoadedAt} showBusyLabel={false}
                 compactTimestampButton />
             </div>
-          </div>
+          </DataControlBar>
           {hasDraftChanges && (
             <div class="consumption-draft-actions" role="toolbar" aria-label="Forecast draft actions">
               <span>Draft changes</span>
@@ -2067,12 +2078,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
               <button type="button" aria-label="Move table right" title="Move right" disabled={tableScrollState.left >= tableScrollState.max} onClick={() => moveTableHorizontally(1)}><span class="oj-ux-ico-chevron-right" aria-hidden="true"></span></button>
             </div>
           </div>
-          {recordsViewState === "error" ? (
-            <div class="consumption-empty-state" role="alert">
-              <strong>Unable to load Consumption Records.</strong>
-              <span>{recordsQueryError || importError || "The request failed. Please try again."}</span>
-            </div>
-          ) : <>
+          {recordsViewState !== "error" && <>
         <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
           <table class="consumption-table">
             <thead>
