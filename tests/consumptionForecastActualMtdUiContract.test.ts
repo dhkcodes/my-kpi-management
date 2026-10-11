@@ -107,8 +107,10 @@ assert.match(styles, /\.fiscal-year-selector\s*\{[^}]*background:\s*#2f2923[^}]*
   "the shared fiscal-year selector retains the approved Bark capsule surface");
 assert.equal((fiscalYearSelector.match(/class="fiscal-year-selector__nav is-(?:previous|next)"/gu) ?? []).length, 2,
   "both fiscal-year directions retain their shared circular navigation control");
-assert.match(styles, /\.fiscal-year-selector__nav\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent[^}]*height:\s*1\.75rem[^}]*width:\s*1\.75rem/iu,
-  "the resized capsule preserves the 28px navigation button and removes browser tap highlight");
+assert.match(styles, /\.fiscal-year-selector__nav\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent[^}]*height:\s*1\.375rem[^}]*width:\s*1\.375rem/iu,
+  "the reduced capsule uses unclipped 22px visible navigation buttons and removes browser tap highlight");
+assert.match(styles, /\.fiscal-year-selector__nav::after\s*\{[^}]*inset:\s*-\.6875rem/iu,
+  "the compact navigation controls retain an effective 44px mobile touch target");
 assert.match(styles, /\.fiscal-year-selector__nav:hover\s*\{[^}]*background:\s*linear-gradient/iu,
   "the Bark navigation control retains its subtle hover surface");
 assert.match(styles, /\.fiscal-year-selector__nav:active\s*\{[^}]*transform:\s*translateY\(1px\)/iu,

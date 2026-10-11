@@ -42,13 +42,17 @@ assert.match(consumptionPage, /disabled=\{loading\}/,
   "Consumption Analysis locks FY input exactly while its loading bar is active");
 assert.match(forecastActualPage, /disabled=\{loading\}/,
   "Forecast vs Actual locks FY input exactly while its loading bar is active");
-assert.match(styles, /\.fiscal-year-selector\s*\{[^}]*height:\s*2\.125rem;[^}]*padding:\s*\.1875rem\s+\.25rem;/s,
-  "the Bark capsule remains 34px with 28px navigation buttons");
-assert.match(styles, /\.fiscal-year-selector__filmstrip\s*\{[^}]*font-size:\s*\.89rem;/s,
-  "the FY label remains 14.24px");
+assert.match(styles, /\.fiscal-year-selector\s*\{[^}]*height:\s*1\.75rem;[^}]*padding:\s*\.1875rem\s+\.25rem;/s,
+  "the Bark capsule is reduced to the title text's visual height");
+assert.match(styles, /\.fiscal-year-selector__filmstrip\s*\{[^}]*font-size:\s*\.89rem;[^}]*height:\s*1\.375rem;/s,
+  "the FY label remains 14.24px inside the reduced capsule");
+assert.match(styles, /\.fiscal-year-selector__nav\s*\{[^}]*height:\s*1\.375rem;[^}]*width:\s*1\.375rem;/s,
+  "visible arrow buttons fit the reduced capsule without clipping");
+assert.match(styles, /\.fiscal-year-selector__nav::after\s*\{[^}]*inset:\s*-\.6875rem;/s,
+  "compact visible buttons retain an effective 44px touch target");
 assert.match(styles, /\.fiscal-year-selector__nav:disabled\s*\{/,
   "disabled controls have an explicit subtle Bark/Ivory treatment");
-assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__title-row,[\s\S]*\.kap-page-shell\.forecast-actual-page \.kap-page-shell__title-row\s*\{[^}]*column-gap:\s*1rem;/s,
-  "Analysis and FVA retain the 16px title-to-selector gap");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__title-row,[\s\S]*\.kap-page-shell\.forecast-actual-page \.kap-page-shell__title-row\s*\{[^}]*column-gap:\s*2rem;[^}]*row-gap:\s*\.875rem;/s,
+  "Analysis and FVA use a wider visible title gap on desktop and mobile");
 
 console.log("fiscal year selector stability contract: ok");
