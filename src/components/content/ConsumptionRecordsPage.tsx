@@ -1107,6 +1107,16 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
   const refreshRecords = async () => {
     const { fromQuarter: appliedFromQuarter, toQuarter: appliedToQuarter, search } = recordsQueryRef.current;
+    if (!isConsumptionQuarterRangeValid(appliedFromQuarter, appliedToQuarter)) {
+      setRecordsQueryError("");
+      setImportError("");
+      try {
+        await loadRecordsPage(false, { fromQuarter: "", toQuarter: "", search: "" }, selectedPillar, "initial");
+      } catch (error) {
+        setRecordsQueryError(error instanceof Error ? error.message : "Consumption Records could not be loaded.");
+      }
+      return;
+    }
     return runRecordsQuery({ fromQuarter: appliedFromQuarter, toQuarter: appliedToQuarter, search });
   };
 

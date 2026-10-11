@@ -973,6 +973,8 @@ assert.doesNotMatch(recordsPage, /setDataMode\("error"\);\s*setImportError/,
   "Records does not duplicate an initial load failure in the floating operation banner");
 assert.match(recordsPage, /if \(dataMode === "backend" && serverActualTotals === null\) pageMessages\.push\(\{ id: "records-total"/,
   "Records suppresses derived floating total warnings while the initial backend load is unavailable");
+assert.match(recordsPage, /if \(!isConsumptionQuarterRangeValid\(appliedFromQuarter, appliedToQuarter\)\)[\s\S]*setRecordsQueryError\(""\)[\s\S]*setImportError\(""\)[\s\S]*loadRecordsPage\(false, \{ fromQuarter: "", toQuarter: "", search: "" \}, selectedPillar, "initial"\)[\s\S]*setRecordsQueryError\(error instanceof Error/,
+  "Records Retry re-enters the initial backend load when the failed first request left no valid applied range");
 assert.match(insightsPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
   "Analysis uses the named Data Control Bar");
 assert.match(forecastActualPage, /<DataControlBar[\s\S]*ConsumptionMtdControl[\s\S]*PageActivity[\s\S]*<\/DataControlBar>/,
