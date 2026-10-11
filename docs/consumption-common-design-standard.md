@@ -6,143 +6,119 @@ Last updated: 2026-10-11
 
 ## 1. Scope and exceptions
 
-This standard applies only to controls that already exist on the three Consumption pages. It does not add missing filters or controls.
+This standard covers the three Consumption routes only. It standardizes names, accessibility semantics, control height and error behavior while preserving each page's approved information architecture and pre-commonization visual layout.
 
-- Consumption Records keeps its existing **From Quarter / To Quarter** range.
-- Consumption Records does **not** add a fiscal-year selector.
-- Analysis and FVA keep their existing fiscal-year selector.
-- Page-specific business actions and table content remain page-specific.
-- Shared CSS overrides must remain scoped by `.kap-page-shell.consumption-page`, `.kap-page-shell.consumption-insights-page`, or `.kap-page-shell.forecast-actual-page` so unrelated routes are not changed.
+Exceptions:
+
+- Analysis keeps FY, Pillar, Sales Rep and searchable Account context.
+- FVA keeps FY/Quarter/Pillar and Account search.
+- Records keeps From/To and Search Account / End User. It does not gain an FY control.
+- Account search inputs are not native select controls and are excluded from select-arrow styling.
+- Home is outside this scope. Consumption icon styling must not leak into Home.
 
 ## 2. Shared tokens
 
 | Token | Value | Use |
 |---|---:|---|
-| `--kap-consumption-control-height` | `2.15rem` | Existing Account/search inputs, From/To selects, relevant selects, and Pillar buttons |
-| `--kpi-panel-radius` | `var(--oj-core-border-radius-md, .2rem)` | Search/filter container radius; same subtle radius level as grid panels |
-| `--kap-data-control-gap` | `.5rem` | Desktop gap inside Data Control Bar |
-| `--kap-section-gap` | `.375rem` | Search → Data Control Bar spacing baseline |
-| `--kap-footer-gap` | `.75rem` | Root page container → footer vertical gap (`.5rem` at `<=760px`) |
+| `--kap-consumption-control-height` | `2.15rem` | Existing Account/search inputs, From/To selects, relevant selects and Pillar buttons |
+| `--kpi-panel-radius` | `var(--oj-core-border-radius-md, .2rem)` | Search/filter panels and subtle panel radius |
 
 Typography is unchanged. Existing Redwood/JET colors, disabled states, focus rings, busy indicators and message severity tokens remain authoritative.
 
 ## 3. Root container, fixed regions and scrolling
 
 - `.kpi-shell` owns the viewport grid: header, content and footer.
-- `.kpi-shell__body` and `.kpi-content` remain non-scrolling containment regions.
-- `.kap-page-shell` is height-constrained and clips overflow.
-- `.kap-page-shell__scroll` is the single vertical page scroll owner.
+- `.kap-page-shell__scroll` remains the single vertical page-scroll owner.
 - Wide tables may retain their own horizontal scrolling, but must not introduce a second page-level vertical scrollbar.
-- Header/navigation and footer remain outside the page body scroll.
-- Footer spacing is `--kap-footer-gap`; mobile spacing is `.5rem`.
+- The three Consumption `.kap-page-shell` roots alone use `var(--oj-core-border-radius-md, .2rem)`, measured at approximately `3.2px`; the previous commonization value measured approximately `12px`.
+- Commonization must not add a global footer margin. Existing shell/layout flow owns footer spacing.
 
-## 4. Heading and left alignment
+## 4. Heading, search and filter alignment
 
-- Page title begins at the `.kap-page-shell__inner` content start line.
-- Search/filter container begins on the same root content line.
-- Data Control Bar uses the same full content width.
-- Show MTD and its applied-date label begin at `.5rem` inset through `.consumption-records-toolbar__left`, consistently across all three pages.
-- Page-specific summary values may follow Show MTD, but must not move its starting line.
+- Page titles begin at the `.kap-page-shell__inner` content start line.
+- Use `PageFilterPanel` / `.kap-page-filter` without changing each page's field order or labels.
+- Desktop filter layout remains wrapped flex with existing page-specific alignment.
+- Mobile remains the existing page-specific single-column/responsive layout.
+- Control height is `2.15rem`.
+- Analysis native select text inset remains `.65rem`.
+- FVA and Records native select text inset is `.55rem`.
+- All three pages' native select arrows use `background-position: right .55rem center` and `padding-inline-end: 1.75rem`.
+- Account search inputs retain their existing appearance and are excluded from select-arrow rules.
 
-## 5. Search/filter container
+## 5. Explanation icons
 
-- Use `PageFilterPanel` / `.kap-page-filter`.
-- Background: existing alternate surface token.
-- Border: existing `--kpi-border`.
-- Radius: `--kpi-panel-radius`.
-- Desktop layout: wrapped flex row, controls bottom-aligned, column gap `.75rem`, row gap `.5rem`, padding `.5rem .75rem`.
-- Mobile (`<=760px`): one-column grid, stretch controls, padding `.65rem`.
-- Filter titles stay directly above their controls with the existing `.72rem` bold label style and `.2rem` label-to-control gap.
+- Consumption icon rules must be scoped to Consumption surfaces.
+- Home retains the pre-commonization geometry at desktop and mobile: trigger approximately `9.59px × 9.59px`, horizontal margins `1.6px`, and wrapper margin `1.6px 0 0 -1.28px`.
+- Regression review must compare the visible glyph, clickable trigger box, margins and position relative to its label; glyph size alone is insufficient.
+- Decorative glyphs remain `aria-hidden`; the trigger button owns the accessible label and tooltip relationship.
 
-## 6. Inputs and state expression
-
-Existing controls only:
-
-- Account search input
-- General search input
-- Existing select controls
-- Consumption Records From/To quarter selectors
-- Pillar segmented buttons
-
-Rules:
-
-- Height/min-height: `--kap-consumption-control-height` (`2.15rem`).
-- Existing font sizes and horizontal padding are retained.
-- Disabled, focus-visible, selected/pressed and busy states use existing Redwood/JET semantics and tokens.
-- Pillar buttons retain `aria-pressed` and their current selected-state border/color.
-- Search inputs retain their current clear affordance and composition-event handling.
-- Records From/To remains a quarter-range selector; no FY control is introduced.
-
-## 7. Explanation icons
-
-- Help/explanation triggers are `1.15rem × 1.15rem`.
-- Inline margin from the associated label is `.1rem`.
-- Keep `cursor: help`, visible keyboard focus, accessible name/title, and `aria-describedby` or equivalent tooltip relationship.
-- Decorative glyphs inside the trigger remain `aria-hidden`; the button owns the accessible label.
-
-## 8. Data Control Bar
+## 6. Data Control Bar
 
 The shared row between the search/filter container and primary data area is named **Data Control Bar**.
 
 Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 
-- Semantics: `role="toolbar"` with a page-specific accessible label.
-- Left: Show MTD, applied date and optional page summary.
-- Right: reload control, busy indicator and last successful completion time.
-- Desktop: center-aligned, `justify-content: space-between`, gap `.5rem`.
-- Mobile: wrapping behavior follows the page-specific summary needs; common gap is `.375rem`.
-- Search → bar top spacing: `.375rem`.
-- Bar → table/content spacing: `.325rem`.
-- Reload host height: `2.25rem` on desktop and `2.75rem` at `<=760px`; existing icon and font size remain.
-- Busy state uses the existing progress indicator and disabled reload action.
-- The displayed completion time changes only after a successful load. A failed refresh keeps both existing data and the last successful timestamp.
+- The common component owns only the name, wrapper and `role="toolbar"` semantics.
+- It does not impose `align-items`, `justify-content`, gap, margin, padding, min-height or wrapping.
+- Existing page-specific classes own layout and overflow prevention.
+- Desktop measured height after restoration: Analysis `40px`, FVA `40px`, Records `40px`.
+- Mobile measured height: Analysis `40px`; FVA and Records retain only their existing responsive wrapping needed to avoid overflow.
+- Commonization-added `2.25rem`/`2.75rem` Reload host heights, extra padding/gap and forced wrapping are prohibited.
 
-## 9. Error handling
+### Activity controls
 
-### 9.1 Data unavailable / page cannot display its primary content
+- Last-success timestamp and Reload are separate elements.
+- Reload uses `chroming="outlined"`, `oj-button-sm`, refresh icon and visible `Reload` label; measured button height is `36px`.
+- The timestamp must not be embedded in the Reload button.
+- Busy state uses the existing JET progress indicator in the same activity region.
+- Completion time changes only after a successful load. A failed operation retains both successful data and timestamp.
 
-- Render a shared JET `oj-c-message-banner` in normal document flow, immediately below the page header and before filters/content.
-- Use `severity="error"`, sticky persistence, a concise summary and retry guidance.
-- Provide a JET Retry button when retry is possible.
-- Inline wrapper: `.app-message-region.is-inline` (`position: static; width: 100%`).
+## 7. Analysis refresh policy
 
-### 9.2 Non-blocking operation failure
+- Initial load may use the initial page loading state.
+- A later FY/filter refresh keeps the last completed data and page shell mounted.
+- The FY selector remains disabled while its request is in flight, preserving the existing selection-lock policy.
+- When the requested FY differs from the displayed response FY, visible status states both values: `Refreshing FYxx; showing FYyy until complete`.
+- The progress indicator is part of the Analysis data region; it does not replace the full page.
+- Request-generation checks remain in place so a stale response cannot overwrite the latest valid request.
 
-Examples: refresh with preserved data, export, import or save failure.
+## 8. Error handling
 
-- Keep existing data visible.
-- Preserve the last successful completion time.
-- Use the shared floating `AppMessageBanner` in the upper-right.
-- Desktop edge offset: `1rem`, maximum width `28rem`.
-- Mobile edge offset: `.5rem`, width `calc(100vw - 1rem)`.
-- Error messages remain until dismissed; success/information messages may auto-dismiss.
+### Initial-load failure
 
-### 9.3 Shared safeguards
+- No usable data is available.
+- Render one inline error banner in normal flow with Retry.
 
-- Classify by user impact, not page name.
-- Do not show the same error both inline and floating.
-- Preserve JET alert/live-region semantics and keyboard operability.
-- Do not hard-code a second error palette; use JET/Redwood severity styling.
-- Production error-state verification must use request interception or another non-mutating method; never corrupt production data to trigger an error.
+### Operation failure with successful data already present
 
-## 10. Oracle JET element selection record
+- Keep content and last-success timestamp visible.
+- Render one floating error banner in the existing notification region.
+- Do not duplicate the same error inline and floating.
 
-The project uses Oracle JET `18.1.0`.
+Rules:
 
-- Kept `oj-c-message-banner` for Redwood severity, close behavior and accessibility semantics.
-- Kept `oj-button` for Retry and Reload actions.
-- Kept native HTML search/select controls where the existing page behavior depends on composition handling, simple quarter options, or established lightweight filtering.
-- Kept native Pillar buttons because they form a compact `aria-pressed` segmented control with page-owned state.
-- No JET DataProvider-backed selector was introduced because no new selection control was requested.
+- Preserve JET alert/live-region semantics and keyboard operation.
+- Use JET/Redwood severity styling rather than a second hard-coded palette.
+- Production error verification must use non-mutating request interception. Do not alter production data or execute Import Apply.
 
-## 11. Verification contract
+## 9. Oracle JET element selection record
 
-Minimum release verification covers:
+The project uses Oracle JET `20.1.3`.
 
-1. shared contract/type checks and production build;
-2. authenticated desktop and mobile views for all three pages;
-3. computed input/control height and filter radius;
-4. root page scrolling and table horizontal scrolling;
-5. inline load-error vs floating operation-error behavior using non-mutating interception;
-6. preserved content and last-success timestamp after a failed refresh;
-7. route-scope check confirming unrelated pages do not receive Consumption-only control overrides.
+- Keep `oj-c-message-banner` for Redwood severity, close behavior and accessibility semantics.
+- Keep native `select` where existing DOM/CSS relies on native controls; style only the owned select element and do not target JET internal classes.
+- Keep `oj-button` for Reload and action controls.
+- Do not override Oracle JET internal DOM or internal class names.
+
+## 10. Verification contract
+
+Minimum release checks:
+
+1. `npm run test:consumption`
+2. `npm run typecheck`
+3. `npm run test:consumption-browser`
+4. `git diff --check`
+5. `npx ojet build --release`
+6. Authenticated desktop `1440 × 1000` and mobile `390 × 844` review of Home and all three Consumption routes.
+7. Analysis partial-refresh probe confirms previous response remains visible, FY selection is locked, visible status identifies requested/displayed FY, and the completed response replaces it.
+8. No production data mutation; Import Apply remains out of scope.

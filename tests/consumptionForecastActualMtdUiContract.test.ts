@@ -89,8 +89,10 @@ assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*text-align:\s*center
 for (const column of ["is-forecast", "is-actual", "is-difference"]) {
   assert.match(styles, new RegExp(`forecast-actual-month-value\\.${column}[^}]*text-align:\\s*right`, "u"), `${column} values are right aligned`);
 }
-assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*showBusyLabel=\{false\}[^]*compactTimestampButton/u,
-  "Reload and completion time use the same compact table-toolbar activity treatment as Consumption Records");
+assert.match(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*lastCompletedAt=\{lastCompletedAt\}[^]*showBusyLabel=\{false\} labeledRefreshButton \/>/u,
+  "the labeled Reload button and completion time keep the pre-commonization separate table-toolbar treatment");
+assert.doesNotMatch(page, /forecast-actual-data-toolbar[^]*PageActivity[^]*compactTimestampButton/u,
+  "Forecast vs Actual does not recombine completion time into the Reload button");
 assert.match(styles, /--forecast-rep-width:\s*7rem/u);
 assert.match(styles, /--forecast-month-width:\s*5\.6rem/u,
   "wide Forecast vs Actual columns are compacted without collapsing content");

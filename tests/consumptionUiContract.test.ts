@@ -40,6 +40,8 @@ assert.match(pageShell, /refreshSlotRef[\s\S]*addEventListener\("click", handleR
   "the shared Refresh action binds a physical click listener and exposes the full KST timestamp as a tooltip");
 assert.match(pageShell, /compactTimestampButton\?[\s\S]*formatKstTime[\s\S]*Reload[\s\S]*kap-page-activity__separator/,
   "the reusable opt-in compact Refresh control combines JET icon, Reload, separator, and HH:mm:ss");
+assert.match(pageShell, /labeledRefreshButton[\s\S]*oj-button-sm[\s\S]*chroming=\{labeledRefreshButton \? "outlined" : "borderless"\}[\s\S]*\{labeledRefreshButton \? "Reload" : null\}/,
+  "the reusable activity control can preserve a labeled compact Reload button while leaving completion time separate");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
@@ -241,6 +243,40 @@ assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is O
   "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
   "tooltips open only from the dedicated information icon wrapper on hover or keyboard focus");
+assert.doesNotMatch(styles, /\.consumption-info-tooltip__trigger,\s*\.forecast-actual-info-trigger\s*\{[^}]*width:\s*1\.15rem/s,
+  "Consumption commonization does not globally resize Home or other pre-existing information-icon triggers");
+assert.match(styles, /\.kap-data-control-bar\s*\{(?=[^}]*min-width:\s*0;)(?=[^}]*width:\s*100%;)[^}]*\}/s,
+  "Data Control Bar keeps only non-visual containment needed by the named component");
+assert.doesNotMatch(styles, /\.kap-data-control-bar\s*\{[^}]*(?:min-height|padding|margin|gap|align-items|justify-content):/s,
+  "Data Control Bar does not override the pre-commonization page-specific height, alignment or spacing");
+assert.doesNotMatch(insightsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Analysis keeps completion time and Reload as separate controls");
+assert.doesNotMatch(forecastActualPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Forecast vs Actual keeps completion time and Reload as separate controls");
+assert.doesNotMatch(recordsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+  "Records keeps completion time and Reload as separate controls");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page,\s*\.kap-page-shell\.forecast-actual-page,\s*\.kap-page-shell\.consumption-page\s*\{[^}]*border-radius:\s*var\(--oj-core-border-radius-md, \.2rem\);/s,
+  "only the three Consumption root containers use the same small radius as their grids");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select\s*\{(?=[^}]*padding-inline-start:\s*\.65rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
+  "Analysis keeps its original text inset while adopting the shared right arrow inset");
+assert.match(styles, /\.forecast-actual-toolbar select,\s*\.consumption-range-bar select\s*\{(?=[^}]*padding-inline-start:\s*\.55rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
+  "FVA and Records native selects use the same right arrow inset without touching Account search inputs");
+assert.doesNotMatch(styles, /\.forecast-actual-toolbar input[^}]*background-position|\.consumption-insights-filter input[^}]*background-position/s,
+  "Account search inputs are excluded from select-arrow styling");
+assert.match(insightsPage, /const analysis = analysisResponse;/,
+  "Analysis keeps its last completed response mounted while another FY loads");
+assert.doesNotMatch(insightsPage, /const analysis = analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/,
+  "changing FY no longer unmounts the page shell and all completed content");
+assert.match(insightsPage, /generation !== requestGeneration\.current/,
+  "out-of-order Analysis responses cannot overwrite the latest FY selection");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\} disabled=\{loading\}/,
+  "Analysis preserves the approved FY selection lock while a request is in flight");
+assert.match(insightsPage, /`Refreshing \$\{fiscalYear\}; showing \$\{analysis\.fiscalYear\} until complete`/,
+  "the refresh state identifies both requested and still-visible completed FY data");
+assert.match(insightsPage, /"data-response-fiscal-year": analysis\.fiscalYear/,
+  "the Analysis data region exposes its completed FY for browser race verification");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page\[data-response-fiscal-year\] \.kap-page-data-progress\s*\{[^}]*position:\s*relative;/s,
+  "an Analysis FY refresh indicator remains in the data area instead of overlaying the whole viewport");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(account\.coveredExpectedAmountExact\)\}/,
@@ -432,12 +468,12 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumption
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
-assert.match(insightsPage, /analysisResponse\?\.fiscalYear === fiscalYear \? analysisResponse : null/, "Analysis keeps the last same-FY response mounted while filters refresh");
+assert.match(insightsPage, /const analysis = analysisResponse;/, "Analysis keeps the last completed response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
 assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading keeps only the centered progress indicator");
-assert.match(insightsPage, /<PageActivity busy=\{loading\} busyLabel="Refreshing analysis" refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*<PageDataProgress busy=\{loading\}/, "Analysis keeps Reload mounted and disabled while refreshing existing results");
+assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*labeledRefreshButton[\s\S]*<PageDataProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis keeps a separate labeled Reload control mounted and disabled while clearly identifying the last completed FY during partial refresh");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
-assert.match(insightsPage, /else if \(analysisResponse\) \{\s*setAnalysis\(null\);\s*\}/, "a failed FY transition discards the previous-FY response before rendering the current error state");
+assert.doesNotMatch(insightsPage, /setAnalysis\(null\)/, "a failed FY transition preserves the last completed response while rendering a floating error");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts/, "the analysis filter is a searchable Account combobox whose first option is the portfolio total");
@@ -904,8 +940,8 @@ assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecord
   "the authenticated shell opts into the shared viewport layout before the child surface mounts");
 assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
-assert.match(recordsPage, /<PageActivity[\s\S]*compactTimestampButton/,
-  "Records opts into the reusable compound Reload and HH:mm:ss control");
+assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}showBusyLabel=\{false\}[\s\S]{0,80}labeledRefreshButton \/>/,
+  "Records keeps the reusable but separate labeled Reload and timestamp controls");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,
   "the legacy Actual CSV export action is hidden without deleting its underlying export function");
 assert.match(recordsPage, /title="Export ACTUAL data in Excel format"[\s\S]*Actual Export/,
@@ -987,11 +1023,11 @@ assert.doesNotMatch(styles, /\.consumption-pillar-selector button\s*\{[^}]*2\.25
   "Pillar controls no longer retain the old 2.25rem height");
 assert.match(styles, /\.kap-page-filter\s*\{[^}]*border-radius:\s*var\(--kpi-panel-radius\)/s,
   "search/filter containers reuse the grid-panel radius token");
-assert.match(styles, /\.kap-data-control-bar\s*\{[^}]*align-items:\s*center[^}]*justify-content:\s*space-between/s,
-  "the shared Data Control Bar defines its cross-page alignment contract");
+assert.doesNotMatch(styles, /\.kap-data-control-bar\s*\{[^}]*(?:align-items|justify-content|gap|min-height|padding|margin):/s,
+  "the shared Data Control Bar leaves the original per-page alignment, height and vertical spacing intact");
 assert.match(styles, /\.app-message-region\.is-inline\s*\{[^}]*position:\s*static[^}]*width:\s*100%/s,
   "page-load errors remain in the document flow instead of overlaying content");
-assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*?\.kap-page-shell\.forecast-actual-page \.kap-data-control-bar\s*\{[^}]*flex-wrap:\s*wrap/s,
-  "mobile Data Control Bars use a scoped, high-specificity wrap contract instead of clipping Reload outside the viewport");
+assert.doesNotMatch(styles, /@media \(max-width:\s*760px\)[\s\S]*?\.kap-page-shell\.forecast-actual-page \.kap-data-control-bar\s*\{[^}]*flex-wrap:\s*wrap/s,
+  "mobile Forecast vs Actual preserves the pre-commonization compact single-row Data Control Bar");
 
 console.log("consumptionUiContract tests passed");

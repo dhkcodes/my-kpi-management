@@ -28,6 +28,8 @@ assert.doesNotMatch(selector, /normalizePage|loopDirection/,
   "boundary navigation never wraps");
 assert.match(selector, /disabled=\{disabled \|\| selected === FIRST_FISCAL_YEAR\}/,
   "previous is physically disabled at FY01 and while loading");
+assert.match(consumptionPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\} disabled=\{loading\}/,
+  "Analysis keeps FY navigation locked while the selected FY request is loading");
 assert.match(selector, /disabled=\{disabled \|\| selected === LAST_FISCAL_YEAR\}/,
   "next is physically disabled at FY98 and while loading");
 assert.match(selector, /disabled\?: boolean/,
@@ -38,10 +40,12 @@ assert.match(selector, /toggleAttribute\("inert", disabled\)/,
   "the Film Strip blocks click, touch, swipe, and keyboard interaction while loading");
 assert.match(selector, /aria-disabled=\{disabled \? "true" : "false"\}/,
   "the loading lock is exposed accessibly");
-assert.match(consumptionPage, /disabled=\{loading\}/,
-  "Consumption Analysis locks FY input exactly while its loading bar is active");
+assert.match(consumptionPage, /<FiscalYearSelector[^>]*disabled=\{loading\}/,
+  "Consumption Analysis preserves the approved FY selection lock while a response is in flight");
+assert.match(consumptionPage, /generation !== requestGeneration\.current/,
+  "Consumption Analysis ignores an older response after a newer FY choice");
 assert.match(forecastActualPage, /disabled=\{loading\}/,
-  "Forecast vs Actual locks FY input exactly while its loading bar is active");
+  "Forecast vs Actual retains its existing loading lock");
 assert.match(styles, /\.fiscal-year-selector\s*\{[^}]*height:\s*1\.75rem;[^}]*padding:\s*\.1875rem\s+\.25rem;/s,
   "the Bark capsule is reduced to the title text's visual height");
 assert.match(styles, /\.fiscal-year-selector__filmstrip\s*\{[^}]*font-size:\s*\.89rem;[^}]*height:\s*1\.375rem;/s,

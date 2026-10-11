@@ -56,6 +56,7 @@ type PageActivityProps = Pick<PageShellProps, "busy" | "busyLabel" | "onRefresh"
   lastCompletedAt?: Date | null;
   showBusyLabel?: boolean;
   compactTimestampButton?: boolean;
+  labeledRefreshButton?: boolean;
 };
 
 const padTimestampPart = (value: number) => String(value).padStart(2, "0");
@@ -77,7 +78,8 @@ export function PageActivity({
   refreshDisabled = false,
   lastCompletedAt = null,
   showBusyLabel = true,
-  compactTimestampButton = false
+  compactTimestampButton = false,
+  labeledRefreshButton = false
 }: PageActivityProps) {
   const refreshSlotRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -125,9 +127,10 @@ export function PageActivity({
               <oj-progress-circle class="kap-page-activity__progress" size="sm" value={-1} aria-label={busyLabel}></oj-progress-circle>
               <span class={showBusyLabel ? "" : "oj-helper-hidden-accessible"}>{busyLabel}</span>
             </span>
-          ) : <oj-button class="kap-page-activity__refresh" chroming="borderless" disabled={!onRefresh || refreshDisabled}
+          ) : <oj-button class={`kap-page-activity__refresh${labeledRefreshButton ? " oj-button-sm" : ""}`}
+              chroming={labeledRefreshButton ? "outlined" : "borderless"} disabled={!onRefresh || refreshDisabled}
               aria-label="Refresh" title={refreshTitle}>
-              <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>
+              <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true"></span>{labeledRefreshButton ? "Reload" : null}
             </oj-button>}
         </span>
       </span>

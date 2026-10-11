@@ -218,8 +218,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
             setSelectedAccountContext(analysisResponse.selectedAccount ?? "");
             setCandidateSearch("");
             setDebouncedCandidateSearch("");
-          } else if (analysisResponse) {
-            setAnalysis(null);
           }
         }
       })
@@ -231,7 +229,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   // The refresh indicator makes that transition explicit; replacing the
   // response with null here would also remove and recreate the header/filter
   // controls before the request completes.
-  const analysis = analysisResponse?.fiscalYear === fiscalYear ? analysisResponse : null;
+  const analysis = analysisResponse;
 
   const filteredCandidates = useMemo(() => (analysis?.accountCandidates ?? [])
     .filter((candidate) => matchesCandidate(candidate, candidateSearch)), [analysis, candidateSearch]);
@@ -364,8 +362,8 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const mtdAppliedTimestamp = analysis?.mtdAsOf ?? analysis?.mtdSummary?.asOf;
 
   const currentFiscalYear = getLatestFiscalYear();
-  const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
-    disabled={loading} onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
+  const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear} disabled={loading}
+    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
   const messages: ConsumptionMessage[] = [
     ...(error ? [{ id: "analysis-load", severity: "error" as const, summary: "데이터를 새로 고치지 못했습니다.", detail: "기존 데이터와 마지막 완료 시각을 유지합니다. Reload로 다시 시도해 주세요." }] : []),
     ...(exportError ? [{ id: "analysis-export", severity: "error" as const, summary: "내보내지 못했습니다.", detail: "현재 화면은 유지됩니다. 잠시 후 다시 시도해 주세요." }] : [])
@@ -382,6 +380,9 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     <PageDataProgress busy={loading} busyLabel="Loading data" />
   </PageShell>;
 
+  const refreshStatusLabel = analysis.fiscalYear === fiscalYear
+    ? `Refreshing ${fiscalYear}`
+    : `Refreshing ${fiscalYear}; showing ${analysis.fiscalYear} until complete`;
   const latestCompleteQuarter = [...analysis.quarters].reverse()
     .find((quarter) => quarter.status === "ACTUAL" && quarter.coveragePercent === 100) ?? null;
   const forecastExposureExact = calculateOpenForecastExposureExact(
@@ -475,7 +476,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   };
 
   return <PageShell className="consumption-insights-page" ariaLabelledBy="consumptionAnalysisTitle"
-    rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-account-context": selectedAccountContext || "all" }}
+    rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-response-fiscal-year": analysis.fiscalYear, "data-account-context": selectedAccountContext || "all" }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
     actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
@@ -549,11 +550,11 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
           tooltipId="analysis-show-mtd-tooltip" />
       </div>
         <div class="consumption-records-toolbar-activity">
-          <PageActivity busy={loading} busyLabel="Refreshing analysis" refreshDisabled={loading || !!exporting}
-            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
+          <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={loading || !!exporting}
+            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} labeledRefreshButton />
         </div>
     </DataControlBar>
-    <PageDataProgress busy={loading} busyLabel="Refreshing analysis" />
+    <PageDataProgress busy={loading} busyLabel={refreshStatusLabel} />
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
