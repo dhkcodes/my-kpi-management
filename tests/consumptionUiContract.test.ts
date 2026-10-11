@@ -5,6 +5,7 @@ const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const attainmentPage = readFileSync("src/components/content/AttainmentPage.tsx", "utf8");
 const forecastActualPage = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
+const consumptionViewportProgress = readFileSync("src/components/content/ConsumptionViewportProgress.tsx", "utf8");
 const forecastActualSort = readFileSync("src/data/forecastActualSort.ts", "utf8");
 const messageBanner = readFileSync("src/components/content/ConsumptionMessageBanner.tsx", "utf8");
 const sharedMessageBanner = readFileSync("src/components/content/AppMessageBanner.tsx", "utf8");
@@ -285,10 +286,14 @@ assert.match(insightsPage, /`Refreshing \$\{fiscalYear\}; showing \$\{analysis\.
   "the refresh state identifies both requested and still-visible completed FY data");
 assert.match(insightsPage, /"data-response-fiscal-year": analysis\.fiscalYear/,
   "the Analysis data region exposes its completed FY for browser race verification");
-assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*left:\s*50vw;[^}]*position:\s*fixed;[^}]*top:\s*var\(--consumption-viewport-center-y,\s*50vh\);/s,
-  "Analysis and Forecast vs Actual use the Records visible-root viewport-center coordinate");
-assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;[^}]*position:\s*fixed;[^}]*transform:\s*translate\(-50%,\s*-50%\);/s,
-  "Analysis keeps the viewport-centered progress track without the generic floating white card");
+assert.doesNotMatch(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{/,
+  "Analysis and Forecast vs Actual no longer override the Records loading card appearance or positioning");
+assert.match(consumptionViewportProgress, /class="consumption-viewport-controls consumption-page-progress-controls"[\s\S]*<PageDataProgress busy=\{busy\}/,
+  "Analysis and Forecast vs Actual render the shared progress inside the same fixed viewport-control structure used by Records");
+assert.match(consumptionViewportProgress, /const visibleTop = Math\.max\(rootRect\.top, 0\);[\s\S]*const visibleBottom = Math\.min\(rootRect\.bottom, window\.innerHeight\);[\s\S]*const viewportCenterY = \(visibleTop \+ visibleBottom\) \/ 2;/,
+  "the shared progress computes the same visible-root center as Records");
+assert.match(styles, /\.consumption-viewport-controls \.kap-page-data-progress\s*\{[^}]*left:\s*var\(--consumption-viewport-center-x\);[^}]*top:\s*var\(--consumption-viewport-center-y\);/s,
+  "all Consumption progress cards use the Records viewport-center variables");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
   "Attention Accounts labels finalized Actual separately");
 assert.match(insightsPage, /<OpenForecastLabel \/> \{formatExactKFixed\(account\.forecastAmountExact\)\} · Covered-period expected \{formatExactKFixed\(account\.coveredExpectedAmountExact\)\}/,
@@ -482,8 +487,8 @@ assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumption
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
 assert.match(insightsPage, /const analysis = analysisResponse;/, "Analysis keeps the last completed response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
-assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading keeps only the centered progress indicator");
-assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*compactTimestampButton[\s\S]*<PageDataProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis restores one compact icon-or-spinner and timestamp button while exposing the detailed partial-refresh state accessibly");
+assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading reuses the Records initial PageShell-body loading card");
+assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*compactTimestampButton[\s\S]*<ConsumptionViewportProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis restores one compact icon-or-spinner and timestamp button while exposing the detailed partial-refresh state accessibly");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.doesNotMatch(insightsPage, /setAnalysis\(null\)/, "a failed FY transition preserves the last completed response while rendering a floating error");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
@@ -499,7 +504,8 @@ assert.doesNotMatch(insightsPage, /FINAL \+ \{mtdAsOfPeriod\} MTD|Growth, YoY, a
   "Analysis removes the long MTD implementation notice");
 assert.doesNotMatch(insightsPage, /Forecast \{account\.forecastEntryStatus\.toLowerCase\(\)\}/,
   "Account Contribution omits the redundant Forecast entered message");
-assert.match(insightsPage, /Quarter-over-quarter[\s\S]*qoqChangePercent/, "QoQ values render as decision cards");
+assert.match(insightsPage, /<h2 id="qoqTitle">QoQ<\/h2>[\s\S]*qoqChangePercent/, "QoQ values render under the concise KPI-consistent heading");
+assert.doesNotMatch(insightsPage, />Quarter-over-quarter</, "the long QoQ section title is removed without changing its calculation");
 assert.match(insightsPage, /const selectedAlert = analysis\?\.alerts\.find[^\n]+\?\? null/, "alerts start and remain unselected without falling back to the first alert");
 assert.match(insightsPage, /const trendPoints[\s\S]*selectedAlert[\s\S]*getAlertActualTrend[\s\S]*analysis\?\.contextActualTrend/, "unselected Trend uses the backend current-context ACTUAL trend");
 assert.match(insightsPage, /const contextTrendLabel[\s\S]*selectedAlert \?[^:]+: contextTrendLabel/, "unselected Trend displays All Accounts Total in the current filter context");
@@ -627,7 +633,7 @@ assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompo
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
 assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
-assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>;/, "Initial Analysis loading renders only the loading shell without export controls");
+assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>;/, "Initial Analysis loading renders only the Records-compatible loading shell without export controls");
 assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("png"\)[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("pdf"\)[\s\S]*<\/div>\}/, "PNG and PDF controls stay mounted for completed Analysis data and disable during refresh or export");
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
@@ -659,7 +665,8 @@ assert.match(insightsPage, /coveredPeriodConsumptionTooltip/);
 assert.match(insightsPage, /MTD adds .* to Actual\. After excluding .* already covered by Forecast, covered-period Expected increases by/);
 assert.match(insightsPage, /account\.coveredExpectedAmountExact/);
 assert.doesNotMatch(insightsPage, /<span class=\{statusTone\(plan\.status\)\}>\{plan\.status\}<\/span>/);
-assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress[\s\S]*position: fixed/);
+assert.match(consumptionViewportProgress, /ResizeObserver[\s\S]*visualViewport\?\.addEventListener\("resize"[\s\S]*visualViewport\?\.addEventListener\("scroll"/,
+  "the Records-compatible progress center follows root resizing and the mobile visual viewport lifecycle");
 assert.match(insightsPage, /The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, />\s*Forecast Import\s*</, "Forecast import button omits file-format wording");
@@ -920,8 +927,8 @@ assert.doesNotMatch(fiscalYearSelector, /onPointerUp|addEventListener\("pointerd
   "the Film Strip selector no longer carries the legacy popup pointer, dismissal, focus, or positioning handlers");
 assert.doesNotMatch(styles, /\.fiscal-year-selector__popover\s*\{/u,
   "the Film Strip selector no longer renders the legacy fixed popup");
-assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
-assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
+assert.match(forecastActualPage, /contentReady[\s\S]*<ConsumptionViewportProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast reuses the corresponding Records initial and refresh loading implementations");
+assert.doesNotMatch(forecastActualPage, /<ConsumptionViewportProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the Records-compatible loading card once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
 assert.match(apiSource, /projectedAmount: string \| null/, "summary preserves unavailable projection instead of coercing it to zero");
 assert.match(forecastActualPage, /actualState === "MTD"[\s\S]*actualAsOf[\s\S]*latestMtdAppliedTimestamp/, "Forecast vs Actual derives one header date from actual MTD import timestamps");
@@ -995,20 +1002,16 @@ assert.doesNotMatch(forecastActualPage, /Actual is not confirmed\./,
 
 assert.doesNotMatch(insightsPage, /labeledRefreshButton|shortVisibleTimestamp/, "Analysis uses the restored compact timestamp button without text or timestamp separation");
 assert.doesNotMatch(forecastActualPage, /labeledRefreshButton|shortVisibleTimestamp/, "Forecast vs Actual uses the restored compact timestamp button without text or timestamp separation");
-assert.match(insightsPage, /<PageActivity[\s\S]{0,300}compactTimestampButton[\s\S]*<\/DataControlBar>\s*<PageDataProgress busy=\{loading\}/,
-  "Analysis restores the established progress placement after the data-control row");
+assert.match(insightsPage, /<PageActivity[\s\S]{0,300}compactTimestampButton[\s\S]*<\/DataControlBar>\s*<ConsumptionViewportProgress busy=\{loading\}/,
+  "Analysis uses the Records-compatible loading card after the data-control row");
 assert.doesNotMatch(insightsPage, /class="consumption-analysis-data-controls"/,
   "Analysis does not introduce a new progress-positioning wrapper around the toolbar");
 assert.doesNotMatch(styles, /\.consumption-analysis-data-controls \.kap-page-data-progress/,
   "Analysis does not relocate progress to the data-control bottom");
-assert.match(styles, /\.consumption-insights-page \.kap-page-data-progress\s*\{[^}]*top:\s*var\(--consumption-viewport-center-y,\s*50vh\)/s,
-  "Analysis and Forecast vs Actual anchor progress to the Records viewport-center coordinate");
-assert.match(insightsPage, /scrollElementRef=\{\(element\) => \{ pageScrollRef\.current = element; \}\}/,
-  "Analysis observes the same root page scroller used to place the Records progress indicator");
-assert.match(insightsPage, /const viewportCenterY = \(visibleTop \+ visibleBottom\) \/ 2;[\s\S]*--consumption-viewport-center-y/,
-  "Analysis computes the same visible-root viewport center as Records rather than relying on mobile vh units");
-assert.match(insightsPage, /resizeObserver\.observe\(root\);[\s\S]{0,700}\}, \[analysisResponse\]\);/,
-  "Analysis installs its viewport-center observer after the loaded PageShell exposes the root scroller");
+assert.match(insightsPage, /<ConsumptionViewportProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\} \/>/,
+  "Analysis uses one shared Records-compatible progress implementation for loaded refresh states");
+assert.match(consumptionViewportProgress, /resizeObserver\.observe\(root\)[\s\S]*window\.addEventListener\("scroll", updatePosition, true\)/,
+  "the shared progress observes the root page scroller and root geometry without depending on initial or loaded parent structure");
 assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*row-gap:\s*0;/s,
   "mobile Records keeps Show MTD\/count and Reload in one control row instead of reserving a false second-row gap");
 assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-records-toolbar-activity\s*\{[^}]*flex-basis:\s*auto;[^}]*flex-wrap:\s*nowrap;/s,

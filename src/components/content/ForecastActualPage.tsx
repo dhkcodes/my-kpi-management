@@ -24,6 +24,7 @@ import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageSh
 import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
 import { ConsumptionMessageBanner, type ConsumptionMessage } from "./ConsumptionMessageBanner";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 
 const formatAmount = (value: string | null, unavailable = "Unconfirmed") => value === null ? unavailable : formatExactKFixed(value, 2);
 const renderTotalAmount = (value: string | null) => value === null
@@ -399,7 +400,9 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
       </div>
     </PageFilterPanel> : undefined}>
 
-    <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual" />
+    {contentReady
+      ? <ConsumptionViewportProgress busy={loading} busyLabel="Loading Forecast vs Actual" />
+      : <PageDataProgress busy={loading} busyLabel="Loading Forecast vs Actual" />}
 
     {contentReady && currentData && <div class="forecast-actual-results" aria-busy="false">
       <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" ariaLabel="Forecast vs Actual data controls">

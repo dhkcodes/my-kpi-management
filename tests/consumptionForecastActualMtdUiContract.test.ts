@@ -12,7 +12,7 @@ assert.match(page, /<PageShell[\s\S]*className="consumption-insights-page foreca
   "Forecast vs Actual uses the shared Consumption Records page shell");
 assert.match(page, /PageFilterPanel/u);
 assert.match(page, /PageActivity/u);
-assert.match(page, /PageDataProgress/u);
+assert.match(page, /ConsumptionViewportProgress/u);
 assert.match(mtdControl, /role="switch"/u);
 assert.match(mtdControl, /aria-checked=\{checked\}/u);
 assert.match(mtdControl, /disabled=\{disabled\}/u);

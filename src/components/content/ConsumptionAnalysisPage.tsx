@@ -42,6 +42,7 @@ import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { FiscalYearSelector } from "../common/FiscalYearSelector";
 import { ConsumptionMtdControl } from "./ConsumptionMtdControl";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 import html2canvasPro = require("html2canvas-pro");
 import { jsPDF } from "jspdf";
 
@@ -169,7 +170,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const requestGeneration = useRef(0);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
-  const pageScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (candidateComposing) return;
@@ -177,30 +177,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     return () => window.clearTimeout(timeout);
   }, [candidateComposing, candidateSearch]);
 
-  useEffect(() => {
-    const root = pageScrollRef.current;
-    if (!root) return undefined;
-    const updateProgressCenter = () => {
-      const rootRect = root.getBoundingClientRect();
-      const visibleTop = Math.max(0, rootRect.top);
-      const visibleBottom = Math.min(window.innerHeight, rootRect.bottom);
-      const viewportCenterY = (visibleTop + visibleBottom) / 2;
-      root.style.setProperty("--consumption-viewport-center-y", `${viewportCenterY}px`);
-    };
-    const update = () => window.requestAnimationFrame(updateProgressCenter);
-    const resizeObserver = new ResizeObserver(update);
-    resizeObserver.observe(root);
-    window.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("scroll", update);
-    updateProgressCenter();
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("scroll", update);
-    };
-  }, [analysisResponse]);
 
   useEffect(() => {
     if (!comboboxOpen) return;
@@ -502,7 +478,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   };
 
   return <PageShell className="consumption-insights-page" ariaLabelledBy="consumptionAnalysisTitle"
-    scrollElementRef={(element) => { pageScrollRef.current = element; }}
     rootAttributes={{ id: "consumptionAnalysisExportTarget", "data-fiscal-year": fiscalYear, "data-response-fiscal-year": analysis.fiscalYear, "data-account-context": selectedAccountContext || "all" }}
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
@@ -581,7 +556,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
             onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
     </DataControlBar>
-    <PageDataProgress busy={loading} busyLabel={refreshStatusLabel} />
+    <ConsumptionViewportProgress busy={loading} busyLabel={refreshStatusLabel} />
 
     <section class="kpi-panel consumption-sales-rep-overview" aria-labelledby="salesRepOverviewTitle">
       <div class="consumption-section-heading"><div><h2 id="salesRepOverviewTitle">Sales Rep Overview</h2></div>
@@ -618,7 +593,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         </div>
       </section>
       <section class="kpi-panel" aria-labelledby="qoqTitle">
-        <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">Quarter-over-quarter</h2></div></div>
+        <div class="consumption-section-heading"><div><span class="kpi-section-label">vs previous fiscal quarter</span><h2 id="qoqTitle">QoQ</h2></div></div>
         <div class="consumption-insights-qoq-cards">{analysis.quarters.map((quarter) => <article key={quarter.quarter} class={quarter.qoqChangePercentExact !== null && compareExactDecimals(quarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}><span>{quarter.quarter}</span><strong>{percentageTextExact(quarter.qoqChangePercentExact, true)}</strong><small class={statusTone(quarter.status)}>{qoqKind(quarter.status)}</small></article>)}</div>
 
       </section>

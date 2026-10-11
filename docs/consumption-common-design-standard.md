@@ -79,15 +79,15 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 
 ## 7. Analysis/FVA refresh-position policy
 
-- Initial load may use the initial page loading state.
+- Initial load reuses Records' initial `PageShell` body child `PageDataProgress`; later data requests reuse its fixed `.consumption-viewport-controls` host through `ConsumptionViewportProgress`.
 - A later FY/filter refresh keeps the last completed data and page shell mounted.
 - The FY selector remains disabled while its request is in flight, preserving the existing selection-lock policy.
 - When the requested FY differs from the displayed response FY, the accessible status states both values: `Refreshing FYxx; showing FYyy until complete`.
-- Analysis and FVA compute the same visible-root viewport-center coordinate used by Records: halfway between `max(0, root.top)` and `min(window.innerHeight, root.bottom)`. They publish it as `--consumption-viewport-center-y`; `50vh` is fallback only.
-- Recompute that coordinate for root resize, window resize, and `visualViewport` resize/scroll. This keeps browser-chrome and visual-viewport changes from leaving Analysis/FVA tied to a stale CSS viewport unit.
-- The indicator remains a direct page-body child at `left: 50vw` with `transform: translate(-50%, -50%)`. Its existing size, color, shape and Analysis thin-track treatment are unchanged; the Records container-style indicator is not changed.
-- The Analysis/FVA rule neutralizes the generic floating progress card (`background: transparent`, no border, radius, shadow or padding), so only the thin progress track is visible. The shell and last successful result stay mounted; no white loading box or top-left displacement is allowed.
-- Do not place the indicator inside `.consumption-analysis-data-controls`: the `3dec372` combination of an absolute `.consumption-analysis-data-controls .kap-page-data-progress` rule with the generic transform was the control-bar relocation regression.
+- Consumption Records is the visual and positioning authority. Analysis and FVA reuse its `.consumption-viewport-controls` fixed host, shared `PageDataProgress`, and visible-root center calculation: Y is halfway between `max(0, root.top)` and `min(window.innerHeight, root.bottom)`; X is halfway between the root bounds clipped to `window.innerWidth`.
+- Recompute both coordinates for root resize, window resize, captured scroll, and `visualViewport` resize/scroll. This preserves the Records coordinate contract while reacting to browser-chrome and visual-viewport changes.
+- Keep the shared Records loading card unchanged: outer white background, border, shadow, padding and radius plus the same Oracle JET indeterminate bar width, color and animation. Analysis/FVA must not apply a thin-track-only override.
+- The fixed refresh host is independent of filter, toolbar and result containers. Do not place it inside `.consumption-analysis-data-controls` or another state-dependent parent. Initial and later requests intentionally follow the corresponding Records implementation rather than a hand-tuned coordinate.
+- Existing completed results remain mounted and request-time input controls remain disabled according to each page's established lifecycle. Unsupported controls are documented as unsupported rather than simulated.
 - Request-generation checks remain in place so a stale response cannot overwrite the latest valid request.
 
 ## 8. Error handling
