@@ -14,6 +14,7 @@ import {
   type HomeConsumptionOverviewData
 } from "../../data/homeConsumptionOverview";
 import { compareExactDecimals, divideExactDecimal, formatExactK } from "../../data/exactDecimal";
+import { formatMtdAppliedDate } from "../../data/mtdDate";
 
 const amountK = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -34,7 +35,7 @@ const periodRange = (periods: readonly string[]) => {
 const OPEN_FORECAST_TOOLTIP = "Open Forecast excludes FINAL periods. When MTD Actual is available for an included period, FY Expected removes overlapping Forecast once and uses MTD Actual instead.";
 const MTD_TOOLTIP = "MTD Actual is cumulative month-to-date usage and is not final. It remains visible until finalized Actual is uploaded; finalized Actual then takes priority.";
 type HomeTooltipPosition = Readonly<{ left: number; top: number; width: number }>;
-const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => {
+const InfoTooltip = ({ id, label, text, updatedOn }: Readonly<{ id: string; label: string; text: string; updatedOn?: string | null }>) => {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -115,7 +116,10 @@ const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; 
     {position && typeof document !== "undefined" && createPortal(
       <span ref={tooltipRef} id={id} class="consumption-info-tooltip__content home-consumption__info-tooltip-content is-portal"
         style={{ position: "fixed", left: `${position.left}px`, top: `${position.top}px`, width: `${position.width}px` }} role="tooltip"
-        onMouseEnter={clearScheduledClose} onMouseLeave={scheduleClose}>{text}</span>,
+        onMouseEnter={clearScheduledClose} onMouseLeave={scheduleClose}>
+        {text}
+        {updatedOn && <span class="consumption-info-tooltip__meta">Updated on {updatedOn}</span>}
+      </span>,
       document.body
     )}
   </span>;
@@ -184,6 +188,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
   const monthlyMax = useMemo(() => Math.max(0, ...(data?.months.flatMap((month) => [month.amountChartCoordinate ?? 0, month.forecastAmountChartCoordinate ?? 0]) ?? [])), [data]);
   const monthlyEdges = useMemo(() => buildHomeConsumptionLineEdges(data?.months ?? []), [data]);
   const firstForecastIndex = data?.months.findIndex((month) => month.periodKey === data.forecastStartPeriod) ?? -1;
+  const mtdUpdatedOn = formatMtdAppliedDate(data?.mtdAsOf);
 
   return (
     <section id="consumptionOverview" class="kpi-panel kpi-dashboard-section home-consumption" aria-labelledby="consumptionOverviewTitle">
@@ -213,7 +218,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
         <>
           <div class="home-consumption__coverage" role="note">
             <span><i class="home-consumption__legend home-consumption__legend--actual"></i>Actual {periodRange(data.actualPeriods)}</span>
-            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD <InfoTooltip id="homeMtdCoverageTooltip" label="Explain MTD Actual" text={MTD_TOOLTIP} />{data.mtdAsOf ? ` · As of ${data.mtdAsOf}` : ""}</span>}
+            {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__legend home-consumption__legend--mtd"></i>MTD <InfoTooltip id="homeMtdCoverageTooltip" label="Explain MTD Actual" text={MTD_TOOLTIP} updatedOn={mtdUpdatedOn} /></span>}
             <span><i class="home-consumption__legend home-consumption__legend--forecast"></i>Open Forecast {periodRange(data.forecastPeriods)}</span>
           </div>
           {data.finalUploadRequiredPeriods.length > 0 && (
@@ -280,7 +285,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
                       </div>
                       <div class="home-consumption__quarter-values">
                         {showActual && <span>Actual <strong>{formatAmountK(quarter.actualAmountExact)}</strong></span>}
-                        {showMtd && <span>MTD <InfoTooltip id={`homeQuarterMtdTooltip-${quarter.quarter}`} label={`Explain ${quarter.quarter} MTD Actual`} text={MTD_TOOLTIP} /> <strong>{formatAmountK(mtdAmountExact)}</strong></span>}
+                        {showMtd && <span>MTD <InfoTooltip id={`homeQuarterMtdTooltip-${quarter.quarter}`} label={`Explain ${quarter.quarter} MTD Actual`} text={MTD_TOOLTIP} updatedOn={mtdUpdatedOn} /> <strong>{formatAmountK(mtdAmountExact)}</strong></span>}
                         <span>Forecast <strong>{formatAmountK(quarter.forecastAmountExact)}</strong></span>
                       </div>
                     </div>
@@ -319,7 +324,7 @@ export function HomeConsumptionOverview({ fiscalYear, canReadRecords }: Readonly
               <div><h3>Tentative Monthly Consumption</h3></div>
               <div class="home-consumption__monthly-legend" aria-label="Line legend">
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--actual"></i>Actual</span>
-                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd"></i>MTD <InfoTooltip id="homeMonthlyMtdTooltip" label="Explain monthly MTD Actual" text={MTD_TOOLTIP} /></span>}
+                {data.months.some((month) => month.kind === "MTD") && <span><i class="home-consumption__monthly-legend-dot home-consumption__monthly-legend-dot--mtd"></i>MTD <InfoTooltip id="homeMonthlyMtdTooltip" label="Explain monthly MTD Actual" text={MTD_TOOLTIP} updatedOn={mtdUpdatedOn} /></span>}
                 <span><i class="home-consumption__monthly-legend-line home-consumption__monthly-legend-line--forecast"></i>Forecast</span>
               </div>
             </div>

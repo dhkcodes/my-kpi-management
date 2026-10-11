@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const page = readFileSync("src/components/content/ForecastActualPage.tsx", "utf8");
 const analysis = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const mtdControl = readFileSync("src/components/content/ConsumptionMtdControl.tsx", "utf8");
+const homeOverview = readFileSync("src/components/content/HomeConsumptionOverview.tsx", "utf8");
 const fiscalYearSelector = readFileSync("src/components/common/FiscalYearSelector.tsx", "utf8");
 const api = readFileSync("src/data/consumptionApi.ts", "utf8");
 const styles = readFileSync("src/styles/app.css", "utf8");
@@ -29,6 +30,16 @@ assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[^]*Up
   "the shared MTD tooltip derives its Updated on date from the real period metadata");
 assert.match(mtdControl, /aria-describedby=\{tooltipId\}[^]*consumption-info-tooltip__content/u,
   "only the dedicated information trigger owns the shared MTD tooltip");
+assert.match(homeOverview, /formatMtdAppliedDate\(data\?\.mtdAsOf\)/u,
+  "home MTD metadata uses the shared UTC date formatter");
+assert.match(homeOverview, /Updated on \{updatedOn\}/u,
+  "home MTD tooltips use the shared metadata line design");
+for (const tooltipId of ["homeMtdCoverageTooltip", "homeQuarterMtdTooltip-", "homeMonthlyMtdTooltip"]) {
+  assert.match(homeOverview, new RegExp(`${tooltipId}[^\\n]*updatedOn=\\{mtdUpdatedOn\\}`, "u"),
+    `${tooltipId} receives the formatted MTD update date`);
+}
+assert.doesNotMatch(homeOverview, /As of \$\{data\.mtdAsOf\}/u,
+  "home Consumption no longer exposes the raw MTD timestamp beside its legend");
 
 assert.match(page, /visibleForecastActualPeriods\(currentData\?\.fullForecastPeriods \?\? \[\], currentData\?\.rows \?\? \[\]\)/u,
   "the visible calendar merges the server fiscal calendar with value-bearing row periods");
