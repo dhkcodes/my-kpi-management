@@ -40,7 +40,7 @@ Typography is unchanged. Existing Redwood/JET colors, disabled states, focus rin
 - Desktop filter layout remains wrapped flex with existing page-specific alignment.
 - Mobile remains the existing page-specific single-column/responsive layout.
 - Control height is `2.15rem`.
-- Analysis, FVA and Records native select text inset is `.65rem`, verified from each control's left border to its rendered text start at desktop and mobile.
+- Analysis native select keeps `.65rem`; FVA and Records use `calc(.65rem + 1px)` to compensate for their different rendered font/glyph bearing. The acceptance criterion is the measured visible text start from the control's left border—not equality of CSS declarations—at desktop and mobile.
 - All three pages' native select arrows use `background-position: right .55rem center` and `padding-inline-end: 1.75rem`.
 - Account search inputs retain their existing appearance and are excluded from select-arrow rules.
 

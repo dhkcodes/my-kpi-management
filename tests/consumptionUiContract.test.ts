@@ -261,8 +261,8 @@ assert.match(styles, /\.kap-page-shell\.consumption-insights-page,\s*\.kap-page-
   "only the three Consumption root containers use the same small radius as their grids");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select\s*\{(?=[^}]*padding-inline-start:\s*\.65rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
   "Analysis keeps its original text inset while adopting the shared right arrow inset");
-assert.match(styles, /\.forecast-actual-toolbar select,\s*\.consumption-range-bar select\s*\{(?=[^}]*padding-inline-start:\s*\.65rem;)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
-  "FVA and Records native selects match the Analysis text start while preserving the shared right arrow inset without touching Account search inputs");
+assert.match(styles, /\.forecast-actual-toolbar select,\s*\.consumption-range-bar select\s*\{(?=[^}]*padding-inline-start:\s*calc\(\.65rem \+ 1px\);)(?=[^}]*padding-inline-end:\s*1\.75rem;)(?=[^}]*background-position:\s*right \.55rem center;)[^}]*\}/s,
+  "FVA and Records native selects offset their different rendered glyph bearing by 1px to match the Analysis visible text start while preserving the shared right arrow inset without touching Account search inputs");
 assert.doesNotMatch(styles, /\.forecast-actual-toolbar input[^}]*background-position|\.consumption-insights-filter input[^}]*background-position/s,
   "Account search inputs are excluded from select-arrow styling");
 assert.match(insightsPage, /const analysis = analysisResponse;/,
