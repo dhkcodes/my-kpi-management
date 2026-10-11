@@ -1,16 +1,18 @@
 import { h } from "preact";
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import "ojs/ojfilmstrip";
 import type { FilmStripElement } from "ojs/ojfilmstrip";
+import Context = require("ojs/ojcontext");
 import type { FiscalYear } from "../../data/kpiMockData";
 
 const yearNumber = (year: FiscalYear) => Number(year.slice(2));
 const fiscalYear = (year: number) => `FY${String((year + 100) % 100).padStart(2, "0")}` as FiscalYear;
 
-export const fiscalYearWindow = (center: FiscalYear): readonly FiscalYear[] => {
-  const value = yearNumber(center);
-  return [fiscalYear(value - 1), center, fiscalYear(value + 1)];
-};
+// FiscalYear is defined by the API as FY plus exactly two digits. Generate that
+// complete namespace once: response renders then preserve every Film Strip item
+// and there are no data-derived or manually chosen past/future boundaries.
+const FISCAL_YEARS = Object.freeze(Array.from({ length: 100 }, (_, year) => fiscalYear(year)));
+const normalizePage = (page: number) => (page + FISCAL_YEARS.length) % FISCAL_YEARS.length;
 
 const displayFiscalYear = (year: FiscalYear) => `FY ${year.slice(2)}`;
 
@@ -27,31 +29,61 @@ export function FiscalYearSelector({ selected, current, onSelect, className = ""
   className?: string;
 }>) {
   const stripRef = useRef<FilmStripElement | null>(null);
-  const navigationLockedRef = useRef(false);
-  const years = useMemo(() => fiscalYearWindow(selected), [selected]);
+  const navigationRunningRef = useRef(false);
+  const pendingOffsetsRef = useRef<Array<-1 | 1>>([]);
+  const lastEmittedRef = useRef<FiscalYear>(selected);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => stripRef.current?.refresh());
-    return () => window.cancelAnimationFrame(frame);
+    lastEmittedRef.current = selected;
   }, [selected]);
 
-  const navigate = async (offset: -1 | 1) => {
-    if (navigationLockedRef.current) return;
-    navigationLockedRef.current = true;
-    const fallback = fiscalYear(yearNumber(selected) + offset);
+  const processPendingNavigation = async () => {
+    if (navigationRunningRef.current) return;
+    navigationRunningRef.current = true;
     try {
-      const model = stripRef.current?.getPagingModel();
-      if (!model) {
-        onSelect(fallback);
-        return;
+      while (pendingOffsetsRef.current.length) {
+        const offset = pendingOffsetsRef.current.shift()!;
+        const model = stripRef.current?.getPagingModel();
+        if (!model) {
+          const fallback = fiscalYear(yearNumber(lastEmittedRef.current) + offset);
+          lastEmittedRef.current = fallback;
+          onSelect(fallback);
+          continue;
+        }
+        try {
+          const currentPage = model.getPage();
+          const targetPage = normalizePage(currentPage + offset);
+          const wrapsNamespace = (offset === -1 && currentPage === 0)
+            || (offset === 1 && currentPage === FISCAL_YEARS.length - 1);
+          await model.setPage(targetPage, wrapsNamespace
+            ? { loopDirection: offset === -1 ? "prev" : "next" }
+            : undefined);
+        } catch {
+          // Keep visible FY, page state, and requested data aligned if JET
+          // rejects navigation. A later user click starts from the unchanged page.
+          pendingOffsetsRef.current.length = 0;
+          return;
+        }
+        // PagingModel.setPage resolves before JET's CSS motion completes. The
+        // Film Strip's public BusyContext resolves from its transition-end path,
+        // so the next queued click starts only after the prior motion is done.
+        try {
+          await Context.getContext(stripRef.current!).getBusyContext().whenReady(2000);
+        } catch {
+          // Never start a second transition when JET did not report readiness.
+          pendingOffsetsRef.current.length = 0;
+          return;
+        }
       }
-      const targetPage = model.getPage() + offset;
-      await model.setPage(targetPage);
-    } catch {
-      onSelect(fallback);
     } finally {
-      window.setTimeout(() => { navigationLockedRef.current = false; }, 80);
+      navigationRunningRef.current = false;
+      if (pendingOffsetsRef.current.length) void processPendingNavigation();
     }
+  };
+
+  const navigate = (offset: -1 | 1) => {
+    pendingOffsetsRef.current.push(offset);
+    void processPendingNavigation();
   };
 
   return <div class={`fiscal-year-selector ${className}`.trim()} data-current-fiscal-year={current}>
@@ -62,14 +94,16 @@ export function FiscalYearSelector({ selected, current, onSelect, className = ""
     </button>
     <div class="fiscal-year-selector__viewport">
       <oj-film-strip ref={stripRef} class="fiscal-year-selector__filmstrip"
-        arrowVisibility="hidden" arrowPlacement="overlay" orientation="horizontal" looping="off"
+        arrowVisibility="hidden" arrowPlacement="overlay" orientation="horizontal" looping="page"
         maxItemsPerPage={1} currentItem={{ id: selected }}
         translations={{ labelAccFilmStrip: "Fiscal year", labelAccArrowPreviousPage: "Previous fiscal year", labelAccArrowNextPage: "Next fiscal year" }}
         oncurrentItemChanged={(event) => {
           const next = event.detail.value.id as FiscalYear | undefined;
-          if (next && next !== selected && years.includes(next)) onSelect(next);
+          if (!next || next === lastEmittedRef.current || !FISCAL_YEARS.includes(next)) return;
+          lastEmittedRef.current = next;
+          onSelect(next);
         }}>
-        {years.map((year) => <div id={year} key={year} class="fiscal-year-selector__item">{displayFiscalYear(year)}</div>)}
+        {FISCAL_YEARS.map((year) => <div id={year} key={year} class="fiscal-year-selector__item">{displayFiscalYear(year)}</div>)}
       </oj-film-strip>
     </div>
     <button type="button" class="fiscal-year-selector__nav is-next"

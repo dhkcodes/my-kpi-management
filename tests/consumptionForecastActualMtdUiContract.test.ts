@@ -103,22 +103,18 @@ assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*to
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 
-assert.match(styles, /\.fiscal-year-selector__trigger:hover,[\s\S]*\.fiscal-year-selector__trigger\[aria-expanded="true"\]\s*\{[^}]*background:\s*#fdf1ef[^}]*color:\s*#182027/u,
-  "opening or selecting the fiscal-year trigger uses the requested light Redwood red treatment");
-assert.match(styles, /\.fiscal-year-selector__trigger:focus-visible[^}]*box-shadow:\s*0 0 0 2px/iu,
-  "the light fiscal-year treatment retains a visible keyboard focus indicator");
-assert.match(styles, /\.fiscal-year-selector__trigger,[\s\S]*\.fiscal-year-selector__nav,[\s\S]*\.fiscal-year-selector__row\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent/iu,
-  "touch interaction cannot leave a browser tap highlight on any fiscal-year control");
-assert.equal((fiscalYearSelector.match(/class="fiscal-year-selector__nav"/gu) ?? []).length, 2,
-  "both fiscal-year range navigation buttons receive the shared light-state class");
-assert.match(styles, /\.fiscal-year-selector__nav:hover,[\s\S]*\.fiscal-year-selector__navigation button:focus-visible\s*\{[^}]*background:\s*#fdf1ef/iu,
-  "fiscal-year navigation controls use light Redwood red hover, press, and keyboard focus states");
-assert.match(styles, /\.fiscal-year-selector__row:hover,[\s\S]*\.fiscal-year-selector__row:active,[\s\S]*\.fiscal-year-selector__row:focus-visible\s*\{[^}]*background:\s*#fdf1ef/iu,
-  "fiscal-year options use light Redwood red hover, press, and keyboard focus states");
-assert.match(styles, /\.fiscal-year-selector__row\.is-selected\s*\{[^}]*background:\s*#f9e6e2[^}]*box-shadow:/iu,
-  "the selected fiscal year uses a distinct light Redwood red surface");
-assert.doesNotMatch(styles, /\.fiscal-year-selector__(?:trigger|nav|row)[^\{]*\{[^}]*background:\s*#(?:006b54|004f3f|0b6b57)/iu,
-  "no fiscal-year interaction state uses the former dark teal background");
+assert.match(styles, /\.fiscal-year-selector\s*\{[^}]*background:\s*#2f2923[^}]*border-radius:\s*999px/iu,
+  "the shared fiscal-year selector retains the approved Bark capsule surface");
+assert.equal((fiscalYearSelector.match(/class="fiscal-year-selector__nav is-(?:previous|next)"/gu) ?? []).length, 2,
+  "both fiscal-year directions retain their shared circular navigation control");
+assert.match(styles, /\.fiscal-year-selector__nav\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent[^}]*height:\s*1\.75rem[^}]*width:\s*1\.75rem/iu,
+  "the resized capsule preserves the 28px navigation button and removes browser tap highlight");
+assert.match(styles, /\.fiscal-year-selector__nav:hover\s*\{[^}]*background:\s*linear-gradient/iu,
+  "the Bark navigation control retains its subtle hover surface");
+assert.match(styles, /\.fiscal-year-selector__nav:active\s*\{[^}]*transform:\s*translateY\(1px\)/iu,
+  "the Bark navigation control retains its pressed response");
+assert.match(styles, /\.fiscal-year-selector__nav:focus-visible\s*\{[^}]*outline:\s*2px solid #f6ead8/iu,
+  "the compact Bark navigation control retains visible Ivory keyboard focus");
 assert.match(styles, /\.forecast-actual-total-strip\s*\{[^}]*display:\s*flex/iu,
   "Total Actual and Forecast remain in the Show MTD toolbar row");
 assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-data-toolbar\s*\{[^}]*align-items:\s*center/iu,

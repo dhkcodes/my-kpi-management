@@ -119,20 +119,20 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
 assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
 
-assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) onFiscalYearChange\(year\); \}\} \/>/u,
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) setFiscalYear\(year\); \}\} \/>/u,
   "Analysis renders the shared fiscal-year picker beside the title");
 assert.match(insightsPage, /const fiscalYearControl = <FiscalYearSelector/u,
-  "Analysis keeps fiscal-year selection in the app-owned picker contract");
+  "Analysis keeps fiscal-year selection in its page-owned picker contract");
 assert.match(insightsPage, /titleControls=\{fiscalYearControl\}/u,
   "Analysis places the FY control beside the page title");
-assert.match(content, /<ConsumptionAnalysisPage fiscalYear=\{fiscalYear\} fiscalYears=\{fiscalYears\}[\s\S]*onFiscalYearChange=\{onFiscalYearChange\}/,
-  "Analysis wires FY selection through the existing route state");
-assert.match(app, /const resetFiscalYearForRoute = \(\) => \{[^}]*getLatestFiscalYear\(\)[^}]*setFiscalYear/u,
-  "route changes reset the page-owned FY selection to the current fiscal year");
-assert.equal((app.match(/resetFiscalYearForRoute\(\);/g) ?? []).length, 4,
-  "normal navigation, active-page re-entry, browser history navigation, and access fallback all reset FY");
-assert.match(app, /if \(!destinationChanged\) \{\s*resetFiscalYearForRoute\(\);\s*onAccepted\?\.\(\);\s*return;/u,
-  "re-entering the active page also resets its fiscal year to the current FY");
+assert.match(insightsPage, /useState<FiscalYear>\(\(\) => getLatestFiscalYear\(\)\)/u,
+  "Analysis initializes its local FY from the KAP service fiscal year");
+assert.match(forecastActualPage, /useState<FiscalYear>\(\(\) => getLatestFiscalYear\(\)\)/u,
+  "FVA independently initializes its local FY from the KAP service fiscal year");
+assert.match(content, /<ConsumptionAnalysisPage breadcrumb=\{pageNavigation\} \/>[\s\S]*<ForecastActualPage breadcrumb=\{pageNavigation\} \/>/u,
+  "route composition does not pass or persist FY state between Analysis and FVA");
+assert.doesNotMatch(content, /<ConsumptionAnalysisPage[^>]*(?:onFiscalYearChange|fiscalYears=|fiscalYear=)|<ForecastActualPage[^>]*(?:onFiscalYearChange|fiscalYears=|fiscalYear=)/u,
+  "FY state is not hoisted from Analysis or FVA into shared route state");
 assert.match(homeConsumption, /createPortal[\s\S]*position:\s*"fixed"[\s\S]*role="tooltip"/u,
   "Home Consumption info tooltips render against the viewport rather than a clipping card ancestor");
 assert.match(homeConsumption, /const tooltip = tooltipRef\.current;[\s\S]*tooltip\.getBoundingClientRect\(\)[\s\S]*window\.innerHeight - rect\.height - margin/u,
@@ -167,8 +167,8 @@ assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[\s\S]
   "the shared tooltip formats one UTC-basis Updated on date from metadata");
 assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
   "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
-assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) onFiscalYearChange\(year\); \}\} \/>/u,
-  "Analysis delegates fiscal-year browsing and selection to the shared picker");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) setFiscalYear\(year\); \}\} \/>/u,
+  "Analysis delegates page-local fiscal-year browsing and selection to the shared picker");
 assert.doesNotMatch(insightsPage, /handleFiscalYearMenuAction|handleFiscalYearMenuKeyDown/u,
   "Analysis no longer maintains the legacy JET fiscal-year menu handlers");
 assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
@@ -426,7 +426,7 @@ assert.match(attainmentPage, /export function AttainmentPage/, "feature code and
 assert.match(navigation, /id: "consumption"[\s\S]*children: consumptionNavItems/, "Consumption is the parent of the approved leaves");
 assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*id: "records"[\s\S]*module: "consumptionRecords"/, "Consumption leaves have independent route modules");
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
-assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage[\s\S]*fiscalYear=\{fiscalYear\}/, "Consumption Analysis receives the selected fiscal year");
+assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage breadcrumb=\{pageNavigation\} \/>/, "Consumption Analysis owns its selected fiscal year locally");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*canWrite=\{canWrite\}/, "Consumption Records renders the preserved editable workspace without global FY coupling");
 assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis and Forecast vs Actual selectors and remains hidden for FY-independent pages");
 
@@ -633,8 +633,8 @@ assert.match(recordsPage, /onojAction=\{\(\) => void exportForecastXlsx\(\)\}/, 
 assert.match(recordsPage, /Import Forecast data from an Excel \(\.xlsx\) file\./, "Forecast Import tooltip describes the Excel-only function instead of presenting the generated template name as the last imported file");
 assert.match(recordsPage, /importMetadata\.forecastSourceFileName \? `\\nLast Import file: \$\{importMetadata\.forecastSourceFileName\}` : ""/,
   "Forecast Import hides a filename line when no source filename exists");
-assert.match(styles, /\.fiscal-year-selector__row:hover,[\s\S]*\.fiscal-year-selector__row:active,[\s\S]*\.fiscal-year-selector__row:focus-visible \{ background: #eef7f4; color: #182027; \}/,
-  "the common fiscal-year option keeps hover, press, and focus states light");
+assert.doesNotMatch(fiscalYearSelector, /fiscal-year-selector__row|aria-expanded=/,
+  "the common fiscal-year control no longer exposes the legacy popup option rows");
 assert.match(recordsPage, /previewConsumptionForecastWide\(file\)[\s\S]*applyConsumptionForecastWide\(pendingForecastImport\.file, pendingForecastImport\.preview\.etag\)/, "Forecast Import enforces Preview then ETag-guarded Apply with the retained file");
 assert.match(recordsPage, /Blank no-op[\s\S]*Explicit zero/, "Forecast preview exposes blank no-op and explicit-zero semantics");
 assert.match(recordsPage, /Exact Plan[\s\S]*Forecast-only \/ Plan unassigned/, "Forecast preview keeps plan assignment semantics without historical replay blocking");
@@ -860,22 +860,16 @@ assert.match(styles, /\.kap-page-shell\.forecast-actual-page \.forecast-actual-s
 assert.match(styles, /\.forecast-actual-month-value\s*\{[^}]*text-align:\s*right/, "month amounts align to the right edge of their cells");
 assert.match(styles, /\.forecast-actual-month-value\.is-status\s*\{[^}]*justify-content:\s*center[^}]*text-align:\s*center/, "status-only cells and badges stay centered independently of amount cells");
 assert.doesNotMatch(insightsPage, /YoY same-period ACTUAL contribution · K USD/, "the Analysis Growth / Reduction label removes only the duplicated K USD suffix");
-assert.match(fiscalYearSelector, /setBrowseCenter\(\(center\) => fiscalYear\(yearNumber\(center\) \+ offset\)\)/,
-  "FY navigation uses a functional state update so rapid taps cannot collapse onto a stale center year");
-assert.match(fiscalYearSelector, /onPointerUp[\s\S]*pointerType === "mouse"[\s\S]*preventDefault/,
-  "FY controls provide an immediate non-mouse pointer path for WebKit touch input");
-assert.match(fiscalYearSelector, /addEventListener\("pointerdown", close, true\)/,
-  "FY outside dismissal observes pointer input in capture phase instead of mouse-only events");
-assert.match(fiscalYearSelector, /event\.key === "Escape"[\s\S]*closeAndRestoreFocus\(\)/,
-  "the FY popup closes with Escape");
-assert.match(fiscalYearSelector, /const closeAndRestoreFocus[\s\S]*triggerRef\.current\?\.focus\(\)/,
-  "closing after a keyboard or selection action restores focus to the FY trigger");
-assert.match(fiscalYearSelector, /querySelector<HTMLButtonElement>\('\[aria-checked="true"\]'\)[\s\S]*focus\(\)/,
-  "opening the FY popup moves focus to the selected year");
-assert.match(fiscalYearSelector, /getBoundingClientRect\(\)/,
-  "the FY popup derives viewport coordinates from its trigger");
-assert.match(styles, /\.fiscal-year-selector__popover\s*\{[^}]*position:\s*fixed/,
-  "the FY popup is viewport-positioned so page overflow cannot clip it");
+assert.match(fiscalYearSelector, /pendingOffsetsRef\.current\.push\(offset\)/,
+  "rapid FY taps are queued instead of collapsing onto a stale selected year");
+assert.match(fiscalYearSelector, /getBusyContext\(\)\.whenReady\(2000\)/,
+  "queued FY taps wait for the current Film Strip animation to settle");
+assert.match(styles, /\.fiscal-year-selector__nav\s*\{[^}]*touch-action:\s*manipulation/iu,
+  "FY controls expose an immediate touch path without browser gesture delay");
+assert.doesNotMatch(fiscalYearSelector, /onPointerUp|addEventListener\("pointerdown"|closeAndRestoreFocus|aria-checked|getBoundingClientRect/,
+  "the Film Strip selector no longer carries the legacy popup pointer, dismissal, focus, or positioning handlers");
+assert.doesNotMatch(styles, /\.fiscal-year-selector__popover\s*\{/u,
+  "the Film Strip selector no longer renders the legacy fixed popup");
 assert.match(forecastActualPage, /<PageDataProgress busy=\{loading\} busyLabel="Loading Forecast vs Actual" \/>/, "Forecast filters reuse the centered page progress bar during background refresh");
 assert.doesNotMatch(forecastActualPage, /<PageDataProgress busy=\{loading && !contentReady\}/, "Forecast background refresh does not suppress the centered progress bar once content is mounted");
 assert.match(apiSource, /confirmedActualAmount: string \| null/, "summary preserves unavailable finalized Actual instead of coercing it to zero");
