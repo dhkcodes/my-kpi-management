@@ -130,7 +130,7 @@ async function verifyMobileLayout(page, routeConfig) {
   assert.equal(layout.documentFits, true, `${routeConfig.name}: mobile document does not overflow`);
   assert.equal(layout.barFits, true, `${routeConfig.name}: mobile Data Control Bar does not overflow`);
   assert.equal(layout.barInsideViewport, true, `${routeConfig.name}: mobile Data Control Bar remains in viewport`);
-  assert.equal(Math.round(layout.reloadHeight), 44, `${routeConfig.name}: mobile Reload remains 44px`);
+  assert.equal(Math.round(layout.reloadHeight), 36, `${routeConfig.name}: mobile Reload restores the original compact 36px height`);
   return layout;
 }
 

@@ -67,9 +67,9 @@ Implementation primitive: `DataControlBar` / `.kap-data-control-bar`.
 
 ### Activity controls
 
-- Last-success timestamp and Reload are separate elements.
+- Last-success timestamp (`HH:mm:ss`) and Reload are separate elements; the full KST timestamp remains in the Reload tooltip.
 - Reload uses `chroming="outlined"`, `oj-button-sm`, refresh icon and visible `Reload` label; measured button height is `36px`.
-- The timestamp must not be embedded in the Reload button.
+- The visible timestamp must not be embedded in the Reload button.
 - Busy state uses the existing JET progress indicator in the same activity region.
 - Completion time changes only after a successful load. A failed operation retains both successful data and timestamp.
 

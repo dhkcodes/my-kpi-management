@@ -551,7 +551,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
       </div>
         <div class="consumption-records-toolbar-activity">
           <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={loading || !!exporting}
-            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} labeledRefreshButton />
+            onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} labeledRefreshButton shortVisibleTimestamp />
         </div>
     </DataControlBar>
     <PageDataProgress busy={loading} busyLabel={refreshStatusLabel} />

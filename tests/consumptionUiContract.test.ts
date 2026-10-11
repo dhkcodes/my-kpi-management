@@ -42,6 +42,8 @@ assert.match(pageShell, /compactTimestampButton\?[\s\S]*formatKstTime[\s\S]*Relo
   "the reusable opt-in compact Refresh control combines JET icon, Reload, separator, and HH:mm:ss");
 assert.match(pageShell, /labeledRefreshButton[\s\S]*oj-button-sm[\s\S]*chroming=\{labeledRefreshButton \? "outlined" : "borderless"\}[\s\S]*\{labeledRefreshButton \? "Reload" : null\}/,
   "the reusable activity control can preserve a labeled compact Reload button while leaving completion time separate");
+assert.match(pageShell, /shortVisibleTimestamp \? formatKstTime\(lastCompletedAt\) : formatKstTimestamp\(lastCompletedAt\)/,
+  "the separate completion timestamp can use HH:mm:ss without losing the full KST tooltip");
 assert.match(doubleActivation, /pointerType !== "touch"[\s\S]*elapsed[\s\S]*distance/, "double-touch activation rejects mouse input, slow taps, and scrolling gestures");
 assert.match(recordsPage, /<PageShell[\s\S]*<PageFilterPanel[\s\S]*className="consumption-range-bar"/, "Records adopts the reusable shell and filter container without changing filter contents");
 assert.match(recordsPage, /doubleActivationRef[\s\S]*onPointerDown[\s\S]*onPointerUp/, "editable Forecast cells support reusable mobile double-touch activation");
@@ -940,7 +942,7 @@ assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecord
   "the authenticated shell opts into the shared viewport layout before the child surface mounts");
 assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
-assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}showBusyLabel=\{false\}[\s\S]{0,80}labeledRefreshButton \/>/,
+assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}showBusyLabel=\{false\}[\s\S]{0,80}labeledRefreshButton shortVisibleTimestamp \/>/,
   "Records keeps the reusable but separate labeled Reload and timestamp controls");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,
   "the legacy Actual CSV export action is hidden without deleting its underlying export function");
@@ -1021,6 +1023,10 @@ assert.match(styles, /--kap-consumption-control-height:\s*2\.15rem/,
   "Consumption compact control height is a reusable 2.15rem token");
 assert.doesNotMatch(styles, /\.consumption-pillar-selector button\s*\{[^}]*2\.25rem/s,
   "Pillar controls no longer retain the old 2.25rem height");
+assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-page \.kap-page-activity__refresh\s*\{[^}]*min-height:\s*2\.75rem/s,
+  "mobile Records does not retain the commonization-era forced 44px Reload height");
+assert.match(styles, /@media \(max-width:\s*760px\)[\s\S]*\.consumption-analysis-toolbar \.consumption-records-toolbar__left\s*\{[^}]*padding-inline-start:\s*0/s,
+  "mobile Analysis removes only the overflowing left inset instead of forcing Data Control Bar wrapping");
 assert.match(styles, /\.kap-page-filter\s*\{[^}]*border-radius:\s*var\(--kpi-panel-radius\)/s,
   "search/filter containers reuse the grid-panel radius token");
 assert.doesNotMatch(styles, /\.kap-data-control-bar\s*\{[^}]*(?:align-items|justify-content|gap|min-height|padding|margin):/s,

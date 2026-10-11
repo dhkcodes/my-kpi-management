@@ -57,6 +57,7 @@ type PageActivityProps = Pick<PageShellProps, "busy" | "busyLabel" | "onRefresh"
   showBusyLabel?: boolean;
   compactTimestampButton?: boolean;
   labeledRefreshButton?: boolean;
+  shortVisibleTimestamp?: boolean;
 };
 
 const padTimestampPart = (value: number) => String(value).padStart(2, "0");
@@ -79,7 +80,8 @@ export function PageActivity({
   lastCompletedAt = null,
   showBusyLabel = true,
   compactTimestampButton = false,
-  labeledRefreshButton = false
+  labeledRefreshButton = false,
+  shortVisibleTimestamp = false
 }: PageActivityProps) {
   const refreshSlotRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -119,7 +121,7 @@ export function PageActivity({
     <div class={`kap-page-activity${busy ? " is-busy" : ""}`} role="status" aria-live="polite">
       <span class="kap-page-activity__loading-group">
         {lastCompletedAt && <time class="kap-page-activity__completed-at" dateTime={lastCompletedAt.toISOString()}>
-          {formatKstTimestamp(lastCompletedAt)}
+          {shortVisibleTimestamp ? formatKstTime(lastCompletedAt) : formatKstTimestamp(lastCompletedAt)}
         </time>}
         <span ref={refreshSlotRef} class="kap-page-activity__control-slot">
           {busy ? (
