@@ -55,6 +55,28 @@ void (async () => {
     "Summary amounts must not append a second K suffix");
   assert.match(styles, /\.consumption-summary__scroll\s*\{[^}]*overflow-x:\s*auto/s,
     "long quarter ranges must scroll inside Summary only");
+  assert.match(page, /const \[summaryExpanded, setSummaryExpanded\] = useState\(false\)/,
+    "Summary must be collapsed on initial page entry");
+  assert.match(page, /aria-expanded=\{expanded\}/,
+    "Summary disclosure must expose its state accessibly");
+  assert.match(page, /summaryModeLabel\(item\?\.mode \?\? "NO_DATA"\)/,
+    "each quarter amount header must identify the active Summary mode");
+  assert.doesNotMatch(page, /consumption-summary__unit|Consumption \(\$K\)/,
+    "the redundant Consumption ($K) label must be removed");
+  assert.doesNotMatch(page, /consumption-summary__mode consumption-summary__mode--/,
+    "mode labels must not be repeated inside amount cells");
+  assert.match(page, /const recordsActivityBusy = rangeLoading \|\| recordsLoading \|\| consumptionSummaryLoading/,
+    "Records progress must remain active until both Records and Summary are settled");
+  assert.match(page, /const visibleTop = Math\.max\(rootRect\.top, tableRect\.top, 0\)/,
+    "Records progress must anchor to the visible Records body rather than the full page");
+  assert.match(page, /const visibleBottom = Math\.min\(rootRect\.bottom, tableRect\.bottom, window\.innerHeight\)/,
+    "Records progress must stay centered in the visible Records body after scroll or resize");
+  assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-summary__table th,[\s\S]*border-right:/,
+    "Summary borders must remain local to Consumption Records");
+  assert.match(styles, /\.consumption-summary__table tbody th:first-child[^}]*font-size:\s*\.9rem/s,
+    "Summary row labels must match Records account-name sizing");
+  assert.match(styles, /\.consumption-summary__amount[^}]*font-size:\s*\.88rem/s,
+    "Summary amounts must match Records numeric sizing");
 
   console.log("consumption summary contract passed");
 })();

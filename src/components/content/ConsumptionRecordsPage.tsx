@@ -464,34 +464,41 @@ const summaryQoq = (quarter: ConsumptionSummary["rows"][number]["quarters"][numb
 };
 const summaryK = (value: string | null): string => value === null ? "N/A" : formatExactKFixed(value, 2);
 
-const ConsumptionSummaryPanel = ({ summary, loading, error }: Readonly<{
-  summary: ConsumptionSummary | null; loading: boolean; error: string;
+const ConsumptionSummaryPanel = ({ summary, loading, error, expanded, onToggle }: Readonly<{
+  summary: ConsumptionSummary | null; loading: boolean; error: string; expanded: boolean; onToggle: () => void;
 }>) => <section className="consumption-summary" aria-labelledby="consumption-summary-title" aria-busy={loading ? "true" : "false"}>
   <div className="consumption-summary__heading">
-    <h3 id="consumption-summary-title">Summary</h3>
-    <span className="consumption-summary__unit">Consumption ($K)</span>
+    <button type="button" className="consumption-summary__toggle" aria-controls="consumption-summary-content"
+      aria-expanded={expanded} onClick={onToggle}>
+      <span id="consumption-summary-title">Summary</span>
+      <span className={`oj-ux-ico-chevron-${expanded ? "up" : "down"}`} aria-hidden="true"></span>
+    </button>
   </div>
-  {summary ? <div className="consumption-summary__scroll" tabIndex={0} aria-label="Summary by fiscal quarter">
-    <table className="consumption-summary__table">
-      <thead><tr><th scope="col">Pillar</th>{summary.displayQuarterOrder.map((quarter) =>
-        <th scope="col" colSpan={2} key={quarter}>{quarter.replace("-", " ")}</th>)}</tr>
-        <tr><th aria-hidden="true"></th>{summary.displayQuarterOrder.flatMap((quarter) => [
-          <th scope="col" key={`${quarter}-consumption`}>Consumption</th>,
-          <th scope="col" key={`${quarter}-qoq`}>QoQ</th>
-        ])}</tr></thead>
-      <tbody>{summary.rows.map((row) => <tr key={row.label}>
-        <th scope="row">{row.label}</th>
-        {row.quarters.flatMap((quarter) => {
-          const qoq = summaryQoq(quarter);
-          return [<td className="consumption-summary__amount" key={`${row.label}-${quarter.quarter}-amount`}>
-            <strong>{summaryK(quarter.totalAmountExact)}</strong>
-            <span className={`consumption-summary__mode consumption-summary__mode--${quarter.mode.toLowerCase().replaceAll("_", "-")}`}>{summaryModeLabel(quarter.mode)}</span>
-            {quarter.mode === "MIXED" && <small>Actual {summaryK(quarter.actualAmountExact)} · Remaining {summaryK(quarter.forecastAmountExact)}</small>}
-          </td>, <td className="consumption-summary__qoq" key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
-        })}
-      </tr>)}</tbody>
-    </table>
-  </div> : <div className="consumption-summary__status" role={error ? "alert" : "status"}>{loading ? "Loading summary…" : error || "Summary data is unavailable."}</div>}
+  {expanded && <div id="consumption-summary-content">
+    {summary ? <div className="consumption-summary__scroll" tabIndex={0} aria-label="Summary by fiscal quarter">
+      <table className="consumption-summary__table">
+        <thead><tr className="consumption-summary__quarter-row"><th scope="col" rowSpan={2}>Pillar</th>{summary.displayQuarterOrder.map((quarter) =>
+          <th scope="colgroup" colSpan={2} key={quarter}>{quarter.replace("-", " ")}</th>)}</tr>
+          <tr className="consumption-summary__metric-row">{summary.displayQuarterOrder.flatMap((quarter) => {
+            const item = summary.rows[0]?.quarters.find((candidate) => candidate.quarter === quarter);
+            return [
+              <th scope="col" className="consumption-summary__amount" key={`${quarter}-consumption`}>{summaryModeLabel(item?.mode ?? "NO_DATA")}</th>,
+              <th scope="col" className="consumption-summary__qoq" key={`${quarter}-qoq`}>QoQ</th>
+            ];
+          })}</tr></thead>
+        <tbody>{summary.rows.map((row) => <tr key={row.label}>
+          <th scope="row">{row.label}</th>
+          {row.quarters.flatMap((quarter) => {
+            const qoq = summaryQoq(quarter);
+            return [<td className={`consumption-summary__amount${quarter.mode === "MIXED" ? " is-mtd-composite" : ""}`} key={`${row.label}-${quarter.quarter}-amount`}>
+              <strong>{summaryK(quarter.totalAmountExact)}</strong>
+              {quarter.mode === "MIXED" && <small><span>Actual {summaryK(quarter.actualAmountExact)}</span><span>Remaining {summaryK(quarter.forecastAmountExact)}</span></small>}
+            </td>, <td className="consumption-summary__qoq" key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
+          })}
+        </tr>)}</tbody>
+      </table>
+    </div> : <div className="consumption-summary__status" role={error ? "alert" : "status"}>{loading ? "Loading summary…" : error || "Summary data is unavailable."}</div>}
+  </div>}
 </section>;
 
 type Props = Readonly<{
@@ -556,6 +563,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const [consumptionSummary, setConsumptionSummary] = useState<ConsumptionSummary | null>(null);
   const [consumptionSummaryLoading, setConsumptionSummaryLoading] = useState(true);
   const [consumptionSummaryError, setConsumptionSummaryError] = useState("");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
@@ -1014,16 +1022,12 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     const rootRect = root.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
     const tableRect = table.getBoundingClientRect();
-    const rootTop = Math.max(0, rootRect.top);
-    const rootBottom = Math.min(window.innerHeight, rootRect.bottom);
-    const centerY = (rootTop + rootBottom) / 2;
-    const tableVisible = rootBottom > rootTop
-      && tableRect.bottom > rootTop
-      && tableRect.top < rootBottom
-      && centerY >= tableRect.top
-      && centerY <= tableRect.bottom;
-    const left = Math.max(rootRect.left, panelRect.left, 0);
-    const right = Math.min(rootRect.right, panelRect.right, window.innerWidth);
+    const visibleTop = Math.max(rootRect.top, tableRect.top, 0);
+    const visibleBottom = Math.min(rootRect.bottom, tableRect.bottom, window.innerHeight);
+    const centerY = visibleTop + Math.max(0, visibleBottom - visibleTop) / 2;
+    const tableVisible = visibleBottom > visibleTop;
+    const left = Math.max(rootRect.left, panelRect.left, tableRect.left, 0);
+    const right = Math.min(rootRect.right, panelRect.right, tableRect.right, window.innerWidth);
     const centerX = left + Math.max(0, right - left) / 2;
 
     controls.dataset.visible = tableVisible ? "true" : "false";
@@ -1108,7 +1112,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       window.removeEventListener("resize", updateTableScrollState);
       window.removeEventListener("scroll", updateTableViewportControls, true);
     };
-  }, [accounts.length, displayQuarterOrder]);
+  }, [accounts.length, displayQuarterOrder, summaryExpanded]);
 
   useEffect(() => {
     if (isSaving) {
@@ -1814,7 +1818,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     || isSaving || isExporting || importPhase !== "idle" || forecastImportPhase !== "idle";
   const exportActionsDisabled = hasDraftChanges || isSaving
     || importPhase === "previewing" || importPhase === "applying" || forecastImportPhase === "applying";
-  const recordsActivityBusy = rangeLoading || recordsLoading;
+  const recordsActivityBusy = rangeLoading || recordsLoading || consumptionSummaryLoading;
   const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
     || importPhase === "previewing" || importPhase === "applying"
     || forecastImportPhase === "previewing" || forecastImportPhase === "applying";
@@ -2163,7 +2167,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             </div>
           )}
         </div>
-        <ConsumptionSummaryPanel summary={consumptionSummary} loading={consumptionSummaryLoading} error={consumptionSummaryError} />
+        <ConsumptionSummaryPanel summary={consumptionSummary} loading={consumptionSummaryLoading} error={consumptionSummaryError}
+          expanded={summaryExpanded} onToggle={() => setSummaryExpanded((current) => !current)} />
         <div id="consumptionTableContent" class="consumption-table-content">
           <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false">
             <PageDataProgress busy={recordsActivityBusy} busyLabel={pageBusyLabel} />
