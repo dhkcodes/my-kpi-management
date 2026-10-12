@@ -32,7 +32,9 @@ assert.match(pageSource, /if \(saving \|\| saveDisabled\) return false;/, "repea
 assert.match(pageSource, /const saveSession = sessionVersion\.current[\s\S]*const saveSessionKey = sessionKeyRef\.current/, "writes must capture the active route and fiscal-year session");
 assert.match(pageSource, /sessionVersion\.current !== saveSession \|\| sessionKeyRef\.current !== saveSessionKey/, "stale save responses must be rejected");
 assert.match(pageSource, /sessionVersion\.current !== deleteSession \|\| sessionKeyRef\.current !== deleteSessionKey/, "stale delete responses must be rejected");
-assert.match(pageSource, /setRows\(\[\]\); setOverviewItems\(\[\]\); setActivitySummary\(null\); setApiMessage\("Loading KPI activities/, "stale fiscal-year rows must be hidden during reload");
+assert.match(pageSource, /if \(fiscalYearChanged\) \{\s*setRows\(\[\]\); setOverviewItems\(\[\]\); setActivitySummary\(null\);/, "stale fiscal-year rows must be hidden during reload");
+assert.doesNotMatch(pageSource, /setApiMessage\([^)]+Loading KPI activities/, "KPI loading must not create a top-right message banner");
+assert.doesNotMatch(pageSource, /<PageActivity busy=\{pageLoading\}/, "Reload areas must not duplicate the central data progress indicator");
 assert.match(pageSource, /disabled=\{saving/, "write controls must be disabled while a mutation is active");
 assert.match(pageSource, /onWriteStateChange\(true\)/, "the app shell must be told when a KPI write starts");
 assert.match(pageSource, /onWriteStateChange\(false\)/, "the app shell must be told when a KPI write settles");

@@ -562,6 +562,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const tableScopeKey = `${fiscalYear}:${activeTab}`;
   const [rows, setRows] = useState<KpiSpreadsheetRow[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
+  const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const [overviewItems, setOverviewItems] = useState<KpiOverviewItem[]>([]);
   const [activitySummary, setActivitySummary] = useState<KpiActivitySummary | null>(null);
   const [selectionByScope, setSelectionByScope] = useState<Record<string, Set<string>>>({});
@@ -579,7 +580,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const endWrite = () => { setSaving(false); onWriteStateChange(false); };
   const savingDialogDesiredRef = useRef(false);
   const savingDialogGenerationRef = useRef(0);
-  const [apiMessage, setApiMessage] = useState("Loading KPI activities…");
+  const [apiMessage, setApiMessage] = useState("");
   const [apiError, setApiError] = useState("");
   const [reloadVersion, setReloadVersion] = useState(0);
   const [selectedQuarter, setSelectedQuarter] = useState<Quarter | null>(null);
@@ -823,13 +824,15 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     let active = true;
     const fiscalYearChanged = loadedFiscalYearRef.current !== fiscalYear;
     setApiError("");
+    setApiMessage("");
     setPageLoading(true);
     if (fiscalYearChanged) {
-      setRows([]); setOverviewItems([]); setActivitySummary(null); setApiMessage("Loading KPI activities…");
+      setRows([]); setOverviewItems([]); setActivitySummary(null);
     }
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
+      setLastDataLoadedAt(new Date());
       setApiMessage(items.length === 0 ? `No KPI activities entered for ${fiscalYear}` : "");
     }).catch((error) => {
       if (!active) return;
@@ -1146,7 +1149,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   };
 
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={getLatestFiscalYear()}
-    disabled={saving || drafts.length > 0}
+    disabled={pageLoading || saving || drafts.length > 0}
     onSelect={(year) => { if (year !== fiscalYear) onFiscalYearChange(year); }} />;
   const guideAction = <oj-button class="oj-button-sm" chroming="outlined" aria-label="Open KPI Guide"
     title="KPI Guide" disabled={guideLoading} onojAction={onOpenGuide}>
@@ -1163,14 +1166,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     onClose={() => setApiMessage("")}
   />;
 
+  const dataReadyForFiscalYear = loadedFiscalYearRef.current === fiscalYear;
+
   return <PageShell className="kpi-spreadsheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
-    breadcrumb={breadcrumb} eyebrow={`KPI Activities / ${activeTab}`}
+    breadcrumb={breadcrumb}
     title={activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}
     titleControls={fiscalYearControl} actions={guideAction} messages={pageMessages}
-    busy={pageLoading || saving} busyLabel={saving ? "Saving KPI activities" : "Loading KPI activities"}
+    busy={pageLoading} busyLabel="Loading KPI activities"
     activityPosition="custom" headingSpacing="compact"
     rootAttributes={{ "data-kpi-tab": activeTab, "data-kpi-edit-phase": editState.phase }}>
-    <PageDataProgress busy={pageLoading || saving} busyLabel={saving ? "Saving KPI activities" : "Loading KPI activities"} />
+    <PageDataProgress busy={pageLoading} busyLabel="Loading KPI activities" />
+    {dataReadyForFiscalYear && <Fragment>
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
 
     {activeTab === "Overview" ? <div class="kpi-overview-scroll-area">
@@ -1218,7 +1224,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
       </section>}
       <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI Performance</h3>
-        <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)} refreshDisabled={saving || drafts.length > 0} labeledRefreshButton />
+        <PageActivity busy={false} busyLabel="" onRefresh={() => setReloadVersion((current) => current + 1)}
+          refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
       </div>
         <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioCode = row.code === "C1" ? "C" : row.code; const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{portfolioCode}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span><span class="kpi-tooltip" role="tooltip">{tooltip}</span></span></td>; })}</tr>; })}</tbody></table></div>
       </section>
@@ -1236,7 +1243,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
-          <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)} refreshDisabled={saving || drafts.length > 0} labeledRefreshButton />
+          <PageActivity busy={false} busyLabel="" onRefresh={() => setReloadVersion((current) => current + 1)}
+          refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
           {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || saving}
             title={!canWrite ? "Write permission is required." : reflectedAction.label} aria-label={reflectedAction.label}
             onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
@@ -1317,6 +1325,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         fiscalYear={fiscalYear} onInput={(key, value) => updateDraft(editorRow, key, value)}
         onWorkload={(option) => selectWorkload(editorRow, option)} onWorkloadReset={() => resetWorkload(editorRow)}
         onFinish={finishEditing} onCancelCell={cancelCurrentCell} onMove={(direction) => moveCell(editorRow.id, editorField.key, direction)} />}
+    </Fragment>}
     </Fragment>}
 
     <oj-dialog ref={savingDialogRef} class="kpi-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">

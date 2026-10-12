@@ -128,6 +128,26 @@ assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*min-width:\s*100%[^}]*width:\s*max-content/, "KPI tables fill the available panel while retaining horizontal overflow on narrow screens");
 assert.match(page, /\}, \[activeTab, fields, pageLoading\]\);/, "column widths are recalculated after the loading view mounts the table host");
 assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== fiscalYear[\s\S]*setPageLoading\(true\)[\s\S]*if \(fiscalYearChanged\)[\s\S]*setRows\(\[\]\)/, "same-FY refresh shows standard progress while keeping mounted rows and dialog host intact");
+assert.match(page, /const dataReadyForFiscalYear = loadedFiscalYearRef\.current === fiscalYear[\s\S]*<PageDataProgress busy=\{pageLoading\}[\s\S]*\{dataReadyForFiscalYear && <Fragment>/,
+  "title and fiscal-year controls render first while the KPI body waits for its matching FY data");
+assert.doesNotMatch(page, /eyebrow=\{`KPI Activities/,
+  "KPI activity titles do not repeat a secondary page label");
+assert.doesNotMatch(page, /setApiMessage\([^)]+Loading KPI activities/,
+  "top-right loading copy is removed in favor of the central progress bar");
+assert.doesNotMatch(page, /<PageActivity busy=\{pageLoading\}/,
+  "Reload areas do not duplicate the central progress bar");
+assert.match(page, /<PageActivity busy=\{false\} busyLabel=""[\s\S]{0,220}refreshDisabled=\{pageLoading \|\| saving \|\| drafts\.length > 0\}/,
+  "Reload keeps the standard button and timestamp while central loading disables duplicate refreshes");
+assert.match(page, /lastCompletedAt=\{lastDataLoadedAt\} compactTimestampButton/,
+  "KPI reload controls use the same compact timestamp treatment as Consumption Analysis");
+assert.match(styles, /\.kap-page-shell\.kpi-spreadsheet-page \.kap-page-shell__masthead \{[^}]*padding-inline:\s*\.5rem/,
+  "KPI headings use the Consumption Analysis inset");
+assert.match(styles, /\.kap-page-shell\.kpi-spreadsheet-page \.kap-page-shell__title-row > h1 \{[^}]*font-size:\s*1\.65rem/,
+  "KPI headings use the Consumption Analysis title size");
+assert.match(styles, /\.kpi-activities-table tbody tr:last-child td \{[^}]*border-bottom:\s*1px solid/,
+  "KPI detail tables retain their final row divider");
+assert.match(styles, /\.kpi-overview-portfolio tbody tr:last-child td \{[^}]*border-bottom:\s*1px solid/,
+  "KPI overview tables retain their final row divider");
 assert.match(page, /const settleDialogClosed = useCallback[\s\S]*await busyContext\.whenReady\(\)[\s\S]*dialog\.close\(\)[\s\S]*await busyContext\.whenReady\(\)/, "all chained KPI dialogs settle their JET BusyContext before another modal or route action starts");
 assert.match(styles, /\.kpi-grid-sort-button\s*\{[^}]*color:\s*var\(--kap-grid-header-ink\)/,
   "KPI header titles use the calm slate token instead of red");
@@ -313,8 +333,8 @@ assert.match(page, /\{!loading && !workloadError && options\.length === 0 && <sp
   "No matching workload is reserved for a successful empty response");
 assert.match(styles, /\.kpi-spreadsheet-page\s*\{[^}]*height:\s*100%[^}]*overflow:\s*hidden/u,
   "every KPI Activity tab reserves the fixed application footer");
-assert.match(styles, /\.kpi-content:has\(\.kpi-spreadsheet-page\)[^{]*\{[^}]*align-content:\s*stretch[^}]*grid-template-rows:\s*max-content max-content minmax\(0,\s*1fr\)/u,
-  "the footer-reserved viewport gives KPI Activities its remaining height");
+assert.match(styles, /\.kpi-content\.is-kap-page-shell-route,[\s\S]{0,120}\.kpi-content:has\(\.kap-page-shell\)\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)[^}]*overflow:\s*hidden/u,
+  "the PageShell route gives KPI Activities the footer-reserved remaining height");
 assert.match(page, /activeTab === "Overview" \? <div class="kpi-overview-scroll-area">/u,
   "KPI Overview owns a dedicated scroll surface inside the fixed-footer workspace");
 assert.match(styles, /\.kpi-overview-scroll-area\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)[^}]*grid-template-rows:\s*max-content repeat\(2,\s*minmax\(0,\s*1fr\)\)[^}]*overflow:\s*hidden/u,

@@ -2271,7 +2271,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-overview-filtered-activities table { border-collapse: collapse; min-width: 68rem; width: 100%; }
 .kpi-overview-filtered-activities th, .kpi-overview-filtered-activities td { border-bottom: 1px solid var(--kpi-border); padding: .65rem; text-align: left; vertical-align: top; }
 .kpi-overview-filtered-activities th { background: var(--kap-grid-header-bg); position: sticky; top: 0; z-index: 1; }
-.kpi-overview-filtered-activities tbody tr:last-child td { border-bottom: 0; }
+.kpi-overview-filtered-activities tbody tr:last-child td { border-bottom: 1px solid var(--kpi-border); }
 .kpi-overview-portfolio { margin-top: 1rem; }
 .kpi-overview-portfolio__heading { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
 .kpi-overview-portfolio__heading h3 { font-size: .95rem; margin: 0 0 .65rem; }
@@ -2279,7 +2279,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-overview-portfolio__table-wrap { border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); overflow-x: auto; }
 .kpi-overview-portfolio table { border-collapse: collapse; min-width: 58rem; width: 100%; }
 .kpi-overview-portfolio th, .kpi-overview-portfolio td { border-bottom: 1px solid var(--kpi-border); padding: .7rem; text-align: left; }
-.kpi-overview-portfolio tbody tr:last-child td { border-bottom: 0; }
+.kpi-overview-portfolio tbody tr:last-child td { border-bottom: 1px solid var(--kpi-border); }
 .kpi-overview-route-link { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-flex; font: inherit; gap: .5rem; padding: 0; text-align: left; }
 .kpi-overview-route-link:hover strong, .kpi-overview-route-link:focus-visible strong { text-decoration: underline; }
 .kpi-overview-status { background: #fff0cc; border-radius: 999px; color: #7b5100; display: inline-block; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; white-space: nowrap; }
@@ -2329,7 +2329,7 @@ h4.weekly-activity-section-label--next-week,
 .kpi-activities-table { border-collapse: collapse; min-width: 100%; table-layout: fixed; width: max-content; }
 .kpi-activities-table th, .kpi-activities-table td { background: var(--kap-grid-cell-bg); border-bottom: 1px solid var(--kap-grid-border); border-right: 1px solid var(--kap-grid-border); box-sizing: border-box; min-height: 3rem; vertical-align: middle; }
 .kpi-activities-table thead th { background: var(--kap-grid-header-bg); position: sticky; top: 0; z-index: 4; }
-.kpi-activities-table tbody tr:last-child td { border-bottom: 0; }
+.kpi-activities-table tbody tr:last-child td { border-bottom: 1px solid var(--kpi-border); }
 .kpi-activities-table tbody tr:hover td { background: var(--kap-grid-hover-bg); }
 .kpi-activities-table tbody tr.kpi-manage-time-reflected-row td, .kpi-activities-table td.kpi-manage-time-reflected-row { background: var(--kap-grid-kpi-reflected-bg); }
 .kpi-activities-table tbody tr.is-selected td, .kpi-activities-table td.is-selected { background: var(--kap-grid-selected-bg); }
@@ -6157,15 +6157,20 @@ h4.weekly-activity-section-label--next-week,
   border-radius: var(--oj-core-border-radius-md, .2rem);
   padding: 0;
 }
-.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__inner { gap: .375rem; }
+.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__inner { gap: .325rem; }
+.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__masthead { padding-inline: .5rem; }
+.kap-page-shell.kpi-spreadsheet-page .kap-page-shell__title-row > h1 { font-size: 1.65rem; line-height: 1.2; }
 .kap-page-shell.kpi-spreadsheet-page .kap-page-shell__body {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-  gap: .375rem;
+  gap: .325rem;
   min-width: 0;
   width: 100%;
 }
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar { margin: 0; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading { margin-bottom: .325rem; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__heading h3 { margin: 0; }
 .kap-page-shell.kpi-spreadsheet-page .kpi-sheet-tabs { flex: 0 0 auto; margin: 0; }
 .kap-page-shell.kpi-spreadsheet-page .kpi-overview-scroll-area { min-height: 0; }
 .kap-page-shell.kpi-spreadsheet-page .kpi-grid-cell { touch-action: pan-x pan-y pinch-zoom; }
