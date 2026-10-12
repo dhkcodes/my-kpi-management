@@ -125,7 +125,7 @@ assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*
   "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
 assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-shell\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
-assert.match(content, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+assert.match(content, /const isKapPageShellRoute = \["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
 
 assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) setFiscalYear\(year\); \}\} \/>/u,
@@ -206,8 +206,8 @@ assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-she
   "Analysis uses the Records six-pixel masthead/filter and filter/toolbar rhythm without negative margins");
 assert.doesNotMatch(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__masthead \+ \.kap-page-filter\s*\{[^}]*margin-top:\s*-/s,
   "Analysis does not hide spacing differences with a negative filter margin");
-assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body\s*\{[^}]*gap:\s*\.325rem;/s,
-  "Analysis matches the Records 5.2-pixel toolbar-to-first-content spacing");
+assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.kap-page-shell__body,\s*\.kap-page-shell\.forecast-actual-page \.kap-page-shell__body\s*\{[^}]*gap:\s*\.375rem;/s,
+  "Analysis uses the six-pixel toolbar-to-first-content spacing");
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*gap:\s*\.2rem[^}]*\}[\s\S]*\.consumption-insights-filter\s*\{[^}]*gap:\s*\.2rem/s,
   "Analysis filter labels use the Records 3.2-pixel label-to-control gap and therefore the same filter height");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter select,[\s\S]*\.kap-page-shell\.consumption-insights-page \.consumption-insights-filter input\s*\{[^}]*font-size:\s*\.72rem;/s,
@@ -242,12 +242,12 @@ assert.match(insightsPage, /finalizedActualExact = subtractExactDecimals\(row\.a
   "FY stacked totals split MTD from Actual and remove Forecast overlap without double counting");
 assert.match(insightsPage, /mtdQuarter = fiscalQuarterForPeriod[\s\S]*finalizedActualExact = subtractExactDecimals\(quarter\.actualAmountExact, mtdAmountExact\)[\s\S]*nonOverlappingForecastExact = subtractExactDecimals\(quarter\.forecastAmountExact, overlapExact\)/,
   "quarter totals use the same non-duplicating MTD split");
-assert.match(insightsPage, /forecastExposureExact = calculateOpenForecastExposureExact\([\s\S]*analysis\.portfolio\.forecastAmountExact,[\s\S]*analysis\.portfolio\.totalAmountExact,[\s\S]*analysis\.mtdSummary\?\.amountExact \?\? "0"[\s\S]*\);/,
-  "Open Forecast exposure uses the executable exact-decimal calculation covered by consumptionData tests");
-assert.match(insightsPage, /<strong>\{forecastExposureExact\}%<\/strong>/,
-  "Open Forecast exposure renders the calculated percentage-point value with one percent sign");
-assert.match(insightsPage, /OPEN_FORECAST_EXPOSURE_TOOLTIP = "The numerator is Open Forecast selected from non-FINAL periods before overlap removal\. The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast\. This is not the chart composition share\."/,
-  "the exposure tooltip distinguishes its raw Forecast numerator and Actual-inclusive denominator from the overlap-adjusted chart composition");
+assert.match(insightsPage, /remainingOpenForecastAmountExact = subtractExactDecimals\(\s*analysis\.portfolio\.forecastAmountExact, analysis\.portfolio\.forecastOverlapAmountExact\)/,
+  "Remaining Open Forecast removes the backend-provided same-grain overlap exactly once");
+assert.match(insightsPage, /<strong>\{formatExactKFixed\(remainingOpenForecastAmountExact\)\}<\/strong>/,
+  "Remaining Open Forecast renders the exact-decimal result without a frontend MTD subtraction");
+assert.match(insightsPage, /<span>FY Forecast <InfoTooltip[^]*<strong>\{forecastComparison \? formatExactKFixed\(forecastComparison\.fiscalYearSummary\.fullPeriodForecastAmount\) : "—"\}<\/strong>[^]*\{fullForecastPeriodLabel\}/,
+  "FY Forecast renders the stored full-period amount and its explicit coverage label");
 assert.match(styles, /\.consumption-info-tooltip:hover \.consumption-info-tooltip__content,[\s\S]*\.consumption-info-tooltip:focus-within \.consumption-info-tooltip__content\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible/,
   "tooltips open only from the dedicated information icon wrapper on hover or keyboard focus");
 assert.doesNotMatch(styles, /\.consumption-info-tooltip__trigger,\s*\.forecast-actual-info-trigger\s*\{[^}]*width:\s*1\.15rem/s,
@@ -491,7 +491,7 @@ assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*i
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage breadcrumb=\{pageNavigation\} \/>/, "Consumption Analysis owns its selected fiscal year locally");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*canWrite=\{canWrite\}/, "Consumption Records renders the preserved editable workspace without global FY coupling");
-assert.match(content, /!\['profile', 'users', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by the compact Analysis and Forecast vs Actual selectors and remains hidden for FY-independent pages");
+assert.match(content, /!\['profile', 'users', 'kpiPage', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by local page controls and remains hidden for FY-independent pages");
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
@@ -616,7 +616,7 @@ assert.match(recordsPage, /type="file"[\s\S]*multiple[\s\S]*handleActualFiles/, 
 assert.match(recordsPage, /Actual Import accepts Excel \(\.xlsx\) files only\. CSV is not supported\./, "Actual Import rejects CSV before upload");
 assert.match(recordsPage, /const files = Array\.from\(input\.files \?\? \[\]\)[\s\S]*files\.length > 8/, "Import retains and validates one to eight selected File objects");
 assert.match(recordsPage, /previewConsumptionImport\(files, "ALL"\)[\s\S]*files, preview/, "multipart preview retains the exact selected File objects and lets filenames own pillar detection");
-assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files, "ALL", pendingImport\.preview\)/, "multipart apply reuses the retained files and validated preview mapping as one cross-pillar atomic set");
+assert.match(recordsPage, /applyConsumptionImport\(pendingImport\.files,\s*"ALL",\s*pendingImport\.preview,\s*diagnosticId\)/, "multipart apply reuses retained files and preview with one diagnostic ID");
 assert.match(recordsPage, /pendingImport\.preview\.files\.map[\s\S]*detectedPillar[\s\S]*owner[\s\S]*fromPeriod[\s\S]*toPeriod[\s\S]*sourceRowCount/, "preview lists pillar, owner, range, and counts per file");
 assert.match(recordsPage, /sameValueDuplicateCount[\s\S]*conflictCount[\s\S]*pendingImport\.preview\.conflicts/, "preview summarizes same-value duplicates and conflicting keys");
 assert.match(recordsPage, /existingSameValueCount[\s\S]*overwriteCount[\s\S]*pendingImport\.preview\.overwrites/, "preview separates existing same-value rows from scoped Actual overwrites");
@@ -629,7 +629,7 @@ assert.match(recordsPage, /Existing Actuals to overwrite[\s\S]*existingValue[\s\
 assert.match(recordsPage, /disabled=\{importPhase === "applying" \|\| !canWrite \|\| pendingImport\.preview\.hasConflicts \|\| isExactReplayPreview\(pendingImport\.preview\)\}/, "applying, write denial, conflicts, and exact replay previews disable atomic Import without blocking metadata-only refresh");
 assert.match(recordsPage, /formatConflictCurrency[\s\S]*#\{conflict\.fileOrdinals\[0\]\}[\s\S]*formatConflictCurrency\(conflict\.values\[0\]\)/, "Hard Conflict rows preserve decimal strings and distinguish equal source filenames by upload ordinal");
 assert.match(apiSource, /overwriteKeys\.size!==overwrites\.length[\s\S]*uploadedNames\.has\(overwrite\.fileName\)[\s\S]*raw\.insertedFactCount\+raw\.unchangedFactCount\+raw\.skippedFactCount\+overwrites\.length!==raw\.physicalFactCount/, "preview decoder rejects duplicate/foreign overwrite rows and inconsistent impact totals");
-assert.match(recordsPage, /Incoming physical facts:[\s\S]*result\.insertedFactCount[\s\S]*result\.overwrittenFactCount[\s\S]*result\.unchangedFactCount[\s\S]*result\.deletedFactCount/, "completion reports transaction-time apply counts rather than stale preview counts");
+assert.match(recordsPage, /Incoming physical facts:[\s\S]*outcome\.receipt\.insertedFactCount[\s\S]*outcome\.receipt\.overwrittenFactCount[\s\S]*outcome\.receipt\.unchangedFactCount[\s\S]*outcome\.receipt\.deletedFactCount/, "completion reports transaction-time apply counts from the verified receipt rather than stale preview counts");
 assert.match(recordsPage, /previewConsumptionImport[\s\S]*applyConsumptionImport/, "Actual file preview and atomic import remain wired");
 assert.match(recordsPage, /renderSalesRepPreview\(pendingImport\.preview\.salesRepChanges/, "Actual preview renders Sales Rep changes before Apply");
 assert.match(recordsPage, /renderSalesRepPreview\(pendingForecastImport\.preview\.salesRepChanges/, "Forecast preview renders Sales Rep changes before Apply");
@@ -671,13 +671,14 @@ assert.match(styles, /@media \(min-width: 1101px\)[\s\S]*composition-grid \{[^}]
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-chart \{[^}]*grid-template-rows: auto minmax\(0, 1fr\)[^}]*height: 18\.5rem[^}]*[\s\S]*data-quarter-count="1"[^}]*height: 13rem[^}]*[\s\S]*data-quarter-count="2"[^}]*height: 14\.5rem[^}]*[\s\S]*data-quarter-count="3"[^}]*height: 16\.5rem/, "mobile Forecast legend precedes a quarter-count-sized plot without the inherited fixed 24rem gap");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-composition-legend \{[^}]*justify-content: flex-start[^}]*padding-top: 0/, "mobile Forecast legend wraps compactly above the plot");
 assert.match(insightsPage, /Forecast signals by quarter/);
-assert.match(insightsPage, /coveredPeriodConsumptionTooltip/);
-assert.match(insightsPage, /MTD adds .* to Actual\. After excluding .* already covered by Forecast, covered-period Expected increases by/);
-assert.match(insightsPage, /account\.coveredExpectedAmountExact/);
+assert.match(insightsPage, /formatForecastCoverage/);
+assert.match(insightsPage, /month\.forecastAmount !== null/);
+assert.match(insightsPage, /remainingOpenForecastAmountExact/);
 assert.doesNotMatch(insightsPage, /<span class=\{statusTone\(plan\.status\)\}>\{plan\.status\}<\/span>/);
 assert.match(consumptionViewportProgress, /ResizeObserver[\s\S]*visualViewport\?\.addEventListener\("resize"[\s\S]*visualViewport\?\.addEventListener\("scroll"/,
   "the Records-compatible progress center follows root resizing and the mobile visual viewport lifecycle");
-assert.match(insightsPage, /The denominator is covered-period total minus provisional MTD: finalized Actual plus non-overlapping Open Forecast/);
+assert.match(insightsPage, /FY Forecast is the stored Forecast for the selected fiscal year, including months that are now closed by FINAL Actual/);
+assert.match(insightsPage, /Remaining Open Forecast starts from Open Forecast[\s\S]*same Account, Pillar, and month overlap once/);
 assert.doesNotMatch(insightsPage, /Renewal/i, "Forecast composition does not invent a Renewal category");
 assert.match(recordsPage, />\s*Forecast Import\s*</, "Forecast import button omits file-format wording");
 assert.match(recordsPage, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/,
@@ -754,7 +755,7 @@ assert.match(recordsPage, /plans: \[\.\.\.page\.plans, \.\.\.nextPage\.plans\][\
   "each successful page is accumulated before the complete result is committed");
 assert.match(recordsPage, /generation !== recordsRequestGeneration\.current/, "new search or sort requests supersede stale multi-page requests");
 assert.match(recordsPage, /if \(!append\) \{\s*recordsQueryRef\.current = \{\s*\.\.\.requestQuery,\s*fromQuarter: page\.fromQuarter,\s*toQuarter: page\.toQuarter,\s*\};\s*setFromQuarter\(page\.fromQuarter\);\s*setToQuarter\(page\.toQuarter\);\s*setRangeInitialized\(true\);\s*setRangeTouched\(false\);\s*\}/, "the applied query commits only after the complete response succeeds and remains current");
-assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase, preserveDrafts\)/, "an existing snapshot ETag mismatch restarts the complete query before snapshots can be mixed");
+assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase, preserveDrafts, diagnosticId\)/, "an existing snapshot ETag mismatch restarts the complete query before snapshots can be mixed");
 assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:\s*"ACCOUNT"[\s\S]*direction:\s*"ASC"/, "records paging uses a stable server order without user-facing sort controls");
 assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{blockingRecordsLoading\}/, "search remains mounted while a complete replacement query loads");
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}[\s\S]*id="consumptionToQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}/, "From and To controls retain their established loading guard");
@@ -775,8 +776,8 @@ assert.match(recordsPage, /consumption-table-panel[\s\S]*consumption-table-conte
 assert.doesNotMatch(recordsPage, /Unable to load Consumption Records/,
   "Records does not duplicate the shared inline load error inside the table panel");
 assert.match(recordsPage, /recordsViewState === "empty" &&[\s\S]*No Consumption Records match the selected range and filters\./, "the empty copy is reachable only from the completed empty state");
-assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*setRecordsQueryError\(contentReady \? "" : message\)/, "replacement queries clear request errors and only replace content when no completed data is available");
-assert.match(recordsPage, /group\.plans\.length > 0[\s\S]*page\.accountForecasts\.some[\s\S]*pageForecastControls\.some/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
+assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*catch \(error\)[\s\S]*setRecordsQueryError\(message\)/, "replacement queries hide stale records and surface the latest request error");
+assert.match(recordsPage, /const accountNames = \[\.\.\.new Set\([\s\S]*workspace\.accountForecasts[\s\S]*forecastControls\.filter[\s\S]*visibleGroups = accountNames\.map/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
 assert.doesNotMatch(recordsPage, /defaultExpandedRecordAccounts/, "initial and appended Account groups are never expanded merely because they have child Plans");
@@ -864,7 +865,7 @@ assert.doesNotMatch(recordsPage, /consumption-range-apply--initializing/, "Recor
 assert.match(styles, /\.consumption-range-apply:hover,\s*\.consumption-range-apply:active,\s*\.consumption-range-apply:focus-visible,\s*\.consumption-range-apply:disabled\s*\{[^}]*background:\s*var\(--kpi-brand\)[^}]*border-color:\s*var\(--kpi-brand\)/, "Apply keeps one brand color through hover, touch, focus, disabled, and completion transitions");
 assert.match(styles, /\.consumption-range-apply:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--oj-core-focus-border-color, #0572ce\)[^}]*outline-offset:\s*2px/, "Apply retains a distinct accessible focus ring without replacing its fill color");
 assert.doesNotMatch(styles, /\.consumption-range-apply[^\n]*#194f63/, "Apply never changes permanently to the legacy teal interaction color");
-assert.match(recordsPage, /if\(viewPillar==="ALL"\)[\s\S]*else\{[\s\S]*setSavedPlans\(\[\]\)[\s\S]*setRecordsTotalAccounts\(0\)[\s\S]*setDataMode\("error"\)/, "a committed import followed by typed refresh failure clears stale rows and marks the view unavailable");
+assert.match(recordsPage, /refresh:async\(\)=>\{[\s\S]*fetchConsumptionWorkspace\(undefined,"ALL"\)[\s\S]*loadRecordsPage\(false,[\s\S]*diagnosticId\)[\s\S]*outcome\.state==="REFRESH_FAILED"[\s\S]*setImportPhase\("warning"\)/, "a committed import followed by refresh failure is reported without retrying Apply");
 assert.match(styles, /\.consumption-load-more[^}]*(?:^|;)\s*height:\s*3\.75rem/m, "Records footer has a fixed placeholder height during replacement loading");
 assert.match(styles, /\.consumption-table-panel\s*\{[^}]*display:\s*flex[^}]*min-height:\s*max\(24rem, calc\(100dvh - 15rem\)\)[\s\S]*\.consumption-load-more[^}]*align-self:\s*end[^}]*height:\s*3\.75rem/, "the Records table card fills the remaining viewport and keeps its 60px footer against the card bottom");
 assert.match(styles, /\.consumption-range-bar\s*\{[^}]*padding:\s*\.5rem \.75rem[^}]*row-gap:\s*\.5rem/, "the compact Records range bar has equal vertical padding and row spacing");
@@ -967,7 +968,7 @@ assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu 
 
 assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the authenticated shell opts into the shared viewport layout before the child surface mounts");
-assert.match(content, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+assert.match(content, /const isKapPageShellRoute = \[[\s\S]*'consumptionRecords'[\s\S]*'consumptionAnalysis'[\s\S]*'forecastActual'[\s\S]*\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
 assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}compactTimestampButton \/>/,
   "Records restores the reusable one-button icon-or-spinner and timestamp control");
@@ -1038,8 +1039,8 @@ assert.match(styles, /\.forecast-actual-search-panel\s*\{[^}]*flex:\s*0 1 18\.75
   "the FVA Account search matches the Analysis desktop width instead of consuming the remaining row");
 assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.forecast-actual-sales-rep,[\s\S]*\.forecast-actual-search-panel\s*\{[^}]*width:\s*100%/s,
   "FVA Sales Rep and Account retain the Analysis full-width mobile rule");
-assert.match(styles, /\.kpi-shell:has\(\.consumption-insights-page\) \.kpi-footer,\s*\.kpi-shell:has\(\.consumption-page\) \.kpi-footer\s*\{[^}]*border-radius:\s*\.2rem/s,
-  "only Consumption routes apply the small grid-level Footer radius");
+assert.match(styles, /\.kpi-shell:has\(\.consumption-insights-page\) \.kpi-footer,\s*\.kpi-shell:has\(\.consumption-page\) \.kpi-footer,\s*\.kpi-shell:has\(\.kpi-spreadsheet-page\) \.kpi-footer\s*\{[^}]*border-radius:\s*\.2rem/s,
+  "Consumption and spreadsheet routes apply the compact Footer radius");
 
 assert.match(forecastActualPage, /<th colSpan=\{3\} class="forecast-actual-total-label is-sticky">Monthly Forecast total<\/th>/,
   "monthly total labels merge Account, Sales Rep, and Q Result into one sticky cell");
@@ -1064,8 +1065,10 @@ assert.match(forecastActualPage, /placement=\{contentReady \? "floating" : "inli
   "Forecast vs Actual classifies no-content failures as inline and preserved-content failures as floating");
 assert.match(recordsPage, /dataMode === "fallback"[\s\S]*placement="inline"[\s\S]*onRetry=\{refreshRecords\}/,
   "Records uses the shared inline JET error banner when backend data is unavailable");
-assert.match(recordsPage, /const contentReady = dataMode === "backend" && lastDataLoadedAt !== null;[\s\S]*setRecordsQueryError\(contentReady \? "" : message\);[\s\S]*setImportError\(contentReady \? message : ""\);/,
-  "Records routes a failed initial or empty-state retry inline, but a refresh failure with completed data only to the floating operation banner");
+assert.doesNotMatch(recordsPage, /const contentReady = dataMode === "backend" && lastDataLoadedAt !== null/,
+  "Records does not retain stale completed content after a replacement-query failure");
+assert.match(recordsPage, /catch \(error\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*setRecordsQueryError\(message\)/,
+  "Records clears replacement rows and exposes the query failure inline");
 assert.doesNotMatch(recordsPage, /setDataMode\("error"\);\s*setImportError/,
   "Records does not duplicate an initial load failure in the floating operation banner");
 assert.match(recordsPage, /if \(dataMode === "backend" && serverActualTotals === null\) pageMessages\.push\(\{ id: "records-total"/,
