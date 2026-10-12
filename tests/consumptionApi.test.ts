@@ -526,6 +526,23 @@ void (async () => {
   assert.equal(mtdComparison.rows[0]?.months[0]?.actualAsOf, "2026-09-10T09:00:00+09:00",
     "MTD parsing preserves the complete import timestamp and offset");
 
+  for (const legacyPayload of [
+    (() => { const { fullForecastPeriods: _omitted, ...rest } = mtdComparisonPayload; return rest; })(),
+    { ...mtdComparisonPayload,
+      fiscalYearSummary: (() => {
+        const { fullPeriodForecastAmount: _omitted, ...rest } = mtdComparisonPayload.fiscalYearSummary;
+        return rest;
+      })() }
+  ]) {
+    runtime.fetch = async () => new Response(JSON.stringify(legacyPayload),
+      { status: 200, headers: { "Content-Type": "application/json" } });
+    await assert.rejects(
+      () => fetchForecastActualComparison({ fiscalYear: "FY27", quarter: "ALL", pillar: "ALL", actualMode: "FINAL" }),
+      /Malformed Forecast vs Actual response/,
+      "legacy responses missing authoritative full-FY Forecast fields must fail explicitly instead of substituting zero or Open Forecast"
+    );
+  }
+
   runtime.fetch = async () => new Response(JSON.stringify({
     forecastSourceFileName: "FY27 Forecast.csv",
     forecastImportedAt: "2026-10-05T13:26:17+09:00",

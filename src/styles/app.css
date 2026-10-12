@@ -6212,7 +6212,6 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar__left { padding-inline-start: .5rem; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-records-toolbar-activity { margin-left: auto; }
 .kap-page-shell.consumption-insights-page .consumption-analysis-toolbar .consumption-mtd-applied-date { font-size: .78rem; font-weight: 600; line-height: 1; }
-.kap-page-shell.consumption-insights-page .kap-page-shell__body { gap: .325rem; }
 .consumption-info-tooltip { display: inline-flex; position: relative; vertical-align: middle; }
 .consumption-insights-legend .consumption-info-tooltip,
 .home-consumption__info-tooltip { align-self: flex-start; margin-left: -.08rem; position: relative; top: -.18rem; vertical-align: super; }
@@ -6267,6 +6266,7 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .consumption-table-scroll { flex: 1 1 auto; min-height: 18rem; }
 .kap-page-shell.consumption-page .consumption-table-scroll { height: auto; overflow-x: auto; overflow-y: visible; }
 .consumption-table-heading { align-items: stretch; flex-direction: column; margin: 0 0 .325rem; }
+.kap-page-shell.consumption-page .consumption-table-heading { margin-bottom: 0; }
 .kap-page-shell.consumption-page .consumption-table-heading__left { padding-left: .5rem; }
 .consumption-records-toolbar { align-items: flex-end; display: flex; gap: 0; justify-content: space-between; margin: 0; min-width: 0; width: 100%; }
 .consumption-records-toolbar__left { align-items: center; border: 0; background: transparent; display: flex; flex-direction: row; gap: .55rem; min-width: 0; padding-inline-start: .5rem; }
@@ -6377,7 +6377,7 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
   .kap-page-shell.consumption-page .consumption-import-actions.is-compact oj-button { min-height: 2.75rem; }
   .kap-page-shell.consumption-page .kap-page-activity__refresh { min-height: 2.75rem; }
 
-  .kap-page-shell.consumption-page .consumption-table-panel { margin-top: .325rem; }
+  .kap-page-shell.consumption-page .consumption-table-panel { margin-top: .375rem; }
   .kap-page-shell.consumption-page .kap-page-activity { justify-content: flex-end; }
   .consumption-records-toolbar { align-items: flex-end; flex-wrap: nowrap; }
   .consumption-records-toolbar__left { flex-wrap: wrap; }
@@ -6407,6 +6407,9 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .kap-page-shell__body,
 .kap-page-shell.forecast-actual-page .kap-page-shell__body {
   gap: .375rem;
+}
+.kap-page-shell.consumption-insights-page .consumption-page-progress-controls[data-visible="false"] {
+  display: none;
 }
 .kap-page-shell.forecast-actual-page .forecast-actual-results {
   gap: .375rem;
@@ -6903,11 +6906,11 @@ oj-menu-button.forecast-actual-fy-button:focus-within {
 @media (max-width: 760px) {
   .kap-page-shell.consumption-page .kap-page-shell__body { gap: .25rem; }
   .kap-page-shell.consumption-page .consumption-quarter-range { gap: .4rem; padding: .5rem .6rem; }
-  .kap-page-shell.consumption-page .consumption-summary { margin: .25rem 0; padding: .4rem .5rem; }
+  .kap-page-shell.consumption-page .consumption-summary { margin: .375rem 0 .25rem; padding: .4rem .5rem; }
   .kap-page-shell.consumption-page .consumption-summary__toggle + * { margin-top: .3rem; }
   .kap-page-shell.consumption-page .consumption-table-panel,
   .kap-page-shell.consumption-page .consumption-table-scroll { min-height: 0; }
-  .kap-page-shell.consumption-page .consumption-table-heading { margin-bottom: .2rem; }
+  .kap-page-shell.consumption-page .consumption-table-heading { margin-bottom: 0; }
   .kap-page-shell.consumption-page .consumption-record-search,
   .kap-page-shell.consumption-insights-page .consumption-insights-filter--account,
   .kap-page-shell.forecast-actual-page .forecast-actual-search-panel {
