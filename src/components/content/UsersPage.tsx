@@ -11,7 +11,7 @@ import {
   cancelUserInvite, deleteUser, disableUser, enableUser, inviteUser, listUsers, lockUser,
   reissueUserInvite, resetUserPassword, unlockUser, updateUserMenuPermissions, type UserActionLink
 } from "../../auth/usersApi";
-import { assignableMenuPermissionIds, menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPermission, type MenuPermissionMap, type UserAccess } from "../../auth/authSession";
+import { assignableMenuPermissionIds, formatLastLoginAtKst, menuPermissionIds, type AuthSession, type MenuPermissionId, type MenuPermission, type MenuPermissionMap, type UserAccess } from "../../auth/authSession";
 
 type DialogState = Readonly<{ kind: "invite" | "reissue" | "reset"; user?: AuthSession }> | null;
 const accessOptions = [{ value: "User", label: "User" }, { value: "Admin", label: "Admin" }];
@@ -176,8 +176,8 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
     <div class="kap-users-header"><div>{breadcrumb}<span class="kpi-eyebrow">Administration</span><h1>Users</h1><p>Manage application access and credential action links.</p></div>
       <oj-button chroming="callToAction" disabled={busy} onojAction={() => openDialog({ kind: "invite" })}>Invite user</oj-button></div>
     {error && <div class="kap-error" role="alert">{error}</div>}
-    <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Menu permissions</th><th>Actions</th></tr></thead>
-      <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Menu permissions">
+    <div class="kap-users-table-wrap"><table class="kap-users-table"><thead><tr><th>Display name</th><th>Login ID</th><th>Access</th><th>Status</th><th>Last login</th><th>Menu permissions</th><th>Actions</th></tr></thead>
+      <tbody>{users.map((user) => <tr key={user.userKey}><td data-label="Display name"><strong>{user.displayName}</strong></td><td data-label="Login ID">{user.loginId}</td><td data-label="Access"><span class="kap-access-badge">{user.access}</span></td><td data-label="Status"><span class={`kap-status kap-status--${user.status.toLowerCase()}`}>{user.status}</span></td><td data-label="Last login" class="kap-last-login">{formatLastLoginAtKst(user.lastLoginAt)}</td><td data-label="Menu permissions">
         {user.access === "Admin" ? <span>Default WRITE</span> : <oj-button chroming="outlined" disabled={busy}
           onojAction={() => openPermissionDialog(user)}>Edit permissions</oj-button>}
       </td><td data-label="Actions"><div class="kap-user-actions">

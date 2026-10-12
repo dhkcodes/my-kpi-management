@@ -32,6 +32,7 @@ export type AuthSession = Readonly<{
   loginId: string;
   access: UserAccess;
   status: UserStatus;
+  lastLoginAt?: string | null;
   menuPermissions: MenuPermissionMap | Readonly<Record<string, never>>;
 }>;
 
@@ -39,6 +40,23 @@ export function getProfileInitials(displayName: string): string {
   const tokens = displayName.trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
   if (tokens.length >= 2) return `${tokens[0][0]}${tokens[1][0]}`.toUpperCase();
   return (tokens[0] ?? "U").slice(0, 2).toUpperCase();
+}
+
+const lastLoginFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23"
+});
+
+export function formatLastLoginAtKst(value: string | null | undefined): string {
+  if (value == null) return "No login record";
+  const parts = Object.fromEntries(lastLoginFormatter.formatToParts(new Date(value)).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 export function parseAuthProfile(value: unknown): AuthSession {
@@ -54,6 +72,14 @@ export function parseAuthProfile(value: unknown): AuthSession {
     !["INVITED", "ACTIVE", "LOCKED", "DISABLED"].includes(String(profile.status))
   ) throw new Error("Invalid authentication response.");
   const access = profile.access as UserAccess;
+  const rawLastLoginAt = profile.lastLoginAt;
+  if (rawLastLoginAt !== undefined && rawLastLoginAt !== null
+      && (typeof rawLastLoginAt !== "string"
+        || !/(?:Z|[+-]\d{2}:\d{2})$/.test(rawLastLoginAt)
+        || Number.isNaN(Date.parse(rawLastLoginAt)))) {
+    throw new Error("Invalid authentication response.");
+  }
+  const lastLoginAt = typeof rawLastLoginAt === "string" ? rawLastLoginAt : null;
   const rawPermissions = profile.menuPermissions;
   let menuPermissions: MenuPermissionMap | Readonly<Record<string, never>> = {};
   if (access === "User") {
@@ -81,6 +107,7 @@ export function parseAuthProfile(value: unknown): AuthSession {
     loginId: profile.loginId.trim(),
     access,
     status: profile.status as UserStatus,
+    ...(rawLastLoginAt === undefined ? {} : { lastLoginAt }),
     menuPermissions
   };
 }

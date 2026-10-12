@@ -45,9 +45,10 @@ assert.match(profile, /Current password[\s\S]*New password[\s\S]*Confirm new pas
 assert.match(profile, /validatePasswordPolicy\(newPassword\)[\s\S]*New passwords do not match/, "dialog validates policy and mismatch before API submission");
 assert.match(profile, /dialogRef\.current\?\.close\(\)/, "successful password change closes the dialog");
 
-assert.match(users, /Display name[\s\S]*Login ID[\s\S]*Access[\s\S]*Status[\s\S]*Menu permissions[\s\S]*Actions/, "user list has the implemented permission and action columns");
+assert.match(users, /Display name[\s\S]*Login ID[\s\S]*Access[\s\S]*Status[\s\S]*Last login[\s\S]*Menu permissions[\s\S]*Actions/, "user list has the implemented permission and action columns");
 const usersHeader = users.match(/<table class="kap-users-table"><thead><tr>([\s\S]*?)<\/tr><\/thead>/)?.[1] ?? "";
-assert.equal((usersHeader.match(/<th>/g) ?? []).length, 6, "user table has exactly six implemented columns");
+assert.equal((usersHeader.match(/<th>/g) ?? []).length, 7, "user table has exactly seven implemented columns");
+assert.match(users, /data-label="Last login"[\s\S]*formatLastLoginAtKst\(user\.lastLoginAt\)/, "desktop and responsive Users rows render the KST last-login value");
 for (const value of ["Admin", "User", "INVITED", "ACTIVE", "LOCKED", "DISABLED"]) assert.match(users, new RegExp(value));
 for (const action of ["Invite user", "Reissue", "Cancel invite", "Reset password", "Lock", "Unlock", "Enable", "Disable"]) assert.match(users, new RegExp(action));
 assert.match(users, /single-use activation URL valid for 7 days/, "invite dialog explains the seven-day activation-link validity");
