@@ -76,6 +76,7 @@ import { ConsumptionMessageBanner } from "./ConsumptionMessageBanner";
 import type { ConsumptionMessage } from "./ConsumptionMessageBanner";
 import { DataControlBar, PageActivity, PageDataProgress, PageFilterPanel, PageShell } from "../common/PageShell";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
+import { createSingleFlightSwapController } from "../../utils/singleFlightSwap";
 import "ojs/ojbutton";
 import "ojs/ojchart";
 import "ojs/ojdialog";
@@ -604,8 +605,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const actualApplyingRef = useRef(false);
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
-  const summaryRequestGeneration = useRef(0);
-  const summaryLoadingRef = useRef(false);
+  const summarySwapRef = useRef(createSingleFlightSwapController<ConsumptionSummary>());
   const recordsQueryActionGeneration = useRef(0);
   const activeRecordsQueryRef = useRef<Readonly<{ key: string; generation: number; search: string }> | null>(null);
   const appliedSearchRef = useRef("");
@@ -678,27 +678,25 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
   const loadConsumptionSummary = async (query: Pick<RecordsQuery, "fromQuarter" | "toQuarter" | "search">,
                                         pillar: ConsumptionPillar, mtd: boolean,
-                                        preserveExisting = false): Promise<boolean> => {
+                                        preserveExisting = false,
+                                        onApplied?: () => void): Promise<boolean> => {
     if (!query.fromQuarter || !query.toQuarter) return false;
-    const generation = ++summaryRequestGeneration.current;
-    summaryLoadingRef.current = true;
     setConsumptionSummaryLoading(true);
     setConsumptionSummaryError("");
     try {
-      const next = await fetchConsumptionSummary({ ...query, pillar, showMtd: mtd });
-      if (summaryRequestGeneration.current !== generation) return false;
-      setConsumptionSummary(next);
-      return true;
+      return await summarySwapRef.current.run(
+        () => fetchConsumptionSummary({ ...query, pillar, showMtd: mtd }),
+        (next) => {
+          setConsumptionSummary(next);
+          onApplied?.();
+        },
+      );
     } catch (error) {
-      if (summaryRequestGeneration.current !== generation) return false;
       if (!preserveExisting) setConsumptionSummary(null);
       setConsumptionSummaryError(error instanceof Error ? error.message : "Summary data is unavailable.");
       throw error;
     } finally {
-      if (summaryRequestGeneration.current === generation) {
-        summaryLoadingRef.current = false;
-        setConsumptionSummaryLoading(false);
-      }
+      if (!summarySwapRef.current.isBusy()) setConsumptionSummaryLoading(false);
     }
   };
 
@@ -1175,7 +1173,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     const clearingSearch = requestQuery.search === ""
       && (appliedSearchRef.current !== "" || Boolean(activeRecordsQueryRef.current?.search));
     if (!isConsumptionQuarterRangeValid(query.fromQuarter, query.toQuarter)
-      || recordsLoadingRef.current || consumptionSummaryLoading
+      || recordsLoadingRef.current || summarySwapRef.current.isBusy()
       || (!clearingSearch && (hasDraftChanges || forecastEditor || searchComposingRef.current))
       || importPhase !== "idle") return;
     const requestKey = JSON.stringify(requestQuery);
@@ -1196,7 +1194,6 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     } catch (error) {
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
       const message = error instanceof Error ? error.message : "Consumption Records could not be loaded.";
-      setConsumptionSummaryLoading(false);
       setConsumptionSummaryError(message);
       setRecordsQueryError(message);
       setDraftSearch(appliedSearchRef.current);
@@ -1233,7 +1230,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   };
 
   const selectQuarterRange = (nextFromQuarter: string, nextToQuarter: string) => {
-    if (recordsLoadingRef.current || consumptionSummaryLoading) return;
+    if (recordsLoadingRef.current || summarySwapRef.current.isBusy()) return;
     setRangeTouched(true);
     setFromQuarter(nextFromQuarter);
     setToQuarter(nextToQuarter);
@@ -2183,12 +2180,10 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
               <ConsumptionMtdControl checked={showMtd} disabled={recordsQueryControlsDisabled || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
                 onToggle={() => {
-                  if (recordsLoadingRef.current || summaryLoadingRef.current) return;
+                  if (recordsLoadingRef.current || summarySwapRef.current.isBusy()) return;
                   const next = !showMtd;
-                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next, true)
-                    .then((applied) => {
-                      if (applied) setShowMtd(next);
-                    })
+                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next, true,
+                    () => setShowMtd(next))
                     .catch(() => {
                       // Keep the last successful mode and rows when the summary refresh fails.
                     });

@@ -70,7 +70,7 @@ void (async () => {
   assert.match(page, /setConsumptionSummaryError\([^;]+;\s*throw error;/,
     "a failed Summary must reject the matching Records replacement before either result is exposed");
   assert.match(page,
-    /onToggle=\{\(\) => \{[\s\S]*loadConsumptionSummary\(recordsQueryRef\.current,[\s\S]*\.catch\(\(\) => \{[\s\S]*Keep the last successful mode/,
+    /onToggle=\{\(\) => \{[\s\S]*loadConsumptionSummary\(recordsQueryRef\.current,[\s\S]*\(\) => setShowMtd\(next\)[\s\S]*\.catch\(\(\) => \{[\s\S]*Keep the last successful mode/,
     "Include MTD must settle a failed Summary request and preserve the last successful mode");
   assert.match(page, /const recordsActivityBusy = rangeLoading \|\| recordsLoading \|\| consumptionSummaryLoading/,
     "Records progress must remain active until both Records and Summary are settled");
