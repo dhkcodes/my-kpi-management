@@ -36,7 +36,7 @@ import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCompositionK } from "../../data/forecastComposition";
 import { validateForecastWorkbookFile } from "../../data/forecastWorkbookValidation";
 import { runConsumptionImportFlow } from "../../data/consumptionImportFlow";
-import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
+import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, formatExactK, formatExactKFixed, subtractExactDecimals } from "../../data/exactDecimal";
 import {
   ActualImportChangeDescription,
   ForecastImportComparison,
@@ -48,6 +48,7 @@ import {
   ConsumptionApiControlTotal,
   ConsumptionApiWorkspace,
   ConsumptionRecordsPage,
+  ConsumptionSummary,
   ConsumptionApiError,
   ConsumptionConflictError,
   ConsumptionImportPreview,
@@ -62,6 +63,7 @@ import {
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionImportMetadata,
   fetchConsumptionRecords,
+  fetchConsumptionSummary,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
   reconcileConsumptionImport,
@@ -448,6 +450,50 @@ const ConsumptionDataCenter = ({ plan, selectedPillar }: Readonly<{ plan: Consum
   </span>;
 };
 
+const summaryModeLabel = (mode: ConsumptionSummary["rows"][number]["quarters"][number]["mode"]): string => ({
+  FINAL_ACTUAL: "Final Actual", FULL_FORECAST: "Forecast", MIXED: "Actual + Remaining Forecast", NO_DATA: "No data"
+})[mode];
+const summaryQoq = (quarter: ConsumptionSummary["rows"][number]["quarters"][number]): { text: string; title: string } => {
+  if (quarter.qoqStatus === "AVAILABLE" && quarter.qoqPercentExact !== null) {
+    const value = quarter.qoqPercentExact;
+    return { text: `${value.startsWith("-") || value === "0.0" ? "" : "+"}${value}%`, title: "Compared with the previous quarter" };
+  }
+  if (quarter.qoqStatus === "ZERO_BASE") return { text: "N/A", title: "Previous quarter total is zero" };
+  if (quarter.qoqStatus === "NO_PREVIOUS_DATA") return { text: "N/A", title: "Previous quarter data is unavailable" };
+  return { text: "N/A", title: "Current quarter data is unavailable" };
+};
+const summaryK = (value: string | null): string => value === null ? "N/A" : formatExactKFixed(value, 2);
+
+const ConsumptionSummaryPanel = ({ summary, loading, error }: Readonly<{
+  summary: ConsumptionSummary | null; loading: boolean; error: string;
+}>) => <section className="consumption-summary" aria-labelledby="consumption-summary-title" aria-busy={loading ? "true" : "false"}>
+  <div className="consumption-summary__heading">
+    <h3 id="consumption-summary-title">Summary</h3>
+    <span className="consumption-summary__unit">Consumption ($K)</span>
+  </div>
+  {summary ? <div className="consumption-summary__scroll" tabIndex={0} aria-label="Summary by fiscal quarter">
+    <table className="consumption-summary__table">
+      <thead><tr><th scope="col">Pillar</th>{summary.displayQuarterOrder.map((quarter) =>
+        <th scope="col" colSpan={2} key={quarter}>{quarter.replace("-", " ")}</th>)}</tr>
+        <tr><th aria-hidden="true"></th>{summary.displayQuarterOrder.flatMap((quarter) => [
+          <th scope="col" key={`${quarter}-consumption`}>Consumption</th>,
+          <th scope="col" key={`${quarter}-qoq`}>QoQ</th>
+        ])}</tr></thead>
+      <tbody>{summary.rows.map((row) => <tr key={row.label}>
+        <th scope="row">{row.label}</th>
+        {row.quarters.flatMap((quarter) => {
+          const qoq = summaryQoq(quarter);
+          return [<td className="consumption-summary__amount" key={`${row.label}-${quarter.quarter}-amount`}>
+            <strong>{summaryK(quarter.totalAmountExact)}</strong>
+            <span className={`consumption-summary__mode consumption-summary__mode--${quarter.mode.toLowerCase().replaceAll("_", "-")}`}>{summaryModeLabel(quarter.mode)}</span>
+            {quarter.mode === "MIXED" && <small>Actual {summaryK(quarter.actualAmountExact)} · Remaining {summaryK(quarter.forecastAmountExact)}</small>}
+          </td>, <td className="consumption-summary__qoq" key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
+        })}
+      </tr>)}</tbody>
+    </table>
+  </div> : <div className="consumption-summary__status" role={error ? "alert" : "status"}>{loading ? "Loading summary…" : error || "Summary data is unavailable."}</div>}
+</section>;
+
 type Props = Readonly<{
   canWrite: boolean;
   canWriteForecast: boolean;
@@ -507,6 +553,9 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const [serverMtdAsOfByPeriod, setServerMtdAsOfByPeriod] = useState<Record<string, string>>({});
   const [serverAccountMtdAsOf, setServerAccountMtdAsOf] = useState<Record<string, Record<string, string>>>({});
   const [showMtd, setShowMtd] = useState(false);
+  const [consumptionSummary, setConsumptionSummary] = useState<ConsumptionSummary | null>(null);
+  const [consumptionSummaryLoading, setConsumptionSummaryLoading] = useState(true);
+  const [consumptionSummaryError, setConsumptionSummaryError] = useState("");
   const [recordsNextOffset, setRecordsNextOffset] = useState(0);
   const [recordsHasMore, setRecordsHasMore] = useState(false);
   const [recordsLoadingPhase, setRecordsLoadingPhase] = useState<RecordsLoadingPhase>("initial");
@@ -545,6 +594,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const actualApplyingRef = useRef(false);
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
+  const summaryRequestGeneration = useRef(0);
   const recordsQueryActionGeneration = useRef(0);
   const activeRecordsQueryRef = useRef<Readonly<{ key: string; generation: number; search: string }> | null>(null);
   const appliedSearchRef = useRef("");
@@ -615,6 +665,25 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     setConflictWorkspace(null);
   };
 
+  const loadConsumptionSummary = async (query: Pick<RecordsQuery, "fromQuarter" | "toQuarter" | "search">,
+                                        pillar: ConsumptionPillar, mtd: boolean): Promise<void> => {
+    if (!query.fromQuarter || !query.toQuarter) return;
+    const generation = ++summaryRequestGeneration.current;
+    setConsumptionSummaryLoading(true);
+    setConsumptionSummaryError("");
+    try {
+      const next = await fetchConsumptionSummary({ ...query, pillar, showMtd: mtd });
+      if (summaryRequestGeneration.current !== generation) return;
+      setConsumptionSummary(next);
+    } catch (error) {
+      if (summaryRequestGeneration.current !== generation) return;
+      setConsumptionSummary(null);
+      setConsumptionSummaryError(error instanceof Error ? error.message : "Summary data is unavailable.");
+    } finally {
+      if (summaryRequestGeneration.current === generation) setConsumptionSummaryLoading(false);
+    }
+  };
+
   const loadRecordsPage = async (
     append: boolean,
     query = { fromQuarter, toQuarter, search: appliedSearch },
@@ -678,6 +747,11 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
         return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts, diagnosticId);
       }
+      if (!append) void loadConsumptionSummary({
+        fromQuarter: page.fromQuarter,
+        toQuarter: page.toQuarter,
+        search: requestQuery.search,
+      }, page.selectedPillar, showMtd);
       const pageForecastControls = accountForecastControls(page);
       const visibleGroups = page.accountGroups.map((group) => ({
         ...group,
@@ -2066,7 +2140,11 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             <div class="consumption-records-toolbar__left">
               <ConsumptionMtdControl checked={showMtd} disabled={dataMode !== "backend" || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
-                onToggle={() => setShowMtd((current) => !current)} tooltipId="records-show-mtd-tooltip" />
+                onToggle={() => setShowMtd((current) => {
+                  const next = !current;
+                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next);
+                  return next;
+                })} tooltipId="records-show-mtd-tooltip" />
               {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
                 <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
               </div>}
@@ -2085,6 +2163,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             </div>
           )}
         </div>
+        <ConsumptionSummaryPanel summary={consumptionSummary} loading={consumptionSummaryLoading} error={consumptionSummaryError} />
         <div id="consumptionTableContent" class="consumption-table-content">
           <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false">
             <PageDataProgress busy={recordsActivityBusy} busyLabel={pageBusyLabel} />

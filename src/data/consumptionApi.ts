@@ -92,6 +92,20 @@ export type ConsumptionRecordsQuery = Readonly<{
   fromQuarter: string; toQuarter: string; search: string; sort: "ACCOUNT" | "AMOUNT";
   direction: "ASC" | "DESC"; offset: number; limit: number; pillar?: ConsumptionPillar;
 }>;
+export type ConsumptionSummaryQuery = Readonly<{
+  fromQuarter: string; toQuarter: string; search: string; pillar: ConsumptionPillar; showMtd: boolean;
+}>;
+export type ConsumptionSummaryQuarter = Readonly<{
+  quarter: string; mode: "FINAL_ACTUAL" | "FULL_FORECAST" | "MIXED" | "NO_DATA";
+  actualAmountExact: string | null; forecastAmountExact: string | null; totalAmountExact: string | null;
+  qoqPercentExact: string | null; qoqStatus: "AVAILABLE" | "NO_DATA" | "NO_PREVIOUS_DATA" | "ZERO_BASE";
+}>;
+export type ConsumptionSummaryRow = Readonly<{
+  label: "Total" | "OCI" | "DP"; pillar: ConsumptionPillar; quarters: readonly ConsumptionSummaryQuarter[];
+}>;
+export type ConsumptionSummary = Readonly<{
+  currentQuarter: string; showMtd: boolean; displayQuarterOrder: readonly string[]; rows: readonly ConsumptionSummaryRow[];
+}>;
 export type ConsumptionRecordsTotals = Readonly<{
   actualByPeriod: Readonly<Record<string, string>>;
   appliedForecastByPeriod: Readonly<Record<string, string>>;
@@ -1046,6 +1060,57 @@ const request = async (path: string, init?: RequestInit,
       typeof error.message === "string" ? error.message : `Consumption API request failed (${response.status})`);
   }
   return { response, payload };
+};
+
+const summaryModes = new Set(["FINAL_ACTUAL", "FULL_FORECAST", "MIXED", "NO_DATA"] as const);
+const summaryQoqStatuses = new Set(["AVAILABLE", "NO_DATA", "NO_PREVIOUS_DATA", "ZERO_BASE"] as const);
+const decodeSummaryQuarter = (value: unknown, expectedQuarter: string): ConsumptionSummaryQuarter => {
+  if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption summary response");
+  const raw = value as Record<string, unknown>;
+  const amount = (candidate: unknown): string | null => {
+    if (candidate === null) return null;
+    if (isDecimalString(candidate)) return candidate;
+    throw new Error("Malformed Consumption summary response");
+  };
+  if (raw.quarter !== expectedQuarter || !summaryModes.has(raw.mode as never)
+    || !summaryQoqStatuses.has(raw.qoqStatus as never)) throw new Error("Malformed Consumption summary response");
+  const result: ConsumptionSummaryQuarter = {
+    quarter: expectedQuarter, mode: raw.mode as ConsumptionSummaryQuarter["mode"],
+    actualAmountExact: amount(raw.actualAmount), forecastAmountExact: amount(raw.forecastAmount),
+    totalAmountExact: amount(raw.totalAmount), qoqPercentExact: amount(raw.qoqPercent),
+    qoqStatus: raw.qoqStatus as ConsumptionSummaryQuarter["qoqStatus"]
+  };
+  if ((result.qoqStatus === "AVAILABLE") !== (result.qoqPercentExact !== null)) throw new Error("Malformed Consumption summary response");
+  return result;
+};
+
+export const fetchConsumptionSummary = async (query: ConsumptionSummaryQuery): Promise<ConsumptionSummary> => {
+  const parameters = new URLSearchParams({
+    fromQuarter: query.fromQuarter, toQuarter: query.toQuarter, search: query.search,
+    pillar: query.pillar, showMtd: String(query.showMtd)
+  });
+  const { payload } = await request(`/consumption/records/summary?${parameters}`, undefined, query.pillar, true,
+    ["actualAmount", "forecastAmount", "totalAmount", "qoqPercent"]);
+  if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption summary response");
+  const raw = payload as Record<string, unknown>;
+  if (!fiscalQuarterPattern.test(String(raw.currentQuarter)) || typeof raw.showMtd !== "boolean"
+    || !Array.isArray(raw.displayQuarterOrder) || !Array.isArray(raw.rows)) throw new Error("Malformed Consumption summary response");
+  const order = raw.displayQuarterOrder as unknown[];
+  if (order.some((value) => typeof value !== "string" || !fiscalQuarterPattern.test(value))
+    || new Set(order).size !== order.length) throw new Error("Malformed Consumption summary response");
+  const quarters = order as string[];
+  const labelPillars = { Total: "ALL", OCI: "OCI", DP: "DP" } as const;
+  const rows = raw.rows.map((value): ConsumptionSummaryRow => {
+    if (typeof value !== "object" || value === null) throw new Error("Malformed Consumption summary response");
+    const row = value as Record<string, unknown>;
+    if (typeof row.label !== "string" || !(row.label in labelPillars)
+      || row.pillar !== labelPillars[row.label as keyof typeof labelPillars]
+      || !Array.isArray(row.quarters) || row.quarters.length !== quarters.length) throw new Error("Malformed Consumption summary response");
+    return { label: row.label as ConsumptionSummaryRow["label"], pillar: row.pillar as ConsumptionPillar,
+      quarters: row.quarters.map((quarter, index) => decodeSummaryQuarter(quarter, quarters[index])) };
+  });
+  if (new Set(rows.map((row) => row.label)).size !== rows.length) throw new Error("Malformed Consumption summary response");
+  return { currentQuarter: raw.currentQuarter as string, showMtd: raw.showMtd, displayQuarterOrder: quarters, rows };
 };
 
 export const fetchConsumptionWorkspace = async (range?: ConsumptionWorkspaceRange, pillar?: ConsumptionPillar): Promise<ConsumptionApiWorkspace> => {
