@@ -50,6 +50,7 @@ const usersHeader = users.match(/<table class="kap-users-table"><thead><tr>([\s\
 assert.equal((usersHeader.match(/<th>/g) ?? []).length, 6, "user table has exactly six implemented columns");
 for (const value of ["Admin", "User", "INVITED", "ACTIVE", "LOCKED", "DISABLED"]) assert.match(users, new RegExp(value));
 for (const action of ["Invite user", "Reissue", "Cancel invite", "Reset password", "Lock", "Unlock", "Enable", "Disable"]) assert.match(users, new RegExp(action));
+assert.match(users, /single-use activation URL valid for 7 days/, "invite dialog explains the seven-day activation-link validity");
 assert.match(users, /disabled=\{busy \|\| user\.access === "Admin"\}[\s\S]*Lock/, "Admin Lock remains visible but disabled");
 assert.match(users, /disabled=\{busy \|\| user\.access === "Admin"\}[\s\S]*Disable/, "Admin Disable remains visible but disabled");
 assert.doesNotMatch(users, /user\.status === "DISABLED"[\s\S]{0,300}>Disable</, "Disabled rows do not render contradictory Disable actions");

@@ -206,9 +206,9 @@ export function UsersPage({ currentUserKey, breadcrumb }: Readonly<{ currentUser
             <label class="kap-field"><span>Display name</span><oj-input-text ref={displayNameInputRef} value={displayName} required onvalueChanged={(event: InputTextElement.valueChanged) => setDisplayName(String(event.detail.value ?? ""))}></oj-input-text></label>
             <label class="kap-field"><span>Login ID</span><oj-input-text ref={loginIdInputRef} value={loginId} required onvalueChanged={(event: InputTextElement.valueChanged) => setLoginId(String(event.detail.value ?? ""))}></oj-input-text></label>
             <label class="kap-field"><span>Access</span><oj-select-single ref={accessInputRef} data={accessProvider} value={access} onvalueChanged={(event: CustomEvent<{ value: UserAccess | null }>) => setAccess(event.detail.value ?? "User")}></oj-select-single></label>
-            <p class="kap-field__hint">Submitting creates an activation URL. It does not send email.</p>
+            <p class="kap-field__hint">Submitting creates a single-use activation URL valid for 7 days. It does not send email.</p>
           </> : <p>{dialog?.kind === "reissue"
-            ? `Create a new activation link for ${dialog.user?.loginId}? Any previous activation link will stop working.`
+            ? `Create a new activation link for ${dialog.user?.loginId}? It will be valid for 7 days, and any previous activation link will stop working.`
             : `Create a one-time password reset link for ${dialog?.user?.loginId}? The current password remains valid until the link is used.`}</p>}
         </>}
         {dialogError && <div class="kap-error" role="alert">{dialogError}</div>}
