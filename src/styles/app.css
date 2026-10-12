@@ -6408,11 +6408,21 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.forecast-actual-page .kap-page-shell__body {
   gap: .375rem;
 }
+.kap-page-shell.consumption-insights-page .consumption-page-progress-controls {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 48;
+}
+.kap-page-shell.consumption-insights-page .consumption-page-progress-controls .kap-page-data-progress {
+  left: var(--consumption-viewport-center-x, 50%);
+  top: var(--consumption-viewport-center-y, 50%);
+}
 .kap-page-shell.consumption-insights-page .consumption-page-progress-controls[data-visible="false"] {
   display: none;
 }
 .kap-page-shell.consumption-insights-page .consumption-page-progress-controls[data-visible="true"] {
-  display: contents;
+  display: block;
 }
 .kap-page-shell.forecast-actual-page .forecast-actual-results {
   gap: .375rem;
@@ -6935,8 +6945,8 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
   line-height: .60rem;
   width: .60rem;
 }
-.consumption-mtd-control > .consumption-info-tooltip,
-.consumption-info-tooltip { margin-top: .10rem; }
+.kap-page-shell.consumption-insights-page .consumption-info-tooltip { vertical-align: super; }
+.consumption-mtd-control > .consumption-info-tooltip { margin-top: .10rem; vertical-align: middle; }
 
 /* Filter refreshes keep the existing result surface mounted and compact. */
 .kap-page-shell.forecast-actual-page .kap-page-shell__body,

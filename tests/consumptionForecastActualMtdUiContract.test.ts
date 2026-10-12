@@ -24,7 +24,8 @@ assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\
 assert.match(page, /mtdAppliedDate=\{mtdAppliedTimestamp\}/u);
 assert.match(page, /actualMode === "FINAL"[^]*actualMode: "MTD"[^]*setMtdAppliedTimestamp/u,
   "the tooltip fetches and retains the real MTD timestamp while Show MTD is off");
-assert.match(page, /onToggle=\{\(\) => \{ setResultFilter\(null\); setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\); \}\}/u);
+assert.match(page, /onToggle=\{\(\) => runQueryControlAction\(\(\) => \{ setResultFilter\(null\); setActualMode\(\(current\) => current === "MTD" \? "FINAL" : "MTD"\); \}\)\}/u,
+  "Include MTD preserves the existing toggle behavior behind the synchronous query lock");
 assert.match(page, /consumption-pillar-selector[^]*aria-pressed/u, "Pillar uses the same button selector as Consumption Analysis");
 assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[^]*Updated on \{updatedOn\}/u,
   "the shared MTD tooltip derives its Updated on date from the real period metadata");
@@ -112,8 +113,8 @@ assert.match(styles, /\.forecast-actual-matrix \.is-rep[^}]*min-width:\s*var\(--
   "the compact Sales Rep width is applied to the matrix cells");
 assert.match(styles, /\.forecast-actual-matrix \.forecast-actual-period-group[^}]*var\(--forecast-month-width\)[^}]*var\(--forecast-status-width\)/u,
   "period groups consume all compacted leaf-column widths");
-assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*tooltipId="forecast-show-mtd-tooltip"/u,
-  "Forecast vs Actual wires the shared Show MTD control into its data toolbar");
+assert.match(page, /forecast-actual-data-toolbar[^]*<ConsumptionMtdControl[^]*tooltipId="forecast-include-mtd-tooltip"/u,
+  "Forecast vs Actual wires the shared Include MTD control into its data toolbar");
 assert.match(styles, /\.forecast-actual-matrix \.is-quarter-result[^}]*left:\s*17\.5rem/u,
   "Q2 Result starts immediately after the compact Account and Sales Rep sticky widths");
 

@@ -676,7 +676,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   };
 
   const loadConsumptionSummary = async (query: Pick<RecordsQuery, "fromQuarter" | "toQuarter" | "search">,
-                                        pillar: ConsumptionPillar, mtd: boolean): Promise<void> => {
+                                        pillar: ConsumptionPillar, mtd: boolean,
+                                        preserveExisting = false): Promise<void> => {
     if (!query.fromQuarter || !query.toQuarter) return;
     const generation = ++summaryRequestGeneration.current;
     setConsumptionSummaryLoading(true);
@@ -687,7 +688,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       setConsumptionSummary(next);
     } catch (error) {
       if (summaryRequestGeneration.current !== generation) return;
-      setConsumptionSummary(null);
+      if (!preserveExisting) setConsumptionSummary(null);
       setConsumptionSummaryError(error instanceof Error ? error.message : "Summary data is unavailable.");
       throw error;
     } finally {
@@ -763,7 +764,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
           fromQuarter: page.fromQuarter,
           toQuarter: page.toQuarter,
           search: requestQuery.search,
-        }, page.selectedPillar, showMtd);
+        }, page.selectedPillar, showMtd, loadingPhase !== "initial");
         if (generation !== recordsRequestGeneration.current) return;
       }
       const pageForecastControls = accountForecastControls(page);
@@ -955,8 +956,9 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     }));
   }, [visiblePlans, recordAccountNames, draftControlTotals, serverAccountActualTotals]);
   const renderedRecordAccounts = accounts;
+  const recordsQueryDisplayError = renderedRecordAccounts.length === 0 ? recordsQueryError : "";
   const recordsViewState = resolveConsumptionRecordsViewState(
-    recordsReplacementLoading, dataMode, recordsQueryError, renderedRecordAccounts.length);
+    recordsReplacementLoading, dataMode, recordsQueryDisplayError, renderedRecordAccounts.length);
   const sortedMtdPeriods = Object.keys(serverMtdTotals).sort();
   const currentMtdPeriod = Object.keys(serverMtdStatuses).find((period) => serverMtdStatuses[period] === "PROVISIONAL")
     ?? sortedMtdPeriods[sortedMtdPeriods.length - 1] ?? "";
@@ -1167,31 +1169,16 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     const clearingSearch = requestQuery.search === ""
       && (appliedSearchRef.current !== "" || Boolean(activeRecordsQueryRef.current?.search));
     if (!isConsumptionQuarterRangeValid(query.fromQuarter, query.toQuarter)
-      || blockingRecordsLoading || (!clearingSearch && (hasDraftChanges || forecastEditor || searchComposingRef.current))
+      || recordsLoadingRef.current || consumptionSummaryLoading
+      || (!clearingSearch && (hasDraftChanges || forecastEditor || searchComposingRef.current))
       || importPhase !== "idle") return;
     const requestKey = JSON.stringify(requestQuery);
     if (activeRecordsQueryRef.current?.key === requestKey) return;
     const actionGeneration = ++recordsQueryActionGeneration.current;
     activeRecordsQueryRef.current = { key: requestKey, generation: actionGeneration, search: requestQuery.search };
-    recordsQueryRef.current = requestQuery;
-    appliedSearchRef.current = requestQuery.search;
-    setAppliedSearch(requestQuery.search);
-    setSelectedPillar(pillar);
     setRecordsQueryError("");
     setRangeLoading(true);
-    setConsumptionSummary(null);
-    setConsumptionSummaryLoading(true);
     setConsumptionSummaryError("");
-    setRecordAccountNames([]);
-    setSavedPlans([]);
-    setDraftPlans([]);
-    setSavedControlTotals([]);
-    setDraftControlTotals([]);
-    setForecastVariances([]);
-    setAccountForecasts([]);
-    setRecordsTotalAccounts(0);
-    setRecordsNextOffset(0);
-    setRecordsHasMore(false);
     setImportError("");
     try {
       await loadRecordsPage(false, requestQuery, pillar, "query", clearingSearch);
@@ -1203,20 +1190,12 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     } catch (error) {
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
       const message = error instanceof Error ? error.message : "Consumption Records could not be loaded.";
-      setRecordAccountNames([]);
-      setSavedPlans([]);
-      setDraftPlans([]);
-      setSavedControlTotals([]);
-      setDraftControlTotals([]);
-      setForecastVariances([]);
-      setAccountForecasts([]);
-      setRecordsTotalAccounts(0);
-      setRecordsNextOffset(0);
-      setRecordsHasMore(false);
-      setConsumptionSummary(null);
       setConsumptionSummaryLoading(false);
       setConsumptionSummaryError(message);
       setRecordsQueryError(message);
+      setDraftSearch(appliedSearchRef.current);
+      setFromQuarter(recordsQueryRef.current.fromQuarter);
+      setToQuarter(recordsQueryRef.current.toQuarter);
       setImportError("");
     } finally {
       if (activeRecordsQueryRef.current?.generation === actionGeneration) activeRecordsQueryRef.current = null;
@@ -1248,6 +1227,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   };
 
   const selectQuarterRange = (nextFromQuarter: string, nextToQuarter: string) => {
+    if (recordsLoadingRef.current || consumptionSummaryLoading) return;
     setRangeTouched(true);
     setFromQuarter(nextFromQuarter);
     setToQuarter(nextToQuarter);
@@ -1851,11 +1831,14 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   if (staleMtdPeriods.length > 0) pageMessages.push({ id: "records-stale-mtd", severity: "warning", summary: "Final upload required", detail: `${staleMtdPeriods.join(", ")} still has stale MTD data. Upload the final Actual before relying on that period.`, persistence: "sticky" });
 
   const visiblePageMessages = pageMessages.filter((message) => !dismissedMessageIds.has(message.id));
-  const recordsLoadMessages: ConsumptionMessage[] = dataMode === "fallback" || recordsViewState === "error" ? [{
+  const recordsLoadMessages: ConsumptionMessage[] = dataMode === "fallback" || recordsViewState === "error" || Boolean(recordsQueryError) ? [{
     id: "records-load",
     severity: "error",
     summary: "Consumption Records 운영 데이터를 표시할 수 없습니다.",
-    detail: dataMode === "fallback" ? "예시 데이터는 실제 업무에 사용하지 마세요. Retry를 선택해 다시 시도해 주세요." : "요청한 조건의 데이터를 불러오지 못했습니다. Retry를 선택해 다시 시도해 주세요.",
+    detail: dataMode === "fallback" ? "예시 데이터는 실제 업무에 사용하지 마세요. Retry를 선택해 다시 시도해 주세요."
+      : recordsQueryError && renderedRecordAccounts.length > 0
+        ? `새 조건을 불러오지 못해 마지막 정상 데이터를 유지했습니다. ${recordsQueryError}`
+        : "요청한 조건의 데이터를 불러오지 못했습니다. Retry를 선택해 다시 시도해 주세요.",
     persistence: "sticky"
   }] : [];
   const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting
@@ -1865,6 +1848,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const exportActionsDisabled = hasDraftChanges || isSaving
     || importPhase === "previewing" || importPhase === "applying" || forecastImportPhase === "applying";
   const recordsActivityBusy = rangeLoading || recordsLoading || consumptionSummaryLoading;
+  const recordsQueryControlsDisabled = recordsActivityBusy || hasDraftChanges || !!forecastEditor
+    || isSaving || importPhase !== "idle" || dataMode !== "backend";
   const pageBusy = dataMode === "loading" || rangeLoading || recordsLoading || isSaving || isExporting
     || importPhase === "previewing" || importPhase === "applying"
     || forecastImportPhase === "previewing" || forecastImportPhase === "applying";
@@ -1932,26 +1917,27 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Records pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button"
               aria-pressed={selectedPillar === option.value}
-              disabled={hasDraftChanges || !!forecastEditor || isSaving || blockingRecordsLoading || rangeLoading || importPhase !== "idle"}
+              disabled={recordsQueryControlsDisabled}
               onClick={() => void selectPillar(option.value)}>{option.label}</button>)}
           </div>
         </div>
         <label htmlFor="consumptionFromQuarter">From Quarter
-          <select id="consumptionFromQuarter" value={fromQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => selectQuarterRange((event.currentTarget as HTMLSelectElement).value, toQuarter)}>
+          <select id="consumptionFromQuarter" value={fromQuarter} disabled={recordsQueryControlsDisabled} onChange={(event) => selectQuarterRange((event.currentTarget as HTMLSelectElement).value, toQuarter)}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label htmlFor="consumptionToQuarter">To Quarter
-          <select id="consumptionToQuarter" value={toQuarter} disabled={rangeLoading || blockingRecordsLoading || hasDraftChanges} onChange={(event) => selectQuarterRange(fromQuarter, (event.currentTarget as HTMLSelectElement).value)}>
+          <select id="consumptionToQuarter" value={toQuarter} disabled={recordsQueryControlsDisabled} onChange={(event) => selectQuarterRange(fromQuarter, (event.currentTarget as HTMLSelectElement).value)}>
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
         <label class="consumption-record-search" htmlFor="consumptionRecordSearch">Search
           <input id="consumptionRecordSearch" type="search" value={draftSearch} placeholder="Account, workload, end user, or Plan"
-            disabled={blockingRecordsLoading}
+            disabled={recordsQueryControlsDisabled}
             onCompositionStart={() => { searchComposingRef.current = true; setSearchComposing(true); }}
             onCompositionEnd={(event) => { searchComposingRef.current = false; setDraftSearch(event.currentTarget.value); setSearchComposing(false); }}
             onInput={(event) => {
+              if (recordsActivityBusy) return;
               const value = event.currentTarget.value;
               setDraftSearch(value);
               if (!value && (appliedSearchRef.current || activeRecordsQueryRef.current?.search))
@@ -1959,7 +1945,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             }}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposingRef.current) { event.preventDefault(); void submitRecordsQuery(); } }} />
           <button type="button" class="consumption-record-search__submit" aria-label="Apply filters and search" title="Apply filters and search"
-            disabled={!isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || rangeLoading || blockingRecordsLoading || hasDraftChanges || !!forecastEditor || searchComposing || dataMode !== "backend"}
+            disabled={recordsQueryControlsDisabled || !isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || searchComposing}
             onClick={() => void submitRecordsQuery()}>
             <span class="oj-ux-ico-search" aria-hidden="true" />
           </button>
@@ -2188,13 +2174,16 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         <div class="consumption-section-heading consumption-table-heading">
           <DataControlBar className="consumption-records-toolbar" ariaLabel="Consumption Records data controls">
             <div class="consumption-records-toolbar__left">
-              <ConsumptionMtdControl checked={showMtd} disabled={dataMode !== "backend" || !currentMtdPeriod}
+              <ConsumptionMtdControl checked={showMtd} disabled={recordsQueryControlsDisabled || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
-                onToggle={() => setShowMtd((current) => {
+                onToggle={() => {
+                  if (recordsActivityBusy) return;
+                  setShowMtd((current) => {
                   const next = !current;
-                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next).catch(() => undefined);
+                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next, true).catch(() => undefined);
                   return next;
-                })} tooltipId="records-show-mtd-tooltip" />
+                  });
+                }} tooltipId="records-include-mtd-tooltip" />
               {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
                 <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
               </div>}

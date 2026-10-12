@@ -37,11 +37,11 @@ assert.match(styles,
   /\.kap-page-shell\.consumption-insights-page \.consumption-page-progress-controls\[data-visible="false"\]\s*\{[^}]*display:\s*none/s,
   "Only the hidden progress host may be removed from flow; the visible loading indicator keeps its existing placement");
 assert.match(styles,
-  /\.kap-page-shell\.consumption-insights-page \.consumption-page-progress-controls\[data-visible="true"\]\s*\{[^}]*display:\s*contents/s,
-  "The visible Analysis and Forecast vs Actual progress host must not add a second six-pixel layout gap");
-assert.doesNotMatch(styles,
-  /\.kap-page-shell\.consumption-insights-page \.consumption-page-progress-controls[^}]*position:\s*fixed/s,
-  "Analysis and Forecast vs Actual loading placement must not be converted to a fixed overlay");
+  /\.kap-page-shell\.consumption-insights-page \.consumption-page-progress-controls\s*\{[^}]*position:\s*fixed[^}]*z-index:\s*48/s,
+  "Analysis and Forecast vs Actual progress must remain viewport-fixed above sticky table headers");
+assert.match(styles,
+  /\.kap-page-shell\.consumption-insights-page \.consumption-page-progress-controls\[data-visible="true"\]\s*\{[^}]*display:\s*block/s,
+  "The visible fixed progress host must not participate in the page layout rhythm");
 
 assert.match(analysis,
   /fetchForecastActualComparison\(\{[\s\S]*?quarter:\s*"ALL"[\s\S]*?actualMode:\s*"FINAL"[\s\S]*?\}\)/,

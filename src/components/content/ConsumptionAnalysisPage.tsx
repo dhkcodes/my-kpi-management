@@ -79,9 +79,9 @@ const FORECAST_COLOR = "#78abc4";
 const MTD_COLOR = "#b56a3b";
 const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
 
-const ACTUAL_TO_DATE_TOOLTIP = "Actual to date uses FINAL Actual, with closed-period MTD fallback only when FINAL is unavailable. Show MTD adds the current-period MTD once.";
-const FY_FORECAST_TOOLTIP = "FY Forecast is the stored Forecast for the selected fiscal year, including months that are now closed by FINAL Actual. Show MTD does not change this amount.";
-const REMAINING_OPEN_FORECAST_TOOLTIP = "Remaining Open Forecast starts from Open Forecast and, when Show MTD is on, removes only the same Account, Pillar, and month overlap once.";
+const ACTUAL_TO_DATE_TOOLTIP = "Actual to date uses FINAL Actual, with closed-period MTD fallback only when FINAL is unavailable. Include MTD adds the current-period MTD once.";
+const FY_FORECAST_TOOLTIP = "FY Forecast is the stored Forecast for the selected fiscal year, including months that are now closed by FINAL Actual. Include MTD does not change this amount.";
+const REMAINING_OPEN_FORECAST_TOOLTIP = "Remaining Open Forecast starts from Open Forecast and, when Include MTD is on, removes only the same Account, Pillar, and month overlap once.";
 const InfoTooltip = ({ id, label, text }: Readonly<{ id: string; label: string; text: string }>) => <span class="consumption-info-tooltip">
   <button type="button" class="consumption-info-tooltip__trigger" aria-label={label} aria-describedby={id}>!</button>
   <span id={id} class="consumption-info-tooltip__content" role="tooltip">{text}</span>
@@ -155,6 +155,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const [analysisResponse, setAnalysis] = useState<ConsumptionAnalysis | null>(null);
   const [forecastComparison, setForecastComparison] = useState<ForecastActualComparison | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryControlsLocked = loading;
   const [error, setError] = useState("");
   const [selectedAccountContext, setSelectedAccountContext] = useState("");
   const [candidateSearch, setCandidateSearch] = useState("");
@@ -170,6 +171,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastDataLoadedAt, setLastDataLoadedAt] = useState<Date | null>(null);
   const requestGeneration = useRef(0);
+  const queryControlsLockRef = useRef(true);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -188,10 +190,15 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [comboboxOpen]);
 
+  useEffect(() => {
+    if (queryControlsLocked) setComboboxOpen(false);
+  }, [queryControlsLocked]);
+
 
   useEffect(() => {
     let active = true;
     const generation = ++requestGeneration.current;
+    queryControlsLockRef.current = true;
     setLoading(true);
     setError("");
     void Promise.all([
@@ -230,7 +237,12 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
           }
         }
       })
-      .finally(() => { if (active && generation === requestGeneration.current) setLoading(false); });
+      .finally(() => {
+        if (active && generation === requestGeneration.current) {
+          queryControlsLockRef.current = false;
+          setLoading(false);
+        }
+      });
     return () => { active = false; };
   }, [debouncedCandidateSearch, fiscalYear, includeMtd, refreshTrigger, selectedAccountContext, selectedPillar, selectedSalesRep]);
 
@@ -239,6 +251,13 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   // response with null here would also remove and recreate the header/filter
   // controls before the request completes.
   const analysis = analysisResponse;
+
+  const runQueryControlAction = (action: () => void) => {
+    if (queryControlsLockRef.current) return;
+    queryControlsLockRef.current = true;
+    setLoading(true);
+    action();
+  };
 
   const filteredCandidates = useMemo(() => (analysis?.accountCandidates ?? [])
     .filter((candidate) => matchesCandidate(candidate, candidateSearch)), [analysis, candidateSearch]);
@@ -267,21 +286,25 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     workload.plans.map((plan) => ({ workload: workload.workload, plan, percentageContext: "selected Account" }))) ?? [];
 
   const selectAccountContext = (account: string) => {
+    if (queryControlsLockRef.current) return;
     const refreshRequired = shouldRefreshConsumptionAnalysisContext(selectedAccountContext, account, debouncedCandidateSearch);
-    if (refreshRequired) setLoading(true);
-    setSelectedAccountContext(account.trim());
-    setCandidateSearch("");
-    setDebouncedCandidateSearch("");
-    setComboboxOpen(false);
-    setActiveCandidateIndex(0);
-    setSelectedAlertId("");
-    setSelectedAccountName("");
-    setSelectedMovement(null);
+    const apply = () => {
+      setSelectedAccountContext(account.trim());
+      setCandidateSearch("");
+      setDebouncedCandidateSearch("");
+      setComboboxOpen(false);
+      setActiveCandidateIndex(0);
+      setSelectedAlertId("");
+      setSelectedAccountName("");
+      setSelectedMovement(null);
+    };
+    if (refreshRequired) runQueryControlAction(apply);
+    else apply();
   };
 
   const selectCandidateAt = (index: number) => selectAccountContext(candidateOptions[index]?.account ?? "");
   const handleComboboxKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing) return;
+    if (queryControlsLockRef.current || event.isComposing) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       setComboboxOpen(true);
@@ -372,14 +395,13 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
 
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear} disabled={loading}
-    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
+    onSelect={(year) => { if (year !== fiscalYear) runQueryControlAction(() => setFiscalYear(year)); }} />;
   const messages: ConsumptionMessage[] = [
     ...(error ? [{ id: "analysis-load", severity: "error" as const, summary: "데이터를 새로 고치지 못했습니다.", detail: "기존 데이터와 마지막 완료 시각을 유지합니다. Reload로 다시 시도해 주세요." }] : []),
     ...(exportError ? [{ id: "analysis-export", severity: "error" as const, summary: "내보내지 못했습니다.", detail: "현재 화면은 유지됩니다. 잠시 후 다시 시도해 주세요." }] : [])
   ];
   const refreshAnalysis = () => {
-    setLoading(true);
-    setRefreshTrigger((current) => current + 1);
+    runQueryControlAction(() => setRefreshTrigger((current) => current + 1));
   };
   if (!analysis) return <PageShell className="consumption-insights-page consumption-initial-state"
     ariaLabelledBy="consumptionAnalysisTitle" rootAttributes={{ "data-fiscal-year": fiscalYear }}
@@ -497,11 +519,11 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     breadcrumb={breadcrumb} title="Consumption Analysis" titleControls={fiscalYearControl} headingSpacing="compact"
     busy={loading || !!exporting} busyLabel={exporting ? "Exporting analysis" : "Refreshing analysis"} activityPosition="custom"
     actions={<div class="consumption-import-actions is-compact" data-html2canvas-ignore="true" aria-label="Export current Consumption Analysis view">
-      <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
+      <oj-button class="oj-button-sm" chroming="outlined" disabled={!!exporting}
         title="Export the current Consumption Analysis view as PNG" onojAction={() => void downloadCanvas("png")}>
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "png" ? "Exporting…" : "PNG"}
       </oj-button>
-      <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || !!exporting}
+      <oj-button class="oj-button-sm" chroming="outlined" disabled={!!exporting}
         title="Export the current Consumption Analysis view as PDF" onojAction={() => void downloadCanvas("pdf")}>
         <span slot="startIcon" class="oj-ux-ico-download" aria-hidden="true"></span>{exporting === "pdf" ? "Exporting…" : "PDF"}
       </oj-button>
@@ -515,15 +537,15 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
           <span>Pillar</span>
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
-              disabled={loading && !analysis}
-              onClick={() => { if(option.value===selectedPillar)return; setLoading(true); setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setSelectedMovement(null); }}>{option.label}</button>)}
+              disabled={queryControlsLocked}
+              onClick={() => { if(queryControlsLockRef.current || option.value===selectedPillar)return; runQueryControlAction(() => { setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setSelectedMovement(null); }); }}>{option.label}</button>)}
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
           <div class="consumption-insights-filter consumption-insights-filter--sales-rep">
             <label htmlFor="consumptionSalesRepContext">Sales Rep</label>
-            <select id="consumptionSalesRepContext" value={selectedSalesRep}
-              onChange={(event) => { setLoading(true); setSelectedSalesRep(event.currentTarget.value); setSelectedAccountContext(""); setSelectedAccountName(""); setSelectedAlertId(""); }}>
+            <select id="consumptionSalesRepContext" value={selectedSalesRep} disabled={queryControlsLocked}
+              onChange={(event) => { if (queryControlsLockRef.current) return; const value = event.currentTarget.value; runQueryControlAction(() => { setSelectedSalesRep(value); setSelectedAccountContext(""); setSelectedAccountName(""); setSelectedAlertId(""); }); }}>
               <option value="">All Sales Reps</option>
               {analysis.salesRepOptions.map((salesRep) => <option key={salesRep} value={salesRep}>{salesRep}</option>)}
             </select>
@@ -536,21 +558,23 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
             aria-activedescendant={comboboxOpen ? `consumption-account-option-${activeCandidateIndex}` : undefined}
             value={comboboxOpen ? candidateSearch : selectedContextLabel}
             placeholder="Search Account"
-            onClick={(event) => { setComboboxOpen(true); setCandidateSearch(""); event.currentTarget.select(); }}
-            onInput={(event) => { setCandidateSearch(event.currentTarget.value); setComboboxOpen(true); setActiveCandidateIndex(0); }}
+            disabled={queryControlsLocked}
+            onClick={(event) => { if (queryControlsLockRef.current) return; setComboboxOpen(true); setCandidateSearch(""); event.currentTarget.select(); }}
+            onInput={(event) => { if (queryControlsLockRef.current) return; setCandidateSearch(event.currentTarget.value); setComboboxOpen(true); setActiveCandidateIndex(0); }}
             onCompositionStart={() => setCandidateComposing(true)}
             onCompositionEnd={(event) => { setCandidateSearch(event.currentTarget.value); setCandidateComposing(false); }}
             onKeyDown={handleComboboxKeyDown} />
-          {selectedAccountContext && <button type="button" class="consumption-insights-clear" aria-label="Clear account" onClick={() => selectAccountContext("")}>Clear</button>}
+          {selectedAccountContext && <button type="button" class="consumption-insights-clear" aria-label="Clear account" disabled={queryControlsLocked} onClick={() => { if (!queryControlsLockRef.current) selectAccountContext(""); }}>Clear</button>}
           {comboboxOpen && <div id="consumptionAccountOptions" class="consumption-insights-options" role="listbox">
             <button id="consumption-account-option-0" type="button" role="option" aria-selected={!selectedAccountContext}
-              class={activeCandidateIndex === 0 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext("")}>
+              class={activeCandidateIndex === 0 ? "is-active" : ""} disabled={queryControlsLocked}
+              onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext("")}>
               <strong>All Accounts</strong>
             </button>
             {analysis.accountCandidates.filter((candidate) => matchesCandidate(candidate, candidateSearch)).map((candidate, index) => <button
               id={`consumption-account-option-${index + 1}`} type="button" role="option" key={candidate.account}
               aria-selected={selectedAccountContext === candidate.account} class={activeCandidateIndex === index + 1 ? "is-active" : ""}
-              onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext(candidate.account)}>
+              disabled={queryControlsLocked} onMouseDown={(event) => event.preventDefault()} onClick={() => selectAccountContext(candidate.account)}>
               <strong>{candidate.account}</strong>
             </button>)}
             {filteredCandidates.length === 0 && <p>No matching Accounts.</p>}
@@ -561,13 +585,13 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     </PageFilterPanel>}>
     <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar" ariaLabel="Consumption Analysis data controls">
       <div class="consumption-records-toolbar__left">
-        <ConsumptionMtdControl checked={includeMtd} disabled={loading || !analysis.currentMtdAvailable}
+        <ConsumptionMtdControl checked={includeMtd} disabled={queryControlsLocked || !analysis.currentMtdAvailable}
           mtdAppliedDate={mtdAppliedTimestamp}
-          onToggle={() => { setLoading(true); setIncludeMtd((current) => !current); }}
-          tooltipId="analysis-show-mtd-tooltip" />
+          onToggle={() => runQueryControlAction(() => setIncludeMtd((current) => !current))}
+          tooltipId="analysis-include-mtd-tooltip" />
       </div>
         <div class="consumption-records-toolbar-activity">
-          <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={loading || !!exporting}
+          <PageActivity busy={loading} busyLabel={refreshStatusLabel} refreshDisabled={queryControlsLocked || !!exporting}
             onRefresh={refreshAnalysis} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
     </DataControlBar>
@@ -578,7 +602,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
       </div>
       <div class="consumption-sales-rep-table"><table><thead><tr><th>Sales Rep</th><th>Actual YTD</th><th>YoY same-period Actual</th><th>Covered-period Expected</th><th>Accounts</th><th>Top 3</th><th>Attention</th></tr></thead><tbody>
         {analysis.salesRepOverview.map((row) => <tr key={row.salesRep} class={analysis.selectedSalesRep === row.salesRep ? "is-selected" : ""}>
-          <th><button type="button" onClick={() => { setLoading(true); setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); }}>{row.salesRep}</button></th>
+          <th><button type="button" disabled={queryControlsLocked} onClick={() => runQueryControlAction(() => { setSelectedSalesRep(row.salesRep); setSelectedAccountContext(""); setSelectedAccountName(""); })}>{row.salesRep}</button></th>
           <td>{formatExactKFixed(row.actualAmountExact)}</td><td class={row.actualGrowthAmountExact === null ? "" : compareExactDecimals(row.actualGrowthAmountExact, "0") < 0 ? "is-negative" : "is-positive"}>
             {row.actualGrowthAmountExact === null ? "N/A"
               : <>{formatExactKFixed(row.actualGrowthAmountExact)} · {row.yoyComparisonStatus === "PRIOR_PERIOD_ZERO" ? "rate N/A" : percentageTextExact(row.actualGrowthPercentExact, true)}</>}
