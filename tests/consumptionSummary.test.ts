@@ -69,8 +69,9 @@ void (async () => {
     "Records must await the matching Summary before exposing the completed result");
   assert.match(page, /setConsumptionSummaryError\([^;]+;\s*throw error;/,
     "a failed Summary must reject the matching Records replacement before either result is exposed");
-  assert.match(page, /loadConsumptionSummary\(recordsQueryRef\.current,[\s\S]*\.catch\(\(\) => undefined\)/,
-    "Show MTD must settle a failed Summary request without leaving an unhandled rejection");
+  assert.match(page,
+    /onToggle=\{\(\) => \{[\s\S]*loadConsumptionSummary\(recordsQueryRef\.current,[\s\S]*\.catch\(\(\) => \{[\s\S]*Keep the last successful mode/,
+    "Include MTD must settle a failed Summary request and preserve the last successful mode");
   assert.match(page, /const recordsActivityBusy = rangeLoading \|\| recordsLoading \|\| consumptionSummaryLoading/,
     "Records progress must remain active until both Records and Summary are settled");
   assert.match(page, /const visibleTop = Math\.max\(rootRect\.top, 0\)/,

@@ -605,6 +605,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const forecastApplyingRef = useRef(false);
   const recordsRequestGeneration = useRef(0);
   const summaryRequestGeneration = useRef(0);
+  const summaryLoadingRef = useRef(false);
   const recordsQueryActionGeneration = useRef(0);
   const activeRecordsQueryRef = useRef<Readonly<{ key: string; generation: number; search: string }> | null>(null);
   const appliedSearchRef = useRef("");
@@ -677,22 +678,27 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
   const loadConsumptionSummary = async (query: Pick<RecordsQuery, "fromQuarter" | "toQuarter" | "search">,
                                         pillar: ConsumptionPillar, mtd: boolean,
-                                        preserveExisting = false): Promise<void> => {
-    if (!query.fromQuarter || !query.toQuarter) return;
+                                        preserveExisting = false): Promise<boolean> => {
+    if (!query.fromQuarter || !query.toQuarter) return false;
     const generation = ++summaryRequestGeneration.current;
+    summaryLoadingRef.current = true;
     setConsumptionSummaryLoading(true);
     setConsumptionSummaryError("");
     try {
       const next = await fetchConsumptionSummary({ ...query, pillar, showMtd: mtd });
-      if (summaryRequestGeneration.current !== generation) return;
+      if (summaryRequestGeneration.current !== generation) return false;
       setConsumptionSummary(next);
+      return true;
     } catch (error) {
-      if (summaryRequestGeneration.current !== generation) return;
+      if (summaryRequestGeneration.current !== generation) return false;
       if (!preserveExisting) setConsumptionSummary(null);
       setConsumptionSummaryError(error instanceof Error ? error.message : "Summary data is unavailable.");
       throw error;
     } finally {
-      if (summaryRequestGeneration.current === generation) setConsumptionSummaryLoading(false);
+      if (summaryRequestGeneration.current === generation) {
+        summaryLoadingRef.current = false;
+        setConsumptionSummaryLoading(false);
+      }
     }
   };
 
@@ -2177,12 +2183,15 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
               <ConsumptionMtdControl checked={showMtd} disabled={recordsQueryControlsDisabled || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}
                 onToggle={() => {
-                  if (recordsActivityBusy) return;
-                  setShowMtd((current) => {
-                  const next = !current;
-                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next, true).catch(() => undefined);
-                  return next;
-                  });
+                  if (recordsLoadingRef.current || summaryLoadingRef.current) return;
+                  const next = !showMtd;
+                  void loadConsumptionSummary(recordsQueryRef.current, recordsQueryRef.current.pillar, next, true)
+                    .then((applied) => {
+                      if (applied) setShowMtd(next);
+                    })
+                    .catch(() => {
+                      // Keep the last successful mode and rows when the summary refresh fails.
+                    });
                 }} tooltipId="records-include-mtd-tooltip" />
               {loadedAccountCount > 0 && <div class="consumption-records-count-summary" role="status">
                 <strong>{loadedAccountCount}</strong> Accounts · <strong>{loadedPlanCount}</strong> Plans
