@@ -1022,19 +1022,30 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     const rootRect = root.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
     const tableRect = table.getBoundingClientRect();
-    const visibleTop = Math.max(rootRect.top, tableRect.top, 0);
-    const visibleBottom = Math.min(rootRect.bottom, tableRect.bottom, window.innerHeight);
-    const centerY = visibleTop + Math.max(0, visibleBottom - visibleTop) / 2;
-    const tableVisible = visibleBottom > visibleTop;
-    const left = Math.max(rootRect.left, panelRect.left, tableRect.left, 0);
-    const right = Math.min(rootRect.right, panelRect.right, tableRect.right, window.innerWidth);
-    const centerX = left + Math.max(0, right - left) / 2;
+    // Loading belongs to the visible Records body, not to Summary or table geometry.
+    // The PageShell scroll viewport already excludes the application header/footer.
+    const visibleTop = Math.max(rootRect.top, 0);
+    const visibleBottom = Math.min(rootRect.bottom, window.innerHeight);
+    const visibleLeft = Math.max(rootRect.left, 0);
+    const visibleRight = Math.min(rootRect.right, window.innerWidth);
+    const centerY = (visibleTop + visibleBottom) / 2;
+    const centerX = (visibleLeft + visibleRight) / 2;
+    const bodyVisible = visibleBottom > visibleTop && visibleRight > visibleLeft;
 
-    controls.dataset.visible = tableVisible ? "true" : "false";
+    // Horizontal table navigation remains tied to the visible table only.
+    const tableVisibleTop = Math.max(rootRect.top, tableRect.top, 0);
+    const tableVisibleBottom = Math.min(rootRect.bottom, tableRect.bottom, window.innerHeight);
+    const tableVisible = tableVisibleBottom > tableVisibleTop;
+    const tableRight = Math.min(rootRect.right, panelRect.right, tableRect.right, window.innerWidth);
+    const tableCenterY = (tableVisibleTop + tableVisibleBottom) / 2;
+
+    controls.dataset.visible = bodyVisible ? "true" : "false";
+    controls.dataset.tableVisible = tableVisible ? "true" : "false";
     controls.style.setProperty("--consumption-viewport-center-x", `${centerX}px`);
     controls.style.setProperty("--consumption-viewport-center-y", `${centerY}px`);
-    controls.style.setProperty("--consumption-viewport-left", `${left}px`);
-    controls.style.setProperty("--consumption-viewport-right", `${right}px`);
+    controls.style.setProperty("--consumption-viewport-left", `${visibleLeft}px`);
+    controls.style.setProperty("--consumption-viewport-right", `${tableRight}px`);
+    controls.style.setProperty("--consumption-table-center-y", `${tableCenterY}px`);
   };
 
   const updateTableScrollState = () => {
@@ -2170,7 +2181,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         <ConsumptionSummaryPanel summary={consumptionSummary} loading={consumptionSummaryLoading} error={consumptionSummaryError}
           expanded={summaryExpanded} onToggle={() => setSummaryExpanded((current) => !current)} />
         <div id="consumptionTableContent" class="consumption-table-content">
-          <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false">
+          <div ref={viewportControlsRef} class="consumption-viewport-controls" data-visible="false" data-table-visible="false">
             <PageDataProgress busy={recordsActivityBusy} busyLabel={pageBusyLabel} />
             <div class="consumption-scroll-controls" aria-label="Horizontal table navigation">
               <button type="button" aria-label="Move table left" title="Move left" disabled={tableScrollState.left <= 0} onClick={() => moveTableHorizontally(-1)}><span class="oj-ux-ico-chevron-left" aria-hidden="true"></span></button>

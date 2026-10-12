@@ -292,6 +292,10 @@ assert.match(consumptionViewportProgress, /class="consumption-viewport-controls 
   "Analysis and Forecast vs Actual render the shared progress inside the same fixed viewport-control structure used by Records");
 assert.match(consumptionViewportProgress, /const visibleTop = Math\.max\(rootRect\.top, 0\);[\s\S]*const visibleBottom = Math\.min\(rootRect\.bottom, window\.innerHeight\);[\s\S]*const viewportCenterY = \(visibleTop \+ visibleBottom\) \/ 2;/,
   "the shared progress computes the same visible-root center as Records");
+assert.match(recordsPage, /const visibleTop = Math\.max\(rootRect\.top, 0\);[\s\S]*const visibleBottom = Math\.min\(rootRect\.bottom, window\.innerHeight\);[\s\S]*const centerY = \(visibleTop \+ visibleBottom\) \/ 2;/,
+  "Records progress uses the header/footer-excluded visible PageShell body center independently of Summary and table geometry");
+assert.match(recordsPage, /controls\.dataset\.visible = bodyVisible \? "true" : "false";[\s\S]*controls\.dataset\.tableVisible = tableVisible \? "true" : "false";/,
+  "Records keeps progress-body visibility separate from table navigation visibility");
 assert.match(styles, /\.consumption-viewport-controls \.kap-page-data-progress\s*\{[^}]*left:\s*var\(--consumption-viewport-center-x\);[^}]*top:\s*var\(--consumption-viewport-center-y\);/s,
   "all Consumption progress cards use the Records viewport-center variables");
 assert.match(insightsPage, /<strong>Actual \{formatExactKFixed\(account\.actualAmountExact\)\}<\/strong>/,
