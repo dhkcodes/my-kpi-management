@@ -128,6 +128,10 @@ assert.match(styles, /\.kpi-activities-table-wrap\s*\{[^}]*max-width:\s*100%[^}]
 assert.match(styles, /\.kpi-activities-table\s*\{[^}]*min-width:\s*100%[^}]*width:\s*max-content/, "KPI tables fill the available panel while retaining horizontal overflow on narrow screens");
 assert.match(page, /\}, \[activeTab, fields, pageLoading\]\);/, "column widths are recalculated after the loading view mounts the table host");
 assert.match(page, /const fiscalYearChanged = loadedFiscalYearRef\.current !== fiscalYear[\s\S]*setPageLoading\(true\)[\s\S]*if \(fiscalYearChanged\)[\s\S]*setRows\(\[\]\)/, "same-FY refresh shows standard progress while keeping mounted rows and dialog host intact");
+assert.match(page, /if \(fiscalYearChanged\) \{[\s\S]{0,160}setLastDataLoadedAt\(null\)/,
+  "a fiscal-year transition clears the previous fiscal year's successful-load timestamp");
+assert.match(page, /\.catch\(\(error\) => \{[\s\S]{0,240}if \(fiscalYearChanged\) \{[\s\S]{0,120}setRows\(\[\]\)/,
+  "same-FY reload failures preserve the previously displayed data while fiscal-year failures remain empty");
 assert.match(page, /const dataReadyForFiscalYear = loadedFiscalYearRef\.current === fiscalYear[\s\S]*<PageDataProgress busy=\{pageLoading\}[\s\S]*\{dataReadyForFiscalYear && <Fragment>/,
   "title and fiscal-year controls render first while the KPI body waits for its matching FY data");
 assert.doesNotMatch(page, /eyebrow=\{`KPI Activities/,
