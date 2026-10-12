@@ -1836,8 +1836,9 @@ body {
 .kap-users-header { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
 .kap-users-header p { color: var(--kpi-muted); margin: .35rem 0 0; }
 .kap-users-table-wrap { border: 1px solid var(--kpi-border); margin-top: 1rem; overflow-x: auto; }
-.kap-users-table { border-collapse: collapse; min-width: 52rem; width: 100%; }
+.kap-users-table { border-collapse: collapse; min-width: 64rem; width: 100%; }
 .kap-users-table th, .kap-users-table td { border-bottom: 1px solid var(--kpi-border); padding: .7rem; text-align: left; }
+.kap-last-login { white-space: nowrap; }
 .kap-users-table th { background: var(--kpi-soft); color: var(--kpi-muted); font-size: .75rem; text-transform: uppercase; }
 .kap-users-table tbody tr:hover { background: var(--kap-grid-hover-bg); }
 .kap-users-table td { vertical-align: middle; }
