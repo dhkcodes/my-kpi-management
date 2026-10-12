@@ -42,6 +42,15 @@ assert.doesNotMatch(records,
   "Records refresh failure must retain the last successful rows");
 assert.match(records, /\|\| recordsLoadingRef\.current \|\| summarySwapRef\.current\.isBusy\(\)/,
   "Records event handlers must reject re-entry even before disabled rendering settles");
+assert.match(records, /if \(append && \(recordsLoadingRef\.current \|\| summarySwapRef\.current\.isBusy\(\) \|\| hasDraftChanges\)\) return/,
+  "pagination must not race an active MTD Summary replacement");
+assert.match(records, /if \(!append && !allowActiveRestart[\s\S]*recordsLoadingRef\.current \|\| summarySwapRef\.current\.isBusy\(\)/,
+  "every non-append Records entry point must synchronously reject overlap with Records or Summary requests");
+assert.match(records, /const summaryApplied = await loadConsumptionSummary[\s\S]*if \(!summaryApplied\) return/,
+  "Records must not commit a page when its matching Summary was not applied");
+assert.match(records, /nextDate === businessDateRef\.current[\s\S]*summarySwapRef\.current\.isBusy\(\)/,
+  "business-date refresh must not race an active MTD Summary replacement");
+
 assert.match(records, /createSingleFlightSwapController<ConsumptionSummary>/,
   "Records Include MTD must have a synchronous single-flight request guard");
 assert.match(records,

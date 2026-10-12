@@ -707,8 +707,11 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     loadingPhase: RecordsLoadingPhase = append ? "append" : "query",
     preserveDrafts = false,
     diagnosticId?: string,
+    allowActiveRestart = false,
   ): Promise<ConsumptionRecordsPage | undefined> => {
-    if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
+    if (append && (recordsLoadingRef.current || summarySwapRef.current.isBusy() || hasDraftChanges)) return;
+    if (!append && !allowActiveRestart
+      && (recordsLoadingRef.current || summarySwapRef.current.isBusy())) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
 
     recordsLoadingRef.current = true;
@@ -761,14 +764,15 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       }
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts, diagnosticId);
+        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts, diagnosticId, true);
       }
       if (!append) {
-        await loadConsumptionSummary({
+        const summaryApplied = await loadConsumptionSummary({
           fromQuarter: page.fromQuarter,
           toQuarter: page.toQuarter,
           search: requestQuery.search,
         }, page.selectedPillar, showMtd, loadingPhase !== "initial");
+        if (!summaryApplied) return;
         if (generation !== recordsRequestGeneration.current) return;
       }
       const pageForecastControls = accountForecastControls(page);
@@ -930,7 +934,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   useEffect(() => {
     const refreshAtBusinessDateChange = () => {
       const nextDate = koreaBusinessDate();
-      if (nextDate === businessDateRef.current || hasDraftChanges || dataMode !== "backend" || recordsLoadingRef.current) return;
+      if (nextDate === businessDateRef.current || hasDraftChanges || dataMode !== "backend"
+        || recordsLoadingRef.current || summarySwapRef.current.isBusy()) return;
       businessDateRef.current = nextDate;
       void loadRecordsPage(false, { fromQuarter, toQuarter, search: appliedSearch }, selectedPillar, "query")
         .catch((error) => setImportError(error instanceof Error ? error.message : "Consumption periods could not be refreshed."));
