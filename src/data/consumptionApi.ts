@@ -248,7 +248,7 @@ export type ConsumptionMultiImportResult = Readonly<{
   diagnosticId: string;
 }>;
 export type ConsumptionImportReconciliation = Readonly<{
-  files: readonly Readonly<{ sourceSha256: string; pillar: Exclude<ConsumptionPillar, "ALL">; state: "APPLIED" | "NOT_FOUND"; batchId: number | null }>[];
+  files: readonly Readonly<{ sourceSha256: string; pillar: Exclude<ConsumptionPillar, "ALL">; lifecycleIdentity: string; state: "APPLIED" | "NOT_FOUND"; batchId: number | null }>[];
   allApplied: boolean;
   diagnosticId: string;
 }>;
@@ -1493,7 +1493,12 @@ export const reconcileConsumptionImport = async (
   if (!diagnosticId || !/^[A-Za-z0-9._-]{1,64}$/.test(diagnosticId) || preview.files.length < 1 || preview.files.length > 8)
     throw new Error("Invalid Consumption import reconciliation request");
   const parameters=new URLSearchParams();
-  preview.files.forEach((file)=>{parameters.append("sourceSha256",file.sourceSha256);parameters.append("pillar",file.detectedPillar);});
+  const expectedIdentities=preview.files.map((file)=>{
+    const mtdPeriodKeys=[...new Set(file.mtdPeriodKeys)].sort();
+    return mtdPeriodKeys.length?`MTD:${mtdPeriodKeys.join(",")}`:"FINAL";
+  });
+  preview.files.forEach((file,index)=>{parameters.append("sourceSha256",file.sourceSha256);parameters.append("pillar",file.detectedPillar);
+    parameters.append("lifecycleIdentity",expectedIdentities[index]);});
   const { response, payload }=await request(`/consumption/imports/status?${parameters}`,
     { headers: { "X-Diagnostic-Id": diagnosticId } },"ALL",true);
   const responseDiagnosticId=response.headers.get("X-Diagnostic-Id");
@@ -1505,11 +1510,13 @@ export const reconcileConsumptionImport = async (
     if(typeof value!=="object"||value===null)throw new Error("Malformed Consumption import reconciliation response");
     const item=value as Record<string,unknown>;const expected=preview.files[index];
     if(!expected||item.sourceSha256!==expected.sourceSha256||item.pillar!==expected.detectedPillar
+      ||item.lifecycleIdentity!==expectedIdentities[index]
       ||(item.state!=="APPLIED"&&item.state!=="NOT_FOUND")
       ||!(item.batchId===null||isPositiveInteger(item.batchId))
       ||(item.state==="APPLIED"&&item.batchId===null)||(item.state==="NOT_FOUND"&&item.batchId!==null))
       throw new Error("Malformed Consumption import reconciliation response");
     return {sourceSha256:item.sourceSha256 as string,pillar:item.pillar as Exclude<ConsumptionPillar,"ALL">,
+      lifecycleIdentity:item.lifecycleIdentity as string,
       state:item.state as "APPLIED"|"NOT_FOUND",batchId:item.batchId as number|null};
   });
   if(files.length!==preview.files.length||raw.allApplied!==files.every((file)=>file.state==="APPLIED"))
