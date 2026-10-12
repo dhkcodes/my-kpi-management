@@ -1855,7 +1855,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     id: "records-load",
     severity: "error",
     summary: "Consumption Records 운영 데이터를 표시할 수 없습니다.",
-    detail: dataMode === "fallback" ? "예시 데이터는 실제 업무에 사용하지 마세요. Retry를 선택해 다시 시도해 주세요." : "기존 데이터와 마지막 완료 시각을 유지합니다. Retry를 선택해 다시 시도해 주세요.",
+    detail: dataMode === "fallback" ? "예시 데이터는 실제 업무에 사용하지 마세요. Retry를 선택해 다시 시도해 주세요." : "요청한 조건의 데이터를 불러오지 못했습니다. Retry를 선택해 다시 시도해 주세요.",
     persistence: "sticky"
   }] : [];
   const importActionsDisabled = !canWrite || hasDraftChanges || isSaving || isExporting

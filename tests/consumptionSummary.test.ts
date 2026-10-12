@@ -83,6 +83,10 @@ void (async () => {
     "Records must not drop API account groups that only have actual totals");
   assert.match(page, /setRecordsQueryError\(message\)[\s\S]*setImportError\(""\)/,
     "a failed replacement query must expose an error instead of retaining the previous result as current");
+  assert.match(page, /detail: dataMode === "fallback" \?[^\n]+: "요청한 조건의 데이터를 불러오지 못했습니다\. Retry를 선택해 다시 시도해 주세요\."/,
+    "the Records query failure copy must describe the cleared result instead of claiming prior data is retained");
+  assert.match(page, /if \(importError\)[^\n]+기존 데이터와 마지막 완료 시각을 유지합니다/,
+    "the separate import-operation response must retain its existing preserve-data guidance");
   assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-summary__table th,[\s\S]*border-right:/,
     "Summary borders must remain local to Consumption Records");
   assert.match(styles, /\.consumption-summary__table tbody th:first-child[^}]*font-size:\s*\.9rem/s,
