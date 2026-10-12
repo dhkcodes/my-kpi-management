@@ -270,14 +270,14 @@ void (async () => {
     "exact replay remains decodable and reports no second insertion");
   const mtdReconciliationPreview = {
     ...unifiedActualPreview,
-    files: unifiedActualPreview.files.map((file) => ({ ...file, mtdPeriodKeys: ["FY27-OCT"] }))
+    files: unifiedActualPreview.files.map((file) => ({ ...file, mtdPeriodKeys: ["FY27-JAN", "FY27-OCT", "FY27-OCT"] }))
   };
   runtime.fetch=async(input,init)=>{
     assert.match(String(input),/\/consumption\/imports\/status\?/);
-    assert.match(String(input),/lifecycleIdentity=MTD%3AFY27-OCT/);
+    assert.match(String(input),/lifecycleIdentity=MTD%3AFY27-OCT%2CFY27-JAN/);
     assert.equal(new Headers(init?.headers).get("X-Diagnostic-Id"),"diag-reconcile");
     return new Response(JSON.stringify({files:mtdReconciliationPreview.files.map((file,index)=>({
-      sourceSha256:file.sourceSha256,pillar:file.detectedPillar,lifecycleIdentity:"MTD:FY27-OCT",state:"APPLIED",batchId:79+index
+      sourceSha256:file.sourceSha256,pillar:file.detectedPillar,lifecycleIdentity:"MTD:FY27-OCT,FY27-JAN",state:"APPLIED",batchId:79+index
     })),allApplied:true}),{status:200,headers:{"Content-Type":"application/json","X-Diagnostic-Id":"diag-reconcile"}});
   };
   const reconciled=await reconcileConsumptionImport(mtdReconciliationPreview,"diag-reconcile");

@@ -325,6 +325,7 @@ const signalTypes = new Set<ConsumptionSignal["type"]>(["ABOVE_USUAL", "BELOW_US
 const previousDirections = new Set<ConsumptionSignal["previousDirection"]>(["INCREASED", "DECREASED", "UNCHANGED"]);
 const signalGrades = new Set<ConsumptionSignal["grade"]>(["CRITICAL", "HIGH", "WATCH"]);
 const fiscalPeriodPattern = /^FY\d{2}-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/;
+const fiscalMonthOrder = new Map(["JUN","JUL","AUG","SEP","OCT","NOV","DEC","JAN","FEB","MAR","APR","MAY"].map((month,index)=>[month,index]));
 const fiscalQuarterPattern = /^FY\d{2}-Q[1-4]$/;
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -1494,7 +1495,10 @@ export const reconcileConsumptionImport = async (
     throw new Error("Invalid Consumption import reconciliation request");
   const parameters=new URLSearchParams();
   const expectedIdentities=preview.files.map((file)=>{
-    const mtdPeriodKeys=[...new Set(file.mtdPeriodKeys)].sort();
+    const mtdPeriodKeys=[...new Set(file.mtdPeriodKeys)].sort((left,right)=>{
+      const fiscalYear=Number(left.slice(2,4))-Number(right.slice(2,4));
+      return fiscalYear!==0?fiscalYear:(fiscalMonthOrder.get(left.slice(5))??0)-(fiscalMonthOrder.get(right.slice(5))??0);
+    });
     return mtdPeriodKeys.length?`MTD:${mtdPeriodKeys.join(",")}`:"FINAL";
   });
   preview.files.forEach((file,index)=>{parameters.append("sourceSha256",file.sourceSha256);parameters.append("pillar",file.detectedPillar);
