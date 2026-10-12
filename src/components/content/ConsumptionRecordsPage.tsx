@@ -35,6 +35,7 @@ import {
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCompositionK } from "../../data/forecastComposition";
 import { validateForecastWorkbookFile } from "../../data/forecastWorkbookValidation";
+import { runConsumptionImportFlow } from "../../data/consumptionImportFlow";
 import { addExactDecimals, compareExactDecimals, exactDecimalToChartCoordinate, exactDecimalToK, formatExactCurrency, subtractExactDecimals } from "../../data/exactDecimal";
 import {
   ActualImportChangeDescription,
@@ -63,6 +64,7 @@ import {
   fetchConsumptionRecords,
   fetchConsumptionWorkspace,
   previewConsumptionImport,
+  reconcileConsumptionImport,
   previewConsumptionForecastWide,
   saveConsumptionForecasts
 } from "../../data/consumptionApi";
@@ -619,6 +621,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     pillar: ConsumptionPillar = selectedPillar,
     loadingPhase: RecordsLoadingPhase = append ? "append" : "query",
     preserveDrafts = false,
+    diagnosticId?: string,
   ): Promise<ConsumptionRecordsPage | undefined> => {
     if (append && (recordsLoadingRef.current || hasDraftChanges)) return;
     const requestQuery: RecordsQuery = append ? recordsQueryRef.current : { ...query, pillar };
@@ -634,7 +637,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         sort: "ACCOUNT",
         direction: "ASC",
         pillar: requestQuery.pillar
-      });
+      }, diagnosticId);
       const visitedOffsets = new Set<number>();
       while (!append && page.hasMore) {
         if (generation !== recordsRequestGeneration.current) return;
@@ -649,7 +652,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
           sort: "ACCOUNT",
           direction: "ASC",
           pillar: requestQuery.pillar
-        });
+        }, diagnosticId);
         if (nextPage.etag !== page.etag) {
           throw new Error("Consumption Records changed while the complete list was loading. Please refresh.");
         }
@@ -673,7 +676,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       }
       if (generation !== recordsRequestGeneration.current) return;
       if (shouldRestartConsumptionRecordsPage(append, apiEtag, page.etag)) {
-        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts);
+        return loadRecordsPage(false, requestQuery, requestQuery.pillar, loadingPhase, preserveDrafts, diagnosticId);
       }
       const pageForecastControls = accountForecastControls(page);
       const visibleGroups = page.accountGroups.map((group) => ({
@@ -1482,37 +1485,39 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     setImportPhase("applying");
     setImportError("");
     setImportResult("");
+    const viewPillar=selectedPillar;
+    const diagnosticId=globalThis.crypto.randomUUID();
     try {
-      const viewPillar=selectedPillar;
-      const result = await applyConsumptionImport(pendingImport.files, "ALL", pendingImport.preview);
-      if(viewPillar==="ALL")adoptWorkspace(result.workspace);
-      let refreshFailed=false;
-      let refreshMessage="";
-      try {
-        await loadRecordsPage(false, { fromQuarter: result.workspace.fromQuarter, toQuarter: result.workspace.toQuarter, search: appliedSearch }, viewPillar);
-      } catch (refreshError) {
-        refreshFailed=true;
-        if(viewPillar==="ALL"){
-          adoptWorkspace(result.workspace);
+      const outcome=await runConsumptionImportFlow({
+        apply:()=>applyConsumptionImport(pendingImport.files,"ALL",pendingImport.preview,diagnosticId),
+        reconcile:async()=>(await reconcileConsumptionImport(pendingImport.preview,diagnosticId)).allApplied,
+        refresh:async()=>{
+          const refreshedWorkspace=await fetchConsumptionWorkspace(undefined,"ALL");
+          if(viewPillar==="ALL")adoptWorkspace(refreshedWorkspace);
+          await loadRecordsPage(false,{fromQuarter:refreshedWorkspace.fromQuarter,toQuarter:refreshedWorkspace.toQuarter,search:appliedSearch},viewPillar,"query",false,diagnosticId);
+        },
+        isConfirmedStorageFailure:isConfirmedPreCommitImportFailure
+      });
+      if(outcome.state==="STORAGE_FAILED"){
+        const message=`확정된 저장 실패 · ${formatConsumptionImportError(outcome.error,"Actual Import","Consumption Records","Records")} · 진단 ID: ${diagnosticId}`;
+        setImportError(message);
+        setImportResult(message);
+        setImportPhase("preview");
+      }else if(outcome.state==="UNCONFIRMED"){
+        const message=`반영 결과 미확인 · Apply 결과와 읽기 전용 fingerprint 상태를 확인하지 못했습니다. 자동 Apply 또는 재업로드하지 않았습니다. 진단 ID: ${diagnosticId}`;
+        setImportError(message);setImportResult(message);setImportPhase("error");
+      }else{
+        const summary=outcome.receipt
+          ?`Incoming physical facts: ${outcome.receipt.physicalFactCount} · Inserted: ${outcome.receipt.insertedFactCount} · Overwritten: ${outcome.receipt.overwrittenFactCount} · Existing same values: ${outcome.receipt.unchangedFactCount} · Exact replay skipped: ${outcome.receipt.skippedFactCount} · Deleted: ${outcome.receipt.deletedFactCount} · Upload duplicates: ${outcome.receipt.deduplicatedFactCount} · Duplicate file set: ${outcome.receipt.duplicate ? "Yes" : "No"}`
+          :`Apply 응답 유실 후 읽기 전용 fingerprint 확인: ${pendingImport.preview.files.length}개 APPLIED`;
+        if(outcome.state==="REFRESH_FAILED"){
+          const message=`반영 완료·화면 갱신 실패 · 저장은 확인되었지만 Consumption Records를 갱신하지 못했습니다. 진단 ID: ${diagnosticId}`;
+          setImportError(message);setImportResult(`${summary} · ${message}`);setImportPhase("warning");
         }else{
-          setSavedPlans([]);setDraftPlans([]);setSavedControlTotals([]);setDraftControlTotals([]);setRecordAccountNames([]);
-          setRecordsTotalAccounts(0);setRecordsNextOffset(0);setRecordsHasMore(false);setDataMode("error");
+          setSelectedSignalId("");setEditCell(null);
+          setImportResult(`반영 완료 · ${summary} · 진단 ID: ${diagnosticId}`);setImportPhase("complete");
         }
-        refreshMessage=`Import succeeded, but Consumption Records could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "unknown error"}`;
-        setImportError(refreshMessage);
       }
-      setSelectedSignalId("");
-      setEditCell(null);
-      setImportResult(`Incoming physical facts: ${result.physicalFactCount} · Inserted: ${result.insertedFactCount} · Overwritten: ${result.overwrittenFactCount} · Existing same values: ${result.unchangedFactCount} · Exact replay skipped: ${result.skippedFactCount} · Deleted: ${result.deletedFactCount} · Upload duplicates: ${result.deduplicatedFactCount} · Duplicate file set: ${result.duplicate ? "Yes" : "No"}${refreshMessage ? ` · ${refreshMessage}` : ""}`);
-      setImportPhase(refreshFailed?"warning":"complete");
-    } catch (error) {
-      const confirmedRequestFailure = isConfirmedPreCommitImportFailure(error);
-      const resultMessage = confirmedRequestFailure
-        ? formatConsumptionImportError(error, "Actual Import", "Consumption Records", "Records")
-        : "처리 결과를 확인하지 못했습니다. 반영 여부 확인이 필요합니다.";
-      setImportError(resultMessage);
-      setImportResult(resultMessage);
-      setImportPhase(confirmedRequestFailure ? "preview" : "error");
     } finally {
       actualApplyingRef.current = false;
     }

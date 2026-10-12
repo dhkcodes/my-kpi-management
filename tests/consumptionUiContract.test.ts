@@ -411,8 +411,14 @@ assert.doesNotMatch(recordsPage, /pendingForecastImport\.preview\.exactReplay|�
 assert.doesNotMatch(recordsPage, /DB mutation|Applied \$\{result\.appliedCount\} Forecast cells/,
   "internal Forecast replay, mutation, and Applied codes are not shown to users");
 assert.doesNotMatch(recordsPage, /Applied: 0/, "Actual result decoding failures must not claim that zero rows were applied");
-assert.match(recordsPage, /처리 결과를 확인하지 못했습니다\. 반영 여부 확인이 필요합니다\./,
-  "ambiguous Actual apply results must explicitly require a data-state check");
+assert.match(recordsPage, /반영 결과 미확인/,
+  "ambiguous Actual apply results remain unconfirmed after read-only fingerprint reconciliation");
+assert.match(recordsPage, /반영 완료·화면 갱신 실패/,
+  "confirmed storage and Records refresh failure are separate states");
+assert.match(recordsPage, /확정된 저장 실패/,
+  "pre-commit validation failures remain distinct from ambiguous results");
+assert.match(recordsPage, /자동 Apply 또는 재업로드하지 않았습니다/,
+  "ambiguous result handling never retries Apply automatically");
 const navigation = readFileSync("src/data/kpiMockData.ts", "utf8");
 const routes = readFileSync("src/components/navigationRoutes.ts", "utf8");
 const authSession = readFileSync("src/auth/authSession.ts", "utf8");

@@ -235,7 +235,6 @@ export type ConsumptionImportResult = Readonly<{
   sourceRowCount: number;
 }>;
 export type ConsumptionMultiImportResult = Readonly<{
-  workspace: ConsumptionApiWorkspace;
   batchIds: readonly number[];
   duplicate: boolean;
   physicalFactCount: number;
@@ -245,6 +244,13 @@ export type ConsumptionMultiImportResult = Readonly<{
   overwrittenFactCount: number;
   skippedFactCount: number;
   deletedFactCount: number;
+  workspaceEtag: string;
+  diagnosticId: string;
+}>;
+export type ConsumptionImportReconciliation = Readonly<{
+  files: readonly Readonly<{ sourceSha256: string; pillar: Exclude<ConsumptionPillar, "ALL">; state: "APPLIED" | "NOT_FOUND"; batchId: number | null }>[];
+  allApplied: boolean;
+  diagnosticId: string;
 }>;
 export type ConsumptionCsvExport = Readonly<{ blob: Blob; fileName: string }>;
 export type ConsumptionForecastWideResolution = "EXACT_PLAN" | "SIMILAR_ACCOUNT" | "PLAN_UNASSIGNED";
@@ -1122,7 +1128,7 @@ const decodeRecordsTotals = (value: unknown): ConsumptionRecordsTotals => {
   return { ...withStatuses, mtdAsOfByPeriod: Object.fromEntries(asOfEntries) as Record<string, string> };
 };
 
-export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): Promise<ConsumptionRecordsPage> => {
+export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery, diagnosticId?: string): Promise<ConsumptionRecordsPage> => {
   const pillar = query.pillar ?? "ALL";
   if (!isConsumptionPillar(pillar) || !((query.fromQuarter === "" || fiscalQuarterPattern.test(query.fromQuarter))
       && (query.toQuarter === "" || fiscalQuarterPattern.test(query.toQuarter)))
@@ -1135,7 +1141,8 @@ export const fetchConsumptionRecords = async (query: ConsumptionRecordsQuery): P
     sort: query.sort, direction: query.direction, offset: String(query.offset), limit: String(query.limit)
   });
   if (query.pillar !== undefined) parameters.set("pillar", pillar);
-  const { response, payload } = await request(`/consumption/records?${parameters}`, undefined, pillar, true);
+  const { response, payload } = await request(`/consumption/records?${parameters}`,
+    diagnosticId ? { headers: { "X-Diagnostic-Id": diagnosticId } } : undefined, pillar, true);
   if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption records response");
   const raw = payload as Record<string, unknown>;
   if (!Array.isArray(raw.accountGroups) || raw.accountGroups.length > query.limit || !isNonNegativeInteger(raw.totalAccounts)
@@ -1424,8 +1431,8 @@ export const exportConsumptionForecastXlsx = async (pillar: ConsumptionPillar): 
   return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.xlsx" };
 };
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
-export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar, validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionMultiImportResult>;
-export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL", validatedPreview?: ConsumptionImportPreview): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
+export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar, validatedPreview?: ConsumptionImportPreview, diagnosticId?: string): Promise<ConsumptionMultiImportResult>;
+export async function applyConsumptionImport(input: string | readonly File[], pillar: ConsumptionPillar = "ALL", validatedPreview?: ConsumptionImportPreview, diagnosticId?: string): Promise<ConsumptionImportResult | ConsumptionMultiImportResult> {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
   const expectedBatchCount = typeof input === "string" ? 1 : validatedPreview ? (() => {
     const expectedNames = input.map((file) => file.name);
@@ -1442,25 +1449,28 @@ export async function applyConsumptionImport(input: string | readonly File[], pi
   })() : input.length;
   const init: RequestInit = typeof input === "string"
     ? { method: "POST", headers: { "Content-Type": "text/csv; charset=UTF-8" }, body: input }
-    : { method: "POST", body: multipartFiles(input) };
+    : { method: "POST", headers: diagnosticId ? { "X-Diagnostic-Id": diagnosticId } : undefined, body: multipartFiles(input) };
   const path = typeof input === "string" ? "/consumption/imports/apply" : `/consumption/imports/apply?pillar=${pillar}`;
   const { response, payload } = await request(path, init);
   if (typeof input !== "string") {
     if (typeof payload !== "object" || payload === null) throw new Error("Malformed Consumption multi-file import result");
     const raw=payload as Record<string,unknown>;
-    const workspace=parseWorkspace(raw.workspace,response.headers.get("ETag"),"ALL");
+    const responseDiagnosticId=response.headers.get("X-Diagnostic-Id");
     if (!Array.isArray(raw.batchIds) || raw.batchIds.length !== expectedBatchCount || raw.batchIds.some((id)=>!isPositiveInteger(id))
       || typeof raw.duplicate !== "boolean" || !isNonNegativeInteger(raw.physicalFactCount)
       || !isNonNegativeInteger(raw.deduplicatedFactCount) || !isNonNegativeInteger(raw.insertedFactCount)
       || !isNonNegativeInteger(raw.unchangedFactCount) || !isNonNegativeInteger(raw.overwrittenFactCount)
-      || !isNonNegativeInteger(raw.skippedFactCount)
+      || !isNonNegativeInteger(raw.skippedFactCount) || !isNonEmptyString(raw.workspaceEtag)
+      || !isNonEmptyString(raw.diagnosticId) || !isNonEmptyString(responseDiagnosticId)
+      || raw.diagnosticId !== responseDiagnosticId || (diagnosticId !== undefined && responseDiagnosticId !== diagnosticId)
       || raw.deletedFactCount !== 0) throw new Error("Malformed Consumption multi-file import result");
     if(raw.insertedFactCount+raw.unchangedFactCount+raw.overwrittenFactCount+raw.skippedFactCount!==raw.physicalFactCount)
       throw new Error("Malformed Consumption multi-file import result");
-    return {workspace,batchIds:raw.batchIds as number[],duplicate:raw.duplicate,
+    return {batchIds:raw.batchIds as number[],duplicate:raw.duplicate,
       physicalFactCount:raw.physicalFactCount,deduplicatedFactCount:raw.deduplicatedFactCount,
       insertedFactCount:raw.insertedFactCount,unchangedFactCount:raw.unchangedFactCount,
-      overwrittenFactCount:raw.overwrittenFactCount,skippedFactCount:raw.skippedFactCount,deletedFactCount:raw.deletedFactCount};
+      overwrittenFactCount:raw.overwrittenFactCount,skippedFactCount:raw.skippedFactCount,deletedFactCount:raw.deletedFactCount,
+      workspaceEtag:raw.workspaceEtag,diagnosticId:raw.diagnosticId};
   }
   const result = payload as { workspace?: unknown; planCount?: unknown; controlTotalCount?: unknown; insertedCount?: unknown; updatedCount?: unknown; appliedCount?: unknown; selectedPillar?: unknown; noOpCount?: unknown; conflictCount?: unknown };
   const workspace = parseWorkspace(result.workspace, response.headers.get("ETag"), pillar);
@@ -1476,6 +1486,37 @@ export async function applyConsumptionImport(input: string | readonly File[], pi
     insertedCount:result.insertedCount, updatedCount:result.updatedCount, appliedCount:result.appliedCount,
     noOpCount, conflictCount, sourceRowCount:result.planCount+result.controlTotalCount };
 }
+
+export const reconcileConsumptionImport = async (
+  preview: ConsumptionImportPreview, diagnosticId: string
+): Promise<ConsumptionImportReconciliation> => {
+  if (!diagnosticId || !/^[A-Za-z0-9._-]{1,64}$/.test(diagnosticId) || preview.files.length < 1 || preview.files.length > 8)
+    throw new Error("Invalid Consumption import reconciliation request");
+  const parameters=new URLSearchParams();
+  preview.files.forEach((file)=>{parameters.append("sourceSha256",file.sourceSha256);parameters.append("pillar",file.detectedPillar);});
+  const { response, payload }=await request(`/consumption/imports/status?${parameters}`,
+    { headers: { "X-Diagnostic-Id": diagnosticId } },"ALL",true);
+  const responseDiagnosticId=response.headers.get("X-Diagnostic-Id");
+  if(typeof payload!=="object"||payload===null||!Array.isArray((payload as Record<string,unknown>).files)
+    ||typeof (payload as Record<string,unknown>).allApplied!=="boolean"||responseDiagnosticId!==diagnosticId)
+    throw new Error("Malformed Consumption import reconciliation response");
+  const raw=payload as {files:unknown[];allApplied:boolean};
+  const files=raw.files.map((value,index)=>{
+    if(typeof value!=="object"||value===null)throw new Error("Malformed Consumption import reconciliation response");
+    const item=value as Record<string,unknown>;const expected=preview.files[index];
+    if(!expected||item.sourceSha256!==expected.sourceSha256||item.pillar!==expected.detectedPillar
+      ||(item.state!=="APPLIED"&&item.state!=="NOT_FOUND")
+      ||!(item.batchId===null||isPositiveInteger(item.batchId))
+      ||(item.state==="APPLIED"&&item.batchId===null)||(item.state==="NOT_FOUND"&&item.batchId!==null))
+      throw new Error("Malformed Consumption import reconciliation response");
+    return {sourceSha256:item.sourceSha256 as string,pillar:item.pillar as Exclude<ConsumptionPillar,"ALL">,
+      state:item.state as "APPLIED"|"NOT_FOUND",batchId:item.batchId as number|null};
+  });
+  if(files.length!==preview.files.length||raw.allApplied!==files.every((file)=>file.state==="APPLIED"))
+    throw new Error("Malformed Consumption import reconciliation response");
+  return {files,allApplied:raw.allApplied,diagnosticId:responseDiagnosticId};
+};
+
 const forecastWideBody = (file: File) => {
   const body = new FormData();
   body.append("files", file, file.name);
