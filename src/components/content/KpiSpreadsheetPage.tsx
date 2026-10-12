@@ -828,6 +828,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     setPageLoading(true);
     if (fiscalYearChanged) {
       setRows([]); setOverviewItems([]); setActivitySummary(null);
+      setLastDataLoadedAt(null);
     }
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
       if (!active) return;
@@ -837,7 +838,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     }).catch((error) => {
       if (!active) return;
       const message = error instanceof Error ? error.message : "KPI API request failed.";
-      setRows([]); setOverviewItems([]); setActivitySummary(null);
+      if (fiscalYearChanged) {
+        setRows([]); setOverviewItems([]); setActivitySummary(null);
+      }
       setApiError(message);
       setApiMessage(`KPI API unavailable — ${message}`);
     })
