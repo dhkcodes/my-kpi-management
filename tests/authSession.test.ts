@@ -18,6 +18,7 @@ assert.equal(parseAuthProfile({ ...session, lastLoginAt: "2026-10-12T10:46:10Z" 
 assert.equal(formatLastLoginAtKst("2026-10-12T10:46:10Z"), "2026-10-12 19:46:10");
 assert.equal(formatLastLoginAtKst(null), "No login record");
 assert.throws(() => parseAuthProfile({ ...session, lastLoginAt: "not-a-date" }), /Invalid authentication response/);
+assert.throws(() => parseAuthProfile({ ...session, lastLoginAt: "2026-02-30T00:00:00Z" }), /Invalid authentication response/);
 assert.throws(() => parseAuthProfile({ ...session, status: "PENDING" }), /Invalid authentication response/);
 
 console.log("auth session tests passed");

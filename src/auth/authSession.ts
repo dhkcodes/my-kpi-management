@@ -59,6 +59,17 @@ export function formatLastLoginAtKst(value: string | null | undefined): string {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
+function isAbsoluteIsoTimestamp(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match || Number.isNaN(Date.parse(value))) return false;
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  return calendarDate.getUTCFullYear() === year
+    && calendarDate.getUTCMonth() === month - 1
+    && calendarDate.getUTCDate() === day;
+}
+
 export function parseAuthProfile(value: unknown): AuthSession {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Invalid authentication response.");
@@ -75,8 +86,7 @@ export function parseAuthProfile(value: unknown): AuthSession {
   const rawLastLoginAt = profile.lastLoginAt;
   if (rawLastLoginAt !== undefined && rawLastLoginAt !== null
       && (typeof rawLastLoginAt !== "string"
-        || !/(?:Z|[+-]\d{2}:\d{2})$/.test(rawLastLoginAt)
-        || Number.isNaN(Date.parse(rawLastLoginAt)))) {
+        || !isAbsoluteIsoTimestamp(rawLastLoginAt))) {
     throw new Error("Invalid authentication response.");
   }
   const lastLoginAt = typeof rawLastLoginAt === "string" ? rawLastLoginAt : null;
