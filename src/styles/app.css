@@ -6411,6 +6411,9 @@ oj-menu-button.consumption-analysis-fy-button { min-width: 5.75rem; white-space:
 .kap-page-shell.consumption-insights-page .consumption-page-progress-controls[data-visible="false"] {
   display: none;
 }
+.kap-page-shell.consumption-insights-page .consumption-page-progress-controls[data-visible="true"] {
+  display: contents;
+}
 .kap-page-shell.forecast-actual-page .forecast-actual-results {
   gap: .375rem;
 }
