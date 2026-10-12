@@ -65,18 +65,34 @@ void (async () => {
     "the redundant Consumption ($K) label must be removed");
   assert.doesNotMatch(page, /consumption-summary__mode consumption-summary__mode--/,
     "mode labels must not be repeated inside amount cells");
+  assert.match(page, /await loadConsumptionSummary\([\s\S]*if \(generation !== recordsRequestGeneration\.current\) return;/,
+    "Records must await the matching Summary before exposing the completed result");
+  assert.match(page, /setConsumptionSummaryError\([^;]+;\s*throw error;/,
+    "a failed Summary must reject the matching Records replacement before either result is exposed");
+  assert.match(page, /loadConsumptionSummary\(recordsQueryRef\.current,[\s\S]*\.catch\(\(\) => undefined\)/,
+    "Show MTD must settle a failed Summary request without leaving an unhandled rejection");
   assert.match(page, /const recordsActivityBusy = rangeLoading \|\| recordsLoading \|\| consumptionSummaryLoading/,
     "Records progress must remain active until both Records and Summary are settled");
-  assert.match(page, /const visibleTop = Math\.max\(rootRect\.top, tableRect\.top, 0\)/,
-    "Records progress must anchor to the visible Records body rather than the full page");
-  assert.match(page, /const visibleBottom = Math\.min\(rootRect\.bottom, tableRect\.bottom, window\.innerHeight\)/,
-    "Records progress must stay centered in the visible Records body after scroll or resize");
+  assert.match(page, /const visibleTop = Math\.max\(rootRect\.top, 0\)/,
+    "Records progress must anchor to the visible PageShell body rather than Summary or table geometry");
+  assert.match(page, /const visibleBottom = Math\.min\(rootRect\.bottom, window\.innerHeight\)/,
+    "Records progress must stay centered in the visible PageShell body after scroll or resize");
+  assert.match(page, /\[\.\.\.summary\.displayQuarterOrder\]\.reverse\(\)/,
+    "Summary quarters must display newest first without changing the API's chronological QoQ values");
+  assert.doesNotMatch(page, /page\.accountGroups\.map\([\s\S]{0,300}\)\.filter\(\(group\) => group\.plans\.length/,
+    "Records must not drop API account groups that only have actual totals");
+  assert.match(page, /setRecordsQueryError\(message\)[\s\S]*setImportError\(""\)/,
+    "a failed replacement query must expose an error instead of retaining the previous result as current");
   assert.match(styles, /\.kap-page-shell\.consumption-page \.consumption-summary__table th,[\s\S]*border-right:/,
     "Summary borders must remain local to Consumption Records");
   assert.match(styles, /\.consumption-summary__table tbody th:first-child[^}]*font-size:\s*\.9rem/s,
     "Summary row labels must match Records account-name sizing");
   assert.match(styles, /\.consumption-summary__amount[^}]*font-size:\s*\.88rem/s,
     "Summary amounts must match Records numeric sizing");
+  assert.match(styles, /\.consumption-summary__amount small \{[^}]*font-weight:\s*400[^}]*white-space:\s*nowrap/s,
+    "MTD composition labels and amounts must remain regular-weight on one line");
+  assert.match(styles, /\.consumption-summary__qoq \{[^}]*font-weight:\s*800/s,
+    "Summary QoQ values must be bold and right aligned");
 
   console.log("consumption summary contract passed");
 })();
