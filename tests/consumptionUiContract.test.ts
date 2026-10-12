@@ -128,8 +128,8 @@ assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecas
 assert.match(content, /const isKapPageShellRoute = \["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "all three Consumption PageShell pages share the root content geometry");
 
-assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) setFiscalYear\(year\); \}\} \/>/u,
-  "Analysis renders the shared fiscal-year picker beside the title");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) runQueryControlAction\(\(\) => setFiscalYear\(year\)\); \}\} \/>/u,
+  "Analysis renders the shared fiscal-year picker beside the title and synchronously locks the request trigger");
 assert.match(insightsPage, /const fiscalYearControl = <FiscalYearSelector/u,
   "Analysis keeps fiscal-year selection in its page-owned picker contract");
 assert.match(insightsPage, /titleControls=\{fiscalYearControl\}/u,
@@ -176,8 +176,8 @@ assert.match(mtdControl, /formatMtdAppliedDate\(mtdAppliedDate \?\? null\)[\s\S]
   "the shared tooltip formats one UTC-basis Updated on date from metadata");
 assert.doesNotMatch(insightsPage, />MTD updated \{mtdAppliedDate\}|>Uploaded \{mtdAppliedDate\}/u,
   "Analysis does not label the import batch timestamp as MTD updated or Uploaded");
-assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) setFiscalYear\(year\); \}\} \/>/u,
-  "Analysis delegates page-local fiscal-year browsing and selection to the shared picker");
+assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) runQueryControlAction\(\(\) => setFiscalYear\(year\)\); \}\} \/>/u,
+  "Analysis delegates fiscal-year selection through the synchronous query lock");
 assert.doesNotMatch(insightsPage, /handleFiscalYearMenuAction|handleFiscalYearMenuKeyDown/u,
   "Analysis no longer maintains the legacy JET fiscal-year menu handlers");
 assert.doesNotMatch(insightsPage, /Current FY <strong>|<select aria-label="Selected fiscal year"/,
@@ -256,11 +256,11 @@ assert.match(styles, /\.kap-data-control-bar\s*\{(?=[^}]*min-width:\s*0;)(?=[^}]
   "Data Control Bar keeps only non-visual containment needed by the named component");
 assert.doesNotMatch(styles, /\.kap-data-control-bar\s*\{[^}]*(?:min-height|padding|margin|gap|align-items|justify-content):/s,
   "Data Control Bar does not override the pre-commonization page-specific height, alignment or spacing");
-assert.match(insightsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+assert.match(insightsPage, /<PageActivity[\s\S]{0,400}compactTimestampButton/,
   "Analysis restores completion time inside the original compact Reload button");
-assert.match(forecastActualPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+assert.match(forecastActualPage, /<PageActivity[\s\S]{0,400}compactTimestampButton/,
   "Forecast vs Actual restores completion time inside the original compact Reload button");
-assert.match(recordsPage, /<PageActivity[\s\S]{0,240}compactTimestampButton/,
+assert.match(recordsPage, /<PageActivity[\s\S]{0,400}compactTimestampButton/,
   "Records restores completion time inside the original compact Reload button");
 assert.match(styles, /\.kap-page-shell\.consumption-insights-page,\s*\.kap-page-shell\.forecast-actual-page,\s*\.kap-page-shell\.consumption-page\s*\{[^}]*border-radius:\s*var\(--oj-core-border-radius-md, \.2rem\);/s,
   "only the three Consumption root containers use the same small radius as their grids");
@@ -498,7 +498,7 @@ assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]
 assert.match(insightsPage, /const analysis = analysisResponse;/, "Analysis keeps the last completed response mounted while filters refresh");
 assert.doesNotMatch(insightsPage, /analysisResponse\.selectedAccount === \(selectedAccountContext \|\| null\)/, "same-FY filter changes do not unmount the Analysis header and controls");
 assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>/, "Analysis initial loading reuses the Records initial PageShell-body loading card");
-assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{loading \|\| !!exporting\}[\s\S]*compactTimestampButton[\s\S]*<ConsumptionViewportProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis restores one compact icon-or-spinner and timestamp button while exposing the detailed partial-refresh state accessibly");
+assert.match(insightsPage, /const refreshStatusLabel = analysis\.fiscalYear === fiscalYear[\s\S]*showing \$\{analysis\.fiscalYear\} until complete[\s\S]*<PageActivity busy=\{loading\} busyLabel=\{refreshStatusLabel\} refreshDisabled=\{queryControlsLocked \|\| !!exporting\}[\s\S]*compactTimestampButton[\s\S]*<ConsumptionViewportProgress busy=\{loading\} busyLabel=\{refreshStatusLabel\}/, "Analysis restores one compact icon-or-spinner and timestamp button while exposing the detailed partial-refresh state accessibly");
 assert.doesNotMatch(insightsPage, /hasStaleFiscalYearResponse|accounts-workloads-loading/u, "Analysis uses the shared page shell instead of a replacing loading surface");
 assert.doesNotMatch(insightsPage, /setAnalysis\(null\)/, "a failed FY transition preserves the last completed response while rendering a floating error");
 assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)[\s\S]*setSelectedPillar\(analysisResponse\.selectedPillar\)[\s\S]*setSelectedSalesRep\(analysisResponse\.selectedSalesRep \?\? ""\)[\s\S]*setSelectedAccountContext\(analysisResponse\.selectedAccount \?\? ""\)/, "failed refreshes restore the filter context of the still-displayed response");
@@ -568,8 +568,8 @@ assert.equal(insightsPage.includes("const [includeMtd, setIncludeMtd] = useState
 assert.equal(insightsPage.includes("includeMtd"), true, "Analysis request includes the MTD mode");
 assert.match(insightsPage, /<ConsumptionMtdControl checked=\{includeMtd\}/u, "Analysis exposes the shared Show MTD toolbar toggle");
 assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
-assert.match(recordsPage, /<ConsumptionMtdControl checked=\{showMtd\}/u, "Records exposes the shared Show MTD toggle");
-assert.equal(mtdControl.includes("Show MTD"), true, "the shared control retains the visible Show MTD label");
+assert.match(recordsPage, /<ConsumptionMtdControl checked=\{showMtd\}/u, "Records exposes the shared Include MTD toggle");
+assert.equal(mtdControl.includes("Include MTD"), true, "the shared control exposes the approved Include MTD label");
 assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
 assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPeriod[\s\S]*serverMtdTotals\[currentMtdPeriod\][\s\S]*actualsExact: \{ \.\.\.displayedActualsExact \}[\s\S]*forecastsExact: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
@@ -644,7 +644,7 @@ assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{sel
 assert.match(insightsPage, /selectedMovement\.category === "All"[\s\S]*<th>Total<\/th><th>New<\/th><th>Expansion<\/th><th>Reduction<\/th>/, "All detail distinguishes every stored composition amount without duplicating the K unit in headers");
 assert.doesNotMatch(insightsPage, /FORECAST · projection|MIXED · projection/, "Forecast status does not repeat its meaning with the redundant projection label");
 assert.match(insightsPage, /if \(!analysis\) return <PageShell[\s\S]*<PageDataProgress busy=\{loading\} busyLabel="Loading data" \/>[\s\S]*<\/PageShell>;/, "Initial Analysis loading renders only the Records-compatible loading shell without export controls");
-assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("png"\)[\s\S]*disabled=\{loading \|\| !!exporting\}[\s\S]*downloadCanvas\("pdf"\)[\s\S]*<\/div>\}/, "PNG and PDF controls stay mounted for completed Analysis data and disable during refresh or export");
+assert.match(insightsPage, /actions=\{<div class="consumption-import-actions is-compact"[\s\S]*disabled=\{!!exporting\}[\s\S]*downloadCanvas\("png"\)[\s\S]*disabled=\{!!exporting\}[\s\S]*downloadCanvas\("pdf"\)[\s\S]*<\/div>\}/, "PNG and PDF controls stay mounted for completed Analysis data and remain available during query refresh");
 assert.match(insightsPage, /class="consumption-metric is-actual"[\s\S]*class="consumption-metric is-forecast"[\s\S]*class="consumption-metric is-quarter"/, "Analysis retains text labels while applying semantic highlight classes");
 assert.match(insightsPage, /legend=\{\{ rendered: "off"/, "Forecast composition disables the Oracle JET default legend palette");
 assert.match(insightsPage, /consumption-insights-composition-legend[\s\S]*Object\.entries\(MOVEMENT_COLORS\)/, "Forecast composition custom legend is bound to the exact chart category colors");
@@ -724,8 +724,8 @@ assert.match(recordsPage, /onNavigationGuardChange[\s\S]*window\.confirm\(/, "un
 assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*id="consumptionToQuarter"[\s\S]*isConsumptionQuarterRangeValid/, "Data keeps its independent Quarter range");
 assert.match(recordsPage, /expandConsumptionQuarterOptions[\s\S]*setAvailableQuarterOptions/, "every represented Fiscal Year exposes Q1 through Q4 in the mobile-compatible native selects");
 assert.match(recordsPage, /selectPillar[\s\S]*runRecordsQuery\(\{ fromQuarter, toQuarter, search: appliedSearch \}, pillar\)/, "pillar changes immediately retain the applied From and To range");
-assert.match(recordsPage, /selectQuarterRange[\s\S]*setFromQuarter\(nextFromQuarter\)[\s\S]*setToQuarter\(nextToQuarter\)[\s\S]*isConsumptionQuarterRangeValid[\s\S]*runRecordsQuery/,
-  "each valid From or To selection applies immediately while invalid ranges remain local for validation");
+assert.match(recordsPage, /selectQuarterRange[\s\S]*isConsumptionQuarterRangeValid[\s\S]*runRecordsQuery\(\{[\s\S]*fromQuarter: nextFromQuarter[\s\S]*toQuarter: nextToQuarter/,
+  "each valid From or To selection applies through the guarded query while invalid ranges remain local for validation");
 assert.match(recordsPage, /consumption-range-bar[\s\S]*consumption-range-pillar[\s\S]*consumption-pillar-selector[\s\S]*consumptionFromQuarter/, "Pillar is immediately before the From Quarter control in the compact range bar");
 assert.match(recordsPage, /filterVisibleConsumptionPlans\(group\.plans, page\.fromQuarter, page\.toQuarter\)/, "the client defensively applies the same selected-range nonzero Actual or Forecast-presence rule as the backend");
 assert.match(recordsPage, /submitRecordsQuery[\s\S]*runRecordsQuery\(\{ fromQuarter, toQuarter, search: draftSearch\.trim\(\) \}\)/, "search icon submits the current quarter and search query atomically");
@@ -757,9 +757,9 @@ assert.match(recordsPage, /generation !== recordsRequestGeneration\.current/, "n
 assert.match(recordsPage, /if \(!append\) \{\s*recordsQueryRef\.current = \{\s*\.\.\.requestQuery,\s*fromQuarter: page\.fromQuarter,\s*toQuarter: page\.toQuarter,\s*\};\s*setFromQuarter\(page\.fromQuarter\);\s*setToQuarter\(page\.toQuarter\);\s*setRangeInitialized\(true\);\s*setRangeTouched\(false\);\s*\}/, "the applied query commits only after the complete response succeeds and remains current");
 assert.match(recordsPage, /shouldRestartConsumptionRecordsPage\(append, apiEtag, page\.etag\)[\s\S]*loadRecordsPage\(false, requestQuery, requestQuery\.pillar, loadingPhase, preserveDrafts, diagnosticId\)/, "an existing snapshot ETag mismatch restarts the complete query before snapshots can be mixed");
 assert.match(recordsPage, /offset:\s*append \? recordsNextOffset : 0[\s\S]*sort:\s*"ACCOUNT"[\s\S]*direction:\s*"ASC"/, "records paging uses a stable server order without user-facing sort controls");
-assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{blockingRecordsLoading\}/, "search remains mounted while a complete replacement query loads");
-assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}[\s\S]*id="consumptionToQuarter"[\s\S]*disabled=\{rangeLoading \|\| blockingRecordsLoading \|\| hasDraftChanges\}/, "From and To controls retain their established loading guard");
-assert.match(recordsPage, /consumption-record-search__submit[\s\S]*disabled=\{!isConsumptionQuarterRangeValid\(fromQuarter, toQuarter\) \|\| rangeLoading \|\| blockingRecordsLoading/, "search submission remains guarded while a blocking replacement query loads");
+assert.match(recordsPage, /id="consumptionRecordSearch"[\s\S]*value=\{draftSearch\}[\s\S]*disabled=\{recordsQueryControlsDisabled\}/, "search remains mounted and locks while a replacement query loads");
+assert.match(recordsPage, /id="consumptionFromQuarter"[\s\S]*disabled=\{recordsQueryControlsDisabled\}[\s\S]*id="consumptionToQuarter"[\s\S]*disabled=\{recordsQueryControlsDisabled\}/, "From and To controls use the shared query lock");
+assert.match(recordsPage, /consumption-record-search__submit[\s\S]*disabled=\{recordsQueryControlsDisabled \|\| !isConsumptionQuarterRangeValid\(fromQuarter, toQuarter\)/, "search submission remains guarded while a replacement query loads");
 assert.doesNotMatch(recordsPage, /IntersectionObserver|data-records-sentinel|Load More|All accounts loaded\.|Showing\s*<strong class="consumption-records-count-value">/,
   "Records removes incremental-loading sentinels, partial-result copy, and manual paging controls");
 assert.match(recordsPage, /const loadedAccountCount = renderedRecordAccounts\.length;[\s\S]*const loadedPlanCount = countUniqueConsumptionPlans/,
@@ -770,13 +770,14 @@ assert.ok(recordsPage.includes('class="consumption-records-count-summary"')
   "the completed table shows centered Account and unique Plan counts");
 assert.match(recordsPage, /No Consumption Records match the selected range and filters\./, "empty filtered results remain explicit");
 assert.match(recordsPage, /recordsReplacementLoading = recordsLoadingPhase === "initial" \|\| recordsLoadingPhase === "query"/, "initial and replacement queries share an explicit non-table loading gate");
-assert.match(recordsPage, /recordsViewState = resolveConsumptionRecordsViewState\([\s\S]*recordsReplacementLoading, dataMode, recordsQueryError, renderedRecordAccounts\.length\)/, "Records distinguishes loading, error, empty, and ready states from completed request data");
+assert.match(recordsPage, /recordsQueryDisplayError = renderedRecordAccounts\.length === 0 \? recordsQueryError : ""[\s\S]*recordsViewState = resolveConsumptionRecordsViewState\([\s\S]*recordsReplacementLoading, dataMode, recordsQueryDisplayError, renderedRecordAccounts\.length\)/, "Records distinguishes initial loading/error/empty states while preserving successful rows on refresh failure");
 assert.match(recordsPage, /consumption-table-panel[\s\S]*consumption-table-content[\s\S]*recordsViewState !== "error"/,
   "the table panel remains mounted while failed initial content is withheld from the data region");
 assert.doesNotMatch(recordsPage, /Unable to load Consumption Records/,
   "Records does not duplicate the shared inline load error inside the table panel");
 assert.match(recordsPage, /recordsViewState === "empty" &&[\s\S]*No Consumption Records match the selected range and filters\./, "the empty copy is reachable only from the completed empty state");
-assert.match(recordsPage, /setRecordsQueryError\(""\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*loadRecordsPage\(false, requestQuery[\s\S]*catch \(error\)[\s\S]*setRecordsQueryError\(message\)/, "replacement queries hide stale records and surface the latest request error");
+assert.doesNotMatch(recordsPage, /setRecordsQueryError\(""\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*loadRecordsPage\(false, requestQuery/, "replacement queries preserve the last successful record rows while refreshing");
+assert.match(recordsPage, /catch \(error\)[\s\S]*setRecordsQueryError\(message\)[\s\S]*setFromQuarter\(recordsQueryRef\.current\.fromQuarter\)[\s\S]*setToQuarter\(recordsQueryRef\.current\.toQuarter\)/, "failed replacement queries surface the error and restore the last applied range controls");
 assert.match(recordsPage, /const accountNames = \[\.\.\.new Set\([\s\S]*workspace\.accountForecasts[\s\S]*forecastControls\.filter[\s\S]*visibleGroups = accountNames\.map/, "forecast-only Plan-unassigned accounts survive pagination without requiring Plan rows");
 assert.doesNotMatch(recordsPage, /Page \{[^}]*\}|page-number|rowsPerPage/, "page-number pagination is absent");
 assert.match(recordsPage, /renderedRecordAccounts\.map/, "the table renders the incremental account collection");
@@ -877,7 +878,7 @@ assert.match(insightsPage, /import html2canvasPro = require\("html2canvas-pro"\)
 assert.match(insightsPage, /html2canvasModule\.default \?\? html2canvasModule\.html2canvas/, "the renderer is resolved from its AMD module shape");
 assert.doesNotMatch(insightsPage, /PNG 생성 중|PDF 생성 중|oj-progress-circle/u, "exports use the shared app loading overlay instead of local progress UI");
 assert.match(insightsPage, /const finishBusy = beginAppBusy\(\)[\s\S]*finally[\s\S]*finishBusy\(\)/, "export loading always releases the shared busy counter");
-assert.match(insightsPage, /disabled=\{loading \|\| !!exporting\}/, "both export buttons reject duplicate clicks while either export is active");
+assert.match(insightsPage, /disabled=\{!!exporting\}/, "both export buttons reject duplicate clicks while either export is active without treating export as a query control");
 assert.match(insightsPage, /finally\s*\{[\s\S]*setExporting\(""\)/, "export controls recover after both success and failure");
 assert.match(styles, /\.consumption-insights-linked-trend h3\s*\{[^}]*font-size:\s*1rem[^}]*font-weight:\s*700/, "ACTUAL Trend matches the card-heading hierarchy rather than inheriting an oversized title");
 
@@ -1065,10 +1066,10 @@ assert.match(forecastActualPage, /placement=\{contentReady \? "floating" : "inli
   "Forecast vs Actual classifies no-content failures as inline and preserved-content failures as floating");
 assert.match(recordsPage, /dataMode === "fallback"[\s\S]*placement="inline"[\s\S]*onRetry=\{refreshRecords\}/,
   "Records uses the shared inline JET error banner when backend data is unavailable");
-assert.doesNotMatch(recordsPage, /const contentReady = dataMode === "backend" && lastDataLoadedAt !== null/,
-  "Records does not retain stale completed content after a replacement-query failure");
-assert.match(recordsPage, /catch \(error\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*setRecordsQueryError\(message\)/,
-  "Records clears replacement rows and exposes the query failure inline");
+assert.match(recordsPage, /recordsQueryDisplayError = renderedRecordAccounts\.length === 0 \? recordsQueryError : ""/,
+  "Records retains completed content and limits the inline empty-state error to requests without preserved rows");
+assert.doesNotMatch(recordsPage, /catch \(error\)[\s\S]*setRecordAccountNames\(\[\]\)[\s\S]*setRecordsQueryError\(message\)/,
+  "Records preserves replacement rows when a query fails");
 assert.doesNotMatch(recordsPage, /setDataMode\("error"\);\s*setImportError/,
   "Records does not duplicate an initial load failure in the floating operation banner");
 assert.match(recordsPage, /if \(dataMode === "backend" && serverActualTotals === null\) pageMessages\.push\(\{ id: "records-total"/,

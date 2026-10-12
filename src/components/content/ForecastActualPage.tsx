@@ -102,6 +102,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   const [account, setAccount] = useState("");
   const [data, setData] = useState<ForecastActualComparison | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryControlsLocked = loading;
   const [error, setError] = useState("");
   const [sortKey, setSortKey] = useState<ForecastActualSortKey>("account");
   const [sortDirection, setSortDirection] = useState<ForecastActualSortDirection>("asc");
@@ -122,6 +123,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   const matrixFrameRef = useRef<HTMLDivElement>(null);
   const matrixScrollRef = useRef<HTMLElement>(null);
   const viewportControlsRef = useRef<HTMLDivElement>(null);
+  const queryControlsLockRef = useRef(true);
 
   useEffect(() => {
     let active = true;
@@ -136,6 +138,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
 
   useEffect(() => {
     const controller = new AbortController();
+    queryControlsLockRef.current = true;
     setLoading(true); setError("");
     fetchForecastActualComparison({ fiscalYear, quarter: "ALL", pillar, actualMode, salesRep, account }, controller.signal)
       .then(async (next) => {
@@ -150,7 +153,12 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
         }
       })
       .catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load Forecast vs Actual."); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          queryControlsLockRef.current = false;
+          setLoading(false);
+        }
+      });
     return () => controller.abort();
   }, [fiscalYear, pillar, actualMode, salesRep, account, refreshNonce]);
 
@@ -160,6 +168,10 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [accountSearchOpen]);
+
+  useEffect(() => {
+    if (queryControlsLocked) setAccountSearchOpen(false);
+  }, [queryControlsLocked]);
 
   useEffect(() => {
     if (accountComposing) return;
@@ -183,6 +195,12 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   // Preserve the previous result while the next filtered request is in flight.
   // The effect cleanup guards against stale responses replacing newer ones.
   const currentData = data;
+  const runQueryControlAction = (action: () => void) => {
+    if (queryControlsLockRef.current) return;
+    queryControlsLockRef.current = true;
+    setLoading(true);
+    action();
+  };
   const contentReady = jetControlsReady && currentData !== null;
 
   const allPeriods = useMemo(
@@ -254,8 +272,14 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   };
   const ariaSort = (key: ForecastActualSortKey): "ascending" | "descending" | "none" => sortKey === key ? (sortDirection === "asc" ? "ascending" : "descending") : "none";
   const resetAccountScope = () => { setAccount(""); setAccountSearch(""); setAccountSearchOpen(false); setAccountOptionCache([]); setActiveAccountIndex(0); setResultFilter(null); };
-  const chooseAccount = (value: string) => { setAccount(value); setAccountSearch(""); setAccountSearchOpen(false); setActiveAccountIndex(0); setResultFilter(null); };
+  const chooseAccount = (value: string) => {
+    if (queryControlsLockRef.current) return;
+    runQueryControlAction(() => {
+      setAccount(value); setAccountSearch(""); setAccountSearchOpen(false); setActiveAccountIndex(0); setResultFilter(null);
+    });
+  };
   const handleAccountKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (queryControlsLockRef.current || event.isComposing) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault(); setAccountSearchOpen(true);
       const direction = event.key === "ArrowDown" ? 1 : -1;
@@ -283,7 +307,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
   const currentFiscalYear = getLatestFiscalYear();
   const fiscalYearControl = <FiscalYearSelector selected={fiscalYear} current={currentFiscalYear}
     className="forecast-actual-fy-button" disabled={loading}
-    onSelect={(year) => { if (year !== fiscalYear) setFiscalYear(year); }} />;
+    onSelect={(year) => { if (year !== fiscalYear) runQueryControlAction(() => setFiscalYear(year)); }} />;
   const updateViewportControls = () => {
     const root = pageScrollRef.current;
     const frame = matrixFrameRef.current;
@@ -376,24 +400,26 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
     filters={contentReady ? <PageFilterPanel className="forecast-actual-toolbar" ariaLabel="Forecast vs Actual filters">
       <div class="forecast-actual-control forecast-actual-pillar"><span>Pillar</span><div class="consumption-pillar-selector" role="group" aria-label="Forecast vs Actual pillar">
         {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={pillar === option.value}
-          onClick={() => { if (option.value === pillar) return; setPillar(option.value); setSalesRep(""); resetAccountScope(); }}>{option.label}</button>)}
+          disabled={queryControlsLocked}
+          onClick={() => { if (queryControlsLockRef.current || option.value === pillar) return; runQueryControlAction(() => { setPillar(option.value); setSalesRep(""); resetAccountScope(); }); }}>{option.label}</button>)}
       </div></div>
-      <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} onChange={(event) => { setQuarter(event.currentTarget.value); setResultFilter(null); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
-      <label class="forecast-actual-control forecast-actual-sales-rep">Sales Rep<select id="forecastActualSalesRep" value={salesRep} onChange={(event) => { setSalesRep(event.currentTarget.value); resetAccountScope(); }}><option value="">All Sales Reps</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
+      <label class="forecast-actual-control">Quarter<select id="forecastActualQuarter" value={quarter} disabled={queryControlsLocked} onChange={(event) => { if (queryControlsLockRef.current) return; setQuarter(event.currentTarget.value); setResultFilter(null); }}><option value="ALL">All</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></label>
+      <label class="forecast-actual-control forecast-actual-sales-rep">Sales Rep<select id="forecastActualSalesRep" value={salesRep} disabled={queryControlsLocked} onChange={(event) => { if (queryControlsLockRef.current) return; const value = event.currentTarget.value; runQueryControlAction(() => { setSalesRep(value); resetAccountScope(); }); }}><option value="">All Sales Reps</option>{data?.salesRepOptions.map((value) => <option value={value}>{value}</option>)}</select></label>
       <div class="forecast-actual-control forecast-actual-search-panel">
         <label htmlFor="forecastActualAccountSearch">Account</label>
         <div class="consumption-insights-combobox forecast-actual-account-search" ref={accountComboboxRef}>
           <input id="forecastActualAccountSearch" type="search" role="combobox" aria-autocomplete="list" aria-expanded={accountSearchOpen} aria-controls="forecastActualAccountOptions"
             aria-activedescendant={accountSearchOpen ? `forecast-actual-account-option-${activeAccountIndex}` : undefined}
             value={accountSearchOpen ? accountSearch : (account || "All Accounts")}
-            onFocus={(event) => { setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
-            onClick={(event) => { setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
-            onInput={(event) => { setAccountSearch(event.currentTarget.value); setAccount(""); setAccountSearchOpen(true); setActiveAccountIndex(0); setResultFilter(null); }}
+            disabled={queryControlsLocked}
+            onFocus={(event) => { if (queryControlsLockRef.current) return; setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
+            onClick={(event) => { if (queryControlsLockRef.current) return; setAccountSearchOpen(true); setAccountSearch(""); event.currentTarget.select(); }}
+            onInput={(event) => { if (queryControlsLockRef.current) return; const value = event.currentTarget.value; const apply = () => { setAccountSearch(value); setAccount(""); setAccountSearchOpen(true); setActiveAccountIndex(0); setResultFilter(null); }; if (account) runQueryControlAction(apply); else apply(); }}
             onCompositionStart={() => setAccountComposing(true)} onCompositionEnd={(event) => { setAccountComposing(false); setAccountSearch(event.currentTarget.value); }} onKeyDown={handleAccountKeyDown} />
-          {account && <button type="button" class="consumption-insights-clear" aria-label="Clear selected account" onClick={() => chooseAccount("")}>Clear</button>}
+          {account && <button type="button" class="consumption-insights-clear" aria-label="Clear selected account" disabled={queryControlsLocked} onClick={() => chooseAccount("")}>Clear</button>}
           {accountSearchOpen && <div id="forecastActualAccountOptions" class="consumption-insights-options" role="listbox">
-            <button id="forecast-actual-account-option-0" type="button" role="option" aria-selected={!account} class={activeAccountIndex === 0 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount("")}><strong>All Accounts</strong><small>전체 Account 보기</small></button>
-            {filteredAccountOptions.map((value, index) => <button key={value} id={`forecast-actual-account-option-${index + 1}`} type="button" role="option" aria-selected={account === value} class={activeAccountIndex === index + 1 ? "is-active" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount(value)}><strong>{value}</strong></button>)}
+            <button id="forecast-actual-account-option-0" type="button" role="option" aria-selected={!account} class={activeAccountIndex === 0 ? "is-active" : ""} disabled={queryControlsLocked} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount("")}><strong>All Accounts</strong><small>전체 Account 보기</small></button>
+            {filteredAccountOptions.map((value, index) => <button key={value} id={`forecast-actual-account-option-${index + 1}`} type="button" role="option" aria-selected={account === value} class={activeAccountIndex === index + 1 ? "is-active" : ""} disabled={queryControlsLocked} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseAccount(value)}><strong>{value}</strong></button>)}
             {!filteredAccountOptions.length && <p>No matching accounts.</p>}
           </div>}
         </div>
@@ -409,8 +435,8 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
         <div class="consumption-records-toolbar__left forecast-actual-toolbar-summary">
           <ConsumptionMtdControl checked={actualMode === "MTD"} disabled={loading || !currentData?.currentMtdAvailable}
             mtdAppliedDate={mtdAppliedTimestamp}
-            onToggle={() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); }}
-            tooltipId="forecast-show-mtd-tooltip" />
+            onToggle={() => runQueryControlAction(() => { setResultFilter(null); setActualMode((current) => current === "MTD" ? "FINAL" : "MTD"); })}
+            tooltipId="forecast-include-mtd-tooltip" />
           <div class="forecast-actual-total-strip" aria-label="Selected scope totals">
             <span class="forecast-actual-total-text forecast-actual-total-text--actual"><small>Total Actual</small>
               <strong>{formatAmount(selectedTotalActual, "N/A")}</strong>
@@ -420,8 +446,8 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
           </div>
         </div>
         <div class="consumption-records-toolbar-activity">
-          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results"
-            onRefresh={() => setRefreshNonce((value) => value + 1)} lastCompletedAt={lastCompletedAt}
+          <PageActivity busy={loading} busyLabel="Loading Forecast vs Actual results" refreshDisabled={queryControlsLocked}
+            onRefresh={() => runQueryControlAction(() => setRefreshNonce((value) => value + 1))} lastCompletedAt={lastCompletedAt}
             compactTimestampButton />
         </div>
       </DataControlBar>
@@ -429,8 +455,10 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
         <div class="forecast-actual-quarter-cards" aria-label="Quarter results">
         {quarterCards.map((card) => {
           return <article key={card.quarter} class={quarter === card.quarter || resultFilter?.quarter === card.quarter ? "is-selected" : ""}
-            role="button" tabIndex={0} aria-pressed={quarter === card.quarter || resultFilter?.quarter === card.quarter}
+            role="button" tabIndex={queryControlsLocked ? -1 : 0} aria-disabled={queryControlsLocked}
+            aria-pressed={quarter === card.quarter || resultFilter?.quarter === card.quarter}
             onClick={(event) => {
+              if (queryControlsLockRef.current) return;
               if ((event.target as HTMLElement).closest("button")) return;
               if (quarter === card.quarter || resultFilter?.quarter === card.quarter) {
                 setQuarter("ALL");
@@ -440,6 +468,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
                 setResultFilter(null);
               }
             }} onKeyDown={(event) => {
+              if (queryControlsLockRef.current) return;
               if (event.key !== "Enter" && event.key !== " ") return;
               event.preventDefault();
               if (quarter === card.quarter || resultFilter?.quarter === card.quarter) { setQuarter("ALL"); setResultFilter(null); }
@@ -456,7 +485,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
                   ? "Matched difference is exactly 0 K USD. It is not the sum of matched customers' Actual. Activate to filter matched Accounts."
                   : `${fullLabel} is summed after each Account is compared within this quarter; excess from another Account is not offset.`}`;
                 const pressed = resultFilter?.quarter === card.quarter && resultFilter.status === status;
-                return <button key={status} type="button" class={`is-${status.toLowerCase()}`} aria-pressed={pressed}
+                return <button key={status} type="button" class={`is-${status.toLowerCase()}`} aria-pressed={pressed} disabled={queryControlsLocked}
                   aria-label={`${card.quarter} ${fullLabel}: ${formatAmount(amount, "0")} K USD. ${tooltip}`} data-tooltip={tooltip}
                   onClick={(event) => { event.stopPropagation(); toggleResultFilter(card.quarter, status); }}><span>{label}</span><strong>{formatAmount(amount, "0")}</strong></button>;
               })}
