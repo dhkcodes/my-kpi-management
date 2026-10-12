@@ -40,8 +40,13 @@ assert.doesNotMatch(records,
 assert.doesNotMatch(records,
   /const runRecordsQuery[\s\S]*?catch[\s\S]*?setRecords\(\[\]\)/,
   "Records refresh failure must retain the last successful rows");
-assert.match(records, /\|\| recordsLoadingRef\.current \|\| consumptionSummaryLoading/,
+assert.match(records, /\|\| recordsLoadingRef\.current \|\| summarySwapRef\.current\.isBusy\(\)/,
   "Records event handlers must reject re-entry even before disabled rendering settles");
+assert.match(records, /createSingleFlightSwapController<ConsumptionSummary>/,
+  "Records Include MTD must have a synchronous single-flight request guard");
+assert.match(records,
+  /if \(recordsLoadingRef\.current \|\| summarySwapRef\.current\.isBusy\(\)\) return;[\s\S]{0,400}loadConsumptionSummary[\s\S]{0,200}\(\) => setShowMtd\(next\)/,
+  "Records Include MTD must keep the last successful mode until the replacement summary succeeds");
 
 for (const [name, source] of [["Analysis", analysis], ["FVA", forecast]] as const) {
   assert.match(source, /const queryControlsLocked = loading;/,
