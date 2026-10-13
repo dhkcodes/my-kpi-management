@@ -55,10 +55,10 @@ assert.match(analysis,
 assert.match(analysis,
   /subtractExactDecimals\(\s*analysis\.portfolio\.forecastAmountExact,\s*analysis\.portfolio\.forecastOverlapAmountExact\)/s,
   "Remaining Open Forecast must subtract the backend overlap exactly once");
-assert.match(analysis, /Closed-period MTD fallback/,
-  "Actual to date must disclose closed-period MTD fallback separately");
-assert.match(analysis, /Current MTD/,
-  "Actual to date must disclose current-month MTD separately when included");
+assert.doesNotMatch(analysis, /<span>Closed-period MTD fallback/,
+  "Actual to date must keep closed-period MTD fallback out of the visible card detail");
+assert.match(analysis, /Includes MTD/,
+  "Actual to date must disclose the dynamically formatted MTD amount when included");
 
 assert.equal(formatForecastCoverage(["FY27-SEP", "FY27-OCT", "FY27-NOV"]), "Partial · Sep–Nov");
 assert.equal(formatForecastCoverage(["FY27-SEP", "FY27-NOV"]), "Partial · Sep, Nov",

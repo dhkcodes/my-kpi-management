@@ -52,6 +52,7 @@ import {
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
+import { createDoubleActivationTracker } from "../common/doubleActivation";
 import {
   runAccountsWorkloadsOpportunitySaveFlow,
   runAccountsWorkloadsSaveFlow,
@@ -347,6 +348,8 @@ export function AccountsWorkloadsPage({
   const [pendingDealConfirmation, setPendingDealConfirmation] =
     useState<PendingDealConfirmation | null>(null);
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
+  const mobileEditActivationRef = useRef(createDoubleActivationTracker());
+  const suppressNextDealRowClickRef = useRef<string | null>(null);
   const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
     Readonly<{ text: string; top: number; left: number }> | null
   >(null);
@@ -812,6 +815,25 @@ export function AccountsWorkloadsPage({
           if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginAwEdit(key, field, value);
+        }}
+        onPointerDown={(event) => {
+          if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerDown(event, `aw:${key}:${field}`);
+        }}
+        onPointerMove={(event) => mobileEditActivationRef.current.onPointerMove(event)}
+        onPointerCancel={() => mobileEditActivationRef.current.onPointerCancel()}
+        onPointerUp={(event) => {
+          if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerUp(event, `aw:${key}:${field}`, () => {
+            event.stopPropagation();
+            beginAwEdit(key, field, value);
+          });
         }}
       >
         <div class="accounts-workloads-cell-content">
@@ -2087,6 +2109,14 @@ export function AccountsWorkloadsPage({
         data-deal-field={field}
         class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onClick={(event) => {
+          const activationKey = `opportunity:${key}:${field}`;
+          if (
+            (event as unknown as PointerEvent).pointerType === "touch" &&
+            suppressNextDealRowClickRef.current === activationKey
+          ) {
+            suppressNextDealRowClickRef.current = null;
+            event.stopPropagation();
+          }
           if (dealEditCell && (dealEditCell.key !== key || dealEditCell.field !== field) && !isInteractive(event.target)) {
             setDealEditCell(null);
           }
@@ -2095,6 +2125,45 @@ export function AccountsWorkloadsPage({
           if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginDealEdit(workloadId, effective, field);
+        }}
+        onPointerDown={(event) => {
+          if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerDown(event, `opportunity:${key}:${field}`);
+        }}
+        onPointerMove={(event) => mobileEditActivationRef.current.onPointerMove(event)}
+        onPointerCancel={() => mobileEditActivationRef.current.onPointerCancel()}
+        onPointerUp={(event) => {
+          if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          const activationKey = `opportunity:${key}:${field}`;
+          const result = mobileEditActivationRef.current.onPointerUp(event, activationKey, () => {
+            suppressNextDealRowClickRef.current = activationKey;
+            window.setTimeout(() => {
+              if (suppressNextDealRowClickRef.current === activationKey) {
+                suppressNextDealRowClickRef.current = null;
+              }
+            }, 0);
+            event.stopPropagation();
+            beginDealEdit(workloadId, effective, field);
+          });
+          if (result !== "single") return;
+          suppressNextDealRowClickRef.current = activationKey;
+          window.setTimeout(() => {
+            if (suppressNextDealRowClickRef.current === activationKey) {
+              suppressNextDealRowClickRef.current = null;
+            }
+          }, 0);
+          setSelectedDeals((current) => {
+            const next = new Map(current);
+            if (next.has(effective.id)) next.delete(effective.id);
+            else next.set(effective.id, effective);
+            return next;
+          });
         }}
         onKeyDown={(event) => {
           if (editing && event.key === "Enter") {
