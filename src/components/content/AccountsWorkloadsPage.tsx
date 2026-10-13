@@ -2108,6 +2108,9 @@ export function AccountsWorkloadsPage({
         data-deal-field={field}
         class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onClick={(event) => {
+          if ((event as unknown as PointerEvent).pointerType === "touch") {
+            event.stopPropagation();
+          }
           if (dealEditCell && (dealEditCell.key !== key || dealEditCell.field !== field) && !isInteractive(event.target)) {
             setDealEditCell(null);
           }

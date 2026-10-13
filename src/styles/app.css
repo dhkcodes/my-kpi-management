@@ -7351,3 +7351,25 @@ oj-menu.consumption-analysis-fy-menu .oj-menu-item:not(.oj-disabled).oj-focus {
 .app-message-region.is-inline .app-message-region__actions oj-button {
   min-height: var(--kap-consumption-control-height);
 }
+
+@media (max-width: 720px) {
+  .accounts-workloads-page .accounts-workloads-opportunities__heading {
+    position: sticky;
+    left: 0;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    max-width: calc(100vw - 2rem);
+  }
+
+  .accounts-workloads-page .accounts-workloads-opportunity-heading-actions {
+    flex-wrap: wrap;
+  }
+
+  .accounts-workloads-page .accounts-workloads-oppty-grid .is-oppty-sticky-name,
+  .accounts-workloads-page .accounts-workloads-oppty-grid .is-oppty-sticky-id {
+    position: static;
+    left: auto;
+    z-index: auto;
+    box-shadow: none;
+  }
+}

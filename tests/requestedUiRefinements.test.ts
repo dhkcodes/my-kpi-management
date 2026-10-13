@@ -31,10 +31,26 @@ test("AW and Opportunity cells use explicit touch double activation and protect 
   assert.match(aw, /`opportunity:\$\{key\}:\$\{field\}`/);
   assert.match(aw, /data-aw-field=\{field\}/);
   assert.match(aw, /data-deal-field=\{field\}/);
+  assert.match(aw, /\(event as unknown as PointerEvent\)\.pointerType === "touch"[\s\S]*?event\.stopPropagation\(\)/);
 });
 
 test("KPI editor absorbs repeated touch and click activation", () => {
   assert.match(kpi, /onPointerDown=\{stopGridInteraction\}/);
   assert.match(kpi, /onPointerUp=\{stopGridInteraction\}/);
   assert.match(kpi, /onClick=\{stopGridInteraction\}/);
+});
+
+test("Opportunity sticky identity columns release horizontal space on AW mobile only", () => {
+  assert.match(
+    css,
+    /@media \(max-width: 720px\)[\s\S]*?\.accounts-workloads-page \.accounts-workloads-oppty-grid \.is-oppty-sticky-name,[\s\S]*?\.accounts-workloads-page \.accounts-workloads-oppty-grid \.is-oppty-sticky-id\s*\{[^}]*position:\s*static/
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 720px\)[\s\S]*?\.accounts-workloads-page \.accounts-workloads-opportunities__heading\s*\{[^}]*position:\s*sticky[^}]*max-width:\s*calc\(100vw - 2rem\)/
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 720px\)[\s\S]*?\.accounts-workloads-page \.accounts-workloads-opportunity-heading-actions\s*\{[^}]*flex-wrap:\s*wrap/
+  );
 });
