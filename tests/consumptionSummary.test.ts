@@ -98,8 +98,14 @@ void (async () => {
     "MTD composition labels and amounts must remain regular-weight on one line");
   assert.match(styles, /\.consumption-summary__qoq \{[^}]*font-weight:\s*800/s,
     "Summary QoQ values must be bold and right aligned");
-  assert.match(styles, /\.consumption-summary__amount,[\s\S]*\.consumption-summary__qoq\s*\{[^}]*background:\s*#fff/s,
-    "only the Summary numeric cells receive the white background");
+  assert.match(styles, /\.consumption-summary__amount\s*\{[^}]*background:\s*#fff/s,
+    "Summary amount cells keep the white background");
+  assert.match(styles, /\.consumption-summary__qoq\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--oj-core-brand-color-1, #0b607d\) 8%, var\(--oj-core-bg-color-content, #fff\)\); color: #184f73/s,
+    "Summary QoQ values match the header background and text color");
+  assert.match(page, /onClick=\{clearRecordsSearch\}>Clear/,
+    "applied Records search exposes an accessible Clear action");
+  assert.match(page, /runRecordsQuery\(\{ fromQuarter: appliedFrom, toQuarter: appliedTo, search: "" \}, selectedPillar, true\)/,
+    "Clear keeps the applied range, pillar and view selections");
 
   console.log("consumption summary contract passed");
 })();
