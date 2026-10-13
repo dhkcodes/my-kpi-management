@@ -1,0 +1,107 @@
+/* Original “Two Quiet Accents” comparison. Application-owned Summary only.
+   Explicit scope also makes these overrides independent of app.css load order. */
+.kap-page-shell.consumption-page .consumption-summary {
+  background: #f5f6f3;
+  border-color: #d9dfd9;
+  color: #29312b;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table {
+  border-color: #d9dfd9;
+  color: #29312b;
+  /* Fill desktop space; intrinsic column minima retain mobile scrolling
+     while allowing mixed details to wrap in the original 12rem column. */
+  width: 100%;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table th,
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table td {
+  border-right: 0;
+  border-bottom-color: rgba(22, 21, 19, .12);
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead th {
+  background: #ebefeb;
+  color: #59635b;
+  font-weight: 600;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead th[data-summary-mode="FINAL_ACTUAL"] {
+  background: #e7eee5;
+  color: #3e604a;
+  font-weight: 650;
+}
+
+/* Forecast and mixed share their quarter header, amount header and total styling. */
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead th[data-summary-mode="FULL_FORECAST"],
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead th[data-summary-mode="MIXED"] {
+  background: #e7eef2;
+  color: #315b76;
+  white-space: normal;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody th:first-child {
+  background: #fff;
+  color: #29312b;
+  font-weight: 500;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody .consumption-summary__qoq {
+  background: #f5f6f4;
+  border-right: 1px solid #d9dfd9;
+  color: #59635b;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody tr > *:last-child {
+  border-right: 0;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount[data-summary-mode="FINAL_ACTUAL"] strong {
+  color: #3e604a;
+  font-weight: 650;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount[data-summary-mode="FULL_FORECAST"] strong,
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount[data-summary-mode="MIXED"] strong {
+  color: #315b76;
+  font-weight: 500;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount small {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount small span {
+  font-weight: 500;
+  white-space: normal;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .is-mtd-composite small span:first-child,
+.kap-page-shell.consumption-page .consumption-summary .is-mtd-composite small span:last-child {
+  white-space: nowrap;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .is-mtd-composite small span:first-child {
+  color: #3e604a;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .is-mtd-composite small span:last-child {
+  color: #315b76;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__total > * {
+  border-top: 1px solid #bfc9c0;
+}
+
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__total .consumption-summary__amount strong {
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount small {
+    line-height: 1.35;
+  }
+}

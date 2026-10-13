@@ -1,0 +1,136 @@
+/* KPI Activities only. Public Redwood tokens; no JET internal selectors. */
+.kpi-sheet-page {
+  --kpi-activities-radius: var(--oj-core-border-radius-md, .2rem);
+  --kpi-activities-control-height: 36px;
+  border-radius: var(--kpi-activities-radius);
+}
+.kpi-sheet-page .kpi-page-menu { --oj-button-sm-font-size: .74rem; }
+.kpi-sheet-page .kap-page-shell__actions > oj-button {
+  --oj-button-sm-font-size: .74rem;
+  font-size: .74rem;
+}
+/* Match Analysis breadcrumb right edge without moving KPI title/content. */
+.kpi-sheet-page .kap-page-shell__masthead > .kpi-page-menu { margin-inline-end: -.5rem; }
+.kpi-sheet-page .kpi-activity-toolbar,
+.kpi-sheet-page .kpi-overview-portfolio__heading { padding-block: 6px; }
+.kpi-sheet-page .kap-page-activity { margin-block: 0; }
+.kpi-sheet-page .kap-page-activity__refresh {
+  --oj-button-sm-height: var(--kpi-activities-control-height);
+  --oj-button-sm-font-size: .74rem;
+  font-size: .74rem;
+}
+.kpi-sheet-page .kpi-activity-toolbar__left > button,
+.kpi-sheet-page .kpi-activity-toolbar__right > button {
+  box-sizing: border-box;
+  height: var(--kpi-activities-control-height);
+  min-height: var(--kpi-activities-control-height);
+  font-family: Arial, sans-serif;
+  font-size: .74rem;
+  line-height: normal;
+  border-radius: var(--kpi-activities-radius);
+}
+.kpi-sheet-page .kpi-inline-save { align-items: center; display: inline-flex; gap: .4rem; font-size: .72rem; }
+.kpi-sheet-page .kpi-inline-save oj-progress-circle { flex: 0 0 auto; }
+.kpi-sheet-page .kpi-activities-table-wrap,
+.kpi-sheet-page .kpi-overview-portfolio,
+.kpi-sheet-page .kpi-overview-filtered-activities,
+.kpi-sheet-page .kpi-sheet-summary,
+.kpi-sheet-page .kpi-activity-guide { border-radius: var(--kpi-activities-radius); }
+.kpi-sheet-page .kpi-grid-cell { height: 2.4rem; min-height: 2.4rem; padding: .3rem .5rem; }
+.kpi-sheet-page .kpi-overview-portfolio td:nth-child(n + 3) { text-align: center; }
+.kpi-sheet-page .kpi-overview-portfolio .kpi-tooltip-trigger { display: inline-flex; justify-content: center; }
+.kpi-sheet-page .kpi-overview-portfolio .kpi-status-badge { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+/* 03 Radial Focus: compact orbit with explanatory copy beside it. */
+.kpi-sheet-page .kpi-overview-metrics { gap: .65rem; }
+.kpi-sheet-page .kpi-overview-metrics > button {
+  --kpi-metric-color: #537562;
+  --kpi-metric-pale: #eef3ee;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: .8rem;
+  row-gap: .25rem;
+  align-content: center;
+  min-height: 112px;
+  padding: .8rem;
+  border-radius: var(--kpi-activities-radius);
+  text-align: left;
+}
+.kpi-sheet-page .kpi-overview-metrics > button:nth-child(2) { --kpi-metric-color: #56828b; --kpi-metric-pale: #edf4f5; }
+.kpi-sheet-page .kpi-overview-metrics > button:nth-child(3) { --kpi-metric-color: #ae7b22; --kpi-metric-pale: #faf1de; }
+.kpi-sheet-page .kpi-overview-metrics > button:nth-child(4) { --kpi-metric-color: #b45548; --kpi-metric-pale: #f9ece7; }
+.kpi-sheet-page .kpi-overview-metrics > button > span:not(.kpi-metric-orbit) { grid-column: 2; grid-row: 1; align-self: end; color: var(--kpi-ink); font-size: .78rem; font-weight: 700; }
+.kpi-sheet-page .kpi-overview-metrics > button > small { grid-column: 2; grid-row: 2; align-self: start; font-size: .68rem; line-height: 1.45; position: static; block-size: auto; inline-size: auto; clip-path: none; overflow: visible; white-space: normal; min-height: 0; }
+.kpi-sheet-page .kpi-metric-orbit {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 76px;
+  height: 76px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--kpi-metric-color);
+  background: conic-gradient(var(--kpi-metric-color) var(--kpi-metric-progress), #e9e6df 0);
+}
+.kpi-sheet-page .kpi-metric-orbit.is-ring::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
+.kpi-sheet-page .kpi-metric-orbit.is-disk { background: var(--kpi-metric-pale); }
+.kpi-sheet-page .kpi-metric-orbit__value { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; color: inherit; }
+.kpi-sheet-page .kpi-metric-orbit__value > strong { color: var(--kpi-metric-color); font-size: 1.4rem; line-height: 1.15; }
+.kpi-sheet-page .kpi-metric-orbit__value > small { color: var(--kpi-muted); font-size: .65rem; line-height: 1.2; position: static; block-size: auto; inline-size: auto; clip-path: none; overflow: visible; white-space: normal; min-height: 0; }
+/* Original 04-B / 04-D1 chronological quarter timeline; separate regions only. */
+.kpi-sheet-page .kpi-quarter-summary,
+.kpi-sheet-page .kpi-d1-progress-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding-top: .5rem; }
+.kpi-sheet-page .kpi-quarter-card,
+.kpi-sheet-page .kpi-d1-progress-quarter {
+  position: relative;
+  background: transparent;
+  border: 0;
+  border-top: 2px solid #d3cec5;
+  border-radius: 0;
+  min-width: 0;
+  padding: 1rem 1.2rem .5rem;
+  text-align: left;
+  box-shadow: none;
+}
+.kpi-sheet-page .kpi-quarter-card::before,
+.kpi-sheet-page .kpi-d1-progress-quarter::before { content: ""; position: absolute; top: -6px; left: 1.2rem; width: 10px; height: 10px; border-radius: 50%; background: #807567; }
+.kpi-sheet-page .kpi-quarter-card:hover,
+.kpi-sheet-page .kpi-d1-progress-quarter:hover { background: #f8f7f4; }
+.kpi-sheet-page .kpi-quarter-card.is-selected,
+.kpi-sheet-page .kpi-d1-progress-quarter.is-selected { background: #f4f0e9; border-top-color: var(--kpi-brand); box-shadow: inset 0 -2px var(--kpi-brand); }
+.kpi-sheet-page .kpi-quarter-card:focus-visible,
+.kpi-sheet-page .kpi-d1-progress-quarter:focus-visible { outline: 2px solid var(--kpi-brand); outline-offset: 2px; }
+.kpi-sheet-page .kpi-quarter-card { display: grid; grid-template-rows: auto auto auto auto; justify-items: start; gap: .5rem; }
+.kpi-sheet-page .kpi-quarter-card .kpi-quarter-card__heading { display: contents; }
+.kpi-sheet-page .kpi-quarter-card .kpi-quarter-card__heading > strong { grid-row: 1; }
+.kpi-sheet-page .kpi-quarter-card .kpi-quarter-status-label { grid-row: 4; }
+.kpi-sheet-page .kpi-quarter-card > .kpi-quarter-count-label { grid-row: 2; background: transparent; border: 0; padding: 0; border-radius: 0; color: var(--kpi-ink); font-size: 1.6rem; font-weight: 500; justify-content: start; }
+.kpi-sheet-page .kpi-quarter-card > small { grid-row: 3; font-size: .72rem; }
+.kpi-sheet-page .kpi-d1-progress-quarter .kpi-quarter-card__heading { align-items: start; flex-direction: column; gap: .6rem; }
+.kpi-sheet-page .kpi-d1-progress-item { margin-top: .9rem; }
+.kpi-sheet-page .kpi-d1-progress-label { font-size: .72rem; gap: .4rem; }
+.kpi-sheet-page .kpi-d1-progress-track { height: 5px; border-radius: 3px; background: #eeebe5; }
+.kpi-sheet-page .kpi-d1-progress-fill--identified { background: #9b9488; }
+.kpi-sheet-page .kpi-d1-progress-fill--validated { background: #829b7c; }
+.kpi-sheet-page .kpi-d1-progress-fill--onboarded { background: #567c60; }
+.kpi-sheet-page .kpi-activity-guide { border-left: 3px solid #b7afa3; padding: 1rem; }
+.kpi-sheet-page .kpi-activity-guide__facts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem 1.25rem; }
+.kpi-sheet-page .kpi-activity-guide__facts > div { display: block; border: 0; border-top: 1px solid #dedbd5; padding-top: .55rem; margin: 0; }
+.kpi-sheet-page .kpi-activity-guide__facts dt { font-size: .68rem; color: var(--kpi-muted); background: transparent; padding: 0; margin-bottom: .35rem; }
+.kpi-sheet-page .kpi-activity-guide__facts dd { font-size: .75rem; line-height: 1.45; font-weight: 400; padding: 0; margin: 0; }
+@media (max-width: 1000px) {
+  .kpi-sheet-page .kpi-overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .kpi-sheet-page .kpi-quarter-summary,
+  .kpi-sheet-page .kpi-d1-progress-grid,
+  .kpi-sheet-page .kpi-activity-guide__facts { grid-template-columns: 1fr; }
+  .kpi-sheet-page .kpi-quarter-card,
+  .kpi-sheet-page .kpi-d1-progress-quarter { border-top: 0; border-left: 2px solid #d3cec5; margin-left: 4px; padding: .8rem 1rem 1.2rem; }
+  .kpi-sheet-page .kpi-quarter-card::before,
+  .kpi-sheet-page .kpi-d1-progress-quarter::before { left: -6px; top: 1.1rem; }
+}
+@media (max-width: 480px) {
+  .kpi-sheet-page .kpi-overview-metrics { grid-template-columns: 1fr; }
+}

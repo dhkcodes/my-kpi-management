@@ -65,7 +65,8 @@ import {
 import { AppMessageBanner } from "./AppMessageBanner";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
 import { FiscalYearSelector } from "../common/FiscalYearSelector";
-import { PageActivity, PageDataProgress, PageShell } from "../common/PageShell";
+import { PageActivity, PageShell } from "../common/PageShell";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 
 const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
 const stages: WorkloadStage[] = ["identified", "validated", "onboarded"];
@@ -313,7 +314,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   const [workloadActive, setWorkloadActive] = useState(field.type === "workload");
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<KpiWorkloadOption[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(field.type === "workload");
   const [workloadError, setWorkloadError] = useState("");
   const [workloadRetryVersion, setWorkloadRetryVersion] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -359,7 +360,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
     setWorkloadActive(field.type === "workload");
     setQuery("");
     setOptions([]);
-    setLoading(false);
+    setLoading(field.type === "workload");
     setWorkloadError("");
     setHasMore(false);
     setOffset(0);
@@ -379,8 +380,8 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
     if (!workloadActive || field.type !== "workload") return;
     let active = true;
     const requestGeneration = ++requestGenerationRef.current;
+    setLoading(true);
     const timer = window.setTimeout(() => {
-      setLoading(true);
       setWorkloadError("");
       void listKpiWorkloadOptions(fiscalYear, query, 0).then((page) => {
         if (!active || requestGenerationRef.current !== requestGeneration) return;
@@ -576,10 +577,12 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const editorAnchorRef = useRef<HTMLElement | null>(null);
   const pendingAutoEditRowIdRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const beginWrite = () => { setSaving(true); onWriteStateChange(true); };
-  const endWrite = () => { setSaving(false); onWriteStateChange(false); };
-  const savingDialogDesiredRef = useRef(false);
-  const savingDialogGenerationRef = useRef(0);
+  const writeInFlightRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const [displayFiscalYear, setDisplayFiscalYear] = useState(fiscalYear);
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+  const beginWrite = () => { writeInFlightRef.current = true; setSaving(true); onWriteStateChange(true); };
+  const endWrite = () => { writeInFlightRef.current = false; setSaving(false); onWriteStateChange(false); };
   const [apiMessage, setApiMessage] = useState("");
   const [apiError, setApiError] = useState("");
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -596,7 +599,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const navigationDialogRef = useRef<ojDialog | null>(null);
   const cancelDialogRef = useRef<ojDialog | null>(null);
   const deleteDialogRef = useRef<ojDialog | null>(null);
-  const savingDialogRef = useRef<ojDialog | null>(null);
   const navigationStayButtonRef = useRef<any>(null);
   const cancelKeepButtonRef = useRef<any>(null);
   const deleteCancelButtonRef = useRef<any>(null);
@@ -605,22 +607,22 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const loadedFiscalYearRef = useRef<FiscalYear | null>(null);
   sessionKeyRef.current = `${routeId}:${fiscalYear}`;
 
-  const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === fiscalYear), [rows, fiscalYear]);
+  const activeRows = useMemo(() => rows.filter((row) => row.fiscalYear === displayFiscalYear), [rows, displayFiscalYear]);
   const overviewMetrics = useMemo(() => activitySummary
-    ? buildKpiActivitiesOverview(activeRows, fiscalYear, activitySummary, asOf)
-    : null, [activeRows, activitySummary, asOf, fiscalYear]);
+    ? buildKpiActivitiesOverview(activeRows, displayFiscalYear, activitySummary, asOf)
+    : null, [activeRows, activitySummary, asOf, displayFiscalYear]);
   const displaySummary = overviewMetrics?.strictSummary ?? activitySummary;
-  const overviewDataState = apiError ? "error" : activeRows.length === 0 ? "empty" : "ready";
+  const overviewDataState = activeRows.length > 0 ? "ready" : pageLoading ? "loading" : apiError ? "error" : "empty";
   const portfolioSummary = overviewDataState === "ready" ? displaySummary : null;
   const overviewValue = (value: string | number) => overviewDataState === "ready"
     ? value
-    : overviewDataState === "error" ? "Unavailable" : "Not entered";
+    : overviewDataState === "error" ? "Unavailable" : overviewDataState === "loading" ? "Loading…" : "—";
   const overviewDetail = (value: string) => overviewDataState === "ready"
     ? value
-    : overviewDataState === "error" ? "KPI API request failed" : `No KPI activities entered for ${fiscalYear}`;
+    : overviewDataState === "error" ? "KPI API request failed" : overviewDataState === "loading" ? "Loading KPI activities" : "";
   const overviewFilteredRows = useMemo(() => activitySummary && overviewFilter
-    ? filterKpiOverviewRows(activeRows, fiscalYear, activitySummary, asOf, overviewFilter)
-    : [], [activeRows, activitySummary, asOf, fiscalYear, overviewFilter]);
+    ? filterKpiOverviewRows(activeRows, displayFiscalYear, activitySummary, asOf, overviewFilter)
+    : [], [activeRows, activitySummary, asOf, displayFiscalYear, overviewFilter]);
   const authoritativeRows = useMemo(() => activeTab === "Overview" ? activeRows : activeRows.filter((row) => row.kpiCode === activeTab), [activeRows, activeTab]);
   const fields = activeTab === "Overview" ? [] : KPI_FIELD_CONTRACTS[activeTab];
   const showSummary = activeTab !== "Overview";
@@ -711,7 +713,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       setApiMessage("Write permission is required.");
       return;
     }
-    if (saving || editStateRef.current.phase === "saving" || editStateRef.current.phase === "cancelling") return;
+    if (pageLoading || displayFiscalYear !== fiscalYear || writeInFlightRef.current || saving || editStateRef.current.phase === "saving" || editStateRef.current.phase === "cancelling") return;
     if (field.type === "manageTime") return;
     if (editStateRef.current.cell?.rowId === row.id && editStateRef.current.cell.field === field.key) return;
     const latest = draftById.get(row.id) ?? row;
@@ -822,34 +824,26 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
 
   useEffect(() => {
     let active = true;
-    const fiscalYearChanged = loadedFiscalYearRef.current !== fiscalYear;
+    const generation = ++loadGenerationRef.current;
+    const isLatest = () => active && generation === loadGenerationRef.current;
     setApiError("");
     setApiMessage("");
     setPageLoading(true);
-    if (fiscalYearChanged) {
-      setRows([]); setOverviewItems([]); setActivitySummary(null);
-      setLastDataLoadedAt(null);
-    }
+    // Commit the whole FY snapshot together; never erase the previous snapshot while loading.
     void Promise.all([listKpiRows(fiscalYear), listKpiOverview(fiscalYear), listKpiSummary(fiscalYear)]).then(([items, overview, summary]) => {
-      if (!active) return;
+      if (!isLatest()) return;
+      loadedFiscalYearRef.current = fiscalYear;
+      setDisplayFiscalYear(fiscalYear); setHasLoadedData(true);
       setRows(items); setOverviewItems(overview.items); setActivitySummary(summary); setAsOf(overview.asOf);
       setLastDataLoadedAt(new Date());
-      setApiMessage(items.length === 0 ? `No KPI activities entered for ${fiscalYear}` : "");
     }).catch((error) => {
-      if (!active) return;
+      if (!isLatest()) return;
       const message = error instanceof Error ? error.message : "KPI API request failed.";
-      if (fiscalYearChanged) {
-        setRows([]); setOverviewItems([]); setActivitySummary(null);
-      }
       setApiError(message);
       setApiMessage(`KPI API unavailable — ${message}`);
-    })
-      .finally(() => {
-        if (active) {
-          loadedFiscalYearRef.current = fiscalYear;
-          setPageLoading(false);
-        }
-      });
+    }).finally(() => {
+      if (isLatest()) setPageLoading(false);
+    });
     return () => { active = false; };
   }, [fiscalYear, reloadVersion]);
 
@@ -895,7 +889,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
 
   const applyManaged = (managed: boolean) => {
     if (!canWrite) { setApiMessage("Write permission is required."); return; }
-    if (saving || selectedRows.length === 0) return;
+    if (pageLoading || displayFiscalYear !== fiscalYear || writeInFlightRef.current || saving || selectedRows.length === 0) return;
     finishEditing();
     const selected = selectedRows.map((row) => row.id);
     setDrafts((current) => applyManagedToSelection(authoritativeRows, current, selected, managed));
@@ -962,7 +956,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   const invalidDraftCount = drafts.filter((draft) => isKpiDraftInvalid(draft, rows.find((row) => row.id === draft.id))).length;
   const reflectedRequirementsMissing = drafts.some((draft) => draft.manageTimeReflected
     && (!draft.deliveryDate || (draft.kpiCode !== "H" && !draft.srNumber.trim())));
-  const saveDisabled = !canWrite || drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
+  const saveDisabled = !canWrite || pageLoading || displayFiscalYear !== fiscalYear || drafts.length === 0 || saving || drafts.some((draft) => isKpiDraftInvalid(draft, authoritativeRows.find((row) => row.id === draft.id)));
   const salesSummary = activeTab === "D1";
   const activityTab = activeTab as SpreadsheetKpiCode;
 
@@ -1000,25 +994,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" }));
   }, [setSelectedIds]);
 
-  useEffect(() => {
-    const dialog = savingDialogRef.current;
-    if (!dialog) return;
-    let active = true;
-    const generation = ++savingDialogGenerationRef.current;
-    const busyContext = Context.getContext(dialog).getBusyContext();
-    void busyContext.whenReady().then(() => {
-      if (!active || generation !== savingDialogGenerationRef.current || savingDialogRef.current !== dialog || savingDialogDesiredRef.current !== saving) return;
-      if (saving) {
-        if (!dialog.isOpen()) dialog.open();
-      } else if (dialog.isOpen()) {
-        dialog.close();
-      }
-    }).catch((error) => {
-      if (active) console.error("KPI saving dialog synchronization failed", error);
-    });
-    return () => { active = false; };
-  }, [saving]);
-
   const settleDialogClosed = useCallback(async (dialog: ojDialog | null): Promise<boolean> => {
     if (!dialog) return true;
     try {
@@ -1036,41 +1011,19 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     }
   }, []);
 
-  const settleSavingDialogClosed = useCallback(async (): Promise<boolean> => {
-    savingDialogDesiredRef.current = false;
-    savingDialogGenerationRef.current += 1;
-    const dialog = savingDialogRef.current;
-    if (!dialog) return true;
-    try {
-      const busyContext = Context.getContext(dialog).getBusyContext();
-      await busyContext.whenReady();
-      if (!dialog.isOpen()) return true;
-      const closed = new Promise<void>((resolve) => dialog.addEventListener("ojClose", () => resolve(), { once: true }));
-      dialog.close();
-      await closed;
-      await busyContext.whenReady();
-      return !dialog.isOpen();
-    } catch (error) {
-      console.error("KPI saving dialog close failed", error);
-      return false;
-    }
-  }, []);
-
-
   const saveDrafts = async (): Promise<boolean> => {
     if (drafts.length === 0) return true;
     if (!canWrite) {
       setApiMessage("Write permission is required. Your unsaved KPI changes were kept.");
       return false;
     }
-    if (saving || saveDisabled) return false;
+    if (writeInFlightRef.current || saving || saveDisabled) return false;
     finishEditing();
     const startedAt = performance.now();
     const saveSession = sessionVersion.current;
     const saveSessionKey = sessionKeyRef.current;
     const draftSnapshot = drafts;
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save" }));
-    savingDialogDesiredRef.current = true;
     beginWrite();
     let saved: KpiSpreadsheetRow[] = [];
     let failed = false;
@@ -1081,7 +1034,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     }
     await minimumProgress(startedAt);
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
-      await settleSavingDialogClosed();
       endWrite(); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     if (!failed) {
@@ -1094,11 +1046,9 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       setSelectedIds(new Set());
     }
     if (sessionVersion.current !== saveSession || sessionKeyRef.current !== saveSessionKey) {
-      await settleSavingDialogClosed();
       endWrite(); setReloadVersion((current) => current + 1); setEditState((current) => transitionKpiActivityEdit(current, { type: "reset" })); return false;
     }
     setApiMessage(failed ? "KPI changes could not be saved. Drafts are unchanged; retry when ready." : `${saved.length} KPI activity row(s) saved atomically`);
-    await settleSavingDialogClosed();
     endWrite();
     if (!failed) setReloadVersion((current) => current + 1);
     setEditState((current) => transitionKpiActivityEdit(current, { type: "save-result", hasFailures: failed }));
@@ -1107,15 +1057,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
 
   const removeSelected = async () => {
     if (!canWrite) { setApiMessage("Write permission is required. Selected rows were not deleted."); return; }
-    if (saving || selectedRows.length === 0) return;
+    if (pageLoading || displayFiscalYear !== fiscalYear || writeInFlightRef.current || saving || selectedRows.length === 0) return;
     const rowsToDelete = [...selectedRows];
     const deleteSession = sessionVersion.current;
     const deleteSessionKey = sessionKeyRef.current;
-    savingDialogDesiredRef.current = true;
     beginWrite();
     const outcomes = await Promise.allSettled(rowsToDelete.map((row) => deleteKpiRow(row)));
     if (sessionVersion.current !== deleteSession || sessionKeyRef.current !== deleteSessionKey) {
-      await settleSavingDialogClosed();
       endWrite();
       setReloadVersion((current) => current + 1);
       return;
@@ -1126,7 +1074,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     setDrafts((current) => current.filter((row) => !deletedIds.has(row.id)));
     setSelectedIds(new Set(failedIds));
     setApiMessage(failedIds.length === 0 ? `${deletedIds.size} KPI activity row(s) deleted` : `${deletedIds.size} deleted · ${failedIds.length} failed`);
-    await settleSavingDialogClosed();
     endWrite();
     setReloadVersion((current) => current + 1);
   };
@@ -1160,7 +1107,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     KPI Guide
   </oj-button>;
   const pageMessages = <AppMessageBanner
-    messages={apiMessage ? [{
+    messages={apiMessage && (apiError || /permission|required|could not|failed|unavailable/i.test(apiMessage)) ? [{
       id: "kpi-api-message",
       severity: apiError ? "error" : /permission|required|could not|failed|unavailable/i.test(apiMessage) ? "warning" : "confirmation",
       summary: apiMessage,
@@ -1169,16 +1116,23 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     onClose={() => setApiMessage("")}
   />;
 
-  const dataReadyForFiscalYear = loadedFiscalYearRef.current === fiscalYear;
+  const dataReadyForFiscalYear = hasLoadedData || !pageLoading;
+  const metricOrbit = (value: string | number, rate?: number) => {
+    const [numerator, denominator] = String(value).split("/");
+    return <span class={`kpi-metric-orbit${rate === undefined ? " is-disk" : " is-ring"}`}
+      style={{ "--kpi-metric-progress": `${Math.min(100, Math.max(0, rate ?? 0))}%` }}>
+      <span class="kpi-metric-orbit__value"><strong>{numerator}</strong>{denominator !== undefined && <small>/{denominator}</small>}</span>
+    </span>;
+  };
 
-  return <PageShell className="kpi-spreadsheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
+  return <PageShell className="kpi-spreadsheet-page kpi-sheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
     breadcrumb={breadcrumb}
     title={activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}
     titleControls={fiscalYearControl} actions={guideAction} messages={pageMessages}
     busy={pageLoading} busyLabel="Loading KPI activities"
     activityPosition="custom" headingSpacing="compact"
-    rootAttributes={{ "data-kpi-tab": activeTab, "data-kpi-edit-phase": editState.phase }}>
-    <PageDataProgress busy={pageLoading} busyLabel="Loading KPI activities" />
+    rootAttributes={{ "data-kpi-displayed-fy": displayFiscalYear, "data-kpi-tab": activeTab, "data-kpi-edit-phase": editState.phase }}>
+    <ConsumptionViewportProgress busy={pageLoading} busyLabel="Loading KPI activities" />
     {dataReadyForFiscalYear && <Fragment>
     <KpiWorkspaceTabs routeId={routeId} onNavigate={onNavigate} disabled={saving} />
 
@@ -1187,25 +1141,25 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         <button type="button" class={overviewFilter === "target-achieved" ? "is-selected" : ""} aria-pressed={overviewFilter === "target-achieved"}
           onClick={() => setOverviewFilter((current) => current === "target-achieved" ? null : "target-achieved")}>
           <span>Quarterly Target Achievement</span>
-          <strong>{overviewValue(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.achieved}/${overviewMetrics.quarterlyTargetAchievement.total}` : "—")}</strong>
+          {metricOrbit(overviewValue(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.achieved}/${overviewMetrics.quarterlyTargetAchievement.total}` : "—"), overviewMetrics?.quarterlyTargetAchievement.rate ?? 0)}
           <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.rate}% · FY-valid reflected deliveries` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "reflected" ? "is-selected" : ""} aria-pressed={overviewFilter === "reflected"}
           onClick={() => setOverviewFilter((current) => current === "reflected" ? null : "reflected")}>
           <span>Reflected Completion</span>
-          <strong>{overviewValue(overviewMetrics ? `${overviewMetrics.reflectedCompletion.reflected}/${overviewMetrics.reflectedCompletion.total}` : "—")}</strong>
-          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${fiscalYear} activities` : "")}</small>
+          {metricOrbit(overviewValue(overviewMetrics ? `${overviewMetrics.reflectedCompletion.reflected}/${overviewMetrics.reflectedCompletion.total}` : "—"), overviewMetrics?.reflectedCompletion.rate ?? 0)}
+          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${displayFiscalYear} activities` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "overdue" ? "is-selected" : ""} aria-pressed={overviewFilter === "overdue"}
           onClick={() => setOverviewFilter((current) => current === "overdue" ? null : "overdue")}>
           <span>Overdue Pending</span>
-          <strong>{overviewValue(overviewMetrics?.overduePending.count ?? "—")}</strong>
+          {metricOrbit(overviewValue(overviewMetrics?.overduePending.count ?? "—"))}
           <small>{overviewDetail(`Pending · FY-valid Delivery Date before ${asOf}`)}</small>
         </button>
         <button type="button" class={overviewFilter === "date-integrity" ? "is-selected" : ""} aria-pressed={overviewFilter === "date-integrity"}
           onClick={() => setOverviewFilter((current) => current === "date-integrity" ? null : "date-integrity")}>
           <span>Date Integrity Exceptions</span>
-          <strong>{overviewValue(overviewMetrics?.dateIntegrity.total ?? "—")}</strong>
+          {metricOrbit(overviewValue(overviewMetrics?.dateIntegrity.total ?? "—"))}
           <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.dateIntegrity.missing} missing · ${overviewMetrics.dateIntegrity.invalid} invalid · ${overviewMetrics.dateIntegrity.outOfFiscalYear} out of FY` : "")}</small>
         </button>
       </div>
@@ -1224,17 +1178,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
               : overviewFilter === "target-achieved" ? "Contributes to achieved KPI quarter" : overviewFilter === "reflected" ? "Reflected" : "Past due, not reflected"}</td>
           </tr>)}</tbody>
         </table></div>
-        {overviewFilteredRows.length === 0 && <p class="kpi-sheet-empty">No activities match this card for {fiscalYear}.</p>}
+
       </section>}
-      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{fiscalYear} KPI Performance</h3>
-        <PageActivity busy={false} busyLabel="" onRefresh={() => setReloadVersion((current) => current + 1)}
+      <section class="kpi-overview-portfolio" aria-labelledby="kpiPortfolioTitle"><div class="kpi-overview-portfolio__heading"><h3 id="kpiPortfolioTitle">{displayFiscalYear} KPI Performance</h3>
+        <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)}
           refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
       </div>
-        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, fiscalYear, asOf); const portfolioCode = row.code === "C1" ? "C" : row.code; const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{portfolioCode}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span><span class="kpi-tooltip" role="tooltip">{tooltip}</span></span></td>; })}</tr>; })}</tbody></table></div>
+        <div class="kpi-overview-portfolio__table-wrap"><table><thead><tr><th>KPI</th><th>Target</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>{KPI_PORTFOLIO_ROWS.filter((row) => row.code !== "C2").map((row) => { const overview = overviewByCode.get(row.code); const statuses = portfolioQuarterStatuses(portfolioSummary, row.code, displayFiscalYear, asOf); const portfolioCode = row.code === "C1" ? "C" : row.code; const portfolioName = row.code === "C1" ? "Workshops & PoCs" : row.name; return <tr key={row.code}><td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.code.toLowerCase()}`)}><span class="kpi-sheet-tab-code">{portfolioCode}</span><strong>{portfolioName}</strong></button></td><td>{overview?.target ?? "—"}</td>{statuses.map((status, index) => { const tooltip = portfolioQuarterTooltip(portfolioSummary, row.code, quarters[index]); return <td key={`${row.code}:${quarters[index]}`}><span class="kpi-tooltip-trigger" tabIndex={0} aria-label={tooltip.replace(/\n/g, "; ")}><span class={`kpi-status-badge kpi-status-badge--${(status ?? "unknown").toLowerCase().replace(" ", "-")}`}>{status ?? "—"}</span><span class="kpi-tooltip" role="tooltip">{tooltip}</span></span></td>; })}</tr>; })}</tbody></table></div>
       </section>
     </div> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
-        <div class="kpi-activity-toolbar__left"><button type="button" disabled={!canWrite || saving || drafts.length > 0 || editState.cell !== null}
+        <div class="kpi-activity-toolbar__left"><button type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving || drafts.length > 0 || editState.cell !== null}
           title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>
           {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
@@ -1246,25 +1200,28 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           </button>
         </div>
         <div class="kpi-activity-toolbar__right">
-          <PageActivity busy={false} busyLabel="" onRefresh={() => setReloadVersion((current) => current + 1)}
+          {saving && <span class="kpi-inline-save" role="status" aria-live="polite">
+            <oj-progress-circle size="sm" value={-1} aria-label="Saving KPI changes"></oj-progress-circle>
+            <span>Saving…</span>
+          </span>}
+          <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)}
           refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
-          {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || saving}
+          {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : reflectedAction.label} aria-label={reflectedAction.label}
             onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
           {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
-          {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={!canWrite || saving}
+          {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : undefined} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
         </div>
       </div>
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing
         ? "Reflected requires both SR Number and Delivery Date."
         : "Complete required fields before saving."}</p>}
-      {showSummary && <Summary id={summaryId} expanded={summaryExpanded} summary={displaySummary} tab={activeTab} fiscalYear={fiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
+      {showSummary && <Summary id={summaryId} expanded={summaryExpanded} summary={displaySummary} tab={activeTab} fiscalYear={displayFiscalYear} asOf={asOf} selectedQuarter={selectedQuarter} onSelectQuarter={selectQuarter} />}
       <section id={guideId} class="kpi-activity-guide" hidden={!guideExpanded} aria-labelledby={`${guideId}Title`}>
         <div class="kpi-activity-guide__heading">
           <div><h3 id={`${guideId}Title`}>[{activeTab}] {activeDefinition?.name}</h3></div>
-          <span>{fiscalYear}</span>
         </div>
         {(guideLoading || guideRecordsStale) ? <p role="status">Loading KPI Guide…</p> : guideError ? <p class="kpi-activity-guide__error" role="alert">{guideError}</p> : activeGuide ? <Fragment>
           <dl class="kpi-activity-guide__facts">
@@ -1277,11 +1234,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
             <div><dt>Task Type</dt><dd>{activeGuide.taskType}</dd></div>
             <div><dt>What are we measuring?</dt><dd>{activeGuide?.measuring}</dd></div>
           </dl>
-          {(activeGuide.details || activeGuide.notes) && <div class="kpi-activity-guide__detail">
-            {activeGuide.details && <p>{activeGuide.details}</p>}
-            {activeGuide.notes && <p><strong>Notes</strong><br />{activeGuide.notes}</p>}
-          </div>}
-        </Fragment> : <p role="status">No KPI Guide is available for {activeTab}.</p>}
+        </Fragment> : null}
       </section>
       <div ref={tableHostRef} class="kpi-activities-table-wrap" data-kpi-table-scope={tableScopeKey}>
         <table ref={tableRef} class="kpi-activities-table" aria-label={`${activeTab} editable KPI activities`}
@@ -1320,10 +1273,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
               <KpiRowSelector rowId={row.id} selected={selectedIds.has(row.id)} onSelectionChange={(selected) => setRowSelection(row.id, selected)} />
             </td>
             {fields.map((field) => renderNativeCell(row, field))}
-          </tr>)}</tbody>
+          </tr>)}{visibleRows.length === 0 && <tr><td colSpan={fields.length + 1} class="kpi-sheet-empty" role="status">{pageLoading && !hasLoadedData ? "Loading KPI activities…" : apiError ? "KPI activities could not be loaded." : `No ${activeTab} activities for ${selectedQuarter ?? displayFiscalYear}.`}</td></tr>}</tbody>
         </table>
       </div>
-      {visibleRows.length === 0 && <p class="kpi-sheet-empty">No {activeTab} activities for {selectedQuarter ?? fiscalYear}.</p>}
+
       {editorRow && editorField && editorRect && <KpiSingleCellEditor state={editState} row={editorRow} field={editorField} rect={editorRect}
         fiscalYear={fiscalYear} onInput={(key, value) => updateDraft(editorRow, key, value)}
         onWorkload={(option) => selectWorkload(editorRow, option)} onWorkloadReset={() => resetWorkload(editorRow)}
@@ -1331,9 +1284,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     </Fragment>}
     </Fragment>}
 
-    <oj-dialog ref={savingDialogRef} class="kpi-saving-dialog" initialVisibility="hide" modality="modal" cancelBehavior="none" dragAffordance="none" resizeBehavior="none" dialogTitle="Saving">
-      <div class="kpi-saving-content" aria-hidden="true"></div>
-    </oj-dialog>
     <oj-dialog ref={cancelDialogRef} class="kpi-cancel-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" modality="modal" cancelBehavior="icon"
       onojOpen={() => cancelKeepButtonRef.current?.focus()}>
       <div slot="body"><p>You have unsaved KPI changes. Choose whether to save them, discard them, or keep editing.</p></div>
@@ -1370,7 +1320,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         <oj-button ref={deleteCancelButtonRef} disabled={saving} onojAction={() => { void (async () => {
           if (!await settleDialogClosed(deleteDialogRef.current)) setApiMessage("Dialog could not close. Delete was cancelled.");
         })(); }}>Cancel</oj-button>
-        <oj-button chroming="danger" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => { void (async () => {
+        <oj-button chroming="danger" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving} title={!canWrite ? "Write permission is required." : undefined} onojAction={() => { void (async () => {
           if (!await settleDialogClosed(deleteDialogRef.current)) { setApiMessage("Dialog could not close. Delete was cancelled."); return; }
           await removeSelected();
         })(); }}>Delete</oj-button>

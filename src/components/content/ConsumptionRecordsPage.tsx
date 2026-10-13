@@ -479,21 +479,21 @@ const ConsumptionSummaryPanel = ({ summary, loading, error, expanded, onToggle }
     {summary ? <div className="consumption-summary__scroll" tabIndex={0} aria-label="Summary by fiscal quarter">
       <table className="consumption-summary__table">
         <thead><tr className="consumption-summary__quarter-row"><th scope="col" rowSpan={2}>Pillar</th>{[...summary.displayQuarterOrder].reverse().map((quarter) =>
-          <th scope="colgroup" colSpan={2} key={quarter}>{quarter.replace("-", " ")}</th>)}</tr>
+          <th scope="colgroup" colSpan={2} data-summary-mode={summary.rows[0]?.quarters.find((candidate) => candidate.quarter === quarter)?.mode ?? "NO_DATA"} key={quarter}>{quarter.replace("-", " ")}</th>)}</tr>
           <tr className="consumption-summary__metric-row">{[...summary.displayQuarterOrder].reverse().flatMap((quarter) => {
             const item = summary.rows[0]?.quarters.find((candidate) => candidate.quarter === quarter);
             return [
-              <th scope="col" className="consumption-summary__amount" key={`${quarter}-consumption`}>{summaryModeLabel(item?.mode ?? "NO_DATA")}</th>,
+              <th scope="col" className="consumption-summary__amount" data-summary-mode={item?.mode ?? "NO_DATA"} key={`${quarter}-consumption`}>{summaryModeLabel(item?.mode ?? "NO_DATA")}</th>,
               <th scope="col" className="consumption-summary__qoq" key={`${quarter}-qoq`}>QoQ</th>
             ];
           })}</tr></thead>
-        <tbody>{summary.rows.map((row) => <tr key={row.label}>
+        <tbody>{summary.rows.map((row) => <tr className={row.label === "Total" ? "consumption-summary__total" : undefined} key={row.label}>
           <th scope="row">{row.label}</th>
           {[...summary.displayQuarterOrder].reverse().flatMap((displayQuarter) => {
             const quarter = row.quarters.find((candidate) => candidate.quarter === displayQuarter);
             if (!quarter) return [];
             const qoq = summaryQoq(quarter);
-            return [<td className={`consumption-summary__amount${quarter.mode === "MIXED" ? " is-mtd-composite" : ""}`} key={`${row.label}-${quarter.quarter}-amount`}>
+            return [<td className={`consumption-summary__amount${quarter.mode === "MIXED" ? " is-mtd-composite" : ""}`} data-summary-mode={quarter.mode} key={`${row.label}-${quarter.quarter}-amount`}>
               <strong>{summaryK(quarter.totalAmountExact)}</strong>
               {quarter.mode === "MIXED" && <small><span>Actual {summaryK(quarter.actualAmountExact)}</span><span aria-hidden="true"> · </span><span>Remaining {summaryK(quarter.forecastAmountExact)}</span></small>}
             </td>, <td className="consumption-summary__qoq" key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
