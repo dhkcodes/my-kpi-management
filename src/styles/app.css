@@ -2295,11 +2295,11 @@ h4.weekly-activity-section-label--next-week,
 /* KPI Activities phase 2: API-backed activity grids and stable workload selection. */
 .kpi-activity-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; margin: 0 0 .9rem; }
 .kpi-activity-toolbar__left, .kpi-activity-toolbar__right { align-items: center; display: flex; flex-wrap: wrap; gap: .45rem; }
-.kpi-activity-toolbar button { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; font-weight: 700; min-height: 2.35rem; padding: .45rem .75rem; }
-.kpi-activity-toolbar__left button:first-child, .kpi-activity-toolbar__right button:first-child { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
+.kpi-activity-toolbar__left > button, .kpi-activity-toolbar__right > button { background: #fff; border: 1px solid var(--kpi-border); border-radius: var(--oj-core-border-radius-sm); color: var(--kpi-ink); cursor: pointer; font: inherit; font-weight: 700; min-height: 2.35rem; padding: .45rem .75rem; }
+.kpi-activity-toolbar__left > button:first-child, .kpi-activity-toolbar__right > button:first-child { background: var(--kpi-brand); border-color: var(--kpi-brand); color: #fff; }
 .kpi-activity-toolbar__left button.kpi-summary-toggle { background: #fff; border-color: var(--kpi-border); color: var(--kpi-ink); }
-.kpi-activity-toolbar__right button:last-child { border-color: #c74634; color: #a63122; }
-.kpi-activity-toolbar button:disabled { cursor: default; opacity: .45; }
+.kpi-activity-toolbar__right > button:last-child { border-color: #c74634; color: #a63122; }
+.kpi-activity-toolbar__left > button:disabled, .kpi-activity-toolbar__right > button:disabled { cursor: default; opacity: .45; }
 .kpi-status-badge { border-radius: 999px; display: inline-block; font-size: .72rem; font-weight: 800; padding: .25rem .55rem; white-space: nowrap; }
 .kpi-status-badge--achieved { background: #e6f4ea; color: #176b3a; }
 .kpi-status-badge--in-progress { background: #fff0cc; color: #7b5100; }

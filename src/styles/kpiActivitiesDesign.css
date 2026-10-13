@@ -5,7 +5,7 @@
   border-radius: var(--kpi-activities-radius);
 }
 .kpi-sheet-page .kpi-page-menu { --oj-button-sm-font-size: .74rem; }
-.kpi-sheet-page .kap-page-shell__actions > oj-button {
+.kpi-sheet-page .kap-page-shell__actions oj-button {
   --oj-button-sm-font-size: .74rem;
   font-size: .74rem;
 }
@@ -14,7 +14,14 @@
 .kpi-sheet-page .kpi-activity-toolbar,
 .kpi-sheet-page .kpi-overview-portfolio__heading { padding-block: 6px; }
 .kpi-sheet-page .kap-page-activity { margin-block: 0; }
-.kpi-sheet-page .kap-page-activity__refresh {
+.kpi-sheet-page .kap-page-activity.is-compact-timestamp {
+  min-height: var(--kpi-activities-control-height);
+}
+.kpi-sheet-page .kap-page-activity__control-slot {
+  min-height: var(--kpi-activities-control-height);
+}
+.kpi-sheet-page .kap-page-activity__refresh,
+.kpi-sheet-page .kap-page-activity.is-compact-timestamp .kap-page-activity__refresh {
   --oj-button-sm-height: var(--kpi-activities-control-height);
   --oj-button-sm-font-size: .74rem;
   font-size: .74rem;
@@ -24,7 +31,7 @@
   box-sizing: border-box;
   height: var(--kpi-activities-control-height);
   min-height: var(--kpi-activities-control-height);
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: .74rem;
   line-height: normal;
   border-radius: var(--kpi-activities-radius);

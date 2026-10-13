@@ -42,3 +42,11 @@ Official API references (validate installed type definitions for actual 20.1 pro
 
 ## Verification boundary
 Fresh desktop 1440x1000 and iPhone 16 393x852 captures of 8 KPI + 3 Consumption routes; real authenticated production GET APIs. Local candidate static asset interception does not replace API results. Browser save/empty/error controlled scenarios must be separately labelled; operational data writes are blocked. UAT visual preference is representative's final judgment, not a substitute for functional evidence.
+
+
+## Blocker-focused follow-up
+- Prior stabilized cancellation checks did not cover scroll overlapping an open JET dialog. Forced-scroll reproduction confirmed surrogate removal; KPI dialogs now sit outside PageShell scroll-state subtree. PageShell itself is unchanged. Seven mobile tabs pass forced-scroll cancellation.
+- Controlled 503: initial double click issues one total request, zero extra duplicates. Explicit retry issues one further request. Error stays visible, draft stays intact and Save becomes enabled, on desktop and iPhone16. All writes intercepted.
+- KPI-only native button rules no longer select JET Reload descendants. Public tokens match 36px/11.84px; actual toolbar-to-button edges are 6px top/bottom on B and D1, desktop/mobile.
+- Consumption controls retain baseline geometry/styles on three routes and both devices. Pixels differ only in timestamp and allowed Summary region. Existing FY/Reload/list-loading checks reused; no broad rerun.
+- Evidence: latest-preservation.json, latest-pixel-comparison.json, ux-latest-focused.json; kap-kpi-common2-save-retry; kap-common2-scroll-all-tabs.

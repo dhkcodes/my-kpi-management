@@ -1125,7 +1125,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     </span>;
   };
 
-  return <PageShell className="kpi-spreadsheet-page kpi-sheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
+  return <><PageShell className="kpi-spreadsheet-page kpi-sheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
     breadcrumb={breadcrumb}
     title={activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}
     titleControls={fiscalYearControl} actions={guideAction} messages={pageMessages}
@@ -1284,6 +1284,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     </Fragment>}
     </Fragment>}
 
+    </PageShell>
+    {/* JET reparents dialogs: keep them outside the scroll-state rerender subtree. */}
     <oj-dialog ref={cancelDialogRef} class="kpi-cancel-dialog" dialogTitle="Unsaved KPI changes" initialVisibility="hide" modality="modal" cancelBehavior="icon"
       onojOpen={() => cancelKeepButtonRef.current?.focus()}>
       <div slot="body"><p>You have unsaved KPI changes. Choose whether to save them, discard them, or keep editing.</p></div>
@@ -1326,5 +1328,5 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         })(); }}>Delete</oj-button>
       </div>
     </oj-dialog>
-  </PageShell>;
+  </>;
 }
