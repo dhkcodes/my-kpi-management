@@ -98,6 +98,8 @@ void (async () => {
     "MTD composition labels and amounts must remain regular-weight on one line");
   assert.match(styles, /\.consumption-summary__qoq \{[^}]*font-weight:\s*800/s,
     "Summary QoQ values must be bold and right aligned");
+  assert.match(styles, /\.consumption-summary__amount,[\s\S]*\.consumption-summary__qoq\s*\{[^}]*background:\s*#fff/s,
+    "only the Summary numeric cells receive the white background");
 
   console.log("consumption summary contract passed");
 })();
