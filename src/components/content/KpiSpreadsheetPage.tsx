@@ -1204,8 +1204,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
             <oj-progress-circle size="sm" value={-1} aria-label="Saving KPI changes"></oj-progress-circle>
             <span>Saving…</span>
           </span>}
-          <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)}
-          refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
           {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : reflectedAction.label} aria-label={reflectedAction.label}
             onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
@@ -1213,6 +1211,10 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : undefined} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}
+        </div>
+        <div class="kpi-activity-toolbar__reload">
+          <PageActivity busy={pageLoading} busyLabel="Loading KPI activities" onRefresh={() => setReloadVersion((current) => current + 1)}
+            refreshDisabled={pageLoading || saving || drafts.length > 0} lastCompletedAt={lastDataLoadedAt} compactTimestampButton />
         </div>
       </div>
       {invalidDraftCount > 0 && <p class="kpi-draft-validation" role="alert">{reflectedRequirementsMissing

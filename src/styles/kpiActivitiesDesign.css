@@ -9,10 +9,37 @@
   --oj-button-sm-font-size: .74rem;
   font-size: .74rem;
 }
-/* Match Analysis breadcrumb right edge without moving KPI title/content. */
-.kpi-sheet-page .kap-page-shell__masthead > .kpi-page-menu { margin-inline-end: -.5rem; }
-.kpi-sheet-page .kpi-activity-toolbar,
-.kpi-sheet-page .kpi-overview-portfolio__heading { padding-block: 6px; }
+/* Match Analysis's start inset; keep the title and content at their existing positions. */
+.kpi-sheet-page .kap-page-shell__masthead > .kpi-page-menu { margin-inline-start: -1.25rem; margin-inline-end: -.5rem; }
+.kap-page-shell.kpi-sheet-page .kpi-activity-toolbar {
+  /* Remove only the surrounding 0.325rem body gaps, not button padding. */
+  margin-block: -.325rem;
+  padding-block: 6px;
+}
+.kap-page-shell.kpi-sheet-page .kpi-activity-toolbar__right:empty { display: none; }
+.kap-page-shell.kpi-sheet-page .kpi-activity-toolbar__reload { margin-inline-start: auto; }
+.kap-page-shell.kpi-sheet-page .kpi-overview-portfolio__heading {
+  border-top: 1px solid var(--kpi-border);
+  margin-bottom: 0;
+  padding-block: 6px;
+}
+@media (max-width: 767px) {
+  .kap-page-shell.kpi-sheet-page .kpi-activity-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .45rem;
+    padding-bottom: 0;
+  }
+  .kap-page-shell.kpi-sheet-page .kpi-activity-toolbar__left,
+  .kap-page-shell.kpi-sheet-page .kpi-activity-toolbar__right { width: 100%; }
+  .kap-page-shell.kpi-sheet-page .kpi-activity-toolbar__reload {
+    border-top: 1px solid var(--kpi-border);
+    display: flex;
+    justify-content: flex-end;
+    margin-inline-start: 0;
+    padding-block: 6px;
+  }
+}
 .kpi-sheet-page .kap-page-activity { margin-block: 0; }
 .kpi-sheet-page .kap-page-activity.is-compact-timestamp {
   min-height: var(--kpi-activities-control-height);
@@ -44,6 +71,7 @@
 .kpi-sheet-page .kpi-sheet-summary,
 .kpi-sheet-page .kpi-activity-guide { border-radius: var(--kpi-activities-radius); }
 .kpi-sheet-page .kpi-grid-cell { height: 2.4rem; min-height: 2.4rem; padding: .3rem .5rem; }
+.kpi-sheet-page .kpi-overview-portfolio th:nth-child(n + 3),
 .kpi-sheet-page .kpi-overview-portfolio td:nth-child(n + 3) { text-align: center; }
 .kpi-sheet-page .kpi-overview-portfolio .kpi-tooltip-trigger { display: inline-flex; justify-content: center; }
 .kpi-sheet-page .kpi-overview-portfolio .kpi-status-badge { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
