@@ -349,6 +349,7 @@ export function AccountsWorkloadsPage({
     useState<PendingDealConfirmation | null>(null);
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
   const mobileEditActivationRef = useRef(createDoubleActivationTracker());
+  const suppressNextDealRowClickRef = useRef<string | null>(null);
   const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
     Readonly<{ text: string; top: number; left: number }> | null
   >(null);
@@ -2108,7 +2109,12 @@ export function AccountsWorkloadsPage({
         data-deal-field={field}
         class={`${field === "name" ? "is-oppty-sticky is-oppty-sticky-name " : field === "opportunityNo" ? "is-oppty-sticky is-oppty-sticky-id " : ""}${changed ? "is-unsaved-cell " : ""}${editing ? "is-editing-cell" : ""}`}
         onClick={(event) => {
-          if ((event as unknown as PointerEvent).pointerType === "touch") {
+          const activationKey = `opportunity:${key}:${field}`;
+          if (
+            (event as unknown as PointerEvent).pointerType === "touch" &&
+            suppressNextDealRowClickRef.current === activationKey
+          ) {
+            suppressNextDealRowClickRef.current = null;
             event.stopPropagation();
           }
           if (dealEditCell && (dealEditCell.key !== key || dealEditCell.field !== field) && !isInteractive(event.target)) {
@@ -2134,9 +2140,29 @@ export function AccountsWorkloadsPage({
             mobileEditActivationRef.current.onPointerCancel();
             return;
           }
-          mobileEditActivationRef.current.onPointerUp(event, `opportunity:${key}:${field}`, () => {
+          const activationKey = `opportunity:${key}:${field}`;
+          const result = mobileEditActivationRef.current.onPointerUp(event, activationKey, () => {
+            suppressNextDealRowClickRef.current = activationKey;
+            window.setTimeout(() => {
+              if (suppressNextDealRowClickRef.current === activationKey) {
+                suppressNextDealRowClickRef.current = null;
+              }
+            }, 0);
             event.stopPropagation();
             beginDealEdit(workloadId, effective, field);
+          });
+          if (result !== "single") return;
+          suppressNextDealRowClickRef.current = activationKey;
+          window.setTimeout(() => {
+            if (suppressNextDealRowClickRef.current === activationKey) {
+              suppressNextDealRowClickRef.current = null;
+            }
+          }, 0);
+          setSelectedDeals((current) => {
+            const next = new Map(current);
+            if (next.has(effective.id)) next.delete(effective.id);
+            else next.set(effective.id, effective);
+            return next;
           });
         }}
         onKeyDown={(event) => {

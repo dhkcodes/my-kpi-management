@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const analysis = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
 const aw = readFileSync("src/components/content/AccountsWorkloadsPage.tsx", "utf8");
+const doubleActivation = readFileSync("src/components/common/doubleActivation.ts", "utf8");
 const kpi = readFileSync("src/components/content/KpiSpreadsheetPage.tsx", "utf8");
 const css = readFileSync("src/styles/app.css", "utf8");
 
@@ -31,7 +32,10 @@ test("AW and Opportunity cells use explicit touch double activation and protect 
   assert.match(aw, /`opportunity:\$\{key\}:\$\{field\}`/);
   assert.match(aw, /data-aw-field=\{field\}/);
   assert.match(aw, /data-deal-field=\{field\}/);
-  assert.match(aw, /\(event as unknown as PointerEvent\)\.pointerType === "touch"[\s\S]*?event\.stopPropagation\(\)/);
+  assert.match(aw, /suppressNextDealRowClickRef\.current === activationKey[\s\S]*?event\.stopPropagation\(\)/);
+  assert.match(aw, /suppressNextDealRowClickRef\.current = activationKey[\s\S]*?beginDealEdit\(workloadId, effective, field\)/);
+  assert.match(doubleActivation, /return "single"/);
+  assert.match(aw, /if \(result !== "single"\) return;[\s\S]*?setSelectedDeals/);
 });
 
 test("KPI editor absorbs repeated touch and click activation", () => {

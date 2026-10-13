@@ -27,7 +27,7 @@ type CompletedTap = {
 export type DoubleActivationTracker = {
   onPointerDown: (event: TouchPointerEvent, key: string) => void;
   onPointerMove: (event: TouchPointerEvent) => void;
-  onPointerUp: (event: TouchPointerEvent, key: string, activate: () => void) => void;
+  onPointerUp: (event: TouchPointerEvent, key: string, activate: () => void) => "ignored" | "single" | "double";
   onPointerCancel: () => void;
 };
 
@@ -59,14 +59,14 @@ export function createDoubleActivationTracker(): DoubleActivationTracker {
       if (distance(active.x, active.y, event.clientX, event.clientY) > MAX_TAP_MOVEMENT_PX) active.moved = true;
     },
     onPointerUp(event, key, activate) {
-      if (event.pointerType !== "touch" || !active || event.pointerId !== active.pointerId || active.key !== key) return;
+      if (event.pointerType !== "touch" || !active || event.pointerId !== active.pointerId || active.key !== key) return "ignored";
       const elapsed = Date.now() - active.startedAt;
       const movedDistance = distance(active.x, active.y, event.clientX, event.clientY);
       const validTap = !active.moved && elapsed <= MAX_TAP_DURATION_MS && movedDistance <= MAX_TAP_MOVEMENT_PX;
       active = null;
       if (!validTap) {
         previous = null;
-        return;
+        return "ignored";
       }
       const now = Date.now();
       const isDoubleTap = Boolean(previous && previous.key === key
@@ -76,9 +76,10 @@ export function createDoubleActivationTracker(): DoubleActivationTracker {
         previous = null;
         if (event.cancelable) event.preventDefault();
         activate();
-        return;
+        return "double";
       }
       previous = { key, completedAt: now, x: event.clientX, y: event.clientY };
+      return "single";
     },
     onPointerCancel() {
       active = null;
