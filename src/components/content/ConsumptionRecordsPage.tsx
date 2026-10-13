@@ -1173,6 +1173,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
   const runRecordsQuery = async (
     query: { fromQuarter: string; toQuarter: string; search: string },
     pillar: ConsumptionPillar = selectedPillar,
+    preserveViewSelections = false,
   ) => {
     const requestQuery = { ...query, search: query.search.trim(), pillar };
     const clearingSearch = requestQuery.search === ""
@@ -1194,8 +1195,10 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
       appliedSearchRef.current = requestQuery.search;
       setAppliedSearch(requestQuery.search);
-      setSelectedSignalId("");
-      setSelectedSeriesId("__all__");
+      if (!preserveViewSelections) {
+        setSelectedSignalId("");
+        setSelectedSeriesId("__all__");
+      }
     } catch (error) {
       if (actionGeneration !== recordsQueryActionGeneration.current) return;
       const message = error instanceof Error ? error.message : "Consumption Records could not be loaded.";
@@ -1218,6 +1221,12 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
   const submitRecordsQuery = async () =>
     runRecordsQuery({ fromQuarter, toQuarter, search: draftSearch.trim() });
+
+  const clearRecordsSearch = () => {
+    setDraftSearch("");
+    const { fromQuarter: appliedFrom, toQuarter: appliedTo } = recordsQueryRef.current;
+    void runRecordsQuery({ fromQuarter: appliedFrom, toQuarter: appliedTo, search: "" }, selectedPillar, true);
+  };
 
   const refreshRecords = async () => {
     const { fromQuarter: appliedFromQuarter, toQuarter: appliedToQuarter, search } = recordsQueryRef.current;
@@ -1939,7 +1948,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             {quarterOptions.map((quarter) => <option value={quarter}>{quarter}</option>)}
           </select>
         </label>
-        <label class="consumption-record-search" htmlFor="consumptionRecordSearch">Search
+        <label class={`consumption-record-search${appliedSearch ? " has-applied-search" : ""}`} htmlFor="consumptionRecordSearch">Search
           <input id="consumptionRecordSearch" type="search" value={draftSearch} placeholder="Account, workload, end user, or Plan"
             disabled={recordsQueryControlsDisabled}
             onCompositionStart={() => { searchComposingRef.current = true; setSearchComposing(true); }}
@@ -1952,6 +1961,9 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
                 void runRecordsQuery({ fromQuarter, toQuarter, search: "" }, selectedPillar);
             }}
             onKeyDown={(event) => { if (event.key === "Enter" && !event.isComposing && !searchComposingRef.current) { event.preventDefault(); void submitRecordsQuery(); } }} />
+          {appliedSearch && <button type="button" class="consumption-record-search__clear" aria-label="Clear search"
+            disabled={recordsQueryControlsDisabled || searchComposing}
+            onClick={clearRecordsSearch}>Clear</button>}
           <button type="button" class="consumption-record-search__submit" aria-label="Apply filters and search" title="Apply filters and search"
             disabled={recordsQueryControlsDisabled || !isConsumptionQuarterRangeValid(fromQuarter, toQuarter) || searchComposing}
             onClick={() => void submitRecordsQuery()}>
