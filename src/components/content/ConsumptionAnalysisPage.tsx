@@ -159,8 +159,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const [error, setError] = useState("");
   const [selectedAccountContext, setSelectedAccountContext] = useState("");
   const [candidateSearch, setCandidateSearch] = useState("");
-  const [debouncedCandidateSearch, setDebouncedCandidateSearch] = useState("");
-  const [candidateComposing, setCandidateComposing] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [selectedAlertId, setSelectedAlertId] = useState("");
@@ -173,12 +171,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
   const requestGeneration = useRef(0);
   const queryControlsLockRef = useRef(true);
   const consumptionComboboxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (candidateComposing) return;
-    const timeout = window.setTimeout(() => setDebouncedCandidateSearch(candidateSearch.trim()), 250);
-    return () => window.clearTimeout(timeout);
-  }, [candidateComposing, candidateSearch]);
 
 
   useEffect(() => {
@@ -202,21 +194,20 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     setLoading(true);
     setError("");
     void Promise.all([
-      fetchConsumptionAnalysis({ fiscalYear, search: debouncedCandidateSearch, account: selectedAccountContext,
+      fetchConsumptionAnalysis({ fiscalYear, search: "", account: selectedAccountContext,
         salesRep: selectedSalesRep, pillar: selectedPillar, includeMtd }),
       fetchForecastActualComparison({ fiscalYear, quarter: "ALL", account: selectedAccountContext,
         salesRep: selectedSalesRep, pillar: selectedPillar, actualMode: "FINAL" })
     ])
       .then(([value, forecastValue]) => {
         if (!active || generation !== requestGeneration.current) return;
-        if (!debouncedCandidateSearch && selectedAccountContext && !value.accountCandidates.some((candidate) =>
+        if (selectedAccountContext && !value.accountCandidates.some((candidate) =>
           candidate.account.toLocaleLowerCase() === selectedAccountContext.toLocaleLowerCase())) {
           setSelectedAccountContext("");
           setCandidateSearch("");
-          setDebouncedCandidateSearch("");
           setSelectedAlertId("");
           setSelectedAccountName("");
-                return;
+          return;
         }
         setAnalysis(value);
         setForecastComparison(forecastValue);
@@ -233,7 +224,6 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
             setSelectedSalesRep(analysisResponse.selectedSalesRep ?? "");
             setSelectedAccountContext(analysisResponse.selectedAccount ?? "");
             setCandidateSearch("");
-            setDebouncedCandidateSearch("");
           }
         }
       })
@@ -244,7 +234,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         }
       });
     return () => { active = false; };
-  }, [debouncedCandidateSearch, fiscalYear, includeMtd, refreshTrigger, selectedAccountContext, selectedPillar, selectedSalesRep]);
+  }, [fiscalYear, includeMtd, refreshTrigger, selectedAccountContext, selectedPillar, selectedSalesRep]);
 
   // Keep the last completed response mounted while same-FY filters refresh.
   // The refresh indicator makes that transition explicit; replacing the
@@ -287,11 +277,10 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
 
   const selectAccountContext = (account: string) => {
     if (queryControlsLockRef.current) return;
-    const refreshRequired = shouldRefreshConsumptionAnalysisContext(selectedAccountContext, account, debouncedCandidateSearch);
+    const refreshRequired = shouldRefreshConsumptionAnalysisContext(selectedAccountContext, account, "");
     const apply = () => {
       setSelectedAccountContext(account.trim());
       setCandidateSearch("");
-      setDebouncedCandidateSearch("");
       setComboboxOpen(false);
       setActiveCandidateIndex(0);
       setSelectedAlertId("");
@@ -356,12 +345,13 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
       const finalizedActualExact = subtractExactDecimals(quarter.actualAmountExact, mtdAmountExact);
       const nonOverlappingForecastExact = subtractExactDecimals(quarter.forecastAmountExact, overlapExact);
       const points: InsightChartPoint[] = [
-        { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(finalizedActualExact), color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} finalized ACTUAL ${formatExactKFixed(finalizedActualExact)}` },
-        { id: `${quarter.quarter}-forecast`, seriesId: "Open Forecast", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(nonOverlappingForecastExact), color: FORECAST_COLOR, pattern: "smallDiagonalRight", shortDesc: `${quarter.quarter} non-overlapping Open Forecast ${formatExactKFixed(nonOverlappingForecastExact)}` }
+        { id: `${quarter.quarter}-actual`, seriesId: "ACTUAL", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(finalizedActualExact), color: ACTUAL_COLOR, shortDesc: `${quarter.quarter} finalized ACTUAL ${formatExactKFixed(finalizedActualExact)}` }
       ];
-      if (compareExactDecimals(mtdAmountExact, "0") > 0) points.splice(1, 0,
+      if (analysis.mtdSummary) points.push(
         { id: `${quarter.quarter}-mtd`, seriesId: "MTD actual", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(mtdAmountExact), color: MTD_COLOR,
           shortDesc: `${quarter.quarter} MTD actual ${formatExactKFixed(mtdAmountExact)}` });
+      points.push(
+        { id: `${quarter.quarter}-forecast`, seriesId: "Open Forecast", groupId: quarter.quarter, value: exactDecimalToChartCoordinate(nonOverlappingForecastExact), color: FORECAST_COLOR, pattern: "smallDiagonalRight", shortDesc: `${quarter.quarter} non-overlapping Open Forecast ${formatExactKFixed(nonOverlappingForecastExact)}` });
       return points;
     }));
   }, [analysis]);
@@ -538,7 +528,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
           <div class="consumption-pillar-selector" role="group" aria-label="Consumption Analysis pillar">
             {consumptionPillarOptions.map((option) => <button key={option.value} type="button" aria-pressed={selectedPillar === option.value}
               disabled={queryControlsLocked}
-              onClick={() => { if(queryControlsLockRef.current || option.value===selectedPillar)return; runQueryControlAction(() => { setSelectedPillar(option.value); setCandidateSearch(""); setDebouncedCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setSelectedMovement(null); }); }}>{option.label}</button>)}
+              onClick={() => { if(queryControlsLockRef.current || option.value===selectedPillar)return; runQueryControlAction(() => { setSelectedPillar(option.value); setCandidateSearch(""); setComboboxOpen(false); setActiveCandidateIndex(0); setSelectedAlertId(""); setSelectedAccountName(""); setSelectedMovement(null); }); }}>{option.label}</button>)}
           </div>
         </div>
         <div class="consumption-insights-context" aria-label="Consumption Analysis filters">
@@ -561,8 +551,8 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
             disabled={queryControlsLocked}
             onClick={(event) => { if (queryControlsLockRef.current) return; setComboboxOpen(true); setCandidateSearch(""); event.currentTarget.select(); }}
             onInput={(event) => { if (queryControlsLockRef.current) return; setCandidateSearch(event.currentTarget.value); setComboboxOpen(true); setActiveCandidateIndex(0); }}
-            onCompositionStart={() => setCandidateComposing(true)}
-            onCompositionEnd={(event) => { setCandidateSearch(event.currentTarget.value); setCandidateComposing(false); }}
+            onCompositionStart={() => setComboboxOpen(true)}
+            onCompositionEnd={(event) => { setCandidateSearch(event.currentTarget.value); setActiveCandidateIndex(0); }}
             onKeyDown={handleComboboxKeyDown} />
           {selectedAccountContext && <button type="button" class="consumption-insights-clear" aria-label="Clear account" disabled={queryControlsLocked} onClick={() => { if (!queryControlsLockRef.current) selectAccountContext(""); }}>Clear</button>}
           {comboboxOpen && <div id="consumptionAccountOptions" class="consumption-insights-options" role="listbox">
@@ -615,7 +605,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
     <section class="consumption-insights-kpis" aria-label="Consumption KPIs">
       <article class="kpi-panel"><span>Actual to date <InfoTooltip id="actualToDateTooltip" label="Explain Actual to date" text={ACTUAL_TO_DATE_TOOLTIP} /></span><strong>{formatExactKFixed(displayedActualAmountExact)}</strong><small><span class="consumption-metric is-actual">Final {formatExactKFixed(finalizedActualAmountExact)}</span>{includeMtd && analysis.mtdSummary && <><span aria-hidden="true"> · </span><span class="consumption-metric is-mtd">Includes MTD {formatExactKFixed(currentMtdAmountExact)}</span></>}</small></article>
       <article class="kpi-panel"><span>FY Forecast <InfoTooltip id="fyForecastTooltip" label="Explain FY Forecast" text={FY_FORECAST_TOOLTIP} /></span><strong>{forecastComparison ? formatExactKFixed(forecastComparison.fiscalYearSummary.fullPeriodForecastAmount) : "—"}</strong><small class="consumption-metric is-forecast">{fullForecastPeriodLabel}</small></article>
-      <article class="kpi-panel"><span>Remaining Open Forecast <InfoTooltip id="remainingOpenForecastTooltip" label="Explain Remaining Open Forecast" text={REMAINING_OPEN_FORECAST_TOOLTIP} /></span><strong>{formatExactKFixed(remainingOpenForecastAmountExact)}</strong><small><span class="consumption-metric is-forecast">Open Forecast {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span>{includeMtd && <><span aria-hidden="true"> · </span><span class="consumption-metric is-mtd">MTD overlap −{formatExactKFixed(analysis.portfolio.forecastOverlapAmountExact)} <InfoTooltip id="mtdOverlapTooltip" variant="overlap" label="Explain MTD overlap" text={`Deducted to avoid double-counting MTD and Forecast. For each matching Account + month + Pillar, overlap = min(max(MTD, 0), max(Forecast, 0)). The displayed overlap ${formatExactKFixed(analysis.portfolio.forecastOverlapAmountExact)} can differ from total MTD ${formatExactKFixed(currentMtdAmountExact)} because only MTD with a matching Forecast is deducted.`} /></span></>}</small></article>
+      <article class="kpi-panel"><span>Remaining Open Forecast <InfoTooltip id="remainingOpenForecastTooltip" label="Explain Remaining Open Forecast" text={REMAINING_OPEN_FORECAST_TOOLTIP} /></span><strong>{formatExactKFixed(remainingOpenForecastAmountExact)}</strong><small><span class="consumption-metric is-forecast">Open Forecast {formatExactKFixed(analysis.portfolio.forecastAmountExact)}</span>{includeMtd && analysis.mtdSummary && !loading && <><span aria-hidden="true"> · </span><span class="consumption-metric is-mtd consumption-insights-overlap">MTD overlap −{formatExactKFixed(analysis.portfolio.forecastOverlapAmountExact)} <InfoTooltip id="mtdOverlapTooltip" variant="overlap" label="Explain MTD overlap" text={`Deducted to avoid double-counting MTD and Forecast. For each matching Account + month + Pillar, overlap = min(max(MTD, 0), max(Forecast, 0)). The displayed overlap ${formatExactKFixed(analysis.portfolio.forecastOverlapAmountExact)} can differ from total MTD ${formatExactKFixed(currentMtdAmountExact)} because only MTD with a matching Forecast is deducted.`} /></span></>}</small></article>
       <article class="kpi-panel"><span>Latest complete quarter</span><strong>{latestCompleteQuarter ? formatExactKFixed(latestCompleteQuarter.totalAmountExact) : "N/A"}</strong><small class="consumption-metric is-quarter">{latestCompleteQuarter ? <>{latestCompleteQuarter.quarter}<span aria-hidden="true"> · </span><span class={latestCompleteQuarter.qoqChangePercentExact !== null && compareExactDecimals(latestCompleteQuarter.qoqChangePercentExact, "0") < 0 ? "is-negative" : "is-positive"}>{percentageTextExact(latestCompleteQuarter.qoqChangePercentExact, true)} QoQ</span></> : "No complete ACTUAL quarter"}</small></article>
     </section>
 

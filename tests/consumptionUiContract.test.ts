@@ -505,10 +505,18 @@ assert.match(insightsPage, /if \(analysisResponse\?\.fiscalYear === fiscalYear\)
 assert.doesNotMatch(insightsPage, /const generation = \+\+requestGeneration\.current;\s*setAnalysis\(null\)/, "candidate refresh keeps the combobox shell mounted and focused");
 assert.match(insightsPage, /role="combobox"[\s\S]*aria-autocomplete="list"[\s\S]*All Accounts/, "the analysis filter is a searchable Account combobox whose first option is the portfolio total");
 assert.match(insightsPage, /onCompositionStart[\s\S]*onCompositionEnd/, "the Account combobox waits for Korean IME composition completion");
+assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search: "", account: selectedAccountContext,[\s\S]*\}, \[fiscalYear, includeMtd, refreshTrigger, selectedAccountContext, selectedPillar, selectedSalesRep\]\);/,
+  "typing filters the mounted Account candidate list locally and only a selected Account changes the Analysis request context");
+assert.doesNotMatch(insightsPage, /debouncedCandidateSearch|setTimeout\([^)]*setDebouncedCandidateSearch/,
+  "Account keystrokes cannot trigger the body request or its progress indicator");
 assert.match(insightsPage, /ArrowDown[\s\S]*ArrowUp[\s\S]*Enter[\s\S]*Escape/, "the Account combobox supports keyboard navigation and selection");
 assert.match(insightsPage, /Clear account[\s\S]*selectAccountContext\(""\)/, "the Account combobox can clear back to All Accounts Total");
 assert.doesNotMatch(insightsPage, /shouldRefreshConsumptionAnalysisContext\(selectedAccountContext, account, debouncedCandidateSearch\)[\s\S]*if \(!refreshRequired\) setLoading\(false\)/,
   "selecting the current All Accounts context does not end a different request's active loading state");
+assert.match(insightsPage, /includeMtd && analysis\.mtdSummary && !loading && <><span aria-hidden="true"> · <\/span><span class="consumption-metric is-mtd consumption-insights-overlap">MTD overlap[\s\S]*variant="overlap"/,
+  "MTD overlap copy, amount, and help icon appear together only after Analysis loading completes");
+assert.match(insightsPage, /const quarterTotalsChart[\s\S]*points\.push\(\s*\{ id: `\$\{quarter\.quarter\}-mtd`[\s\S]*points\.push\(\s*\{ id: `\$\{quarter\.quarter\}-forecast`/,
+  "Mixed quarter consumption registers the stack as Actual, MTD, then Open Forecast without changing its values");
 assert.match(insightsPage, /\{analysis\.fiscalYear\} Mixed quarter consumption/, "FY fact-cell quarter totals use the selected fiscal-year title");
 assert.doesNotMatch(insightsPage, /FINAL \+ \{mtdAsOfPeriod\} MTD|Growth, YoY, anomaly signals, and FY Outlook remain FINAL-based/,
   "Analysis removes the long MTD implementation notice");
@@ -595,7 +603,7 @@ assert.match(styles, /\.consumption-insights-header-actions\s*\{[^}]*align-items
 assert.match(styles, /\.consumption-insights-pillar\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.2rem/, "Pillar uses the Records labelled filter rhythm");
 assert.match(styles, /@media \(max-width: 800px\)[\s\S]*\.consumption-insights-filter--account \{[^}]*flex:\s*0 0 auto;[^}]*\}/, "mobile Account filter clears the desktop 18rem flex basis so it cannot create vertical space before Overview");
 assert.doesNotMatch(insightsPage, /setSelectedPillar\(option\.value\);\s*setSelectedAccountContext\(""\)/, "Pillar changes preserve a still-valid selected Account for cross filtering");
-assert.match(insightsPage, /!debouncedCandidateSearch && selectedAccountContext[\s\S]*value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while candidate search does not clear context");
+assert.match(insightsPage, /selectedAccountContext && !value\.accountCandidates\.some[\s\S]*selectedAccountContext\.toLocaleLowerCase\(\)[\s\S]*setSelectedAccountContext\(""\)/, "an unfiltered Pillar response clears the selected Account only when it is absent from scoped candidates, while local candidate filtering does not clear context");
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Consumption Records sends the selected pillar with every records request");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Consumption Analysis sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar, fromQuarter, toQuarter\)/, "Consumption Records exports Actual for the selected pillar and currently displayed quarter range");
