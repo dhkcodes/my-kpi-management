@@ -537,7 +537,7 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
   }
 
   return <div data-kpi-single-editor data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
-    class={commonClass} style={overlayStyle} onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
+    class={commonClass} style={overlayStyle} onPointerDown={stopGridInteraction} onPointerUp={stopGridInteraction} onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
     {editor}
   </div>;
 }

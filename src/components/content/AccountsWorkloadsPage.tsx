@@ -52,6 +52,7 @@ import {
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
 import { AppMessageBanner } from "./AppMessageBanner";
+import { createDoubleActivationTracker } from "../common/doubleActivation";
 import {
   runAccountsWorkloadsOpportunitySaveFlow,
   runAccountsWorkloadsSaveFlow,
@@ -347,6 +348,7 @@ export function AccountsWorkloadsPage({
   const [pendingDealConfirmation, setPendingDealConfirmation] =
     useState<PendingDealConfirmation | null>(null);
   const [dealEditCell, setDealEditCell] = useState<DealEditCell | null>(null);
+  const mobileEditActivationRef = useRef(createDoubleActivationTracker());
   const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
     Readonly<{ text: string; top: number; left: number }> | null
   >(null);
@@ -812,6 +814,25 @@ export function AccountsWorkloadsPage({
           if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginAwEdit(key, field, value);
+        }}
+        onPointerDown={(event) => {
+          if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerDown(event, `aw:${key}:${field}`);
+        }}
+        onPointerMove={(event) => mobileEditActivationRef.current.onPointerMove(event)}
+        onPointerCancel={() => mobileEditActivationRef.current.onPointerCancel()}
+        onPointerUp={(event) => {
+          if (isDraftDeletedWorkload(workload.id) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerUp(event, `aw:${key}:${field}`, () => {
+            event.stopPropagation();
+            beginAwEdit(key, field, value);
+          });
         }}
       >
         <div class="accounts-workloads-cell-content">
@@ -2095,6 +2116,25 @@ export function AccountsWorkloadsPage({
           if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) return;
           event.stopPropagation();
           beginDealEdit(workloadId, effective, field);
+        }}
+        onPointerDown={(event) => {
+          if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerDown(event, `opportunity:${key}:${field}`);
+        }}
+        onPointerMove={(event) => mobileEditActivationRef.current.onPointerMove(event)}
+        onPointerCancel={() => mobileEditActivationRef.current.onPointerCancel()}
+        onPointerUp={(event) => {
+          if (isDraftDeletedWorkload(workloadId) || isInteractive(event.target)) {
+            mobileEditActivationRef.current.onPointerCancel();
+            return;
+          }
+          mobileEditActivationRef.current.onPointerUp(event, `opportunity:${key}:${field}`, () => {
+            event.stopPropagation();
+            beginDealEdit(workloadId, effective, field);
+          });
         }}
         onKeyDown={(event) => {
           if (editing && event.key === "Enter") {
