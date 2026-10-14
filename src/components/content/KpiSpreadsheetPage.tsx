@@ -288,8 +288,7 @@ function Summary({ summary, tab, fiscalYear, asOf, selectedQuarter, onSelectQuar
       const status = statusFor(quarter);
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
         <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
-        <b class={`kpi-quarter-count-label ${quarterStatusClass(status)}`}>{actual}</b>
-
+        <span class="kpi-quarter-card__body"><b class="kpi-quarter-count-label">{actual}</b><small>Target {combined ? summary.targets.c1C2CombinedPerQuarter : summary.targets.countPerQuarter[tab as keyof typeof summary.targets.countPerQuarter]}</small></span>
       </button>;
     })}</div>
   </section>;
@@ -1188,16 +1187,13 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
       </section>
     </div> : <Fragment>
       <div class="kpi-activity-toolbar" role="toolbar" aria-label={`${activeTab} activity actions`}>
-        <div class="kpi-activity-toolbar__left"><button type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving || drafts.length > 0 || editState.cell !== null}
-          title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>
+        <div class="kpi-activity-toolbar__left">
           {showSummary && <button type="button" class="kpi-summary-toggle" aria-controls={summaryId} aria-expanded={summaryExpanded} onClick={toggleSummary}>
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>
           </button>}
-          <button type="button" class="kpi-guide-toggle" aria-controls={guideId} aria-expanded={guideExpanded} onClick={toggleGuide}>
-            <span class="kpi-toggle-chevron" aria-hidden="true">{guideExpanded ? "⌄" : "›"}</span>
-            <span>KPI Guide</span>
-          </button>
+          <button type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving || drafts.length > 0 || editState.cell !== null}
+            title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>
         </div>
         <div class="kpi-activity-toolbar__right">
           {saving && <span class="kpi-inline-save" role="status" aria-live="polite">

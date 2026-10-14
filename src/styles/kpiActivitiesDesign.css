@@ -169,3 +169,41 @@
 @media (max-width: 480px) {
   .kpi-sheet-page .kpi-overview-metrics { grid-template-columns: 1fr; }
 }
+
+/* Selected 04-B / 04-D1 compact lanes: expanded Summary only. */
+.kpi-sheet-page .kpi-sheet-summary { background: #fff; border: 1px solid #dedbd5; border-radius: 8px; padding: 12px 16px; }
+.kpi-sheet-page .kpi-sheet-summary h3 { font-size: 17px; font-weight: 600; margin: 0 0 10px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-summary,
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-grid { padding-top: 5px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card,
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-quarter { display: block; padding: 10px 14px 6px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card::before,
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-quarter::before { left: 14px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__heading { display: flex; align-items: center; flex-direction: row; justify-content: space-between; gap: 8px; min-width: 0; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__heading > strong { font-size: 14px; font-weight: 600; }
+.kpi-sheet-page .kpi-sheet-summary .is-selected .kpi-quarter-card__heading > strong { text-decoration: underline; text-underline-offset: 4px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-status-label { margin: 0; flex: 0 0 auto; white-space: nowrap; font-size: 11px; font-style: normal; font-weight: 600; padding: 4px 8px; border-radius: 20px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-status-label--achieved { background: #eaf2ec; color: #316541; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-status-label--in-progress { background: #fbf0dc; color: #865911; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-status-label--not-started { background: #f0eeeb; color: #67625c; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-status-label--not-achieved { background: #faeae6; color: #a04535; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body { display: block; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-count-label { display: block; width: auto; min-width: 0; padding: 0; margin: 6px 0 2px; background: none; color: inherit; border-radius: 0; font-size: 32px; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body small { font-size: 12px; color: #716d66; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-item { display: block; margin-top: 8px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-label strong { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-track { height: 5px; background: #eeece8; border-radius: 3px; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-fill--identified { background: #9b9488; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-fill--validated { background: #8b769d; }
+.kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-fill--onboarded { background: #54765d; }
+@media (max-width: 700px) {
+  .kpi-sheet-page .kpi-sheet-summary { padding: 12px 14px; }
+  .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card,
+  .kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-quarter { padding: 8px 12px; }
+  .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card::before,
+  .kpi-sheet-page .kpi-sheet-summary .kpi-d1-progress-quarter::before { left: -6px; top: 15px; }
+  .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+  .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-count-label { margin: 0; }
+  .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body small { text-align: right; }
+}
