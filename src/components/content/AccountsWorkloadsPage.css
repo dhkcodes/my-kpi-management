@@ -359,6 +359,12 @@
   text-align: inherit;
 }
 
+/* Keep the compact parent table inside the same canvas as the filters,
+   including when no Opportunity is expanded on a narrow viewport. */
+.accounts-workloads-layout .kap-page-shell__inner {
+  min-width: 1320px;
+}
+
 /* An expanded child keeps its existing 2575px colgroup on the same root
    scrolling canvas as the parent. No nested horizontal scroller is added. */
 .accounts-workloads-layout:has(.accounts-workloads-child-row) .kap-page-shell__inner {
@@ -376,4 +382,16 @@
 .accounts-workloads-layout .accounts-workloads-oppty-scroll {
   width: auto;
   max-width: none;
+}
+
+/* Two fixed Opportunity columns occupy 425px: on phone-sized screens
+   scroll them with the canvas so they cannot cover every other column. */
+@media (max-width: 600px) {
+  .accounts-workloads-layout .accounts-workloads-oppty-grid th:nth-child(-n+2),
+  .accounts-workloads-layout .accounts-workloads-oppty-grid td:nth-child(-n+2) {
+    position: static;
+    left: auto;
+    z-index: auto;
+    box-shadow: none;
+  }
 }
