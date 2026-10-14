@@ -2389,6 +2389,7 @@ export function AccountsWorkloadsPage({
       <link rel="stylesheet" href="components/content/AccountsWorkloadsPage.css" />
       <PageShell
         ariaLabelledBy="accountsWorkloadsTitle"
+        scrollable={false}
         title="Account & Workload"
         breadcrumb={breadcrumb}
         className="accounts-workloads-page accounts-hierarchy-page accounts-workloads-layout"
@@ -2614,7 +2615,7 @@ export function AccountsWorkloadsPage({
           <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
         </div>
       </DataControlBar>
-      <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy={loading ? "true" : "false"}>
+      <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" tabIndex={0} role="region" aria-label="Account & Workload table data" aria-busy={loading ? "true" : "false"}>
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
               <tr>

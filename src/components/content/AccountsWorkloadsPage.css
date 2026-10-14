@@ -272,7 +272,8 @@
    Keep current column sizing, wrapping, controls and Opportunity sticky pins.
    Apply the same bounded flex chain on mobile so filters remain outside it. */
 .accounts-workloads-layout .kap-page-shell__scroll {
-  overflow: hidden;
+  /* clip is deliberately not a scroll container, including focus/scrollIntoView. */
+  overflow: clip;
   scrollbar-gutter: auto;
 }
 
@@ -292,6 +293,11 @@
   max-height: none;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead {
+  /* Preserve the collapsed 1px border's initial half-pixel inset while pinned. */
+  top: .5px;
 }
 
 .accounts-workloads-layout .accounts-workloads-oppty-scroll {

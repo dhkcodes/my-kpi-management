@@ -24,6 +24,8 @@ type PageShellProps = {
   bodyClassName?: string;
   rootAttributes?: Record<string, string>;
   scrollElementRef?: (element: HTMLDivElement | null) => void;
+  /** Data-grid pages own scrolling in their data region, not in the shell. */
+  scrollable?: boolean;
   onScroll?: (event: Event) => void;
 };
 
@@ -169,6 +171,7 @@ export function PageShell({
   bodyClassName = "",
   rootAttributes,
   scrollElementRef,
+  scrollable = true,
   onScroll
 }: PageShellProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -192,7 +195,9 @@ export function PageShell({
     <section class={`kap-page-shell${className ? ` ${className}` : ""}`} aria-labelledby={ariaLabelledBy} aria-busy={busy ? "true" : "false"} data-app-busy-surface="true" {...rootAttributes}>
       <div ref={(element) => { scrollRef.current = element; scrollElementRef?.(element); }}
         class={`kap-page-shell__scroll${scrolling ? " is-scrolling" : ""}`}
-        onScroll={(event) => { handleScroll(); onScroll?.(event); }} tabIndex={0}>
+        style={scrollable ? undefined : { overflow: "clip" }}
+        onScroll={scrollable ? (event) => { handleScroll(); onScroll?.(event); } : undefined}
+        tabIndex={scrollable ? 0 : undefined}>
         <div class="kap-page-shell__inner">
           <div class={`kap-page-shell__masthead${headingSpacing === "compact" ? " is-compact" : ""}`}>
             {breadcrumb}
