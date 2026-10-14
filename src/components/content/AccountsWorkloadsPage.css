@@ -108,7 +108,7 @@
   justify-self: end;
 }
 
-.accounts-workloads-layout .accounts-workloads-layout__controls > oj-button {
+.accounts-workloads-layout .accounts-workloads-layout__controls .accounts-workloads-add-aw {
   box-sizing: border-box;
   height: 2.25rem;
   margin: 0;
@@ -232,13 +232,17 @@
 }
 .accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-expand-col > button,
 .accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-highlight-col > button {
+  align-items: center;
+  display: inline-flex;
+  width: 100%;
   float: none;
-  margin-inline: auto;
+  margin: 0;
   justify-content: center;
 }
 .accounts-workloads-layout .accounts-workloads-layout__activity {
-  align-self: flex-end;
+  align-self: center;
   flex: 0 0 auto;
+  margin-inline-start: auto;
 }
 .accounts-workloads-layout .accounts-workloads-include-archived-switch {
   margin-inline-start: auto;

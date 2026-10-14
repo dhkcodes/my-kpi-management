@@ -48,6 +48,7 @@
 .kap-page-shell.account-management-overview .account-overview__reload-row { display: flex; justify-content: flex-end; margin: 0; padding: 0 0 6px; }
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity,
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity__control-slot { min-height: 0; }
+.kap-page-shell.account-management-overview .account-overview__exceptions + .account-overview__section { margin-top: 1rem; }
 .kap-page-shell.account-management-overview .account-overview__section + .account-overview__section { margin-top: .75rem; }
 .kap-page-shell.account-management-overview .account-overview__target-head,
 .kap-page-shell.account-management-overview .account-overview__target-row {
@@ -60,8 +61,13 @@
 .kap-page-shell.account-management-overview .account-overview__target-row > span:nth-child(4) { text-align: center; }
 .kap-page-shell.account-management-overview .account-overview__target-grid { overflow-x: auto; }
 .kap-page-shell.account-management-overview .account-overview__target-scroll { min-width: 75rem; height: auto; max-height: none; overflow: visible; }
-.kap-page-shell.account-management-overview .account-overview__actual-details > .account-overview__hierarchy { height: auto; max-height: none; align-self: start; }
-.kap-page-shell.account-management-overview .account-overview__hierarchy-scroll { height: auto; max-height: none; overflow: visible; }
+.kap-page-shell.account-management-overview .account-overview__actual-details > .account-overview__panel { box-sizing: border-box; height: 24rem; min-height: 0; max-height: 24rem; align-self: start; }
+.kap-page-shell.account-management-overview .account-overview__hierarchy-scroll { flex: 1 1 0; height: auto; min-height: 0; max-height: none; overflow: auto; }
+.kap-page-shell.account-management-overview .account-overview__hierarchy-head,
+.kap-page-shell.account-management-overview .account-overview__hierarchy > .account-overview__panel-heading { flex-shrink: 0; }
+@media (max-width: 720px) {
+  .kap-page-shell.account-management-overview .account-overview__actual-details > .account-overview__panel { height: 28rem; max-height: 28rem; }
+}
 .kap-page-shell.account-management-overview .account-overview__target-row > b { text-align: right; }
 .kap-page-shell.account-management-overview .account-overview__target-row > span:nth-child(4) { text-align: center; }
 .kap-page-shell.account-management-overview .account-overview__target-head { display: grid; text-transform: none; }

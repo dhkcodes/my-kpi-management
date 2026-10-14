@@ -2389,7 +2389,7 @@ export function AccountsWorkloadsPage({
         activityPosition="custom"
         busy={loading || saving}
         actions={
-          <div class="consumption-import-actions is-compact">
+          <div class="consumption-import-actions">
             <oj-button
               class="oj-button-sm"
               chroming="outlined"
@@ -2397,8 +2397,9 @@ export function AccountsWorkloadsPage({
               disabled={loading || saving || forecastLoading}
               onojAction={() => void fetchForecast()}
             >
-              <span slot="startIcon" class="oj-ux-ico-upload" aria-hidden="true" />
-              Account Recommendations
+              <span slot="startIcon" class="oj-ux-ico-plus" aria-hidden="true" />
+              <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
+              <span class="accounts-workloads-recommendations-label--mobile">Account Recomm.</span>
             </oj-button>
           </div>
         }
@@ -2555,33 +2556,54 @@ export function AccountsWorkloadsPage({
         </div>
       )}
       <ConsumptionViewportProgress busy={queryControlsDisabled} busyLabel={saving ? "Saving accounts and workloads" : forecastLoading ? "Loading account recommendations" : "Loading accounts and workloads"} />
-      <div class="accounts-workloads-layout__activity">
-        <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
-      </div>
       <DataControlBar className="accounts-workloads-layout__controls" ariaLabel="Account and workload controls">
-        <oj-button
-          class="oj-button-sm accounts-workloads-toolbar-add"
-          chroming="solid"
-          disabled={!canWrite || loading || saving}
-          onojAction={addAw}
-        >Add Account &amp; Workload</oj-button>
-        <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving || savableAwDraftCount === 0} onojAction={() => openActionConfirmation("save")}>Save</oj-button>
-        <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || saving || !dirty} onojAction={() => openActionConfirmation("cancel")}>Cancel</oj-button>
-        <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving || selectedCount === 0 || !!editCell || selectedArchivedCount > 0 || selectedDraftCount === selectedCount} onojAction={deleteSelected}>Archive</oj-button>
+        <button
+          type="button"
+          class="accounts-workloads-add-aw"
+          disabled={!canWrite || saving}
+          onClick={addAw}
+        >
+          Add Account & Workload
+        </button>
+        {savableAwDraftCount > 0 && (
+          <button
+            type="button"
+            class="accounts-workloads-button accounts-workloads-button--primary"
+            disabled={!canWrite || saving}
+            onClick={() => openActionConfirmation("save")}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
+        {dirty && (
+          <button
+            type="button"
+            class="accounts-workloads-button"
+            disabled={saving}
+            onClick={() => openActionConfirmation("cancel")}
+          >
+            Cancel
+          </button>
+        )}
+        {selectedCount > 0 && !editCell && !dirty && selectedArchivedCount > 0 && (
+          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
+            Restore
+          </button>
+        )}
+        {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
+          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
+            {selectedArchivedCount > 0
+              ? "Delete Permanently"
+              : selectedDraftCount === selectedCount
+                ? "Discard Draft"
+                : "Archive"}
+          </button>
+        )}
         <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} Accounts</span>
-      </DataControlBar>
-      {selectedCount > 0 && !editCell && (
-        <div class="accounts-workloads-layout__draft-actions" aria-label="Selected record actions">
-          {!dirty && selectedArchivedCount > 0 && (
-            <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving} onojAction={() => void restoreSelected()}>Restore</oj-button>
-          )}
-          {((selectedArchivedCount > 0 && !dirty) || selectedDraftCount === selectedCount) && (
-            <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving} onojAction={deleteSelected}>
-              {selectedArchivedCount > 0 ? "Delete Permanently" : "Discard Draft"}
-            </oj-button>
-          )}
+        <div class="accounts-workloads-layout__activity">
+          <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
         </div>
-      )}
+      </DataControlBar>
       <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy={loading ? "true" : "false"}>
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
