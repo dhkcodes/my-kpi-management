@@ -213,3 +213,90 @@
   .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-count-label { margin: 0; }
   .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body small { text-align: right; }
 }
+
+/* Requirements 1–4: domain styles only; PageShell owns vertical scrolling. */
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right > .kpi-save-action {
+  background: var(--oj-button-call-to-action-chrome-bg-color, var(--kpi-brand));
+  border-color: var(--oj-button-call-to-action-chrome-bg-color, var(--kpi-brand));
+  color: var(--oj-button-call-to-action-chrome-text-color, #fff);
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right > .kpi-save-action:not(:disabled):hover {
+  background: var(--oj-button-call-to-action-chrome-bg-color-hover, var(--kpi-brand));
+  border-color: var(--oj-button-call-to-action-chrome-bg-color-hover, var(--kpi-brand));
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right > .kpi-save-action:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
+  outline-offset: 2px;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-scroll-area {
+  flex: 0 0 auto;
+  grid-template-rows: none;
+  grid-auto-rows: max-content;
+  overflow: visible;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities,
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-metrics + .kpi-overview-portfolio { grid-row: auto; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-activities-table-wrap,
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities__table-wrap,
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-portfolio__table-wrap {
+  block-size: auto;
+  height: auto;
+  max-height: none;
+  min-height: auto;
+  flex: 0 0 auto;
+  /* Auto height grows with all rows. Only wide tables need an inner scrollbar. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: auto;
+  scrollbar-gutter: auto;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-metrics > button small {
+  line-height: 1.35;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-metrics .kpi-metric-detail-value {
+  color: var(--oj-core-text-color-primary, #26211e);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: inherit;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities table { font-size: .72rem; line-height: 1.35; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities th,
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities td { padding: .35rem .5rem; vertical-align: middle; }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-filtered-activities .kpi-overview-route-link {
+  background: transparent;
+  border: 0;
+  border-radius: var(--oj-core-border-radius-sm, .2rem);
+  color: inherit;
+  display: inline-flex;
+  font: inherit;
+  padding: .15rem;
+  text-decoration: none;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-kpi-badge {
+  align-items: center;
+  background: var(--oj-core-bg-color-selected, #e4f1e7);
+  border: 1px solid var(--kpi-border);
+  border-radius: var(--oj-core-border-radius-sm, .2rem);
+  color: var(--oj-core-text-color-primary, #26211e);
+  display: inline-flex;
+  font-size: .68rem;
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1.2;
+  min-width: 1.7rem;
+  padding: .15rem .35rem;
+}
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-route-link:hover .kpi-overview-kpi-badge { background: var(--oj-core-bg-color-hover, #eee); }
+.kap-page-shell.kpi-spreadsheet-page .kpi-overview-route-link:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
+  outline-offset: 2px;
+}

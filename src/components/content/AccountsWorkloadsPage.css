@@ -83,10 +83,10 @@
 /* Six pixels between visible button bounds and filter/table boundaries. */
 .accounts-workloads-layout .accounts-workloads-layout__controls {
   align-items: center;
-  display: grid;
+  display: flex;
   flex: 0 0 auto;
-  gap: 0 .75rem;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  flex-wrap: wrap;
+  gap: .5rem;
   margin: 0;
   padding: 6px 0;
 }
@@ -108,7 +108,7 @@
   justify-self: end;
 }
 
-.accounts-workloads-layout .accounts-workloads-layout__controls .accounts-workloads-add-aw {
+.accounts-workloads-layout .accounts-workloads-layout__controls > oj-button {
   box-sizing: border-box;
   height: 2.25rem;
   margin: 0;
@@ -213,14 +213,52 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
-  .accounts-workloads-layout__primary-action .accounts-workloads-add-aw {
-    font-size: .72rem;
-    padding-inline: .4rem;
-    white-space: normal;
+  .accounts-workloads-layout .accounts-workloads-layout__controls {
+    flex-wrap: wrap;
   }
 
   .accounts-workloads-layout .accounts-workloads-grid-wrap--compact {
     flex-basis: auto;
     max-height: 65dvh;
   }
+}
+
+/* Center control columns without touching JET-generated DOM. */
+.accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-expand-col,
+.accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-highlight-col {
+  padding-inline: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-expand-col > button,
+.accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-highlight-col > button {
+  float: none;
+  margin-inline: auto;
+  justify-content: center;
+}
+.accounts-workloads-layout .accounts-workloads-layout__activity {
+  align-self: flex-end;
+  flex: 0 0 auto;
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch {
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch:has(input:disabled) {
+  opacity: .55;
+}
+/* Reuse ConsumptionViewportProgress geometry; shared app.css selectors are
+   scoped to Consumption pages, so Account & Workload owns only this bridge. */
+.kap-page-shell.accounts-workloads-layout .consumption-page-progress-controls {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 48;
+}
+.kap-page-shell.accounts-workloads-layout .consumption-page-progress-controls[data-visible="false"] {
+  display: none;
+}
+.kap-page-shell.accounts-workloads-layout .consumption-page-progress-controls .kap-page-data-progress {
+  left: var(--consumption-viewport-center-x, 50%);
+  top: var(--consumption-viewport-center-y, 50%);
 }

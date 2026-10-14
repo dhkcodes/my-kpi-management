@@ -5,6 +5,7 @@ import Context = require("ojs/ojcontext");
 import { ojDialog } from "ojs/ojdialog";
 import "ojs/ojbutton";
 import { DataControlBar, PageActivity, PageFilterPanel, PageShell } from "../common/PageShell";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 
 import "ojs/ojdialog";
 import "ojs/ojdatetimepicker";
@@ -2365,6 +2366,7 @@ export function AccountsWorkloadsPage({
   const savableAwDraftCount =
     dirtyAccounts.size + dirtyWorkloads.size + pendingDeleteWorkloadIds.size + (fxDirty ? 1 : 0);
 
+  const queryControlsDisabled = loading || saving || forecastLoading || forecastMutationKey !== null;
   return (
     <section
       class="accounts-workloads-layout-event-root"
@@ -2387,17 +2389,16 @@ export function AccountsWorkloadsPage({
         activityPosition="custom"
         busy={loading || saving}
         actions={
-          <div class="consumption-import-actions">
+          <div class="consumption-import-actions is-compact">
             <oj-button
               class="oj-button-sm"
               chroming="outlined"
               aria-label="Account Recommendations"
-              disabled={saving}
+              disabled={loading || saving || forecastLoading}
               onojAction={() => void fetchForecast()}
             >
-              <span slot="startIcon" class="oj-ux-ico-plus" />
-              <span class="accounts-workloads-recommendations-label--desktop">Account Recommendations</span>
-              <span class="accounts-workloads-recommendations-label--mobile">Account Recomm.</span>
+              <span slot="startIcon" class="oj-ux-ico-upload" aria-hidden="true" />
+              Account Recommendations
             </oj-button>
           </div>
         }
@@ -2407,7 +2408,7 @@ export function AccountsWorkloadsPage({
               class="accounts-workloads-layout__search-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (searchComposingRef.current) return;
+                if (searchComposingRef.current || queryControlsDisabled) return;
                 if (dirty) {
                   setError("Save or cancel drafts before searching.");
                   return;
@@ -2423,6 +2424,7 @@ export function AccountsWorkloadsPage({
                 <input
                   id="accountsWorkloadsSearch"
                   type="search"
+                  disabled={queryControlsDisabled}
                   value={searchInput}
                   placeholder="Account, workload, opportunity, or Plan"
                   onCompositionStart={() => { searchComposingRef.current = true; }}
@@ -2439,25 +2441,11 @@ export function AccountsWorkloadsPage({
                 <button
                   type="submit"
                   class="consumption-record-search__submit"
-                  disabled={loading || saving}
+                  disabled={queryControlsDisabled}
                 >
                   <span class="oj-ux-ico-search" aria-hidden="true" />
                   <span class="oj-helper-hidden-accessible">Search</span>
                 </button>
-              </label>
-              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
-                <input
-                  type="checkbox"
-                  checked={includeDeleted}
-                  disabled={dirty || loading || saving}
-                  onChange={(event) => {
-                    const nextIncludeDeleted = event.currentTarget.checked;
-                    includeDeletedRef.current = nextIncludeDeleted;
-                    setIncludeDeleted(nextIncludeDeleted);
-                  }}
-                />
-                <span>Include Archived</span>
-                <span class="accounts-workloads-switch" aria-hidden="true" />
               </label>
             </form>
             <div class="accounts-workloads-table-summary accounts-workloads-layout__fx">
@@ -2516,6 +2504,22 @@ export function AccountsWorkloadsPage({
               )}
               </div>
             </div>
+              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-checked={includeDeleted}
+                  checked={includeDeleted}
+                  disabled={dirty || queryControlsDisabled}
+                  onChange={(event) => {
+                    const nextIncludeDeleted = event.currentTarget.checked;
+                    includeDeletedRef.current = nextIncludeDeleted;
+                    setIncludeDeleted(nextIncludeDeleted);
+                  }}
+                />
+                <span>Include Archived</span>
+                <span class="accounts-workloads-switch" aria-hidden="true" />
+              </label>
           </PageFilterPanel>
         }
       >
@@ -2550,60 +2554,34 @@ export function AccountsWorkloadsPage({
           </ul>
         </div>
       )}
+      <ConsumptionViewportProgress busy={queryControlsDisabled} busyLabel={saving ? "Saving accounts and workloads" : forecastLoading ? "Loading account recommendations" : "Loading accounts and workloads"} />
+      <div class="accounts-workloads-layout__activity">
+        <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
+      </div>
       <DataControlBar className="accounts-workloads-layout__controls" ariaLabel="Account and workload controls">
-        <div class="accounts-workloads-layout__primary-action">
-          <button
-            type="button"
-            class="accounts-workloads-add-aw"
-            disabled={!canWrite || saving}
-            onClick={addAw}
-          >
-            Add Account & Workload
-          </button>
-        </div>
+        <oj-button
+          class="oj-button-sm accounts-workloads-toolbar-add"
+          chroming="solid"
+          disabled={!canWrite || loading || saving}
+          onojAction={addAw}
+        >Add Account &amp; Workload</oj-button>
+        <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving || savableAwDraftCount === 0} onojAction={() => openActionConfirmation("save")}>Save</oj-button>
+        <oj-button class="oj-button-sm" chroming="outlined" disabled={loading || saving || !dirty} onojAction={() => openActionConfirmation("cancel")}>Cancel</oj-button>
+        <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving || selectedCount === 0 || !!editCell || selectedArchivedCount > 0 || selectedDraftCount === selectedCount} onojAction={deleteSelected}>Archive</oj-button>
         <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} Accounts</span>
-        <div class="accounts-workloads-layout__activity">
-          <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
-        </div>
-        {(savableAwDraftCount > 0 || dirty || (selectedCount > 0 && !editCell)) && (
-          <div class="accounts-workloads-layout__draft-actions">
-            {savableAwDraftCount > 0 && (
-              <button
-                type="button"
-                class="accounts-workloads-button accounts-workloads-button--primary"
-                disabled={!canWrite || saving}
-                onClick={() => openActionConfirmation("save")}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            )}
-            {dirty && (
-              <button
-                type="button"
-                class="accounts-workloads-button"
-                disabled={saving}
-                onClick={() => openActionConfirmation("cancel")}
-              >
-                Cancel
-              </button>
-            )}
-            {selectedCount > 0 && !editCell && !dirty && selectedArchivedCount > 0 && (
-              <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
-                Restore
-              </button>
-            )}
-            {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
-              <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
-                {selectedArchivedCount > 0
-                  ? "Delete Permanently"
-                  : selectedDraftCount === selectedCount
-                    ? "Discard Draft"
-                    : "Archive"}
-              </button>
-            )}
-          </div>
-        )}
       </DataControlBar>
+      {selectedCount > 0 && !editCell && (
+        <div class="accounts-workloads-layout__draft-actions" aria-label="Selected record actions">
+          {!dirty && selectedArchivedCount > 0 && (
+            <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving} onojAction={() => void restoreSelected()}>Restore</oj-button>
+          )}
+          {((selectedArchivedCount > 0 && !dirty) || selectedDraftCount === selectedCount) && (
+            <oj-button class="oj-button-sm" chroming="outlined" disabled={!canWrite || loading || saving} onojAction={deleteSelected}>
+              {selectedArchivedCount > 0 ? "Delete Permanently" : "Discard Draft"}
+            </oj-button>
+          )}
+        </div>
+      )}
       <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy={loading ? "true" : "false"}>
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
@@ -2696,7 +2674,7 @@ export function AccountsWorkloadsPage({
                         });
                       }}
                     >
-                      <td>
+                      <td class="accounts-workloads-expand-col">
                         <button
                           type="button"
                           class="accounts-workloads-expander"
@@ -2712,7 +2690,7 @@ export function AccountsWorkloadsPage({
                           {expanded ? "▾" : "▸"}
                         </button>
                       </td>
-                      <td>
+                      <td class="accounts-workloads-highlight-col">
                         <button
                           type="button"
                           class="accounts-workloads-highlight"
@@ -3119,6 +3097,7 @@ export function AccountsWorkloadsPage({
                 <input
                   id="accountRecommendationsSearch"
                   type="search"
+                  disabled={queryControlsDisabled}
                   value={forecastSearch}
                   placeholder="Search account name, plan number, or sales rep"
                   onInput={(event) => setForecastSearch(event.currentTarget.value)}
@@ -3129,7 +3108,7 @@ export function AccountsWorkloadsPage({
               </label>
               <oj-button
                 class="accounts-workloads-button accounts-forecast-resync"
-                disabled={forecastLoading || forecastMutationKey !== null}
+                disabled={queryControlsDisabled}
                 onojAction={() => void fetchForecast()}
               >
                 <span slot="startIcon" class="oj-ux-ico-refresh" aria-hidden="true" />
@@ -3140,6 +3119,7 @@ export function AccountsWorkloadsPage({
                   type="checkbox"
                   role="switch"
                   checked={showExcluded}
+                  disabled={queryControlsDisabled}
                   onChange={(event) => setShowExcluded(event.currentTarget.checked)}
                 />
                 <span>Show excluded</span>
@@ -3185,7 +3165,7 @@ export function AccountsWorkloadsPage({
                             <button
                               type="button"
                               class="accounts-forecast-exclusion-action"
-                              disabled={forecastLoading || forecastMutationKey !== null}
+                              disabled={queryControlsDisabled}
                               onClick={() => void toggleCandidateExcluded(candidate)}
                             >
                               {candidate.excluded ? "Unexclude" : "Exclude"}

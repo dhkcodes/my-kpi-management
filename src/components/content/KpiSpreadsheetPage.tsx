@@ -1116,6 +1116,17 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
   />;
 
   const dataReadyForFiscalYear = hasLoadedData || !pageLoading;
+  // Keep card detail states intact, while making numeric/date context scannable.
+  const highlightedOverviewDetail = (value: string) => {
+    const detail = overviewDetail(value);
+    if (overviewDataState !== "ready") return detail;
+    return detail.split(/(\d{4}-\d{2}-\d{2}|FY\d+|\d+(?:\.\d+)?%?)/g).map((part, index) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(part)
+        ? <time key={index} class="kpi-metric-detail-value" dateTime={part}>{part}</time>
+        : /^(?:FY\d+|\d+(?:\.\d+)?%?)$/.test(part)
+          ? <strong key={index} class="kpi-metric-detail-value">{part}</strong>
+          : part);
+  };
   const metricOrbit = (value: string | number, rate?: number) => {
     const [numerator, denominator] = String(value).split("/");
     return <span class={`kpi-metric-orbit${rate === undefined ? " is-disk" : " is-ring"}`}
@@ -1141,25 +1152,25 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           onClick={() => setOverviewFilter((current) => current === "target-achieved" ? null : "target-achieved")}>
           <span>Quarterly Target Achievement</span>
           {metricOrbit(overviewValue(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.achieved}/${overviewMetrics.quarterlyTargetAchievement.total}` : "—"), overviewMetrics?.quarterlyTargetAchievement.rate ?? 0)}
-          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.rate}% · FY-valid reflected deliveries` : "")}</small>
+          <small>{highlightedOverviewDetail(overviewMetrics ? `${overviewMetrics.quarterlyTargetAchievement.rate}% · FY-valid reflected deliveries` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "reflected" ? "is-selected" : ""} aria-pressed={overviewFilter === "reflected"}
           onClick={() => setOverviewFilter((current) => current === "reflected" ? null : "reflected")}>
           <span>Reflected Completion</span>
           {metricOrbit(overviewValue(overviewMetrics ? `${overviewMetrics.reflectedCompletion.reflected}/${overviewMetrics.reflectedCompletion.total}` : "—"), overviewMetrics?.reflectedCompletion.rate ?? 0)}
-          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${displayFiscalYear} activities` : "")}</small>
+          <small>{highlightedOverviewDetail(overviewMetrics ? `${overviewMetrics.reflectedCompletion.rate}% of ${displayFiscalYear} activities` : "")}</small>
         </button>
         <button type="button" class={overviewFilter === "overdue" ? "is-selected" : ""} aria-pressed={overviewFilter === "overdue"}
           onClick={() => setOverviewFilter((current) => current === "overdue" ? null : "overdue")}>
           <span>Overdue Pending</span>
           {metricOrbit(overviewValue(overviewMetrics?.overduePending.count ?? "—"))}
-          <small>{overviewDetail(`Pending · FY-valid Delivery Date before ${asOf}`)}</small>
+          <small>{highlightedOverviewDetail(`Pending · FY-valid Delivery Date before ${asOf}`)}</small>
         </button>
         <button type="button" class={overviewFilter === "date-integrity" ? "is-selected" : ""} aria-pressed={overviewFilter === "date-integrity"}
           onClick={() => setOverviewFilter((current) => current === "date-integrity" ? null : "date-integrity")}>
           <span>Date Integrity Exceptions</span>
           {metricOrbit(overviewValue(overviewMetrics?.dateIntegrity.total ?? "—"))}
-          <small>{overviewDetail(overviewMetrics ? `${overviewMetrics.dateIntegrity.missing} missing · ${overviewMetrics.dateIntegrity.invalid} invalid · ${overviewMetrics.dateIntegrity.outOfFiscalYear} out of FY` : "")}</small>
+          <small>{highlightedOverviewDetail(overviewMetrics ? `${overviewMetrics.dateIntegrity.missing} missing · ${overviewMetrics.dateIntegrity.invalid} invalid · ${overviewMetrics.dateIntegrity.outOfFiscalYear} out of FY` : "")}</small>
         </button>
       </div>
       {overviewFilter && <section class="kpi-overview-filtered-activities" aria-labelledby="kpiOverviewFilteredTitle">
@@ -1170,7 +1181,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         <div class="kpi-overview-filtered-activities__table-wrap"><table aria-label={`${fiscalYear} filtered KPI activities`}>
           <thead><tr><th>KPI</th><th>Reflected</th><th>Account / Workload</th><th>SR Number</th><th>Description</th><th>Delivery Date</th><th>Filter detail</th></tr></thead>
           <tbody>{overviewFilteredRows.map(({ row, integrity }) => <tr key={`overview-filter:${row.id}`}>
-            <td><button type="button" class="kpi-overview-route-link" onClick={() => onNavigate(`activity-${row.kpiCode.toLowerCase()}`)}>{row.kpiCode}</button></td>
+            <td><button type="button" class="kpi-overview-route-link" aria-label={`Open KPI ${row.kpiCode} activities`}
+              onClick={() => onNavigate(`activity-${row.kpiCode.toLowerCase()}`)}><span class="kpi-overview-kpi-badge">{row.kpiCode}</span></button></td>
             <td>{row.manageTimeReflected ? "Reflected" : "Pending"}</td>
             <td>{row.accountWorkload || "—"}</td><td>{row.srNumber || "—"}</td><td>{row.title || "—"}</td><td>{row.deliveryDate || row.deliveryDateRaw || "—"}</td>
             <td>{overviewFilter === "date-integrity" ? ({ missing: "Missing date", invalid: "Invalid date", "out-of-fy": "Outside selected FY", valid: "Valid" } as const)[integrity]
@@ -1207,7 +1219,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           {reflectedAction && <button type="button" class="kpi-reflected-action" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : reflectedAction.label} aria-label={reflectedAction.label}
             onClick={() => applyManaged(reflectedAction.managed)}>{reflectedAction.label}</button>}
-          {toolbarActions.includes("save") && <button type="button" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
+          {toolbarActions.includes("save") && <button type="button" class="kpi-save-action" disabled={saveDisabled} onClick={() => { void saveDrafts(); }}>Save</button>}
           {toolbarActions.includes("cancel") && <button type="button" disabled={saving} onClick={requestCancel}>Cancel</button>}
           {toolbarActions.includes("delete") && <button class="kpi-delete-button" type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving}
             title={!canWrite ? "Write permission is required." : undefined} onClick={() => deleteDialogRef.current?.open()}>Delete</button>}

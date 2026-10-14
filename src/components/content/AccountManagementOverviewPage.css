@@ -33,7 +33,7 @@
   background: transparent; border: 0; border-radius: 0; flex: 0 1 20rem; gap: .2rem; max-width: 100%; min-width: 14.4rem;
   padding: 0; width: min(20rem,22.4vw);
 }
-.kap-page-shell.account-management-overview .account-overview__search > label { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; letter-spacing: normal; }
+.kap-page-shell.account-management-overview .account-overview__search > label { color: var(--kpi-muted); font-size: .72rem; font-weight: 800; letter-spacing: normal; text-transform: none; }
 .kap-page-shell.account-management-overview .account-overview__search-field {
   background: var(--oj-core-bg-color-content, #fff); border: 1px solid var(--oj-core-border-color-enabled, var(--kpi-border));
   border-radius: 0; box-sizing: border-box; height: var(--kap-consumption-control-height); min-height: var(--kap-consumption-control-height); padding: 0 .65rem;
@@ -45,13 +45,13 @@
 .kap-page-shell.account-management-overview .account-overview__exceptions strong { white-space: normal; }
 .kap-page-shell.account-management-overview .account-overview__portfolio-card { background: #f4f8fc; border: 1px solid #ccd9e6; border-radius: 5px; display: flex; align-items: center; gap: .4rem; padding: .65rem .7rem; }
 .kap-page-shell.account-management-overview .account-overview__portfolio-card > span { display: grid; gap: .2rem; }
-.kap-page-shell.account-management-overview .account-overview__reload-row { display: flex; justify-content: flex-end; margin: 0; padding: 6px 0; }
+.kap-page-shell.account-management-overview .account-overview__reload-row { display: flex; justify-content: flex-end; margin: 0; padding: 0 0 6px; }
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity,
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity__control-slot { min-height: 0; }
 .kap-page-shell.account-management-overview .account-overview__section + .account-overview__section { margin-top: .75rem; }
 .kap-page-shell.account-management-overview .account-overview__target-head,
 .kap-page-shell.account-management-overview .account-overview__target-row {
-  grid-template-columns: minmax(17rem,1.8fr) 5.25rem 6rem 6.5rem 7rem 6.5rem 9rem minmax(10rem,1fr);
+  grid-template-columns: minmax(13rem,1fr) 5.25rem 6rem 6.5rem 7rem 6.5rem 8rem minmax(20rem,2fr);
   min-width: 75rem;
 }
 .kap-page-shell.account-management-overview .account-overview__target-head > span:nth-child(3),
@@ -59,12 +59,25 @@
 .kap-page-shell.account-management-overview .account-overview__target-head > span:nth-child(4),
 .kap-page-shell.account-management-overview .account-overview__target-row > span:nth-child(4) { text-align: center; }
 .kap-page-shell.account-management-overview .account-overview__target-grid { overflow-x: auto; }
-.kap-page-shell.account-management-overview .account-overview__target-scroll { min-width: 75rem; overflow-x: hidden; }
+.kap-page-shell.account-management-overview .account-overview__target-scroll { min-width: 75rem; height: auto; max-height: none; overflow: visible; }
+.kap-page-shell.account-management-overview .account-overview__actual-details > .account-overview__hierarchy { height: auto; max-height: none; align-self: start; }
+.kap-page-shell.account-management-overview .account-overview__hierarchy-scroll { height: auto; max-height: none; overflow: visible; }
 .kap-page-shell.account-management-overview .account-overview__target-row > b { text-align: right; }
 .kap-page-shell.account-management-overview .account-overview__target-row > span:nth-child(4) { text-align: center; }
-.kap-page-shell.account-management-overview .account-overview__target-head { display: grid; }
+.kap-page-shell.account-management-overview .account-overview__target-head { display: grid; text-transform: none; }
+.kap-page-shell.account-management-overview .account-overview__filter { text-transform: none; }
+.kap-page-shell.account-management-overview .account-overview__target-head > :nth-child(2),
+.kap-page-shell.account-management-overview .account-overview__target-head > :nth-child(n+4):nth-child(-n+7),
+.kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(2),
+.kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(n+4):nth-child(-n+7) { text-align: center; }
+.kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(6) { justify-self: center; }
+.kap-page-shell.account-management-overview .account-overview__filter > select:disabled,
+.kap-page-shell.account-management-overview .account-overview__search-field:has(input:disabled) { opacity: .6; }
 .kap-page-shell.account-management-overview .account-overview__target-row > * { grid-column: auto; }
 .kap-page-shell.account-management-overview .account-overview__target-row > *::before { content: none; }
+.kap-page-shell.account-management-overview .consumption-page-progress-controls { inset: 0; pointer-events: none; position: fixed; z-index: 48; }
+.kap-page-shell.account-management-overview .consumption-page-progress-controls .kap-page-data-progress { left: var(--consumption-viewport-center-x, 50%); top: var(--consumption-viewport-center-y, 50%); }
+.kap-page-shell.account-management-overview .consumption-page-progress-controls[data-visible="false"] { display: none; }
 @media (max-width: 720px) {
   .kap-page-shell.account-management-overview .account-overview__filter,
   .kap-page-shell.account-management-overview .account-overview__filter > select,
