@@ -288,7 +288,7 @@ function Summary({ summary, tab, fiscalYear, asOf, selectedQuarter, onSelectQuar
       const status = statusFor(quarter);
       return <button type="button" class={cardClass(quarter, "kpi-quarter-card")} aria-pressed={selectedQuarter === quarter} onClick={() => onSelectQuarter(quarter)}>
         <span class="kpi-quarter-card__heading"><strong>{quarter}</strong><em class={`kpi-quarter-status-label ${quarterStatusClass(status)}`}>{status}</em></span>
-        <span class="kpi-quarter-card__body"><b class="kpi-quarter-count-label">{actual}</b><small>Target {combined ? summary.targets.c1C2CombinedPerQuarter : summary.targets.countPerQuarter[tab as keyof typeof summary.targets.countPerQuarter]}</small></span>
+        <span class="kpi-quarter-card__body"><b class="kpi-quarter-count-label">{actual}</b></span>
       </button>;
     })}</div>
   </section>;
@@ -1192,7 +1192,11 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
             <span class="kpi-toggle-chevron" aria-hidden="true">{summaryExpanded ? "⌄" : "›"}</span>
             <span>{summaryLabel}</span>
           </button>}
-          <button type="button" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving || drafts.length > 0 || editState.cell !== null}
+          <button type="button" class="kpi-guide-toggle" aria-controls={guideId} aria-expanded={guideExpanded} onClick={toggleGuide}>
+            <span class="kpi-toggle-chevron" aria-hidden="true">{guideExpanded ? "⌄" : "›"}</span>
+            <span>KPI Guide</span>
+          </button>
+          <button type="button" class="kpi-add-activity" disabled={!canWrite || pageLoading || displayFiscalYear !== fiscalYear || saving || drafts.length > 0 || editState.cell !== null}
             title={!canWrite ? "Write permission is required." : undefined} onClick={addDraft}>Add KPI Activity</button>
         </div>
         <div class="kpi-activity-toolbar__right">

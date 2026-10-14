@@ -63,6 +63,12 @@
   line-height: normal;
   border-radius: var(--kpi-activities-radius);
 }
+/* Preserve the original production Add colour independently of button order. */
+.kpi-sheet-page .kpi-activity-toolbar__left > button.kpi-add-activity {
+  background: var(--kpi-brand);
+  border-color: var(--kpi-brand);
+  color: #fff;
+}
 .kpi-sheet-page .kpi-inline-save { align-items: center; display: inline-flex; gap: .4rem; font-size: .72rem; }
 .kpi-sheet-page .kpi-inline-save oj-progress-circle { flex: 0 0 auto; }
 .kpi-sheet-page .kpi-activities-table-wrap,
