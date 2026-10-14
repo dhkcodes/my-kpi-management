@@ -268,29 +268,30 @@
   top: var(--consumption-viewport-center-y, 50%);
 }
 
-/* Native HTML table composition within the JET 20.1.3 PageShell: the page
-   owns vertical scrolling; only each Opportunity wrapper scrolls horizontally.
-   Keep the parent and filters fitted without clipping content or overriding
-   JET-generated layout internals. */
+/* Restore the pre-856fa77 bounded table scroller, not the whole old page.
+   Keep current column sizing, wrapping, controls and Opportunity sticky pins.
+   Apply the same bounded flex chain on mobile so filters remain outside it. */
 .accounts-workloads-layout .kap-page-shell__scroll {
-  overflow: auto;
+  overflow: hidden;
+  scrollbar-gutter: auto;
 }
 
 .accounts-workloads-layout .kap-page-shell__inner {
-  height: auto;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .accounts-workloads-layout .accounts-workloads-layout__body {
-  flex: 0 0 auto;
+  flex: 1 1 0;
 }
 
 .accounts-workloads-layout .accounts-workloads-grid-wrap.accounts-workloads-grid-wrap--compact {
-  flex: 0 0 auto;
-  height: auto;
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
   max-height: none;
-  overflow: visible;
-  overscroll-behavior: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .accounts-workloads-layout .accounts-workloads-oppty-scroll {
