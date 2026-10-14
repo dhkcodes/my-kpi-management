@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import Context = require("ojs/ojcontext");
 import { ojDialog } from "ojs/ojdialog";
 import "ojs/ojbutton";
+import { DataControlBar, PageActivity, PageFilterPanel, PageShell } from "../common/PageShell";
+
 import "ojs/ojdialog";
 import "ojs/ojdatetimepicker";
 import "ojs/ojprogress-circle";
@@ -307,6 +309,7 @@ export function AccountsWorkloadsPage({
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [completedAt, setCompletedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const dealSaveLock = useRef(createOpportunitySaveLock()).current;
   const [error, setError] = useState("");
@@ -485,6 +488,7 @@ export function AccountsWorkloadsPage({
         ? mergeSearchResultWithAwDrafts(result, current, dirtyAccounts, dirtyWorkloads)
         : result);
       setBaseline(result);
+      setCompletedAt(new Date());
       if (!preserveDrafts) {
         setDirtyAccounts(new Set());
         setDirtyWorkloads(new Set());
@@ -2346,7 +2350,7 @@ export function AccountsWorkloadsPage({
 
   return (
     <section
-      class="accounts-workloads-page accounts-hierarchy-page"
+      class="accounts-workloads-layout-event-root"
       aria-labelledby="accountsWorkloadsTitle"
       onClick={(event) => {
         const target = event.target as HTMLElement;
@@ -2355,14 +2359,20 @@ export function AccountsWorkloadsPage({
         setSelectedDeals(new Map());
       }}
     >
-      <header class="accounts-workloads-header consumption-page__header">
-        <div class="accounts-workloads-header-topline">
-          <div class="accounts-workloads-header-navigation">
-            {breadcrumb}
-            <span class="kpi-eyebrow">Account Management</span>
-          </div>
-          <div class="consumption-import-actions accounts-workloads-header-actions">
+      <link rel="stylesheet" href="components/content/AccountsWorkloadsPage.css" />
+      <PageShell
+        ariaLabelledBy="accountsWorkloadsTitle"
+        title="Account & Workload"
+        breadcrumb={breadcrumb}
+        className="accounts-workloads-page accounts-hierarchy-page accounts-workloads-layout"
+        bodyClassName="accounts-workloads-layout__body"
+        headingSpacing="compact"
+        activityPosition="custom"
+        busy={loading || saving}
+        actions={
+          <div class="consumption-import-actions">
             <oj-button
+              class="oj-button-sm"
               chroming="outlined"
               aria-label="Account Recommendations"
               disabled={saving}
@@ -2373,170 +2383,124 @@ export function AccountsWorkloadsPage({
               <span class="accounts-workloads-recommendations-label--mobile">Account Recomm.</span>
             </oj-button>
           </div>
-        </div>
-        <h1 id="accountsWorkloadsTitle">Account &amp; Workload</h1>
-      </header>
-      <form
-        class="accounts-workloads-toolbar accounts-workloads-toolbar--compact"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (searchComposingRef.current) return;
-          if (dirty) {
-            setError("Save or cancel drafts before searching.");
-            return;
-          }
-          applySearch(searchInput);
-        }}
-      >
-        <label
-          class="consumption-record-search accounts-workloads-search"
-          for="accountsWorkloadsSearch"
-        >
-          <span class="oj-helper-hidden-accessible">Search</span>
-          <input
-            id="accountsWorkloadsSearch"
-            type="search"
-            value={searchInput}
-            placeholder="Account, workload, opportunity, or Plan"
-            onCompositionStart={() => { searchComposingRef.current = true; }}
-            onCompositionEnd={(event) => {
-              searchComposingRef.current = false;
-              setSearchInput(event.currentTarget.value);
-            }}
-            onInput={(event) => {
-              const value = event.currentTarget.value;
-              setSearchInput(value);
-              if (!value && appliedSearchRef.current) applySearch("");
-            }}
-          />
-          <button
-            type="submit"
-            class="consumption-record-search__submit"
-            disabled={loading || saving}
-          >
-            <span class="oj-ux-ico-search" aria-hidden="true" />
-            <span class="oj-helper-hidden-accessible">Search</span>
-          </button>
-        </label>
-        <label class="accounts-workloads-include-deleted">
-          <input
-            type="checkbox"
-            checked={includeDeleted}
-            disabled={dirty || loading || saving}
-            onChange={(event) => {
-              const nextIncludeDeleted = event.currentTarget.checked;
-              includeDeletedRef.current = nextIncludeDeleted;
-              setIncludeDeleted(nextIncludeDeleted);
-            }}
-          />
-          <span>Include Archived</span>
-        </label>
-        <span class="accounts-workloads-toolbar-spacer" />
-        {savableAwDraftCount > 0 && (
-          <button
-            type="button"
-            class="accounts-workloads-button accounts-workloads-button--primary"
-            disabled={!canWrite || saving}
-            onClick={() => openActionConfirmation("save")}
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-        )}
-        {dirty && (
-          <button
-            type="button"
-            class="accounts-workloads-button"
-            disabled={saving}
-            onClick={() => openActionConfirmation("cancel")}
-          >
-            Cancel
-          </button>
-        )}
-        {selectedCount > 0 && !editCell && !dirty && selectedArchivedCount > 0 && (
-          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
-            Restore
-          </button>
-        )}
-        {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
-          <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
-            {selectedArchivedCount > 0
-              ? "Delete Permanently"
-              : selectedDraftCount === selectedCount
-                ? "Discard Draft"
-                : "Archive"}
-          </button>
-        )}
-        <button
-          type="button"
-          class="accounts-workloads-add-aw"
-          disabled={!canWrite || saving}
-          onClick={addAw}
-        >
-          Add Account & Workload
-        </button>
-      </form>
-      <div class="accounts-workloads-table-summary">
-        <strong class="consumption-table-title">
-          Account / Workload / Opportunity
-          <small class="consumption-table-plan-count">{hierarchy.accounts.length} accounts</small>
-        </strong>
-        <div class="accounts-workloads-table-summary__meta">
-          <div class="accounts-workloads-fx">
-          <button
-            type="button"
-            class="accounts-workloads-fx__button"
-            disabled={!canWrite || fxLoading || fxSaving || saving}
-            aria-expanded={fxPopoverOpen ? "true" : "false"}
-            onClick={() => {
-              setFxDraft(String(fxRateValue || ""));
-              setFxPopoverOpen((value) => !value);
-            }}
-          >
-            <span>Exchange Rate (USD to KRW)</span>
-            <strong>1 USD = KRW {fmtUsd.format(fxRateValue)}</strong>
-          </button>
-          {fxPopoverOpen && (
-            <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
-              <label>
-                <span>Exchange Rate (USD to KRW)</span>
+        }
+        filters={
+          <PageFilterPanel className="accounts-workloads-layout__filters">
+            <form
+              class="accounts-workloads-layout__search-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (searchComposingRef.current) return;
+                if (dirty) {
+                  setError("Save or cancel drafts before searching.");
+                  return;
+                }
+                applySearch(searchInput);
+              }}
+            >
+              <label
+                class="consumption-record-search accounts-workloads-search"
+                for="accountsWorkloadsSearch"
+              >
+                <span class="oj-helper-hidden-accessible">Search</span>
                 <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={fxDraft}
-                  disabled={!canWrite || fxLoading || fxSaving || saving}
-                  onInput={(event) => setFxDraft(event.currentTarget.value)}
-                />
-              </label>
-              <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
-              {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
-              {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
-              <div class="accounts-workloads-popover-actions">
-                <button
-                  type="button"
-                  class="accounts-workloads-button accounts-workloads-button--primary"
-                  disabled={!canWrite || fxLoading || fxSaving || saving}
-                  onClick={applyFxRate}
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  class="accounts-workloads-button"
-                  disabled={fxSaving || saving}
-                  onClick={() => {
-                    setFxDraft(String(fxRateValue || ""));
-                    setFxPopoverOpen(false);
+                  id="accountsWorkloadsSearch"
+                  type="search"
+                  value={searchInput}
+                  placeholder="Account, workload, opportunity, or Plan"
+                  onCompositionStart={() => { searchComposingRef.current = true; }}
+                  onCompositionEnd={(event) => {
+                    searchComposingRef.current = false;
+                    setSearchInput(event.currentTarget.value);
                   }}
+                  onInput={(event) => {
+                    const value = event.currentTarget.value;
+                    setSearchInput(value);
+                    if (!value && appliedSearchRef.current) applySearch("");
+                  }}
+                />
+                <button
+                  type="submit"
+                  class="consumption-record-search__submit"
+                  disabled={loading || saving}
                 >
-                  Cancel
+                  <span class="oj-ux-ico-search" aria-hidden="true" />
+                  <span class="oj-helper-hidden-accessible">Search</span>
                 </button>
+              </label>
+              <label class="accounts-workloads-include-deleted">
+                <input
+                  type="checkbox"
+                  checked={includeDeleted}
+                  disabled={dirty || loading || saving}
+                  onChange={(event) => {
+                    const nextIncludeDeleted = event.currentTarget.checked;
+                    includeDeletedRef.current = nextIncludeDeleted;
+                    setIncludeDeleted(nextIncludeDeleted);
+                  }}
+                />
+                <span>Include Archived</span>
+              </label>
+            </form>
+            <div class="accounts-workloads-table-summary accounts-workloads-layout__fx">
+              <div class="accounts-workloads-fx">
+              <button
+                type="button"
+                class="accounts-workloads-fx__button"
+                disabled={!canWrite || fxLoading || fxSaving || saving}
+                aria-expanded={fxPopoverOpen ? "true" : "false"}
+                onClick={() => {
+                  setFxDraft(String(fxRateValue || ""));
+                  setFxPopoverOpen((value) => !value);
+                }}
+              >
+                <span>Exchange Rate (USD to KRW)</span>
+                <strong>1 USD = KRW {fmtUsd.format(fxRateValue)}</strong>
+              </button>
+              {fxPopoverOpen && (
+                <div class="accounts-workloads-fx-popover" role="dialog" aria-label="Edit exchange rate">
+                  <label>
+                    <span>Exchange Rate (USD to KRW)</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={fxDraft}
+                      disabled={!canWrite || fxLoading || fxSaving || saving}
+                      onInput={(event) => setFxDraft(event.currentTarget.value)}
+                    />
+                  </label>
+                  <p>ARR/ACR USD and KRW pairs recalculate automatically after Apply.</p>
+                  {fxLoading && <p id="accountsWorkloadsFxLoading" role="status">Loading saved exchange rate…</p>}
+                  {fxError && <p id="accountsWorkloadsFxError" role="alert">{fxError}</p>}
+                  <div class="accounts-workloads-popover-actions">
+                    <button
+                      type="button"
+                      class="accounts-workloads-button accounts-workloads-button--primary"
+                      disabled={!canWrite || fxLoading || fxSaving || saving}
+                      onClick={applyFxRate}
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      class="accounts-workloads-button"
+                      disabled={fxSaving || saving}
+                      onClick={() => {
+                        setFxDraft(String(fxRateValue || ""));
+                        setFxPopoverOpen(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             </div>
-          )}
-          </div>
-        </div>
-      </div>
+          </PageFilterPanel>
+        }
+      >
       {!canWrite && <div class="accounts-workloads-read-only">Read-only access. Write permission is required.</div>}
       <AppMessageBanner
         messages={[
@@ -2568,6 +2532,60 @@ export function AccountsWorkloadsPage({
           </ul>
         </div>
       )}
+      <DataControlBar className="accounts-workloads-layout__controls" ariaLabel="Account and workload controls">
+        <div class="accounts-workloads-layout__primary-action">
+          <button
+            type="button"
+            class="accounts-workloads-add-aw"
+            disabled={!canWrite || saving}
+            onClick={addAw}
+          >
+            Add Account & Workload
+          </button>
+        </div>
+        <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} accounts</span>
+        <div class="accounts-workloads-layout__activity">
+          <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
+        </div>
+        {(savableAwDraftCount > 0 || dirty || (selectedCount > 0 && !editCell)) && (
+          <div class="accounts-workloads-layout__draft-actions">
+            {savableAwDraftCount > 0 && (
+              <button
+                type="button"
+                class="accounts-workloads-button accounts-workloads-button--primary"
+                disabled={!canWrite || saving}
+                onClick={() => openActionConfirmation("save")}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            )}
+            {dirty && (
+              <button
+                type="button"
+                class="accounts-workloads-button"
+                disabled={saving}
+                onClick={() => openActionConfirmation("cancel")}
+              >
+                Cancel
+              </button>
+            )}
+            {selectedCount > 0 && !editCell && !dirty && selectedArchivedCount > 0 && (
+              <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={() => void restoreSelected()}>
+                Restore
+              </button>
+            )}
+            {selectedCount > 0 && !editCell && (selectedArchivedCount === 0 || !dirty) && (
+              <button type="button" class="accounts-workloads-button" disabled={!canWrite || saving} onClick={deleteSelected}>
+                {selectedArchivedCount > 0
+                  ? "Delete Permanently"
+                  : selectedDraftCount === selectedCount
+                    ? "Discard Draft"
+                    : "Archive"}
+              </button>
+            )}
+          </div>
+        )}
+      </DataControlBar>
       <div class="accounts-workloads-grid-wrap accounts-workloads-grid-wrap--compact" aria-busy={loading ? "true" : "false"}>
           <table class="accounts-workloads-grid accounts-workloads-aw-grid">
             <thead>
@@ -3298,6 +3316,7 @@ export function AccountsWorkloadsPage({
         </div>,
         document.body,
       )}
+      </PageShell>
     </section>
   );
 }

@@ -18,6 +18,10 @@ import {
 } from "../../data/accountManagementOverview";
 import { AppMessageBanner } from "./AppMessageBanner";
 import "ojs/ojprogress-circle";
+import { PageShell, PageFilterPanel, PageActivity } from "../common/PageShell";
+import { FiscalYearSelector } from "../common/FiscalYearSelector";
+import type { FiscalYear } from "../../data/kpiMockData";
+
 
 type Props = Readonly<{
   breadcrumb?: ComponentChildren;
@@ -87,6 +91,9 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [hierarchy, setHierarchy] = useState<Awaited<ReturnType<typeof fetchAccountsWorkloadsHierarchy>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [completedAt, setCompletedAt] = useState<Date | null>(null);
+  const fySelectedRef = useRef(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState("");
@@ -106,11 +113,11 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
     let active = true;
     setLoading(true);
     fetchAccountsWorkloadsHierarchy({ includeArchived: false, includeDeletedDeals: false })
-      .then((value) => { if (active) { setHierarchy(value); setError(""); } })
+      .then((value) => { if (active) { setHierarchy(value); setError(""); setCompletedAt(new Date()); } })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Overview data could not be loaded."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -123,7 +130,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
   const overview = useMemo(() => hierarchy ? buildAccountManagementOverview(hierarchy) : null, [hierarchy]);
   useEffect(() => {
-    if (overview && overview.fiscalYears.length && !overview.fiscalYears.includes(actualFy)) setActualFy(overview.fiscalYears[0]);
+    if (!fySelectedRef.current && overview && overview.fiscalYears.length && !overview.fiscalYears.includes(actualFy)) setActualFy(overview.fiscalYears[0]);
   }, [overview, actualFy]);
 
   const selectedAccountFilter = selectedAccount
@@ -151,6 +158,9 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
     .filter((workload) => !workload.archived)
     .map((workload) => `${workload.name} · ${workload.plans.map((plan) => plan.sourcePlanNumber).filter(Boolean).join(", ") || "—"}`)
     .join(" | ") || "— · —";
+  const activeWorkloadCount = (hierarchy?.accounts ?? [])
+    .filter((account) => !account.archived && (!selectedAccount || (selectedAccountId !== null ? account.id === selectedAccountId : account.name === selectedAccount)))
+    .reduce((total, account) => total + account.workloads.filter((workload) => !workload.archived).length, 0);
   const targetPrimaryTotal = (target?.deals ?? []).reduce((sum, item) => sum + (primaryAmount(item) ?? 0), 0);
   const targetPeriods = [...new Set((overview?.targetDeals ?? [])
     .filter((item) => item.deal.targetFiscalYear && item.deal.targetQuarter)
@@ -186,15 +196,12 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   };
 
   return (
-    <section class="account-management-overview" aria-labelledby="accountManagementOverviewTitle">
-      <header class="account-overview__header">
-        <div>{breadcrumb}<span class="kpi-eyebrow">Accounts &amp; Workloads / Overview</span><h1 id="accountManagementOverviewTitle">Account Management Overview</h1></div>
-      </header>
-
-      <AppMessageBanner ariaLabel="Account overview notifications" messages={error ? [{ id: "overview-load-error", severity: "error", summary: "Unable to load Account Management Overview", detail: error, persistence: "sticky" }] : []} onClose={() => setError("")} />
-
-      {overview && <>
-        <div class="account-overview__top-row">
+    <PageShell className="account-management-overview account-overview-standard" ariaLabelledBy="accountManagementOverviewTitle"
+      title="Account Management Overview" breadcrumb={breadcrumb} headingSpacing="compact" activityPosition="custom"
+      titleControls={<FiscalYearSelector selected={actualFy as FiscalYear} current={current.fiscalYear as FiscalYear} onSelect={(year) => { fySelectedRef.current = true; setActualFy(year); }} />}
+      filters={<PageFilterPanel className="account-overview__filters" ariaLabel="Overview search and filters">
+        <label class="account-overview__filter">Quarter<select aria-label="Actual quarter" value={actualQuarter} onChange={(event) => { const value = event.currentTarget.value; setActualQuarter(value === "ALL" ? "ALL" : Number(value) as 1 | 2 | 3 | 4); }}>{(["ALL", 1, 2, 3, 4] as const).map((quarter) => <option key={quarter} value={quarter}>{quarter === "ALL" ? "All" : `Q${quarter}`}</option>)}</select></label>
+        <label class="account-overview__filter">Measure<select aria-label="Revenue measure" value={actualMeasure} onChange={(event) => setActualMeasure(event.currentTarget.value as RevenueMeasure)}>{(["ALL", "ARR", "ACR"] as const).map((measure) => <option key={measure} value={measure}>{measure === "ALL" ? "All" : measure}</option>)}</select></label>
           <div class="account-overview__search">
             <label for="accountOverviewSearch">Account</label>
             <div class="account-overview__search-combobox" ref={overviewSearchRef}>
@@ -207,18 +214,24 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
             </div>
 
           </div>
+      </PageFilterPanel>}>
+      <link rel="stylesheet" href="components/content/AccountManagementOverviewPage.css" />
+      <AppMessageBanner ariaLabel="Account overview notifications" messages={error ? [{ id: "overview-load-error", severity: "error", summary: "Unable to load Account Management Overview", detail: error, persistence: "sticky" }] : []} onClose={() => setError("")} />
+
+      {overview && <>
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
             <button type="button" class={selectedException === "OVERDUE" ? "is-selected" : ""} aria-pressed={selectedException === "OVERDUE"} onClick={() => toggleException("OVERDUE")}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Target quarter ended</small></span></button>
             <button type="button" class={selectedException === "TARGET_NOT_SET" ? "is-selected" : ""} aria-pressed={selectedException === "TARGET_NOT_SET"} onClick={() => toggleException("TARGET_NOT_SET")}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> Target not set</strong><small>Open Opportunities without FY/Q</small></span></button>
             <button type="button" class={selectedException === "CLOSE_DATE_MISSING" ? "is-selected" : ""} aria-pressed={selectedException === "CLOSE_DATE_MISSING"} onClick={() => toggleException("CLOSE_DATE_MISSING")}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
+            <article class="account-overview__portfolio-card"><span class="account-overview__exception-icon">✓</span><span><strong><b>{activeWorkloadCount}</b> Active Workloads</strong><small>Active accounts/workloads · {selectedAccount || "All Accounts"}<br />All periods and measures</small></span></article>
           </section>
+        <div class="account-overview__reload-row">
+          <PageActivity busy={loading} lastCompletedAt={completedAt} onRefresh={() => setReloadKey((value) => value + 1)} refreshDisabled={loading} compactTimestampButton />
         </div>
 
         <section id="actualPerformance" class="account-overview__section account-overview__section--actual">
           <div class="account-overview__section-heading"><div class="account-overview__title-lockup"><span class="account-overview__title-mark"></span><div><h2>Actual Performance <small>• Actual Close Date</small></h2></div></div>
-            <div class="account-overview__period-controls"><label>Fiscal year<select value={actualFy} onChange={(event) => setActualFy((event.currentTarget as HTMLSelectElement).value)}>{(overview.fiscalYears.length ? overview.fiscalYears : [current.fiscalYear]).map((fy) => <option key={fy} value={fy}>{fy}</option>)}</select></label>
-              <div><span class="account-overview__control-label">Quarter</span><div class="account-overview__segments" aria-label="Actual quarter">{(["ALL", 1, 2, 3, 4] as const).map((quarter) => <button key={quarter} type="button" class={actualQuarter === quarter ? "is-selected" : ""} aria-pressed={actualQuarter === quarter} onClick={() => setActualQuarter(quarter)}>{quarter === "ALL" ? "All" : `Q${quarter}`}</button>)}</div></div>
-              <div><span class="account-overview__control-label">Measure</span><div class="account-overview__segments" aria-label="Revenue measure">{(["ALL", "ARR", "ACR"] as const).map((measure) => <button key={measure} type="button" class={actualMeasure === measure ? "is-selected" : ""} aria-pressed={actualMeasure === measure} onClick={() => setActualMeasure(measure)}>{measure === "ALL" ? "All" : measure}</button>)}</div></div></div>
+
           </div>
 
           <div class="account-overview__kpis">
@@ -262,13 +275,13 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           </div>
 
           <article class="account-overview__panel account-overview__target-list"><div class="account-overview__panel-heading"><div><h3>Open Opportunity action list</h3></div></div>
-            <div class="account-overview__target-head"><span>Account / Workload / Opportunity</span><span>Type</span><span>Target FY/Q</span><span>Amount</span><span>Status</span><span>To target-quarter end</span><span>Latest update</span></div>
-            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN Opportunities in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.account.name} ({item.workload.name})</strong><small>{item.deal.name} ({item.deal.opportunityNo ?? "No Opportunity ID"})</small></span><span><em class={`account-overview__type-badge is-${item.deal.revenueType.toLowerCase()}`}>{item.deal.revenueType}</em></span><span>{displayTarget(item)}</span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{daysToTargetEnd(item)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
-            <footer class="account-overview__target-footer"><span>{target!.deals.length} open Opportunities</span><strong>Selected total {fmtUsd(targetPrimaryTotal)}</strong></footer>
+            <div class="account-overview__target-grid"><div class="account-overview__target-head"><span>Account / Workload / Opportunity</span><span>Type</span><span>Amount</span><span title="Recorded actual close date (actualCloseDate), not a planned closing date.">Close Date</span><span>Target FY/Q</span><span>Status</span><span>To Target-Quarter End</span><span>Latest Update</span></div>
+            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN Opportunities in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.account.name} ({item.workload.name})</strong><small>{item.deal.name} ({item.deal.opportunityNo ?? "No Opportunity ID"})</small></span><span><em class={`account-overview__type-badge is-${item.deal.revenueType.toLowerCase()}`}>{item.deal.revenueType}</em></span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span>{item.deal.actualCloseDate || "—"}</span><span>{displayTarget(item)}</span><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{daysToTargetEnd(item)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
+            </div><footer class="account-overview__target-footer"><span>{target!.deals.length} open Opportunities</span><strong>Selected total {fmtUsd(targetPrimaryTotal)}</strong></footer>
             {latestUpdateTooltip && <div id="accountOverviewLatestUpdateTooltip" class="account-overview__latest-tooltip" role="tooltip" style={{ left: `${latestUpdateTooltip.left}px`, top: `${latestUpdateTooltip.top}px` }}>{latestUpdateTooltip.text}</div>}
           </article>
         </section>
       </>}
-    </section>
+    </PageShell>
   );
 }

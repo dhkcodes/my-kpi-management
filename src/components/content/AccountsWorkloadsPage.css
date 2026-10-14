@@ -1,0 +1,182 @@
+/* Accounts-only PageShell adoption; do not change shared page or JET internals. */
+/* Neutralize the legacy viewport calculation only while this page is mounted. */
+.kpi-content:has(.accounts-workloads-layout) {
+  display: grid;
+  height: auto;
+}
+
+.accounts-workloads-layout-event-root {
+  display: flex;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.kap-page-shell.accounts-workloads-page.accounts-workloads-layout {
+  background: var(--oj-core-bg-color-content, #fff);
+  border-radius: .2rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.accounts-workloads-layout .kap-page-shell__inner {
+  gap: 0;
+  height: 100%;
+}
+
+.accounts-workloads-layout .kap-page-shell__masthead {
+  flex: 0 0 auto;
+  margin-bottom: .375rem;
+}
+
+.accounts-workloads-layout .kap-page-shell__title-row > h1 {
+  inset-inline-start: .5rem;
+  position: relative;
+}
+
+.accounts-workloads-layout .kap-page-shell__heading-copy #accountsWorkloadsTitle {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.2;
+  margin: .2rem 0;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__filters {
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__search-form {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: .5rem .75rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.accounts-workloads-layout__search-form .accounts-workloads-search {
+  flex: 0 1 17rem;
+  min-width: min(13rem, 100%);
+  width: min(17rem, 100%);
+}
+
+/* Retain the old ancestor class for the FX button's exact existing styles. */
+.accounts-workloads-layout .accounts-workloads-layout__fx {
+  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+/* Six pixels between visible button bounds and filter/table boundaries. */
+.accounts-workloads-layout .accounts-workloads-layout__controls {
+  align-items: center;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0 .75rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  margin: 0;
+  padding: 6px 0;
+}
+
+.accounts-workloads-layout__primary-action {
+  justify-self: start;
+  min-width: 0;
+}
+
+.accounts-workloads-layout__account-count {
+  color: var(--kpi-muted);
+  font-size: .75rem;
+  justify-self: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.accounts-workloads-layout__activity {
+  justify-self: end;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__controls .accounts-workloads-add-aw {
+  box-sizing: border-box;
+  height: 2.25rem;
+  margin: 0;
+  min-height: 2.25rem;
+}
+
+.accounts-workloads-layout__controls .kap-page-activity,
+.accounts-workloads-layout__controls .kap-page-activity__loading-group {
+  align-items: center;
+  min-height: 2.25rem;
+}
+
+.accounts-workloads-layout__draft-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  grid-column: 1 / -1;
+  padding-top: 6px;
+}
+
+.accounts-workloads-layout .accounts-workloads-grid-wrap--compact {
+  flex: 1 1 0;
+}
+
+.accounts-workloads-layout .accounts-workloads-grid.accounts-workloads-aw-grid {
+  margin-top: 0;
+  min-width: 1280px;
+}
+
+.accounts-workloads-layout td[data-aw-field="account"]:not(.is-editing-cell) > .accounts-workloads-cell-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .accounts-workloads-layout .kap-page-shell__inner {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .accounts-workloads-layout .accounts-workloads-layout__body {
+    flex-basis: auto;
+  }
+
+  .accounts-workloads-layout .accounts-workloads-layout__search-form {
+    flex-basis: 100%;
+  }
+
+  .accounts-workloads-layout .accounts-workloads-layout__fx {
+    margin-inline-start: auto;
+    max-width: 100%;
+  }
+
+  .accounts-workloads-layout .accounts-workloads-layout__controls {
+    column-gap: .35rem;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .accounts-workloads-layout__primary-action .accounts-workloads-add-aw {
+    font-size: .72rem;
+    padding-inline: .4rem;
+    white-space: normal;
+  }
+
+  .accounts-workloads-layout .accounts-workloads-grid-wrap--compact {
+    flex-basis: auto;
+    max-height: 65dvh;
+  }
+}
