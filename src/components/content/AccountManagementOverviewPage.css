@@ -145,6 +145,10 @@
 }
 .kap-page-shell.account-management-overview .account-overview__bar-item > b { font-size: .6rem; }
 /* Domain-owned chart/list only: no Oracle JET internal selectors. */
+@media (max-width: 760px) {
+  .kap-page-shell.account-management-overview .account-overview__vertical-chart { --chart-headroom: 2.25rem; }
+  .kap-page-shell.account-management-overview .account-overview__bar-item:nth-child(2) .account-overview__bar-total { margin-bottom: 1.35rem; }
+}
 .kap-page-shell.account-management-overview .account-overview__legend span { color: #35465f; }
 .kap-page-shell.account-management-overview {
   --account-overview-new: #0072b2;
