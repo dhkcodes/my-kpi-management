@@ -9,9 +9,28 @@
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table {
   border-color: #d9dfd9;
   color: #29312b;
-  /* Fill desktop space; intrinsic column minima retain mobile scrolling
-     while allowing mixed details to wrap in the original 12rem column. */
-  width: 100%;
+  /* Do not redistribute the space saved by narrow mode-specific columns. */
+  min-width: 0;
+  width: max-content;
+}
+
+/* Baseline amount width is 12rem: Final Actual/Forecast × .6, Mixed × 1.05.
+   Scope to amount cells/headers only; pillar and QoQ columns are unchanged. */
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount {
+  --summary-amount-width: 12rem;
+  min-width: var(--summary-amount-width);
+  width: var(--summary-amount-width);
+  max-width: var(--summary-amount-width);
+}
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="FINAL_ACTUAL"],
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="FULL_FORECAST"] {
+  --summary-amount-width: 7.2rem;
+}
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="MIXED"] {
+  --summary-amount-width: 12.6rem;
+}
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead .consumption-summary__amount {
+  white-space: normal;
 }
 
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table th,

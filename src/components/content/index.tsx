@@ -38,6 +38,7 @@ import "ojs/ojprogress-circle";
 type Props = Readonly<{
   activeRoute: NavigationRouteDefinition;
   profile: AuthSession;
+  onProfileUpdated: (profile: AuthSession) => void;
   accountsWorkloadsRows: AccountWorkloadRow[];
   accountsWorkloadsHierarchy?: AccountsWorkloadsHierarchy;
   accountsWorkloadsAsOf: string;
@@ -297,6 +298,7 @@ function EditableDetails({ details, onChange }: Readonly<{
 export function Content({
   activeRoute,
   profile,
+  onProfileUpdated,
   accountWorkloadMetadata,
   accountsWorkloadsRows,
   accountsWorkloadsHierarchy,
@@ -506,7 +508,7 @@ export function Content({
       )}
 
       {activeRoute.module === "profile" ? (
-        <ProfilePage profile={profile} breadcrumb={pageNavigation} />
+        <ProfilePage profile={profile} onProfileUpdated={onProfileUpdated} breadcrumb={pageNavigation} />
       ) : activeRoute.module === "users" ? (
         profile.access === "Admin" ? <UsersPage currentUserKey={profile.userKey} breadcrumb={pageNavigation} /> : <section class="kap-empty-state" role="alert">{pageNavigation}<h2>Access unavailable</h2><p>User administration is available to Admin accounts only.</p></section>
       ) : showHome ? (

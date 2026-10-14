@@ -180,13 +180,14 @@
 
 .accounts-workloads-layout .accounts-workloads-grid.accounts-workloads-aw-grid {
   margin-top: 0;
-  min-width: 1280px;
+  min-width: 0;
+  width: 100%;
 }
 
 .accounts-workloads-layout td[data-aw-field="account"]:not(.is-editing-cell) > .accounts-workloads-cell-content {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @media (max-width: 760px) {
@@ -267,15 +268,10 @@
   top: var(--consumption-viewport-center-y, 50%);
 }
 
-/* Fit composition for the JET 20.1.3 app shell: PageShell supplies the bounded,
-   keyboard-focusable application scroll element. These are native HTML tables,
-   not JET Table components, so let owned wrappers grow and put BOTH scroll axes
-   on the page root. Preserve full rows, column min-widths, and existing sticky
-   headers. No JET-generated DOM overrides or invented layout="fit" API.
-   JET Table's public layout values are fixed/contents:
-   https://docs.oracle.com/en/middleware/developer-tools/jet/20/reference-api/oj.ojTable.html
-   Common app.css bounds body/#app to 100vh and hides root horizontal overflow;
-   this page-local opt-in avoids clipping without modifying common styles. */
+/* Native HTML table composition within the JET 20.1.3 PageShell: the page
+   owns vertical scrolling; only each Opportunity wrapper scrolls horizontally.
+   Keep the parent and filters fitted without clipping content or overriding
+   JET-generated layout internals. */
 .accounts-workloads-layout .kap-page-shell__scroll {
   overflow: auto;
 }
@@ -359,39 +355,200 @@
   text-align: inherit;
 }
 
-/* Keep the compact parent table inside the same canvas as the filters,
-   including when no Opportunity is expanded on a narrow viewport. */
-.accounts-workloads-layout .kap-page-shell__inner {
-  min-width: 1320px;
-}
-
-/* An expanded child keeps its existing 2575px colgroup on the same root
-   scrolling canvas as the parent. No nested horizontal scroller is added. */
-.accounts-workloads-layout:has(.accounts-workloads-child-row) .kap-page-shell__inner {
-  min-width: 2680px;
+/* Available-width canvas in collapsed, expanded, and editing states. */
+.accounts-workloads-layout .kap-page-shell__inner,
+.accounts-workloads-layout .accounts-workloads-layout__body,
+.accounts-workloads-layout .accounts-workloads-layout__filters,
+.accounts-workloads-layout .accounts-workloads-grid-wrap--compact {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 .accounts-workloads-layout .accounts-workloads-child-row > td {
   position: static;
+  min-width: 0;
   width: auto;
   max-width: none;
 }
 .accounts-workloads-layout .accounts-workloads-opportunities {
-  width: auto;
-  max-width: none;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
-.accounts-workloads-layout .accounts-workloads-oppty-scroll {
-  width: auto;
-  max-width: none;
+.accounts-workloads-layout .accounts-workloads-opportunities__heading,
+.accounts-workloads-layout .accounts-workloads-opportunity-heading-actions {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* Two fixed Opportunity columns occupy 425px: on phone-sized screens
-   scroll them with the canvas so they cannot cover every other column. */
-@media (max-width: 600px) {
-  .accounts-workloads-layout .accounts-workloads-oppty-grid th:nth-child(-n+2),
-  .accounts-workloads-layout .accounts-workloads-oppty-grid td:nth-child(-n+2) {
-    position: static;
-    left: auto;
-    z-index: auto;
-    box-shadow: none;
+/* Scope to direct parent cells: nested Opportunity columns keep their own
+   deterministic colgroup. Wrap complete values rather than truncating them. */
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th,
+.accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td {
+  min-width: 0;
+  max-width: none;
+  padding-inline: .25rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th > button {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-cell-content,
+.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-cell-display,
+.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-ellipsis {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-edit-field {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  padding-inline: .15rem;
+}
+
+/* The old parent percentage colgroup totaled 106%; use a true 100%
+   allocation so the fixed-layout table does not expand the page. */
+/* Parent has no horizontal scroll: do not keep legacy pixel pin offsets. */
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th:nth-child(-n+2),
+.accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td:nth-child(-n+2) {
+  left: auto;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid > colgroup > col:nth-child(-n+2) { width: 4%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > colgroup > col:nth-child(3) { width: 10%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > colgroup > col:nth-child(15) { width: 11%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th:nth-child(-n+2),
+.accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td:nth-child(-n+2) { width: 4%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th:nth-child(3),
+.accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td:nth-child(3) { width: 10%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th:nth-child(15),
+.accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td:nth-child(15) { width: 11%; }
+.accounts-workloads-layout .accounts-workloads-aw-grid > thead input[type="checkbox"],
+.accounts-workloads-layout .accounts-workloads-parent-row input[type="checkbox"] {
+  box-sizing: border-box;
+  margin-inline: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Requested reductions from the existing display widths. Shared tokens keep
+   colgroup, header/body cells, sticky offsets, and total width identical. */
+.accounts-workloads-layout .accounts-workloads-oppty-scroll {
+  box-sizing: border-box;
+  container-type: inline-size;
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-width: auto;
+  -ms-overflow-style: auto;
+  scroll-padding-inline-start: 307px;
+  -webkit-overflow-scrolling: touch;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-scroll::-webkit-scrollbar {
+  display: block;
+  height: .5rem;
+}
+.accounts-workloads-layout .accounts-workloads-opportunities .accounts-workloads-oppty-grid {
+  --aw-oppty-name-width: 208px;
+  --aw-oppty-id-width: 99px;
+  --aw-oppty-editor-font-size: .75rem;
+  --aw-oppty-update-width: 360px;
+  table-layout: fixed;
+  width: calc(var(--aw-oppty-name-width) + var(--aw-oppty-id-width) + 1327px + var(--aw-oppty-update-width));
+  min-width: calc(var(--aw-oppty-name-width) + var(--aw-oppty-id-width) + 1327px + var(--aw-oppty-update-width));
+}
+.accounts-workloads-layout .accounts-workloads-oppty-column--name { width: var(--aw-oppty-name-width); }
+.accounts-workloads-layout .accounts-workloads-oppty-column--id { width: var(--aw-oppty-id-width); }
+.accounts-workloads-layout .accounts-workloads-oppty-column--revenue { width: 136px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--probability { width: 90px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--target { width: 136px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--arr-usd,
+.accounts-workloads-layout .accounts-workloads-oppty-column--arr-krw,
+.accounts-workloads-layout .accounts-workloads-oppty-column--acr-usd,
+.accounts-workloads-layout .accounts-workloads-oppty-column--acr-krw { width: 155px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--status { width: 75px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--date { width: 90px; }
+.accounts-workloads-layout .accounts-workloads-oppty-column--update { width: var(--aw-oppty-update-width, 360px); }
+
+.accounts-workloads-layout .accounts-workloads-oppty-grid th,
+.accounts-workloads-layout .accounts-workloads-oppty-grid td {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  padding-inline: .25rem;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-grid th:nth-child(1),
+.accounts-workloads-layout .accounts-workloads-oppty-grid td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  width: var(--aw-oppty-name-width);
+  min-width: var(--aw-oppty-name-width);
+  max-width: var(--aw-oppty-name-width);
+  z-index: 12;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-grid th:nth-child(2),
+.accounts-workloads-layout .accounts-workloads-oppty-grid td:nth-child(2) {
+  position: sticky;
+  left: var(--aw-oppty-name-width);
+  width: var(--aw-oppty-id-width);
+  min-width: var(--aw-oppty-id-width);
+  max-width: var(--aw-oppty-id-width);
+  z-index: 12;
+  box-shadow: 8px 0 10px -10px rgb(22 43 66 / 85%);
+}
+.accounts-workloads-layout .accounts-workloads-oppty-grid :is(th, td):is(:nth-child(2), :nth-child(3), :nth-child(5), :nth-child(10)),
+.accounts-workloads-layout .accounts-workloads-oppty-grid td:is(:nth-child(2), :nth-child(3), :nth-child(5), :nth-child(10)) :is(input, select) {
+  text-align: center;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-grid .accounts-workloads-cell-content {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-grid :is(input, select, textarea),
+.accounts-workloads-layout .accounts-workloads-oppty-grid oj-input-date {
+  font-size: var(--aw-oppty-editor-font-size);
+  --oj-text-field-font-size: var(--aw-oppty-editor-font-size);
+}
+
+/* Narrow child viewport: retain both pins and reserve 72px for scrolling.
+   Wide fields remain independently pannable; no outer trailing margin may
+   move the table's sticky boundary past its viewport at the scroll end. */
+@container (max-width: 378px) {
+  .accounts-workloads-layout .accounts-workloads-opportunities .accounts-workloads-oppty-grid {
+    --aw-oppty-name-width: min(208px, calc((100cqi - 72px) * 208 / 307));
+    --aw-oppty-id-width: calc(var(--aw-oppty-name-width) * 99 / 208);
+    --aw-oppty-update-width: 72px;
+  }
+}
+@media (max-width: 760px) {
+  .accounts-workloads-layout .accounts-workloads-layout__search-group {
+    flex-wrap: wrap;
+  }
+  .accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th,
+  .accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td {
+    font-size: .65rem;
+    padding-inline: 1px;
+  }
+  .accounts-workloads-layout .accounts-workloads-parent-row :is(.accounts-workloads-expander, .accounts-workloads-highlight),
+  .accounts-workloads-layout .accounts-workloads-aw-grid .accounts-workloads-expand-all {
+    min-width: 0 !important;
+    max-width: 100%;
+    padding-inline: 0;
   }
 }

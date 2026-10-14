@@ -63,6 +63,7 @@ import {
   updateKpiGuide
 } from "../data/kpiConfigurationApi";
 import type { AuthSession } from "../auth/authSession";
+import { fetchProfilePreferences, mergeProfilePreferences } from "../auth/profileApi";
 import { canAccessRoute, canWriteRoute, filterNavigationItems } from "../auth/menuPermissions";
 import { getAuthenticatedSession, logoutUser } from "../auth/authApi";
 import { apiFetch, subscribeAuthRequired } from "../auth/apiFetch";
@@ -107,7 +108,17 @@ function renderDenseNavigationLink(item: NavigationItem, selectedNavigationId: s
   );
 }
 
-function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps) {
+function AuthenticatedApp({ appName, profile: initialProfile, onLogout }: AuthenticatedAppProps) {
+    const [profile, setProfile] = useState(initialProfile);
+    const profileGeneration = useRef(0);
+    useEffect(() => {
+      let cancelled = false;
+      const generation = profileGeneration.current;
+      void fetchProfilePreferences().then(preferences => {
+        if (!cancelled && generation === profileGeneration.current) setProfile(current => mergeProfilePreferences(current, preferences));
+      }).catch(() => { /* Profile screen provides retry/error; header retains initials. */ });
+      return () => { cancelled = true; };
+    }, [initialProfile.userKey]);
     const requestedInitialRoute = typeof window === "undefined"
       ? getNavigationRoute("home")
       : getNavigationRouteFromPath(window.location.pathname);
@@ -710,6 +721,7 @@ function AuthenticatedApp({ appName, profile, onLogout }: AuthenticatedAppProps)
           <Content
             activeRoute={activeRoute}
             profile={profile}
+            onProfileUpdated={(updated) => { profileGeneration.current++; setProfile(updated); }}
             accountsWorkloadsRows={accountsWorkloadsRowsForFiscalYear}
             accountsWorkloadsHierarchy={accountsWorkloadsHierarchy}
             accountsWorkloadsAsOf={accountsWorkloadsAsOf}

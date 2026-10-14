@@ -29,6 +29,8 @@ export const assignableMenuPermissionIds = [
 export type AuthSession = Readonly<{
   userKey: string;
   displayName: string;
+  languageCode?: string;
+  avatarDataUrl?: string | null;
   loginId: string;
   access: UserAccess;
   status: UserStatus;

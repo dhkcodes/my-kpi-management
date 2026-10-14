@@ -88,37 +88,60 @@
 .kap-page-shell.account-management-overview .account-overview__actual-details {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.2fr);
 }
-/* Fit the chart inside the fixed-height panel with balanced inline space. */
+/* A definite track is the numeric coordinate system. Measure/quarter labels
+   have separate rows; totals are absolute so they cannot shrink the bars. */
 .kap-page-shell.account-management-overview .account-overview__vertical-chart {
+  --chart-track-height: 13rem;
+  --chart-headroom: 1.5rem;
   box-sizing: border-box; grid-template-columns: 4rem minmax(0, 1fr);
   margin: auto 0; min-height: 0; min-width: 0; width: 100%;
   padding: .75rem; overflow: visible;
 }
 .kap-page-shell.account-management-overview .account-overview__axis {
-  min-width: 0; padding: 0 .5rem 2rem 0; font-size: .7rem;
+  min-width: 0; padding: 0 .5rem 0 0; font-size: .7rem;
+  height: calc(var(--chart-headroom) + var(--chart-track-height)); position: relative;
 }
+.kap-page-shell.account-management-overview .account-overview__axis span {
+  line-height: 1; position: absolute; right: .5rem; transform: translateY(-50%);
+}
+.kap-page-shell.account-management-overview .account-overview__axis span:nth-child(1) { top: var(--chart-headroom); }
+.kap-page-shell.account-management-overview .account-overview__axis span:nth-child(2) { top: calc(var(--chart-headroom) + var(--chart-track-height) / 3); }
+.kap-page-shell.account-management-overview .account-overview__axis span:nth-child(3) { top: calc(var(--chart-headroom) + var(--chart-track-height) * 2 / 3); }
+.kap-page-shell.account-management-overview .account-overview__axis span:nth-child(4) { top: calc(var(--chart-headroom) + var(--chart-track-height)); }
 .kap-page-shell.account-management-overview .account-overview__plot {
-  box-sizing: border-box; min-width: 0; height: 16.5rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; padding: 0 .25rem;
+  box-sizing: border-box; min-width: 0;
+  height: calc(var(--chart-headroom) + var(--chart-track-height) + 2.7rem);
+  align-items: end; background: none; border-bottom: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; padding: var(--chart-headroom) .25rem 0;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-group {
-  min-width: 0; grid-template-rows: 14rem 1.4rem; gap: .3rem;
+  min-width: 0; grid-template-rows: calc(var(--chart-track-height) + 1rem) 1.4rem; gap: .3rem;
 }
-.kap-page-shell.account-management-overview .account-overview__bar-columns { gap: .25rem; }
+.kap-page-shell.account-management-overview .account-overview__bar-columns { gap: .25rem; position: relative; }
+.kap-page-shell.account-management-overview .account-overview__bar-columns::before {
+  background: repeating-linear-gradient(to top, #d8dfe8 0, #d8dfe8 1px, transparent 1px, transparent 33.333333%);
+  border-bottom: 1px solid #8c9aaf; content: ""; height: var(--chart-track-height);
+  inset: 0 0 auto; pointer-events: none; position: absolute;
+}
 .kap-page-shell.account-management-overview .account-overview__bar-item {
-  min-width: 0; max-width: 4.25rem; display: grid;
-  grid-template-rows: minmax(0, 1fr) 1rem; justify-items: stretch;
+  min-width: 0; max-width: 4.25rem; display: grid; align-self: stretch; position: relative;
+  grid-template-rows: var(--chart-track-height) 1rem; grid-template-columns: minmax(0, 1fr); justify-items: stretch;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-track {
   min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  align-self: stretch; height: var(--chart-track-height); position: relative;
 }
-.kap-page-shell.account-management-overview .account-overview__bar-track .account-overview__bar-stack { flex-shrink: 0; }
+.kap-page-shell.account-management-overview .account-overview__bar-track .account-overview__bar-stack { flex: 0 0 auto; }
+.kap-page-shell.account-management-overview .account-overview__bar-stack i {
+  min-width: 0; max-width: none; border-radius: 0; width: 100%;
+}
 .kap-page-shell.account-management-overview .account-overview__bar-item > b {
   width: 100%; margin: 0; align-self: end; text-align: center; line-height: 1rem;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-item .account-overview__bar-total {
-  box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere;
-  white-space: normal; text-align: center; font-size: .65rem; line-height: 1.2;
+  box-sizing: border-box; max-width: none; overflow-wrap: normal;
+  white-space: nowrap; text-align: center; font-size: .65rem; line-height: 1.2;
+  position: absolute; left: 50%; transform: translateX(-50%); margin-bottom: 4px;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-item > b { font-size: .6rem; }
 /* Domain-owned chart/list only: no Oracle JET internal selectors. */

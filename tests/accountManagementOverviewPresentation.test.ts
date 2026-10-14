@@ -24,7 +24,9 @@ const css = fs.readFileSync(path.resolve("src/components/content/AccountManageme
 assert.match(page, /Open Opportunity/);
 assert.match(page, /Active Workloads/);
 assert.match(page, /activeWorkloadCount/);
-assert.doesNotMatch(page, /Active Workloads<\/strong><small>/);
+assert.match(page, /Active Workloads<\/strong><small>Non-archived workloads in scope<\/small>/);
+assert.match(page, /Open Opportunity<\/strong><small>Open deals in active scope<\/small>/);
+assert.doesNotMatch(page, /All periods and measures/);
 assert.doesNotMatch(page, /\["TARGET_NOT_SET", "Target not set"/);
 assert.match(page, /sortOverviewDeals\(target\?\.deals \?\? \[\], targetSort\)/);
 assert.match(page, /aria-sort=\{/);
@@ -32,5 +34,5 @@ assert.match(page, /account-overview__bar-track/);
 assert.match(css, /--account-overview-new:\s*#0072b2/);
 assert.match(css, /--account-overview-expansion:\s*#d55e00/);
 assert.match(css, /--account-overview-renewal:\s*#8b4caf/);
-assert.match(css, /account-overview__bar-item\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)\s+1rem/s);
+assert.match(css, /account-overview__bar-item\s*\{[^}]*grid-template-rows:\s*var\(--chart-track-height\)\s+1rem/s);
 console.log("accountManagementOverviewPresentation tests passed");

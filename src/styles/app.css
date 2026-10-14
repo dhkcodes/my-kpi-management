@@ -1,4 +1,14 @@
 /* Oracle JET Redwood-aligned KPI dashboard styling. */
+/* Scoped profile preferences editor. */
+.kap-profile-editor { max-width: 680px; margin: 1rem 0; }
+.kap-profile-editor fieldset { border: 0; padding: 0; display: grid; gap: 1rem; }
+.kap-profile-editor legend { font-weight: 600; margin-bottom: 1rem; }
+.kap-profile-editor label { display: grid; gap: .4rem; font-weight: 600; }
+.kap-profile-editor input:not([type=file]), .kap-profile-editor select { font: inherit; color: inherit; background: var(--oj-core-bg-color, white); border: 1px solid var(--oj-core-divider-color, #777); border-radius: 4px; padding: .65rem; }
+.kap-profile-avatar-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.kap-profile-photo-actions p, .kap-profile-editor fieldset > p { font-size: .875rem; margin: .35rem 0; }
+a.kpi-header__brand { text-decoration: none; color: inherit; }
+a.kpi-header__brand:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 :root {
   --oj-core-border-radius-sm: 0.2rem;
   --oj-core-border-radius-md: 0.2rem;

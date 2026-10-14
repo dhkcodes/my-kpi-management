@@ -5,6 +5,7 @@ import "ojs/ojbutton";
 import "ojs/ojtoolbar";
 import "ojs/ojmenu";
 import "ojs/ojavatar";
+import { getNavigationPath, getNavigationRoute } from "./navigationRoutes";
 import { getProfileInitials, type AuthSession } from "../auth/authSession";
 import {
   getOrCreateKapHeaderLogo,
@@ -43,18 +44,18 @@ export function Header({ profile, navigationOpen, onToggleNavigation, onNavigate
               <span slot="startIcon" class={navigationOpen ? "oj-ux-ico-close" : "oj-ux-ico-menu"}></span>
             </oj-button>
           </span>
-          <div class="kpi-header__brand" aria-label="Know the pulse, Act on it. Perform.">
+          <a class="kpi-header__brand" href="/" aria-label="Home — Know the pulse, Act on it. Perform." onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNavigate("home"); } }}>
             <picture class="kap-header-picture">
               <source media="(max-width: 720px)" srcSet={selectedKapHeaderLogo.iconSrc} />
               <img class="kap-header-wordmark" src={selectedKapHeaderLogo.src} alt="Know the pulse, Act on it. Perform." data-variant={selectedKapHeaderLogo.variant} />
             </picture>
             <img class="kpi-header__oracle-logo" src="styles/images/oracle_logo.svg" alt="Oracle" />
-          </div>
+          </a>
         </div>
         <div class="oj-flex-bar-end kpi-header__end">
           <oj-toolbar aria-label="User actions">
             <oj-menu-button id="userMenu" display="all" chroming="borderless" aria-label="User profile menu">
-              <oj-avatar slot="startIcon" initials={getProfileInitials(profile.displayName)} size="2xs" shape="circle"></oj-avatar>
+              <oj-avatar slot="startIcon" src={profile.avatarDataUrl ?? undefined} initials={getProfileInitials(profile.displayName)} size="2xs" shape="circle"></oj-avatar>
               <span class="kpi-profile-email">{profile.displayName}</span>
               <span slot="endIcon" class="oj-component-icon oj-button-menu-dropdown-icon"></span>
               <oj-menu id="profileMenuItems" slot="menu" onojMenuAction={(event) => {

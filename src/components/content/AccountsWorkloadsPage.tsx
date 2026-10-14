@@ -2072,7 +2072,10 @@ export function AccountsWorkloadsPage({
             value={value}
             labelEdge="none"
             onvalueChanged={(event: CustomEvent) => {
-              updateDealDraft(key, field, String(event.detail.value ?? ""));
+              const nextValue = String(event.detail.value ?? "");
+              // JET normalizes an empty value during initialization; that is not a user selection.
+              if (event.detail.updatedFrom === "external" || nextValue === value) return;
+              updateDealDraft(key, field, nextValue);
               setDealEditCell(null);
             }}
           />
@@ -2761,7 +2764,8 @@ export function AccountsWorkloadsPage({
                                   aria-label="Scroll opportunities left"
                                   onClick={(event) =>
                                     event.currentTarget
-                                      .closest<HTMLElement>(".kap-page-shell__scroll")
+                                      .closest<HTMLElement>(".accounts-workloads-opportunities")
+                                      ?.querySelector<HTMLElement>(".accounts-workloads-oppty-scroll")
                                       ?.scrollBy({ left: -480, behavior: "smooth" })
                                   }
                                 >
@@ -2772,7 +2776,8 @@ export function AccountsWorkloadsPage({
                                   aria-label="Scroll opportunities right"
                                   onClick={(event) =>
                                     event.currentTarget
-                                      .closest<HTMLElement>(".kap-page-shell__scroll")
+                                      .closest<HTMLElement>(".accounts-workloads-opportunities")
+                                      ?.querySelector<HTMLElement>(".accounts-workloads-oppty-scroll")
                                       ?.scrollBy({ left: 480, behavior: "smooth" })
                                   }
                                 >
@@ -2841,6 +2846,9 @@ export function AccountsWorkloadsPage({
                               <div
                                 class="accounts-workloads-oppty-scroll"
                                 data-opportunity-scroll={workload.id}
+                                role="region"
+                                aria-label={`AW ${workload.id} Opportunity columns — scroll horizontally`}
+                                tabIndex={0}
                               >
                                 <table class="accounts-workloads-oppty-grid">
                                   <colgroup class="accounts-workloads-oppty-columns">
