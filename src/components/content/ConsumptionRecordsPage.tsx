@@ -2193,6 +2193,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
         <div class="consumption-section-heading consumption-table-heading">
           <DataControlBar className="consumption-records-toolbar" ariaLabel="Consumption Records data controls">
+            <link rel="stylesheet" href="components/content/ConsumptionReloadSpacing.css" />
             <div class="consumption-records-toolbar__left">
               <ConsumptionMtdControl checked={showMtd} disabled={recordsQueryControlsDisabled || !currentMtdPeriod}
                 mtdAppliedDate={currentMtdPeriod ? serverMtdAsOfByPeriod[currentMtdPeriod] : null}

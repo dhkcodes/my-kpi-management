@@ -432,6 +432,7 @@ export const ForecastActualPage = ({ breadcrumb }: Readonly<{
 
     {contentReady && currentData && <div class="forecast-actual-results" aria-busy="false">
       <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar forecast-actual-data-toolbar" ariaLabel="Forecast vs Actual data controls">
+        <link rel="stylesheet" href="components/content/ConsumptionReloadSpacing.css" />
         <div class="consumption-records-toolbar__left forecast-actual-toolbar-summary">
           <ConsumptionMtdControl checked={actualMode === "MTD"} disabled={loading || !currentData?.currentMtdAvailable}
             mtdAppliedDate={mtdAppliedTimestamp}

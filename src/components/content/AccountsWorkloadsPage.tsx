@@ -2405,6 +2405,7 @@ export function AccountsWorkloadsPage({
         }
         filters={
           <PageFilterPanel className="accounts-workloads-layout__filters">
+            <div class="accounts-workloads-layout__search-group">
             <form
               class="accounts-workloads-layout__search-form"
               onSubmit={(event) => {
@@ -2449,6 +2450,23 @@ export function AccountsWorkloadsPage({
                 </button>
               </label>
             </form>
+              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-checked={includeDeleted}
+                  checked={includeDeleted}
+                  disabled={dirty || queryControlsDisabled}
+                  onChange={(event) => {
+                    const nextIncludeDeleted = event.currentTarget.checked;
+                    includeDeletedRef.current = nextIncludeDeleted;
+                    setIncludeDeleted(nextIncludeDeleted);
+                  }}
+                />
+                <span>Include Archived</span>
+                <span class="accounts-workloads-switch" aria-hidden="true" />
+              </label>
+            </div>
             <div class="accounts-workloads-table-summary accounts-workloads-layout__fx">
               <div class="accounts-workloads-fx">
               <button
@@ -2505,22 +2523,6 @@ export function AccountsWorkloadsPage({
               )}
               </div>
             </div>
-              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-checked={includeDeleted}
-                  checked={includeDeleted}
-                  disabled={dirty || queryControlsDisabled}
-                  onChange={(event) => {
-                    const nextIncludeDeleted = event.currentTarget.checked;
-                    includeDeletedRef.current = nextIncludeDeleted;
-                    setIncludeDeleted(nextIncludeDeleted);
-                  }}
-                />
-                <span>Include Archived</span>
-                <span class="accounts-workloads-switch" aria-hidden="true" />
-              </label>
           </PageFilterPanel>
         }
       >
@@ -2633,7 +2635,7 @@ export function AccountsWorkloadsPage({
                     ["notes", "Notes"],
                   ] as [SortField, string][]
                 ).map(([field, label]) => (
-                  <th class={`is-${field}`}>
+                  <th class={`is-${field}`} data-aw-field={field}>
                     <button type="button" onClick={() => toggleSort(field)}>
                       {label}{(field === "account" || field === "workload") && (
                         <> <span class="accounts-workloads-required-marker" aria-label="required">*</span></>
@@ -2759,10 +2761,7 @@ export function AccountsWorkloadsPage({
                                   aria-label="Scroll opportunities left"
                                   onClick={(event) =>
                                     event.currentTarget
-                                      .closest(".accounts-workloads-opportunities")
-                                      ?.querySelector<HTMLElement>(
-                                        ".accounts-workloads-oppty-scroll",
-                                      )
+                                      .closest<HTMLElement>(".kap-page-shell__scroll")
                                       ?.scrollBy({ left: -480, behavior: "smooth" })
                                   }
                                 >
@@ -2773,10 +2772,7 @@ export function AccountsWorkloadsPage({
                                   aria-label="Scroll opportunities right"
                                   onClick={(event) =>
                                     event.currentTarget
-                                      .closest(".accounts-workloads-opportunities")
-                                      ?.querySelector<HTMLElement>(
-                                        ".accounts-workloads-oppty-scroll",
-                                      )
+                                      .closest<HTMLElement>(".kap-page-shell__scroll")
                                       ?.scrollBy({ left: 480, behavior: "smooth" })
                                   }
                                 >

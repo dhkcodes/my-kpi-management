@@ -12,7 +12,7 @@ import {
   TargetView,
   buildAccountManagementOverview,
   currentFiscalPeriod,
-  quarterEndDate,
+  formatDaysToClose,
   targetStatus,
   toggleOverviewExceptionFilter,
 } from "../../data/accountManagementOverview";
@@ -53,14 +53,6 @@ const statusLabel = (item: OverviewDeal) => ({
 const primaryAmount = (item: OverviewDeal) =>
   item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.acrUsd : item.deal.arrUsd;
 
-const daysToTargetEnd = (item: OverviewDeal) => {
-  if (!item.deal.targetFiscalYear || !item.deal.targetQuarter) return "—";
-  const end = quarterEndDate(item.deal.targetFiscalYear, item.deal.targetQuarter);
-  if (!end) return "—";
-  const days = Math.ceil((new Date(`${end}T00:00:00Z`).getTime() - Date.now()) / 86_400_000);
-  return days < 0 ? `${Math.abs(days)} days overdue` : `${days} days`;
-};
-
 const groupActual = (items: readonly OverviewDeal[]) => {
   const accounts = new Map<number, { account: AccountHierarchyAccount; workloads: Map<number, { workload: AccountWorkload; deals: OverviewDeal[] }> }>();
   items.forEach((item) => {
@@ -94,14 +86,17 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [completedAt, setCompletedAt] = useState<Date | null>(null);
-  // Commit a filter together with fresh data, keeping the loaded screen intact
-  // while the read is in flight. No data is written by these refreshes.
-  const pendingFilterRef = useRef<(() => void) | null>(null);
-  const refresh = (commitFilter?: () => void) => {
-    if (loading) return;
-    pendingFilterRef.current = commitFilter ?? null;
+  // Match Consumption: update the controlled filter immediately and keep the
+  // last response mounted. Lock/invalidate synchronously, before effects run.
+  const queryControlsLockRef = useRef(true);
+  const requestGeneration = useRef(0);
+  const refresh = (applyFilter?: () => void) => {
+    if (queryControlsLockRef.current) return;
+    queryControlsLockRef.current = true;
+    ++requestGeneration.current;
     setSearchOpen(false);
     setLoading(true);
+    applyFilter?.();
     setReloadKey((value) => value + 1);
   };
   const fySelectedRef = useRef(false);
@@ -122,11 +117,29 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
 
   useEffect(() => {
     let active = true;
+    const generation = ++requestGeneration.current;
+    queryControlsLockRef.current = true;
     setLoading(true);
+    setError("");
     fetchAccountsWorkloadsHierarchy({ includeArchived: false, includeDeletedDeals: false })
-      .then((value) => { if (active) { setHierarchy(value); pendingFilterRef.current?.(); pendingFilterRef.current = null; setError(""); setCompletedAt(new Date()); } })
-      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Overview data could not be loaded."); })
-      .finally(() => { if (active) { pendingFilterRef.current = null; setLoading(false); } });
+      .then((value) => {
+        if (!active || generation !== requestGeneration.current) return;
+        setHierarchy(value);
+        if (!fySelectedRef.current) {
+          const years = buildAccountManagementOverview(value).fiscalYears;
+          setActualFy((year) => years.length && !years.includes(year) ? years[0] : year);
+        }
+        setCompletedAt(new Date());
+      })
+      .catch((cause: unknown) => {
+        if (active && generation === requestGeneration.current) setError(cause instanceof Error ? cause.message : "Overview data could not be loaded.");
+      })
+      .finally(() => {
+        if (active && generation === requestGeneration.current) {
+          queryControlsLockRef.current = false;
+          setLoading(false);
+        }
+      });
     return () => { active = false; };
   }, [reloadKey]);
 
@@ -140,9 +153,6 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
   }, [searchOpen]);
 
   const overview = useMemo(() => hierarchy ? buildAccountManagementOverview(hierarchy) : null, [hierarchy]);
-  useEffect(() => {
-    if (!fySelectedRef.current && overview && overview.fiscalYears.length && !overview.fiscalYears.includes(actualFy)) setActualFy(overview.fiscalYears[0]);
-  }, [overview, actualFy]);
 
   const selectedAccountFilter = selectedAccount
     ? { accountId: selectedAccountId ?? undefined, accountName: selectedAccount }
@@ -235,7 +245,7 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
       </div>
       {overview && <>
           <section class="account-overview__exceptions" aria-label="Persistent exceptions">
-            <button type="button" class={selectedException === "OVERDUE" ? "is-selected" : ""} aria-pressed={selectedException === "OVERDUE"} onClick={() => toggleException("OVERDUE")}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Target quarter ended</small></span></button>
+            <button type="button" class={selectedException === "OVERDUE" ? "is-selected" : ""} aria-pressed={selectedException === "OVERDUE"} onClick={() => toggleException("OVERDUE")}><span class="account-overview__exception-icon is-overdue">!</span><span><strong><b>{overview.exceptions.overdue}</b> Overdue</strong><small>Close Date has passed</small></span></button>
             <button type="button" class={selectedException === "TARGET_NOT_SET" ? "is-selected" : ""} aria-pressed={selectedException === "TARGET_NOT_SET"} onClick={() => toggleException("TARGET_NOT_SET")}><span class="account-overview__exception-icon is-warning">?</span><span><strong><b>{overview.exceptions.targetNotSet}</b> Target not set</strong><small>Open Opportunities without FY/Q</small></span></button>
             <button type="button" class={selectedException === "CLOSE_DATE_MISSING" ? "is-selected" : ""} aria-pressed={selectedException === "CLOSE_DATE_MISSING"} onClick={() => toggleException("CLOSE_DATE_MISSING")}><span class="account-overview__exception-icon is-warning">!</span><span><strong><b>{overview.exceptions.closeDateMissing}</b> Close date missing</strong><small>WON Opportunities excluded</small></span></button>
             <article class="account-overview__portfolio-card"><span class="account-overview__exception-icon">✓</span><span><strong><b>{activeWorkloadCount}</b> Active Workloads</strong><small>Active accounts/workloads · {selectedAccount || "All Accounts"}<br />All periods and measures</small></span></article>
@@ -287,8 +297,8 @@ export function AccountManagementOverviewPage({ breadcrumb }: Props) {
           </div>
 
           <article class="account-overview__panel account-overview__target-list"><div class="account-overview__panel-heading"><div><h3>Open Opportunity action list</h3></div></div>
-            <div class="account-overview__target-grid"><div class="account-overview__target-head"><span>Account / Workload / Opportunity</span><span>Type</span><span>Amount</span><span title="Recorded actual close date (actualCloseDate), not a planned closing date.">Close Date</span><span>Target FY/Q</span><span>Status</span><span>To Quarter End</span><span>Latest Update</span></div>
-            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN Opportunities in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.account.name} ({item.workload.name})</strong><small>{item.deal.name} ({item.deal.opportunityNo ?? "No Opportunity ID"})</small></span><span><em class={`account-overview__type-badge is-${item.deal.revenueType.toLowerCase()}`}>{item.deal.revenueType}</em></span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span>{item.deal.actualCloseDate || "—"}</span><span>{displayTarget(item)}</span><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{daysToTargetEnd(item)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
+            <div class="account-overview__target-grid"><div class="account-overview__target-head"><span>Account / Workload / Opportunity</span><span>Type</span><span>Amount</span><span>Target FY/Q</span><span>Status</span><span title="Recorded Close Date (actualCloseDate).">Close Date</span><span>Days to Close</span><span>Latest Update</span></div>
+            <div class="account-overview__target-scroll">{target!.deals.length === 0 ? <p class="account-overview__empty">No OPEN Opportunities in this target scope.</p> : target!.deals.map((item) => { const latestUpdate = item.deal.latestUpdate || "No update"; return <div key={item.deal.id} class="account-overview__target-row"><span><strong>{item.account.name} ({item.workload.name})</strong><small>{item.deal.name} ({item.deal.opportunityNo ?? "No Opportunity ID"})</small></span><span><em class={`account-overview__type-badge is-${item.deal.revenueType.toLowerCase()}`}>{item.deal.revenueType}</em></span><b>{primaryAmount(item) === null ? "—" : fmtUsd(primaryAmount(item)!)}</b><span>{displayTarget(item)}</span><span><em class={`account-overview__status is-${targetStatus(item).toLocaleLowerCase()}`}>{statusLabel(item)}</em></span><span>{item.deal.actualCloseDate || "—"}</span><span>{formatDaysToClose(item.deal.actualCloseDate)}</span><span class="account-overview__latest-update" tabIndex={0} aria-describedby={latestUpdateTooltip?.text === latestUpdate ? "accountOverviewLatestUpdateTooltip" : undefined} onMouseEnter={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onMouseLeave={() => setLatestUpdateTooltip(null)} onFocus={(event) => showLatestUpdate(event.currentTarget, latestUpdate)} onBlur={() => setLatestUpdateTooltip(null)}>{latestUpdate}</span></div>; })}</div>
             </div><footer class="account-overview__target-footer"><span>{target!.deals.length} open Opportunities</span><strong>Selected total {fmtUsd(targetPrimaryTotal)}</strong></footer>
             {latestUpdateTooltip && <div id="accountOverviewLatestUpdateTooltip" class="account-overview__latest-tooltip" role="tooltip" style={{ left: `${latestUpdateTooltip.left}px`, top: `${latestUpdateTooltip.top}px` }}>{latestUpdateTooltip.text}</div>}
           </article>

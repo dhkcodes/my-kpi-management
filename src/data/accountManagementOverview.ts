@@ -143,15 +143,30 @@ const metricsFor = (items: readonly OverviewDeal[]): OverviewKpis => ({
 const sameTargetPeriod = (item: OverviewDeal, period: { fiscalYear: string; quarter: number }) =>
   item.deal.targetFiscalYear === period.fiscalYear && item.deal.targetQuarter === period.quarter;
 
+// Calendar-date arithmetic avoids time-of-day and daylight-saving rounding.
+export const daysToClose = (closeDate: string | null | undefined, today = new Date()): number | null => {
+  if (!closeDate || !/^\d{4}-\d{2}-\d{2}$/.test(closeDate)) return null;
+  const close = new Date(`${closeDate}T00:00:00Z`);
+  if (!Number.isFinite(close.getTime()) || close.toISOString().slice(0, 10) !== closeDate) return null;
+  const current = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return Math.round((close.getTime() - current) / 86_400_000);
+};
+
+export const formatDaysToClose = (closeDate: string | null | undefined, today = new Date()): string => {
+  const days = daysToClose(closeDate, today);
+  if (days === null) return "—";
+  const count = Math.abs(days);
+  return `${count} ${count === 1 ? "day" : "days"}${days < 0 ? " overdue" : ""}`;
+};
+
 const isOverdue = (item: OverviewDeal, today: Date) => {
-  if (!item.deal.targetFiscalYear || item.deal.targetQuarter === null) return false;
-  const end = quarterEndDate(item.deal.targetFiscalYear, item.deal.targetQuarter);
-  return end !== null && end < today.toISOString().slice(0, 10);
+  const days = daysToClose(item.deal.actualCloseDate, today);
+  return days !== null && days < 0;
 };
 
 export const targetStatus = (item: OverviewDeal, today = new Date()): "OVERDUE" | "THIS_QUARTER" | "NEXT_QUARTER" | "TARGET_NOT_SET" | "FUTURE" => {
-  if (!item.deal.targetFiscalYear || item.deal.targetQuarter === null) return "TARGET_NOT_SET";
   if (isOverdue(item, today)) return "OVERDUE";
+  if (!item.deal.targetFiscalYear || item.deal.targetQuarter === null) return "TARGET_NOT_SET";
   const current = currentFiscalPeriod(today);
   if (sameTargetPeriod(item, current)) return "THIS_QUARTER";
   if (sameTargetPeriod(item, nextFiscalPeriod(current))) return "NEXT_QUARTER";
@@ -200,7 +215,7 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
         const status = targetStatus(item, at);
         if (view === "PRIORITY") return ["OVERDUE", "THIS_QUARTER", "NEXT_QUARTER", "TARGET_NOT_SET"].includes(status);
         if (view === "OVERDUE") return status === "OVERDUE";
-        if (view === "TARGET_NOT_SET") return status === "TARGET_NOT_SET";
+        if (view === "TARGET_NOT_SET") return !item.deal.targetFiscalYear || item.deal.targetQuarter === null;
         if (view === "THIS_QUARTER") return sameTargetPeriod(item, current);
         if (view === "NEXT_QUARTER") return sameTargetPeriod(item, next);
         return `${item.deal.targetFiscalYear ?? ""} Q${item.deal.targetQuarter ?? ""}` === chosenPeriod;

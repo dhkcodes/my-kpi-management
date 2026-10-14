@@ -574,6 +574,7 @@ export function ConsumptionAnalysisPage({ breadcrumb }: Readonly<{ breadcrumb?: 
         </div>
     </PageFilterPanel>}>
     <DataControlBar className="consumption-records-toolbar consumption-analysis-toolbar" ariaLabel="Consumption Analysis data controls">
+      <link rel="stylesheet" href="components/content/ConsumptionReloadSpacing.css" />
       <div class="consumption-records-toolbar__left">
         <ConsumptionMtdControl checked={includeMtd} disabled={queryControlsLocked || !analysis.currentMtdAvailable}
           mtdAppliedDate={mtdAppliedTimestamp}

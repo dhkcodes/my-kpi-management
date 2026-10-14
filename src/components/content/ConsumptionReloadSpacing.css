@@ -1,0 +1,32 @@
+/* Consumption-only: the visible Reload border, not just its toolbar, must
+ * occupy the full row between the existing 6px outer gaps. Keep the existing
+ * PageActivity compactTimestampButton composition (public oj-button outlined,
+ * startIcon slot, timestamp, disabled/busy behavior). --oj-button-sm-height is
+ * JET 20.1.3's documented public <length>|<percentage> sizing token:
+ * https://docs.oracle.com/en/middleware/developer-tools/jet/20/reference-api/oj.ojButton.html
+ * No JET-generated descendants, private classes or shared styles are changed.
+ * Stretch follows intrinsic wrapped counts/MTD/totals heights, including mobile;
+ * it does not assume a fixed toolbar height or compensate with negative margins.
+ */
+.kap-page-shell.consumption-page .kap-page-shell__body {
+  gap: 0;
+}
+
+.kap-page-shell:is(.consumption-insights-page, .consumption-page) .consumption-records-toolbar {
+  align-items: stretch;
+}
+
+.kap-page-shell:is(.consumption-insights-page, .consumption-page) .consumption-records-toolbar-activity,
+.kap-page-shell:is(.consumption-insights-page, .consumption-page) .consumption-records-toolbar-activity > .kap-page-activity.is-compact-timestamp,
+.kap-page-shell:is(.consumption-insights-page, .consumption-page) .consumption-records-toolbar-activity .kap-page-activity__control-slot {
+  align-items: stretch;
+  align-self: stretch;
+  display: grid;
+  min-height: 0;
+}
+
+.kap-page-shell:is(.consumption-insights-page, .consumption-page) .consumption-records-toolbar-activity oj-button.kap-page-activity__refresh {
+  --oj-button-sm-height: 100%;
+  align-self: stretch;
+  height: 100%;
+}

@@ -266,3 +266,95 @@
   left: var(--consumption-viewport-center-x, 50%);
   top: var(--consumption-viewport-center-y, 50%);
 }
+
+/* Fit composition for the JET 20.1.3 app shell: PageShell supplies the bounded,
+   keyboard-focusable application scroll element. These are native HTML tables,
+   not JET Table components, so let owned wrappers grow and put BOTH scroll axes
+   on the page root. Preserve full rows, column min-widths, and existing sticky
+   headers. No JET-generated DOM overrides or invented layout="fit" API.
+   JET Table's public layout values are fixed/contents:
+   https://docs.oracle.com/en/middleware/developer-tools/jet/20/reference-api/oj.ojTable.html
+   Common app.css bounds body/#app to 100vh and hides root horizontal overflow;
+   this page-local opt-in avoids clipping without modifying common styles. */
+.accounts-workloads-layout .kap-page-shell__scroll {
+  overflow: auto;
+}
+
+.accounts-workloads-layout .kap-page-shell__inner {
+  height: auto;
+  min-height: 100%;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__body {
+  flex: 0 0 auto;
+}
+
+.accounts-workloads-layout .accounts-workloads-grid-wrap.accounts-workloads-grid-wrap--compact {
+  flex: 0 0 auto;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+.accounts-workloads-layout .accounts-workloads-oppty-scroll {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__search-group {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: .5rem .75rem;
+  min-width: 0;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__search-group .accounts-workloads-layout__search-form {
+  flex: 0 1 17rem;
+  min-width: 0;
+}
+
+.accounts-workloads-layout .accounts-workloads-layout__search-group .accounts-workloads-include-archived-switch {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.accounts-workloads-layout .accounts-workloads-opportunities {
+  overflow: visible;
+}
+
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="salesRep"] {
+  text-align: center;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="plan"] {
+  text-align: center;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="arrUsd"] {
+  text-align: right;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="acrUsd"] {
+  text-align: right;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid th[data-aw-field="salesRep"] > button,
+.accounts-workloads-layout .accounts-workloads-aw-grid th[data-aw-field="plan"] > button {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid th[data-aw-field="arrUsd"] > button,
+.accounts-workloads-layout .accounts-workloads-aw-grid th[data-aw-field="acrUsd"] > button {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  box-sizing: border-box;
+}
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="salesRep"] .accounts-workloads-edit-field,
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="plan"] .accounts-workloads-edit-field,
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="arrUsd"] .accounts-workloads-edit-field,
+.accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="acrUsd"] .accounts-workloads-edit-field {
+  text-align: inherit;
+}

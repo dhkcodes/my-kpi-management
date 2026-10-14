@@ -1,5 +1,6 @@
 /* Account Management Overview only: Consumption Analysis is a read-only reference. */
 .kap-page-shell.account-management-overview {
+  --account-overview-section-gap: .75rem;
   border-radius: var(--oj-core-border-radius-md, .2rem);
   display: grid;
   gap: 0;
@@ -48,11 +49,11 @@
 .kap-page-shell.account-management-overview .account-overview__reload-row { display: flex; justify-content: flex-end; margin: 0; padding: 0 0 6px; }
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity,
 .kap-page-shell.account-management-overview .account-overview__reload-row .kap-page-activity__control-slot { min-height: 0; }
-.kap-page-shell.account-management-overview .account-overview__exceptions + .account-overview__section { margin-top: 1rem; }
-.kap-page-shell.account-management-overview .account-overview__section + .account-overview__section { margin-top: .75rem; }
+.kap-page-shell.account-management-overview .account-overview__exceptions + .account-overview__section { margin-top: var(--account-overview-section-gap); }
+.kap-page-shell.account-management-overview .account-overview__section + .account-overview__section { margin-top: var(--account-overview-section-gap); }
 .kap-page-shell.account-management-overview .account-overview__target-head,
 .kap-page-shell.account-management-overview .account-overview__target-row {
-  grid-template-columns: minmax(13rem,1fr) 5.25rem 6rem 6.5rem 7rem 6.5rem 8rem minmax(20rem,2fr);
+  grid-template-columns: minmax(13rem,1fr) 5.25rem 6rem 7rem 6.5rem 6.5rem 8rem minmax(20rem,2fr);
   min-width: 75rem;
 }
 .kap-page-shell.account-management-overview .account-overview__target-head > span:nth-child(3),
@@ -76,7 +77,7 @@
 .kap-page-shell.account-management-overview .account-overview__target-head > :nth-child(n+4):nth-child(-n+7),
 .kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(2),
 .kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(n+4):nth-child(-n+7) { text-align: center; }
-.kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(6) { justify-self: center; }
+.kap-page-shell.account-management-overview .account-overview__target-row > :nth-child(5) { justify-self: center; }
 .kap-page-shell.account-management-overview .account-overview__filter > select:disabled,
 .kap-page-shell.account-management-overview .account-overview__search-field:has(input:disabled) { opacity: .6; }
 .kap-page-shell.account-management-overview .account-overview__target-row > * { grid-column: auto; }
@@ -84,6 +85,35 @@
 .kap-page-shell.account-management-overview .consumption-page-progress-controls { inset: 0; pointer-events: none; position: fixed; z-index: 48; }
 .kap-page-shell.account-management-overview .consumption-page-progress-controls .kap-page-data-progress { left: var(--consumption-viewport-center-x, 50%); top: var(--consumption-viewport-center-y, 50%); }
 .kap-page-shell.account-management-overview .consumption-page-progress-controls[data-visible="false"] { display: none; }
+.kap-page-shell.account-management-overview .account-overview__actual-details {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.2fr);
+}
+/* Fit the chart inside the fixed-height panel with balanced inline space. */
+.kap-page-shell.account-management-overview .account-overview__vertical-chart {
+  box-sizing: border-box; grid-template-columns: 4rem minmax(0, 1fr);
+  margin: auto 0; min-height: 0; min-width: 0; width: 100%;
+  padding: .75rem; overflow: visible;
+}
+.kap-page-shell.account-management-overview .account-overview__axis {
+  min-width: 0; padding: 0 .5rem 2rem 0; font-size: .7rem;
+}
+.kap-page-shell.account-management-overview .account-overview__plot {
+  box-sizing: border-box; min-width: 0; height: 16.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; padding: 0 .25rem;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-group {
+  min-width: 0; grid-template-rows: 14rem 1.4rem; gap: .3rem;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-columns { gap: .25rem; }
+.kap-page-shell.account-management-overview .account-overview__bar-item { min-width: 0; max-width: 4.25rem; }
+.kap-page-shell.account-management-overview .account-overview__bar-item .account-overview__bar-total {
+  box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere;
+  white-space: normal; text-align: center; font-size: .65rem; line-height: 1.2;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-item > b { font-size: .6rem; }
+@media (max-width: 1100px) {
+  .kap-page-shell.account-management-overview .account-overview__actual-details { grid-template-columns: 1fr; }
+}
 @media (max-width: 720px) {
   .kap-page-shell.account-management-overview .account-overview__filter,
   .kap-page-shell.account-management-overview .account-overview__filter > select,
