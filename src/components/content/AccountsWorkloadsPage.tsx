@@ -53,6 +53,7 @@ import {
   sumWonOpportunityAmount,
   sortOpportunitiesByTarget,
 } from "./accountsWorkloadsOpportunityPresentation";
+import { fiscalPeriodForDate } from "../../data/accountManagementOverview";
 import { AppMessageBanner } from "./AppMessageBanner";
 import { createDoubleActivationTracker } from "../common/doubleActivation";
 import {
@@ -1691,6 +1692,9 @@ export function AccountsWorkloadsPage({
       if (!draft) return current;
       let deal = { ...draft.deal };
       if (field === "target") {
+        // A Close Date is the source of truth for the opportunity period.
+        // Do not let a manual target overwrite the date-derived period.
+        if (deal.actualCloseDate) return current;
         const match = /^(FY\d{2}) Q([1-4])$/.exec(value);
         deal.targetFiscalYear = match?.[1] ?? null;
         deal.targetQuarter = match ? Number(match[2]) : null;
@@ -1715,8 +1719,14 @@ export function AccountsWorkloadsPage({
           "contractStartDate",
           "contractEndDate",
         ].includes(field)
-      )
+      ) {
         (deal as any)[field] = nullable(value);
+        if (field === "actualCloseDate") {
+          const period = value ? fiscalPeriodForDate(value) : null;
+          deal.targetFiscalYear = period?.fiscalYear ?? null;
+          deal.targetQuarter = period?.quarter ?? null;
+        }
+      }
       else if (field === "revenueType") {
         deal.revenueType = canonicalizeOpportunityRevenueType(value);
       } else (deal as any)[field] = value;
@@ -1867,6 +1877,12 @@ export function AccountsWorkloadsPage({
       )
     ) {
       setError("Oppty Name is required.");
+      return false;
+    }
+    if (changedDrafts.some((draft) =>
+      !draft.deal.deleted && ["WON", "LOST"].includes(draft.deal.status) && !draft.deal.actualCloseDate,
+    )) {
+      setError("WON 또는 LOST Opportunity에는 Close Date가 필요합니다.");
       return false;
     }
     const drafts = dealSaveLock.tryStart(changedDrafts);
@@ -2030,6 +2046,7 @@ export function AccountsWorkloadsPage({
           <select
             autoFocus
             value={value}
+            disabled={Boolean(effective.actualCloseDate)}
             onChange={(event) =>
               updateDealDraft(key, field, event.currentTarget.value)
             }
@@ -2428,7 +2445,7 @@ export function AccountsWorkloadsPage({
                   <span class="oj-helper-hidden-accessible">Search</span>
                 </button>
               </label>
-              <label class="accounts-workloads-include-deleted">
+              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
                 <input
                   type="checkbox"
                   checked={includeDeleted}
@@ -2440,6 +2457,7 @@ export function AccountsWorkloadsPage({
                   }}
                 />
                 <span>Include Archived</span>
+                <span class="accounts-workloads-switch" aria-hidden="true" />
               </label>
             </form>
             <div class="accounts-workloads-table-summary accounts-workloads-layout__fx">
@@ -2505,7 +2523,7 @@ export function AccountsWorkloadsPage({
       <AppMessageBanner
         messages={[
           ...(error ? [{ id: "accounts-workloads-error", severity: "error" as const, summary: error, persistence: "sticky" as const }] : []),
-          ...(notice ? [{ id: "accounts-workloads-notice", severity: "confirmation" as const, summary: notice, persistence: "auto" as const }] : []),
+
         ]}
         onClose={(id) => {
           if (id === "accounts-workloads-error") {
@@ -2543,7 +2561,7 @@ export function AccountsWorkloadsPage({
             Add Account & Workload
           </button>
         </div>
-        <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} accounts</span>
+        <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} Accounts</span>
         <div class="accounts-workloads-layout__activity">
           <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
         </div>

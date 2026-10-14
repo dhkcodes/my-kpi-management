@@ -86,7 +86,7 @@
   display: grid;
   flex: 0 0 auto;
   gap: 0 .75rem;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   margin: 0;
   padding: 6px 0;
 }
@@ -99,8 +99,8 @@
 .accounts-workloads-layout__account-count {
   color: var(--kpi-muted);
   font-size: .75rem;
-  justify-self: center;
-  text-align: center;
+  justify-self: start;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -126,8 +126,52 @@
   display: flex;
   flex-wrap: wrap;
   gap: .5rem;
-  grid-column: 1 / -1;
-  padding-top: 6px;
+  grid-column: auto;
+  padding-top: 0;
+}
+
+/* Page-local copy of the Consumption Analysis label + switch treatment. */
+.accounts-workloads-layout .accounts-workloads-include-archived-switch {
+  align-items: center;
+  color: var(--kpi-muted);
+  display: inline-flex;
+  font-size: .72rem;
+  font-weight: 800;
+  gap: .35rem;
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch > input {
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+.accounts-workloads-layout .accounts-workloads-switch {
+  background: var(--oj-core-border-color-enabled, #7a7470);
+  border-radius: 999px;
+  height: .95rem;
+  position: relative;
+  width: 1.7rem;
+}
+.accounts-workloads-layout .accounts-workloads-switch::after {
+  background: #fff;
+  border-radius: 50%;
+  content: "";
+  height: .7rem;
+  inset: .125rem auto auto .125rem;
+  position: absolute;
+  transition: transform .15s ease;
+  width: .7rem;
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch > input:checked + span + .accounts-workloads-switch {
+  background: var(--oj-core-brand-primary, #00688c);
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch > input:checked + span + .accounts-workloads-switch::after {
+  transform: translateX(.75rem);
+}
+.accounts-workloads-layout .accounts-workloads-include-archived-switch > input:focus-visible + span + .accounts-workloads-switch {
+  outline: 2px solid var(--oj-core-focus-border-color, #007cc3);
+  outline-offset: 2px;
 }
 
 .accounts-workloads-layout .accounts-workloads-grid-wrap--compact {
