@@ -2177,6 +2177,10 @@ export function AccountsWorkloadsPage({
             beginDealEdit(workloadId, effective, field);
           });
           if (result !== "single") return;
+          if (field === "latestUpdate") {
+            const textElement = event.currentTarget.querySelector<HTMLElement>(".accounts-workloads-ellipsis");
+            if (textElement) showImmediateTooltip(textElement, value, true);
+          }
           suppressNextDealRowClickRef.current = activationKey;
           window.setTimeout(() => {
             if (suppressNextDealRowClickRef.current === activationKey) {
@@ -2207,6 +2211,7 @@ export function AccountsWorkloadsPage({
                 onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
                 onMouseLeave={() => setLatestUpdateTooltip(null)}
                 onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
+                onClick={(event) => showImmediateTooltip(event.currentTarget, value, true)}
                 onBlur={() => setLatestUpdateTooltip(null)}
               >
                 {value || "—"}
