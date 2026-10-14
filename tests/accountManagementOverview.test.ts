@@ -207,13 +207,13 @@ assert.match(appCss, /\.account-overview__legend \.is-renewal \{ color: #b7a6dc;
 assert.match(appCss, /\.account-overview__tree-row\.is-workload\s*>\s*span:first-child/, "workload indentation must be limited to the name cell");
 assert.match(appCss, /\.account-overview__deal-row\s*>\s*span:first-child/, "deal indentation must be limited to the name cell");
 assert.match(pageSource, /<b>\{overview\.exceptions\.overdue\}<\/b> Overdue<\/strong>/, "exception label casing must be exact");
-assert.match(pageSource, /<b>\{overview\.exceptions\.targetNotSet\}<\/b> Target not set<\/strong>/, "exception label casing must be exact");
+assert.match(pageSource, /<b>\{openOpportunityCount\}<\/b> Open Opportunity<\/strong>/, "Open Opportunity card casing must be exact");
 assert.match(pageSource, /<b>\{overview\.exceptions\.closeDateMissing\}<\/b> Close date missing<\/strong>/, "exception label casing must be exact");
 assert.match(pageSource, /overview\?\.closeDateMissingFor/, "Close date missing click must use the same scoped result set as its count");
 assert.match(pageSource, /actualOpportunityList/, "Close date missing click must target the filtered Opportunity list");
 assert.match(pageSource, /Close date missing Opportunities/, "the filtered list must clearly identify the active exception filter");
 assert.match(pageSource, /selectedException === "OVERDUE"/, "Overdue card must expose its selected state");
-assert.match(pageSource, /selectedException === "TARGET_NOT_SET"/, "Target not set card must expose its selected state");
+assert.doesNotMatch(pageSource, /selectedException === "TARGET_NOT_SET"/, "removed Target not set card must not expose a selected state");
 assert.match(pageSource, /selectedException === "CLOSE_DATE_MISSING"/, "Close date missing card must expose its selected state");
 assert.match(pageSource, /setSelectedException\(null\).*Clear filter/s,
   "Clear filter must clear the exception card selection");

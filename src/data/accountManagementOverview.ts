@@ -159,6 +159,41 @@ export const formatDaysToClose = (closeDate: string | null | undefined, today = 
   return `${count} ${count === 1 ? "day" : "days"}${days < 0 ? " overdue" : ""}`;
 };
 
+export type OverviewSortColumn = "account" | "type" | "amount" | "target" | "status" | "closeDate" | "daysToClose" | "latestUpdate";
+export type OverviewSort = Readonly<{ column: OverviewSortColumn; direction: "ascending" | "descending" }>;
+
+export const overviewPrimaryAmount = (item: OverviewDeal): number | null =>
+  item.deal.revenueType.toUpperCase() === "RENEWAL" ? item.deal.acrUsd : item.deal.arrUsd;
+
+// Keep nulls last in either direction; never substitute a target-quarter end for Close Date.
+export const sortOverviewDeals = (items: readonly OverviewDeal[], sort: OverviewSort | null = null, today = new Date()): OverviewDeal[] => {
+  const compare = (left: string | number | null, right: string | number | null, direction = "ascending") => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    const value = typeof left === "number" && typeof right === "number" ? left - right : String(left).localeCompare(String(right));
+    return direction === "descending" ? -value : value;
+  };
+  const valueFor = (item: OverviewDeal, column: OverviewSortColumn): string | number | null => {
+    switch (column) {
+      case "account": return item.account.name;
+      case "type": return item.deal.revenueType;
+      case "amount": return overviewPrimaryAmount(item);
+      case "target": return item.deal.targetFiscalYear && item.deal.targetQuarter !== null ? `${item.deal.targetFiscalYear} Q${item.deal.targetQuarter}` : null;
+      case "status": return targetStatus(item, today);
+      case "closeDate":
+      case "daysToClose": return daysToClose(item.deal.actualCloseDate, today);
+      case "latestUpdate": return item.deal.latestUpdate || null;
+    }
+  };
+  return [...items].sort((left, right) =>
+    (sort ? compare(valueFor(left, sort.column), valueFor(right, sort.column), sort.direction) : 0) ||
+    compare(valueFor(left, "closeDate"), valueFor(right, "closeDate")) ||
+    compare(overviewPrimaryAmount(left), overviewPrimaryAmount(right), "descending") ||
+    compare(left.account.name, right.account.name) ||
+    compare(left.workload.name, right.workload.name) || compare(left.deal.name, right.deal.name) || left.deal.id - right.deal.id
+  );
+};
+
 const isOverdue = (item: OverviewDeal, today: Date) => {
   const days = daysToClose(item.deal.actualCloseDate, today);
   return days !== null && days < 0;
@@ -191,6 +226,9 @@ export const buildAccountManagementOverview = (hierarchy: AccountsWorkloadsHiera
       overdue: targetDeals.filter((item) => isOverdue(item, today)).length,
       targetNotSet: targetDeals.filter((item) => !item.deal.targetFiscalYear || item.deal.targetQuarter === null).length,
       closeDateMissing: closeDateMissingDeals.length,
+    },
+    openFor(search: string, accountFilter?: OverviewAccountFilter) {
+      return targetDeals.filter((item) => matchesAccount(item, accountFilter) && matchesSearch(item, search));
     },
     closeDateMissingFor(search: string, accountFilter?: OverviewAccountFilter) {
       return closeDateMissingDeals.filter((item) => matchesAccount(item, accountFilter) && matchesSearch(item, search));

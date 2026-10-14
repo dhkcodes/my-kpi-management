@@ -55,7 +55,7 @@ assert.strictEqual(daysToClose("2027-01-01", new Date("2026-12-31T23:59:59Z")), 
 
 const page = fs.readFileSync(path.resolve("src/components/content/AccountManagementOverviewPage.tsx"), "utf8");
 const css = fs.readFileSync(path.resolve("src/components/content/AccountManagementOverviewPage.css"), "utf8");
-assert.match(page, /<span>Type<\/span><span>Amount<\/span><span>Target FY\/Q<\/span><span>Status<\/span><span[^>]*>Close Date<\/span><span>Days to Close<\/span>/);
+assert.match(page, /\["type", "Type"\][\s\S]*\["amount", "Amount"\][\s\S]*\["target", "Target FY\/Q"\][\s\S]*\["status", "Status"\][\s\S]*\["closeDate", "Close Date"\][\s\S]*\["daysToClose", "Days to Close"\]/, "sortable headers preserve column order");
 assert.match(page, /formatDaysToClose\(item\.deal\.actualCloseDate\)/);
 assert.doesNotMatch(page, /daysToTargetEnd|To Quarter End|Target quarter ended|pendingFilterRef/);
 assert.match(page, /if \(queryControlsLockRef\.current\) return;[\s\S]*queryControlsLockRef\.current = true;[\s\S]*\+\+requestGeneration\.current;[\s\S]*applyFilter\?\.\(\)/, "lock and invalidate requests synchronously before applying filters");

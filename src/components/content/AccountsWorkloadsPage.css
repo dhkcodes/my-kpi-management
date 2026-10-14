@@ -358,3 +358,22 @@
 .accounts-workloads-layout .accounts-workloads-aw-grid [data-aw-field="acrUsd"] .accounts-workloads-edit-field {
   text-align: inherit;
 }
+
+/* An expanded child keeps its existing 2575px colgroup on the same root
+   scrolling canvas as the parent. No nested horizontal scroller is added. */
+.accounts-workloads-layout:has(.accounts-workloads-child-row) .kap-page-shell__inner {
+  min-width: 2680px;
+}
+.accounts-workloads-layout .accounts-workloads-child-row > td {
+  position: static;
+  width: auto;
+  max-width: none;
+}
+.accounts-workloads-layout .accounts-workloads-opportunities {
+  width: auto;
+  max-width: none;
+}
+.accounts-workloads-layout .accounts-workloads-oppty-scroll {
+  width: auto;
+  max-width: none;
+}

@@ -53,7 +53,7 @@
 .kap-page-shell.account-management-overview .account-overview__section + .account-overview__section { margin-top: var(--account-overview-section-gap); }
 .kap-page-shell.account-management-overview .account-overview__target-head,
 .kap-page-shell.account-management-overview .account-overview__target-row {
-  grid-template-columns: minmax(13rem,1fr) 5.25rem 6rem 7rem 6.5rem 6.5rem 8rem minmax(20rem,2fr);
+  grid-template-columns: minmax(16rem,1.2fr) 5.25rem 6rem 7rem 6.5rem 6.5rem 8rem minmax(18rem,1.8fr);
   min-width: 75rem;
 }
 .kap-page-shell.account-management-overview .account-overview__target-head > span:nth-child(3),
@@ -105,12 +105,42 @@
   min-width: 0; grid-template-rows: 14rem 1.4rem; gap: .3rem;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-columns { gap: .25rem; }
-.kap-page-shell.account-management-overview .account-overview__bar-item { min-width: 0; max-width: 4.25rem; }
+.kap-page-shell.account-management-overview .account-overview__bar-item {
+  min-width: 0; max-width: 4.25rem; display: grid;
+  grid-template-rows: minmax(0, 1fr) 1rem; justify-items: stretch;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-track {
+  min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-track .account-overview__bar-stack { flex-shrink: 0; }
+.kap-page-shell.account-management-overview .account-overview__bar-item > b {
+  width: 100%; margin: 0; align-self: end; text-align: center; line-height: 1rem;
+}
 .kap-page-shell.account-management-overview .account-overview__bar-item .account-overview__bar-total {
   box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere;
   white-space: normal; text-align: center; font-size: .65rem; line-height: 1.2;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-item > b { font-size: .6rem; }
+/* Domain-owned chart/list only: no Oracle JET internal selectors. */
+.kap-page-shell.account-management-overview .account-overview__legend span { color: #35465f; }
+.kap-page-shell.account-management-overview {
+  --account-overview-new: #0072b2;
+  --account-overview-expansion: #d55e00;
+  --account-overview-renewal: #8b4caf;
+}
+.kap-page-shell.account-management-overview .account-overview__bar-columns .is-new,
+.kap-page-shell.account-management-overview .account-overview__legend .is-new::before { background: var(--account-overview-new); }
+.kap-page-shell.account-management-overview .account-overview__bar-columns .is-expansion,
+.kap-page-shell.account-management-overview .account-overview__legend .is-expansion::before { background: var(--account-overview-expansion); }
+.kap-page-shell.account-management-overview .account-overview__bar-columns .is-renewal,
+.kap-page-shell.account-management-overview .account-overview__legend .is-renewal::before { background: var(--account-overview-renewal); }
+.kap-page-shell.account-management-overview .account-overview__sort-button {
+  background: transparent; border: 0; color: inherit; cursor: pointer;
+  font: inherit; font-weight: 700; padding: .3rem 0; text-align: inherit; width: 100%;
+}
+.kap-page-shell.account-management-overview .account-overview__sort-button:hover { color: #315f9b; }
+.kap-page-shell.account-management-overview .account-overview__sort-button:focus-visible { outline: 2px solid #0072b2; outline-offset: 2px; }
+.kap-page-shell.account-management-overview .account-overview__sort-help { color: var(--kpi-muted); font-size: .66rem; margin: 0; }
 @media (max-width: 1100px) {
   .kap-page-shell.account-management-overview .account-overview__actual-details { grid-template-columns: 1fr; }
 }
