@@ -139,7 +139,23 @@ const portfolioQuarterTooltip = (summary: KpiActivitySummary | null, code: Sprea
   return `${displayCode} ${quarter}\nAchieved count / Target count: ${summary.quarterCounts[code][quarter]} / ${target}`;
 };
 
-type EditorRect = Readonly<{ left: number; top: number; width: number; height: number }>;
+type EditorRect = Readonly<{ left: number; top: number; width: number; height: number;
+  viewport: Readonly<{ left: number; top: number; right: number; bottom: number }> }>;
+
+// Fixed editors must be clipped to the data viewport, not merely layered below chrome.
+// JET reparents its date/workload popups; those remain outside this application-owned clip.
+function measureEditorRect(anchor: HTMLElement, host: HTMLElement): EditorRect {
+  const rect = anchor.getBoundingClientRect();
+  const bounds = host.getBoundingClientRect();
+  const headerBottom = Math.max(bounds.top, ...Array.from(host.querySelectorAll("thead th"), (cell) => cell.getBoundingClientRect().bottom));
+  const visual = window.visualViewport;
+  const shell = host.closest(".kap-page-shell__scroll")?.getBoundingClientRect() ?? bounds;
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    viewport: { left: Math.max(bounds.left + host.clientLeft, shell.left, visual?.offsetLeft ?? 0),
+      top: Math.max(bounds.top + host.clientTop, headerBottom, shell.top, visual?.offsetTop ?? 0),
+      right: Math.min(bounds.left + host.clientLeft + host.clientWidth, shell.right, (visual?.offsetLeft ?? 0) + (visual?.width ?? window.innerWidth)),
+      bottom: Math.min(bounds.top + host.clientTop + host.clientHeight, shell.bottom, (visual?.offsetTop ?? 0) + (visual?.height ?? window.innerHeight)) } };
+}
 export type KpiNavigationGuard = (label: string, action: () => void) => void;
 
 function KpiSelectAll({ availableIds, selectedIds, onSelectionChange }: Readonly<{
@@ -536,10 +552,12 @@ function KpiSingleCellEditor({ state, row, field, rect, fiscalYear, onInput, onW
       onInput={(event) => onInput(field.key, (event.currentTarget as HTMLInputElement).value)} onKeyDown={blockContractKey} onKeyUp={keyContract} />;
   }
 
-  return <div data-kpi-single-editor data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
+  return <div class="kpi-cell-editor-viewport" style={{ left: `${rect.viewport.left}px`, top: `${rect.viewport.top}px`,
+    width: `${Math.max(0, rect.viewport.right - rect.viewport.left)}px`, height: `${Math.max(0, rect.viewport.bottom - rect.viewport.top)}px` }}>
+    <div data-kpi-single-editor data-kpi-editor-row={row.id} data-kpi-editor-field={field.key}
     class={commonClass} style={overlayStyle} onPointerDown={stopGridInteraction} onPointerUp={stopGridInteraction} onMouseDown={stopGridInteraction} onClick={stopGridInteraction} onDblClick={stopGridInteraction}>
     {editor}
-  </div>;
+  </div></div>;
 }
 
 export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFiscalYear, guideRecords, guideLoading, guideError, onFiscalYearChange, onOpenGuide, onNavigate, onNavigationGuardChange, onWriteStateChange, breadcrumb }: Readonly<{
@@ -718,8 +736,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     const latest = draftById.get(row.id) ?? row;
     editRowSnapshotRef.current = { ...latest };
     editorAnchorRef.current = element;
-    const rect = element.getBoundingClientRect();
-    setEditorRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+    if (!tableHostRef.current) return;
+    setEditorRect(measureEditorRect(element, tableHostRef.current));
     setEditState((current) => transitionKpiActivityEdit(current, {
       type: "begin",
       cell: { rowId: row.id, field: field.key },
@@ -727,7 +745,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
         ? joinTargetPeriod(latest.targetFiscalYear, latest.targetQuarter)
         : latest[field.key] === null ? "" : String(latest[field.key])
     }));
-  }, [canWrite, draftById, saving]);
+  }, [canWrite, draftById, saving, pageLoading, displayFiscalYear, fiscalYear]);
 
   useEffect(() => {
     const rowId = pendingAutoEditRowIdRef.current;
@@ -743,22 +761,6 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     beginEditing(row, field, element);
   }, [beginEditing, drafts, editState.cell, fields]);
 
-  useEffect(() => {
-    const anchor = editorAnchorRef.current;
-    const host = tableHostRef.current;
-    if (!editState.cell || !anchor || !host) return;
-    const syncEditorRect = () => {
-      if (!anchor.isConnected) return;
-      const rect = anchor.getBoundingClientRect();
-      setEditorRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
-    };
-    host.addEventListener("scroll", syncEditorRect, { passive: true });
-    window.addEventListener("resize", syncEditorRect);
-    return () => {
-      host.removeEventListener("scroll", syncEditorRect);
-      window.removeEventListener("resize", syncEditorRect);
-    };
-  }, [editState.cell]);
 
   const cancelCurrentCell = useCallback(() => {
     const snapshot = editRowSnapshotRef.current;
@@ -778,15 +780,30 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
 
   useEffect(() => {
     if (!editState.cell) return;
-    const updateRect = () => {
+    const updateRect = (event?: Event) => {
       const anchor = editorAnchorRef.current;
       if (!anchor?.isConnected) { finishEditing(); return; }
-      const rect = anchor.getBoundingClientRect();
-      setEditorRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+      const host = tableHostRef.current;
+      if (!host) return;
+      const next = measureEditorRect(anchor, host);
+      const view = next.viewport;
+      if (event?.target === host && (next.top + next.height <= view.top || next.top >= view.bottom || next.left + next.width <= view.left || next.left >= view.right)) {
+        finishEditing(); // Keep the draft, but close an offscreen editor and its JET popup.
+        return;
+      }
+      setEditorRect(next);
     };
+    updateRect();
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
-    return () => { window.removeEventListener("resize", updateRect); window.removeEventListener("scroll", updateRect, true); };
+    window.visualViewport?.addEventListener("resize", updateRect);
+    window.visualViewport?.addEventListener("scroll", updateRect);
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+      window.visualViewport?.removeEventListener("resize", updateRect);
+      window.visualViewport?.removeEventListener("scroll", updateRect);
+    };
   }, [editState.cell, finishEditing]);
 
   useEffect(() => {

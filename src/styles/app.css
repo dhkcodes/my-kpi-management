@@ -2391,6 +2391,11 @@ h4.weekly-activity-section-label--next-week,
 @media (max-width: 720px) {
   .kpi-activity-guide__facts { grid-template-columns: minmax(0, 1fr); }
 }
+.kpi-cell-editor-viewport { position: fixed; clip-path: inset(0); pointer-events: none; z-index: 120; }
+.kpi-cell-editor-viewport > .kpi-cell-editor-overlay { pointer-events: auto; }
+@media (pointer: coarse) {
+  .kpi-cell-editor-viewport .kpi-cell-editor-control, .kpi-cell-editor-viewport .kpi-workload-launcher > input { font-size: max(16px, 1rem); }
+}
 .kpi-cell-editor-overlay { background: #fff; border: 2px solid #2f6f9f; box-shadow: 0 8px 24px rgba(22,21,19,.2); box-sizing: border-box; display: flex; padding: .2rem; position: fixed; z-index: 120; }
 .kpi-cell-editor-overlay--textarea { min-height: 8rem; overflow: auto; padding: .75rem; }
 .kpi-cell-editor-overlay--date { border: 0; box-shadow: none; padding: 0; }

@@ -323,6 +323,7 @@
 .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > :not(.kpi-activities-table-wrap) {
   flex: 0 0 auto;
 }
+
 /* Expanded information stays reachable without growing the outer page. */
 .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > .kpi-sheet-summary,
 .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > .kpi-detail-guide {
@@ -346,4 +347,11 @@
 .kap-page-shell.kpi-activities-scroll-page .kpi-activities-table-wrap:focus-visible {
   outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
   outline-offset: -2px;
+}
+/* Small/touch viewports need a reachable data area when chrome or the keyboard consumes height. */
+@media (max-width: 720px), (max-height: 650px) {
+  .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__scroll { overflow-y: auto; }
+  .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__inner { height: auto; min-height: 100%; overflow: visible; }
+  .kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body { flex: 1 0 auto; overflow: visible; }
+  .kap-page-shell.kpi-activities-scroll-page .kpi-activities-table-wrap { flex: 1 0 12rem; min-height: 12rem; }
 }
