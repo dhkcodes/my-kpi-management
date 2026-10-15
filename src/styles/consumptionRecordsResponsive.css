@@ -4,13 +4,16 @@
 }
 
 .consumption-table.consumption-records-responsive-table {
-  --consumption-record-account-width: clamp(10rem, 22cqw, 19rem);
-  --consumption-record-value-width: max(6.5rem, calc((100cqw - var(--consumption-record-account-width)) / var(--consumption-record-value-columns)));
+  --consumption-record-account-width: 304px;
+  /* Account-only restoration must not shrink the existing wider value columns
+     when fewer quarters are selected. Use the old Account basis for value sizing. */
+  --consumption-record-value-account-basis: clamp(10rem, 22cqw, 19rem);
+  --consumption-record-value-width: max(6.5rem, calc((100cqw - var(--consumption-record-value-account-basis)) / var(--consumption-record-value-columns)));
   /* Explicit colgroup prevents legacy body min-widths from defeating responsive
      leaf widths under quarter colspan headers. Narrow screens scroll, not clip. */
   table-layout: fixed;
-  width: max(100%, calc(var(--consumption-record-account-width) + var(--consumption-record-value-columns) * 6.5rem));
-  min-width: calc(10rem + var(--consumption-record-value-columns) * 6.5rem);
+  width: calc(var(--consumption-record-account-width) + var(--consumption-record-value-columns) * var(--consumption-record-value-width));
+  min-width: calc(var(--consumption-record-account-width) + var(--consumption-record-value-columns) * var(--consumption-record-value-width));
 }
 
 .consumption-records-responsive-table .consumption-record-account-col {
@@ -20,9 +23,15 @@
   width: var(--consumption-record-value-width);
 }
 .consumption-records-responsive-table .consumption-account-column {
-  min-width: 10rem !important;
+  min-width: var(--consumption-record-account-width) !important;
 }
 .consumption-records-responsive-table th:not(.consumption-account-column),
 .consumption-records-responsive-table td:not(.consumption-account-column) {
   min-width: 6.5rem;
+}
+
+@media (max-width: 720px) {
+  .consumption-table.consumption-records-responsive-table {
+    --consumption-record-account-width: 224px;
+  }
 }

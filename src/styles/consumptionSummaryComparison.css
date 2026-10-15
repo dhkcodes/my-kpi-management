@@ -9,25 +9,32 @@
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table {
   border-color: #d9dfd9;
   color: #29312b;
-  /* Do not redistribute the space saved by narrow mode-specific columns. */
-  min-width: 0;
-  width: max-content;
+  /* Fill available Summary space; retain internal scrolling at readable floors. */
+  min-width: 100%;
+  width: 100%;
 }
 
-/* Baseline amount width is 12rem: Final Actual/Forecast × .6, Mixed × 1.05.
-   Scope to amount cells/headers only; pillar and QoQ columns are unchanged. */
+/* Application-owned Records Summary only. Container-relative widths keep compact
+   modes readable and give mixed Actual/Forecast labels additional space. */
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__scroll {
+  container-type: inline-size;
+}
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount {
-  --summary-amount-width: 12rem;
+  --summary-amount-width: clamp(7.2rem, 13cqw, 12rem);
   min-width: var(--summary-amount-width);
-  width: var(--summary-amount-width);
-  max-width: var(--summary-amount-width);
+  /* Amount columns absorb spare space rather than stretching narrow QoQ columns. */
+  width: auto;
+}
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__qoq {
+  width: 4.6rem;
+  max-width: 4.6rem;
 }
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="FINAL_ACTUAL"],
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="FULL_FORECAST"] {
-  --summary-amount-width: 7.2rem;
+  --summary-amount-width: clamp(7.2rem, 13cqw, 12rem);
 }
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table .consumption-summary__amount[data-summary-mode="MIXED"] {
-  --summary-amount-width: 12.6rem;
+  --summary-amount-width: clamp(12.6rem, 22cqw, 18rem);
 }
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table thead .consumption-summary__amount {
   white-space: normal;
@@ -100,12 +107,13 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__amount small span {
   font-weight: 500;
-  white-space: normal;
+  /* Include the separator: a child with normal whitespace reopens a line break. */
+  white-space: nowrap;
 }
 
 .kap-page-shell.consumption-page .consumption-summary .is-mtd-composite small span:first-child,
