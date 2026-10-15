@@ -358,6 +358,15 @@ export function AccountsWorkloadsPage({
   const [latestUpdateTooltip, setLatestUpdateTooltip] = useState<
     Readonly<{ text: string; top: number; left: number }> | null
   >(null);
+  const tooltipCloseTimerRef = useRef<number | null>(null);
+  const keepTooltipOpen = () => {
+    if (tooltipCloseTimerRef.current !== null) window.clearTimeout(tooltipCloseTimerRef.current);
+    tooltipCloseTimerRef.current = null;
+  };
+  const closeTooltipSoon = () => {
+    keepTooltipOpen();
+    tooltipCloseTimerRef.current = window.setTimeout(() => setLatestUpdateTooltip(null), 150);
+  };
   const [permanentDeleteTargets, setPermanentDeleteTargets] = useState<string[]>([]);
   const [dealDeleteTargets, setDealDeleteTargets] = useState<AccountWorkloadDeal[]>([]);
   const [forecastOpen, setForecastOpen] = useState(false);
@@ -459,13 +468,16 @@ export function AccountsWorkloadsPage({
 
   useEffect(() => {
     if (!editCell && !dealEditCell) return;
+    setLatestUpdateTooltip(null);
     const frame = window.requestAnimationFrame(() => {
       const selector = editCell
         ? `[data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell input, [data-aw-row-key="${CSS.escape(editCell.key)}"] td.is-editing-cell textarea`
         : `[data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell input, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell textarea, [data-deal-draft-key="${CSS.escape(dealEditCell!.key)}"] td.is-editing-cell select`;
       const editor = document.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector);
       editor?.focus();
-      if (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) {
+      // Number/date inputs do not support selectionRange and throw on entry.
+      if (editor instanceof HTMLTextAreaElement ||
+        (editor instanceof HTMLInputElement && ["text", "search", "tel", "url", "password"].includes(editor.type))) {
         const end = editor.value.length;
         editor.setSelectionRange(end, end);
       }
@@ -759,14 +771,17 @@ export function AccountsWorkloadsPage({
     value: string,
     onlyIfClipped = false,
   ) => {
-    if (!value || (onlyIfClipped && element.scrollWidth <= element.clientWidth)) {
+    keepTooltipOpen();
+    if (!value || (onlyIfClipped && element.scrollWidth <= element.clientWidth && !value.includes("\n"))) {
       setLatestUpdateTooltip(null);
       return;
     }
     const bounds = element.getBoundingClientRect();
+    const maxHeight = Math.min(window.innerHeight * .4, 320);
     setLatestUpdateTooltip({
       text: value,
-      top: bounds.bottom + 6,
+      top: bounds.bottom + maxHeight + 6 <= window.innerHeight
+        ? bounds.bottom + 6 : Math.max(8, bounds.top - maxHeight - 6),
       left: Math.min(bounds.left, window.innerWidth - 376),
     });
   };
@@ -775,25 +790,15 @@ export function AccountsWorkloadsPage({
       class="accounts-workloads-ellipsis"
       tabIndex={value ? 0 : undefined}
       onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-      onMouseLeave={() => setLatestUpdateTooltip(null)}
+      onMouseLeave={closeTooltipSoon}
       onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
       onBlur={() => setLatestUpdateTooltip(null)}
+      onClick={(event) => showImmediateTooltip(event.currentTarget, value, true)}
     >
       {value || empty}
     </span>
   );
-  const truncatedWorkload = (value: string) => (
-    <span
-      class="accounts-workloads-ellipsis"
-      tabIndex={value ? 0 : undefined}
-      onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-      onMouseLeave={() => setLatestUpdateTooltip(null)}
-      onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-      onBlur={() => setLatestUpdateTooltip(null)}
-    >
-      {value || "—"}
-    </span>
-  );
+
   const renderAwCell = (
     account: AccountHierarchyAccount,
     workload: AccountWorkload,
@@ -885,14 +890,10 @@ export function AccountsWorkloadsPage({
               onBlur={() => setEditCell(null)}
             />
           )
-        ) : field === "lastUpdated" || field === "notes" ? (
-          tooltip(value)
         ) : field === "salesRep" && !value ? (
           "미지정"
-        ) : field === "workload" || field === "salesRep" ? (
-          truncatedWorkload(value)
         ) : (
-          value || "—"
+          tooltip(value)
         )}
         </div>
       </td>
@@ -2204,23 +2205,11 @@ export function AccountsWorkloadsPage({
         <div class="accounts-workloads-cell-content">
         {editing
           ? editor
-          : field === "latestUpdate"
-            ? <span
-                class="accounts-workloads-ellipsis"
-                tabIndex={value ? 0 : undefined}
-                onMouseEnter={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-                onMouseLeave={() => setLatestUpdateTooltip(null)}
-                onFocus={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-                onClick={(event) => showImmediateTooltip(event.currentTarget, value, true)}
-                onBlur={() => setLatestUpdateTooltip(null)}
-              >
-                {value || "—"}
-              </span>
-            : field === "winProbability" && value
+          : tooltip(field === "winProbability" && value
               ? `${Number(value).toLocaleString("en-US")}%`
               : ["arrUsd", "arrKrw", "acrUsd", "acrKrw"].includes(field) && value
                 ? Number(value).toLocaleString("en-US")
-                : value || "—"}
+                : value)}
         </div>
       </td>
     );
@@ -3337,6 +3326,8 @@ export function AccountsWorkloadsPage({
         <div
           class="accounts-workloads-latest-tooltip"
           role="tooltip"
+          onMouseEnter={keepTooltipOpen}
+          onMouseLeave={closeTooltipSoon}
           style={{
             top: `${latestUpdateTooltip.top}px`,
             left: `${Math.max(8, latestUpdateTooltip.left)}px`,

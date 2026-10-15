@@ -184,11 +184,7 @@
   width: 100%;
 }
 
-.accounts-workloads-layout td[data-aw-field="account"]:not(.is-editing-cell) > .accounts-workloads-cell-content {
-  overflow: visible;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
+
 
 @media (max-width: 760px) {
   .accounts-workloads-layout .kap-page-shell__inner {
@@ -391,8 +387,7 @@
   max-width: 100%;
 }
 
-/* Scope to direct parent cells: nested Opportunity columns keep their own
-   deterministic colgroup. Wrap complete values rather than truncating them. */
+/* Keep the current colgroups; display values must not grow rows or columns. */
 .accounts-workloads-layout .accounts-workloads-aw-grid > thead > tr > th,
 .accounts-workloads-layout .accounts-workloads-aw-grid > tbody > .accounts-workloads-parent-row > td {
   min-width: 0;
@@ -407,13 +402,22 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-cell-content,
-.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-cell-display,
-.accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-ellipsis {
-  overflow: visible;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-overflow: clip;
+.accounts-workloads-layout td:not(.is-editing-cell) > .accounts-workloads-cell-content,
+.accounts-workloads-layout .accounts-workloads-ellipsis {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+}
+/* The portal is outside the clipped grid. Allow scrolling long tooltip text
+   without putting an overlay over the cell's double-click edit target. */
+.accounts-workloads-latest-tooltip {
+  box-sizing: border-box;
+  max-width: min(360px, calc(100vw - 16px));
+  pointer-events: auto;
 }
 .accounts-workloads-layout .accounts-workloads-parent-row .accounts-workloads-edit-field {
   box-sizing: border-box;
