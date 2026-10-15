@@ -6,6 +6,8 @@ import { ojDialog } from "ojs/ojdialog";
 import "ojs/ojbutton";
 import { DataControlBar, PageActivity, PageFilterPanel, PageShell } from "../common/PageShell";
 import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
+import { IncludeSwitch } from "../common/IncludeSwitch";
+import { accountsWorkloadsScopeCounts } from "./accountsWorkloadsScopeCounts";
 
 import "ojs/ojdialog";
 import "ojs/ojdatetimepicker";
@@ -579,6 +581,7 @@ export function AccountsWorkloadsPage({
     ? orderRowsByKeys(sortedRows, titleEditOrder)
     : sortedRows;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedRows.has(row.key));
+  const scopeCounts = useMemo(() => accountsWorkloadsScopeCounts(hierarchy), [hierarchy]);
 
   const missingCandidates = useMemo(
     () => filterForecastCandidates(forecastCandidates, hierarchy.accounts),
@@ -2448,22 +2451,15 @@ export function AccountsWorkloadsPage({
                 </button>
               </label>
             </form>
-              <label class="accounts-workloads-include-deleted accounts-workloads-include-archived-switch">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-checked={includeDeleted}
-                  checked={includeDeleted}
-                  disabled={dirty || queryControlsDisabled}
-                  onChange={(event) => {
-                    const nextIncludeDeleted = event.currentTarget.checked;
+              <div class="accounts-workloads-include-deleted">
+                <span id="accountsIncludeArchivedLabel" class="consumption-mtd-switch__label">Include Archived</span>
+                <IncludeSwitch checked={includeDeleted} disabled={dirty || queryControlsDisabled}
+                  labelId="accountsIncludeArchivedLabel" onToggle={() => {
+                    const nextIncludeDeleted = !includeDeleted;
                     includeDeletedRef.current = nextIncludeDeleted;
                     setIncludeDeleted(nextIncludeDeleted);
-                  }}
-                />
-                <span>Include Archived</span>
-                <span class="accounts-workloads-switch" aria-hidden="true" />
-              </label>
+                  }} />
+              </div>
             </div>
             <div class="accounts-workloads-table-summary accounts-workloads-layout__fx">
               <div class="accounts-workloads-fx">
@@ -2599,7 +2595,7 @@ export function AccountsWorkloadsPage({
                 : "Archive"}
           </button>
         )}
-        <span class="accounts-workloads-layout__account-count">{hierarchy.accounts.length} Accounts</span>
+        <span class="accounts-workloads-layout__account-count">{scopeCounts.accounts} {scopeCounts.accounts === 1 ? "Account" : "Accounts"} · {scopeCounts.opportunities} {scopeCounts.opportunities === 1 ? "Opportunity" : "Opportunities"}</span>
         <div class="accounts-workloads-layout__activity">
           <PageActivity busy={loading} busyLabel="Loading accounts and workloads" onRefresh={reload} refreshDisabled={dirty || saving} lastCompletedAt={completedAt} compactTimestampButton />
         </div>

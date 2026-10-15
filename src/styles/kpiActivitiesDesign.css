@@ -214,7 +214,7 @@
   .kpi-sheet-page .kpi-sheet-summary .kpi-quarter-card__body small { text-align: right; }
 }
 
-/* Requirements 1–4: domain styles only; PageShell owns vertical scrolling. */
+/* Requirements 1–4: domain styles only; Overview keeps PageShell scrolling. */
 .kap-page-shell.kpi-spreadsheet-page .kpi-activity-toolbar__right > .kpi-save-action {
   background: var(--oj-button-call-to-action-chrome-bg-color, var(--kpi-brand));
   border-color: var(--oj-button-call-to-action-chrome-bg-color, var(--kpi-brand));
@@ -299,4 +299,51 @@
 .kap-page-shell.kpi-spreadsheet-page .kpi-overview-route-link:focus-visible {
   outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
   outline-offset: 2px;
+}
+
+/* A–H only: bounded data viewport, stationary page chrome. Overview is unchanged.
+   These are application-owned elements, not JET implementation selectors. */
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__scroll {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__inner {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__masthead {
+  flex: 0 0 auto;
+}
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > :not(.kpi-activities-table-wrap) {
+  flex: 0 0 auto;
+}
+/* Expanded information stays reachable without growing the outer page. */
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > .kpi-sheet-summary,
+.kap-page-shell.kpi-activities-scroll-page .kap-page-shell__body > .kpi-detail-guide {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 24%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.kap-page-shell.kpi-activities-scroll-page .kpi-activities-table-wrap {
+  block-size: 0;
+  height: 0;
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+.kap-page-shell.kpi-activities-scroll-page .kpi-activities-table-wrap:focus-visible {
+  outline: 2px solid var(--oj-core-focus-border-color, #0572ce);
+  outline-offset: -2px;
 }

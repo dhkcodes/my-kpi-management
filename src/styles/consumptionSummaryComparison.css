@@ -62,13 +62,23 @@
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody th:first-child {
   background: #fff;
   color: #29312b;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody .consumption-summary__qoq {
-  background: #f5f6f4;
+  /* Amount body cells are white; mode-tinted backgrounds belong to the header. */
+  background: #fff;
   border-right: 1px solid #d9dfd9;
   color: #59635b;
+}
+
+/* Match each QoQ to its own quarter's amount mode, independent of sign. */
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody .consumption-summary__qoq[data-summary-mode="FINAL_ACTUAL"] {
+  color: #3e604a;
+}
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody .consumption-summary__qoq[data-summary-mode="FULL_FORECAST"],
+.kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody .consumption-summary__qoq[data-summary-mode="MIXED"] {
+  color: #315b76;
 }
 
 .kap-page-shell.consumption-page .consumption-summary .consumption-summary__table tbody tr > *:last-child {

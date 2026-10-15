@@ -1135,7 +1135,7 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
     </span>;
   };
 
-  return <><PageShell className="kpi-spreadsheet-page kpi-sheet-page" ariaLabelledBy="kpiSpreadsheetTitle"
+  return <><PageShell className={`kpi-spreadsheet-page kpi-sheet-page${activeTab === "Overview" ? "" : " kpi-activities-scroll-page"}`} ariaLabelledBy="kpiSpreadsheetTitle"
     breadcrumb={breadcrumb}
     title={activeTab === "Overview" ? "KPI Performance" : `[${activeTab}] ${activeDefinition?.name ?? "KPI Activity"}`}
     titleControls={fiscalYearControl} actions={guideAction} messages={pageMessages}
@@ -1250,7 +1250,8 @@ export function KpiSpreadsheetPage({ fiscalYear, routeId, canWrite, guideDataFis
           </dl>
         </Fragment> : null}
       </section>
-      <div ref={tableHostRef} class="kpi-activities-table-wrap" data-kpi-table-scope={tableScopeKey}>
+      <div ref={tableHostRef} class="kpi-activities-table-wrap" data-kpi-table-scope={tableScopeKey}
+        role="region" aria-label={`${activeTab} activity table, scroll to view more rows and columns`} tabIndex={0}>
         <table ref={tableRef} class="kpi-activities-table" aria-label={`${activeTab} editable KPI activities`}
           style={{ width: `${columnLayout.totalWidth}px` }}>
           <colgroup>

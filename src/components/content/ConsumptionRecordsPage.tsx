@@ -484,7 +484,7 @@ const ConsumptionSummaryPanel = ({ summary, loading, error, expanded, onToggle }
             const item = summary.rows[0]?.quarters.find((candidate) => candidate.quarter === quarter);
             return [
               <th scope="col" className="consumption-summary__amount" data-summary-mode={item?.mode ?? "NO_DATA"} key={`${quarter}-consumption`}>{summaryModeLabel(item?.mode ?? "NO_DATA")}</th>,
-              <th scope="col" className="consumption-summary__qoq" key={`${quarter}-qoq`}>QoQ</th>
+              <th scope="col" className="consumption-summary__qoq" data-summary-mode={item?.mode ?? "NO_DATA"} key={`${quarter}-qoq`}>QoQ</th>
             ];
           })}</tr></thead>
         <tbody>{summary.rows.map((row) => <tr className={row.label === "Total" ? "consumption-summary__total" : undefined} key={row.label}>
@@ -496,7 +496,7 @@ const ConsumptionSummaryPanel = ({ summary, loading, error, expanded, onToggle }
             return [<td className={`consumption-summary__amount${quarter.mode === "MIXED" ? " is-mtd-composite" : ""}`} data-summary-mode={quarter.mode} key={`${row.label}-${quarter.quarter}-amount`}>
               <strong>{summaryK(quarter.totalAmountExact)}</strong>
               {quarter.mode === "MIXED" && <small><span>Actual {summaryK(quarter.actualAmountExact)}</span><span aria-hidden="true"> · </span><span>Remaining {summaryK(quarter.forecastAmountExact)}</span></small>}
-            </td>, <td className="consumption-summary__qoq" key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
+            </td>, <td className="consumption-summary__qoq" data-summary-mode={quarter.mode} key={`${row.label}-${quarter.quarter}-qoq`} title={qoq.title}>{qoq.text}</td>];
           })}
         </tr>)}</tbody>
       </table>
@@ -2236,7 +2236,11 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
           </div>
           {recordsViewState !== "error" && <>
         <div ref={tableScrollRef} class="consumption-table-scroll is-scrollable-y" tabIndex={0} aria-label="Scrollable Consumption Records table" onScroll={handleTableScroll} onKeyDown={handleTableKeyDown}>
-          <table class="consumption-table">
+          <table class="consumption-table consumption-records-responsive-table" style={{ "--consumption-record-value-columns": Math.max(1, quarters.length * 5) }}>
+            <colgroup>
+              <col class="consumption-record-account-col" />
+              {Array.from({ length: Math.max(1, quarters.length * 5) }, (_, index) => <col key={index} class="consumption-record-value-col" />)}
+            </colgroup>
             <thead>
               <tr>
                 <th class="consumption-account-column" rowSpan={2}>Account / End User</th>

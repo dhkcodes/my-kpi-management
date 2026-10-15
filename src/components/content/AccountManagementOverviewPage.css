@@ -151,9 +151,9 @@
 }
 .kap-page-shell.account-management-overview .account-overview__legend span { color: #35465f; }
 .kap-page-shell.account-management-overview {
-  --account-overview-new: #0072b2;
-  --account-overview-expansion: #d55e00;
-  --account-overview-renewal: #8b4caf;
+  --account-overview-new: #83b9d7;
+  --account-overview-expansion: #edb28b;
+  --account-overview-renewal: #bda0cf;
 }
 .kap-page-shell.account-management-overview .account-overview__bar-columns .is-new,
 .kap-page-shell.account-management-overview .account-overview__legend .is-new::before { background: var(--account-overview-new); }

@@ -1,0 +1,28 @@
+/* Records-only automatic geometry. No column-resize/persistence API is added. */
+.consumption-table-scroll:has(> .consumption-records-responsive-table) {
+  container-type: inline-size;
+}
+
+.consumption-table.consumption-records-responsive-table {
+  --consumption-record-account-width: clamp(10rem, 22cqw, 19rem);
+  --consumption-record-value-width: max(6.5rem, calc((100cqw - var(--consumption-record-account-width)) / var(--consumption-record-value-columns)));
+  /* Explicit colgroup prevents legacy body min-widths from defeating responsive
+     leaf widths under quarter colspan headers. Narrow screens scroll, not clip. */
+  table-layout: fixed;
+  width: max(100%, calc(var(--consumption-record-account-width) + var(--consumption-record-value-columns) * 6.5rem));
+  min-width: calc(10rem + var(--consumption-record-value-columns) * 6.5rem);
+}
+
+.consumption-records-responsive-table .consumption-record-account-col {
+  width: var(--consumption-record-account-width);
+}
+.consumption-records-responsive-table .consumption-record-value-col {
+  width: var(--consumption-record-value-width);
+}
+.consumption-records-responsive-table .consumption-account-column {
+  min-width: 10rem !important;
+}
+.consumption-records-responsive-table th:not(.consumption-account-column),
+.consumption-records-responsive-table td:not(.consumption-account-column) {
+  min-width: 6.5rem;
+}
