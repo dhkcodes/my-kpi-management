@@ -45,9 +45,23 @@ assert.match(calendarStyles, /\.calendar-timeline-event\.is-editable\s*\{[\s\S]*
 assert.match(calendarSource, /holidays\.get/);
 assert.match(calendarSource, /PRIVATE[\s\S]*DETAILS/);
 assert.doesNotMatch(calendarSource, /BUSY_ONLY/, "Calendar sharing no longer offers a busy-only scope");
-assert.match(calendarSource, /const isInitialLoad = initialCalendarLoadRef\.current;[\s\S]*const finishBusy = \(\) => undefined/, "Calendar data loading never owns the global blocking busy scope");
-assert.match(calendarSource, /if \(isInitialLoad\) setCalendarLoading\(true\)[\s\S]*Promise\.all\(/, "only initial Calendar entry renders the loading state");
-assert.match(calendarSource, /\.finally\(\(\) => \{[\s\S]*finishBusy\(\);[\s\S]*if \(active && isInitialLoad\)[\s\S]*setCalendarLoading\(false\);[\s\S]*initialCalendarLoadRef\.current = false;/, "only the active initial request closes initial local and global loading scopes");
+const calendarLoadEffect = calendarSource.match(/useEffect\(\(\) => \{\s*let active = true;[\s\S]*?\}, \[cursor\.getFullYear\(\), cursor\.getMonth\(\), reloadSequence\]\);/)?.[0];
+assert.ok(calendarLoadEffect, "Calendar loads on entry, month navigation and explicit Reload");
+assert.match(calendarLoadEffect, /setCalendarLoading\(true\);[\s\S]*Promise\.all\(/,
+  "every Calendar read uses the shared local loading lifecycle");
+for (const request of ["listCalendarEvents(fiscalYear, apiFetchQuiet)", "listKoreanHolidays(year, apiFetchQuiet)", "listCalendarShares(apiFetchQuiet)", "getCalendarDisplayPreferences(apiFetchQuiet)", "fetchWeeklyActivities({ fromDate, toDate, size: 100 }, apiFetchQuiet)"]) {
+  assert.ok(calendarLoadEffect.includes(request), `${request} keeps page reads out of the global busy scope`);
+}
+assert.match(calendarLoadEffect, /if \(!active\) return;[\s\S]*setEvents\(items\);[\s\S]*setLastCompletedAt\(new Date\(\)\);/,
+  "only active successful loads replace events and advance the completion timestamp");
+assert.match(calendarLoadEffect, /\.finally\(\(\) => \{\s*if \(active\) \{\s*setCalendarLoading\(false\);\s*\}\s*\}\);\s*return \(\) => \{ active = false; \};/,
+  "superseded loads cannot clear the current local busy lifecycle");
+assert.doesNotMatch(calendarLoadEffect, /setEvents\(\[\]\)|setHolidays\(new Map\(\)\)/,
+  "reload does not clear existing Calendar results while awaiting a replacement");
+assert.match(calendarSource, /<ConsumptionViewportProgress busy=\{calendarLoading \|\| saving\}/,
+  "Calendar uses the standardized non-blocking viewport progress surface");
+assert.match(calendarSource, /<PageActivity lastCompletedAt=\{lastCompletedAt\} busy=\{calendarLoading \|\| saving\}[^>]*onRefresh=\{\(\) => setReloadSequence\(\(value\) => value \+ 1\)\}[^>]*refreshDisabled=\{calendarLoading \|\| saving\} compactTimestampButton/,
+  "Reload and completion time share the local busy lifecycle without concurrent refreshes");
 assert.equal((calendarSource.match(/beginAppBusy\(\)/g) ?? []).length, 0, "Calendar updates never create a full-screen busy overlay");
 assert.match(calendarSource, /onDblClick=\{\(\) => \{[\s\S]*openDay/, "desktop double click opens the selected day");
 assert.match(calendarSource, /onDblClick=\{handleTimelineDoubleClick\}/, "desktop timeline double click creates a direct block draft");

@@ -9,6 +9,11 @@ import "ojs/ojinputtext";
 import "ojs/ojselectsingle";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
+import { PageShell, PageActivity } from "../common/PageShell";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
+import { AppMessageBanner } from "./AppMessageBanner";
+
+
 import { apiFetchQuiet } from "../../auth/apiFetch";
 import { CalendarColorScope, CalendarDisplayPreferences, CalendarEvent, CalendarEventInput, CalendarRelatedItemOption, CalendarRelatedItemType, CalendarShare, SharingUser, acceptCalendarShare, cancelCalendarEvent, changeCalendarDisplayPreference, changeCalendarShareColor, createCalendarEventEntity, deleteCalendarEvent, deleteCalendarShare, getCalendarDisplayPreferences, listCalendarEvents, listCalendarRelatedItems, listCalendarShares, listKoreanHolidays, listSharingUsers, reopenCalendarEvent, requestCalendarShare, syncCalendarEventShares, updateCalendarEvent, updateCalendarEventEntity } from "../../data/calendarApi";
 import { getFiscalYearForDate, getMonthCells } from "../../data/calendarDateUtils";
@@ -206,6 +211,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const [accountNames, setAccountNames] = useState<Map<number, string>>(new Map());
   const [saving, setSaving] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(true);
+  const [reloadSequence, setReloadSequence] = useState(0);
+  const [lastCompletedAt, setLastCompletedAt] = useState<Date | null>(null);
   const [error, setError] = useState("");
   const [sharingOpen, setSharingOpen] = useState(false);
   const [calendarShares, setCalendarShares] = useState<CalendarShare[]>([]);
@@ -269,7 +276,6 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
   const isLatestEventMutation = (eventId: number, field: "forcePrivate" | "vacation", sequence: number) => eventMutationSeqRef.current.get(eventMutationKey(eventId, field)) === sequence;
   const titleLoadMoreInFlightRef = useRef(false);
   const mentionLoadMoreInFlightRef = useRef(false);
-  const initialCalendarLoadRef = useRef(true);
   const editorBaselineRef = useRef<{ draft: Draft; shares: CalendarEvent["shares"] } | null>(null);
   const lastTouchTapRef = useRef<{ date: string; at: number } | null>(null);
   const lastTouchOpenAtRef = useRef<number | null>(null);
@@ -303,9 +309,7 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
 
   useEffect(() => {
     let active = true;
-    const isInitialLoad = initialCalendarLoadRef.current;
-    const finishBusy = () => undefined;
-    if (isInitialLoad) setCalendarLoading(true);
+    setCalendarLoading(true);
     const fiscalYear = getFiscalYearForDate(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`);
     const fromDate = cells[0]?.date ?? `${cursor.getFullYear()}-01-01`;
     const toDate = cells[cells.length - 1]?.date ?? `${cursor.getFullYear()}-12-31`;
@@ -326,16 +330,15 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
       setWeeklyActivities(activities.items);
       setSharingUsers(users);
       setError("");
+      setLastCompletedAt(new Date());
     }).catch((reason) => active && setError(reason instanceof Error ? reason.message : "Calendar could not be loaded."))
       .finally(() => {
-        finishBusy();
-        if (active && isInitialLoad) {
+        if (active) {
           setCalendarLoading(false);
-          initialCalendarLoadRef.current = false;
         }
       });
     return () => { active = false; };
-  }, [cursor.getFullYear(), cursor.getMonth()]);
+  }, [cursor.getFullYear(), cursor.getMonth(), reloadSequence]);
 
   useEffect(() => {
     const trigger = draft ? extractTitleSearchTrigger(draft.title) : null;
@@ -1257,11 +1260,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         : event.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0];
   const eventDisplayTitle = (event: CalendarEvent) => event.title;
 
-  return <section class="calendar-page" aria-labelledby="calendar-heading">
-    <section class="calendar-page-card">
-    {breadcrumb && <div class="calendar-breadcrumb">{breadcrumb}</div>}
-    <header class="page-section-header calendar-toolbar">
-      <div><h2 id="calendar-heading">Calendar</h2></div>
+  return <PageShell ariaLabelledBy="calendar-heading" title="Calendar" breadcrumb={breadcrumb}
+    headingSpacing="compact" activityPosition="custom" className="activities-standard-page activities-calendar-page"
+    actions={canWrite && <oj-button class="oj-button-sm" chroming="outlined" disabled={saving} onojAction={() => void openSharing()}>Manage sharing</oj-button>}
+    titleControls={
       <div class="calendar-toolbar__month" aria-label="Calendar navigation">
         <button type="button" onClick={() => shiftYear(-1)} aria-label="Previous year">«</button>
         <button type="button" onClick={() => shift(-1)} aria-label="Previous month">‹</button>
@@ -1269,8 +1271,10 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         <button type="button" onClick={() => shift(1)} aria-label="Next month">›</button>
         <button type="button" onClick={() => shiftYear(1)} aria-label="Next year">»</button>
         <button type="button" onClick={() => { const now = new Date(); setCursor(new Date(now.getFullYear(), now.getMonth(), 1)); }}>Today</button>
-        {canWrite && <button type="button" disabled={saving} onClick={() => void openSharing()}>Manage sharing</button>}
-      </div>
+      </div>}
+    messages={<AppMessageBanner messages={error ? [{ id: "calendar-error", severity: "error", summary: error }] : []} onClose={() => setError("")} />}>
+    <ConsumptionViewportProgress busy={calendarLoading || saving} busyLabel={saving ? "Saving calendar" : "Loading calendar"} />
+    <div class="activities-calendar-toolbar">
       <div class="calendar-legend" aria-label="Calendar legend">
         <span><button id="calendar-color-own" type="button" class="calendar-legend__swatch" aria-haspopup="dialog" aria-expanded={colorTarget === "OWN"} aria-label="Change My Events color" style={{ backgroundColor: colorTarget === "OWN" && draftColor ? draftColor : displayPreferences.ownColor }} onClick={() => openColorPicker("OWN")} />My Events</span>
         {calendarShares.filter((share) => share.direction === "OUTGOING" && share.status === "ACCEPTED").map((share) => { const safeKey = share.userKey.replace(/[^a-zA-Z0-9_-]/g, "-"); const target = `SHARED:${share.userKey}` as const; return <span key={share.userKey}><button id={`calendar-color-shared-${safeKey}`} type="button" class="calendar-legend__swatch" aria-haspopup="dialog" aria-expanded={colorTarget === target} aria-label={`${sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "Shared user"} color change`} style={{ backgroundColor: colorTarget === target && draftColor ? draftColor : share.ownerBadgeColor ?? CALENDAR_SHARE_COLORS[0] }} onClick={() => openColorPicker(target)} />{sharingUsers.find((user) => user.userKey === share.userKey)?.displayName ?? "Shared user"}</span>; })}
@@ -1278,10 +1282,8 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         <span><button id="calendar-color-cancelled" type="button" class="calendar-legend__swatch" aria-haspopup="dialog" aria-expanded={colorTarget === "CANCELLED"} aria-label="Change Cancelled color" style={{ backgroundColor: colorTarget === "CANCELLED" && draftColor ? draftColor : displayPreferences.cancelledColor }} onClick={() => openColorPicker("CANCELLED")} />Cancelled</span>
         {colorTarget && <oj-c-popup opened={true} launcher={colorTarget.startsWith("SHARED:") ? `#calendar-color-shared-${colorTarget.slice(7).replace(/[^a-zA-Z0-9_-]/g, "-")}` : `#calendar-color-${colorTarget.toLowerCase()}`} anchor={colorTarget.startsWith("SHARED:") ? `#calendar-color-shared-${colorTarget.slice(7).replace(/[^a-zA-Z0-9_-]/g, "-")}` : `#calendar-color-${colorTarget.toLowerCase()}`} placement="bottom-start" autoDismiss="focusLoss" initialFocus="none" onojClose={() => { setColorTarget(null); setDraftColor(""); }}><div class="calendar-legend__palette calendar-legend__palette--jet-content" role="group" aria-label="Event display color selection">{CALENDAR_SHARE_COLORS.map((color) => <button type="button" aria-label={`Color ${color}`} aria-pressed={draftColor === color} style={{ backgroundColor: color }} onClick={() => setDraftColor(color)} />)}<label>Custom<input aria-label="Custom color" type="color" value={draftColor || persistedColor(colorTarget)} onInput={(event) => setDraftColor(event.currentTarget.value)} /></label><div class="calendar-legend__palette-actions"><button type="button" onClick={() => { setColorTarget(null); setDraftColor(""); }}>Cancel</button><button type="button" disabled={saving} onClick={() => void applyDraftColor()}>Apply</button></div></div></oj-c-popup>}
       </div>
-    </header>
-    {!canWrite && <div class="app-message">Read-only access. Write permission is required.</div>}
-    {error && !draft && !sharingOpen && <div class="app-message app-message--error" role="alert">{error}</div>}
-    {calendarLoading && <div class="calendar-local-loading" role="status">Loading calendar…</div>}
+      <PageActivity lastCompletedAt={lastCompletedAt} busy={calendarLoading || saving} busyLabel="Loading calendar" onRefresh={() => setReloadSequence((value) => value + 1)} refreshDisabled={calendarLoading || saving} compactTimestampButton />
+    </div>
     <section class="calendar-surface" aria-label="Monthly calendar">
     <div class="calendar-grid" role="grid" aria-label={monthTitle(cursor)}>
       {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day, index) => <div class={`calendar-grid__weekday${index === 0 ? " is-sunday" : index === 6 ? " is-saturday" : ""}`} role="columnheader">{day}</div>)}
@@ -1381,10 +1383,9 @@ export function CalendarPage({ fiscalYear, canWrite, breadcrumb }: Props) {
         {mentionSearchError ? <span class="calendar-inline-search__error" role="alert">{mentionSearchError}</span> : mentionSearchLoading ? <span class="account-search-empty" role="status">Searching…</span> : (mentionEditing.kind === "related" ? mentionRelatedOptions : mentionUserOptions).length === 0 ? <span class="account-search-empty">No results</span> : null}
       </div>
     </div>}
-    </section>
     {viewingActivity && <oj-c-dialog opened={true} modality="modal" cancelBehavior="icon" dialogTitle="Weekly Activities"
       width="92vw" maxWidth="34rem" maxHeight="90vh" onojClose={() => setViewingActivity(null)}>
       <div slot="body" class="calendar-weekly-popup calendar-weekly-popup__jet-body calendar-weekly-popup--vertical"><div class="calendar-weekly-popup__box"><strong>This Week</strong><div class="calendar-weekly-popup__text" dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(viewingActivity.thisWeekHtml || viewingActivity.thisWeekText || "No content") }} /></div><div class="calendar-weekly-popup__arrow" aria-hidden="true">↓</div><div class="calendar-weekly-popup__box"><strong>Next Week</strong><div class="calendar-weekly-popup__text" dangerouslySetInnerHTML={{ __html: sanitizeWeeklyActivityHtml(viewingActivity.nextWeekHtml || viewingActivity.nextWeekText || "No content") }} /></div></div>
     </oj-c-dialog>}
-  </section>;
+  </PageShell>;
 }

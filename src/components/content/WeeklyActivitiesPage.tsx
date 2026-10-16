@@ -12,6 +12,8 @@ import {
 import { FiscalYear } from "../../data/kpiMockData";
 import { SharedWeeklyActivityEditor } from "./SharedWeeklyActivityEditor";
 import { AppMessageBanner } from "./AppMessageBanner";
+import { DataControlBar, PageActivity, PageShell } from "../common/PageShell";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 import { getWeeklyActivityFiscalYearRange } from "./weeklyActivityFiscalYear";
 import {
   hasWeeklyActivityFormattingParity,
@@ -31,6 +33,7 @@ import {
   weeklyActivityMatchesQuery
 } from "./weeklyActivitiesPageState";
 import "ojs/ojbutton";
+import { apiFetchQuiet } from "../../auth/apiFetch";
 import "ojs/ojdatetimepicker";
 import "ojs/ojdialog";
 import "ojs/ojinputtext";
@@ -87,7 +90,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
   const [editError, setEditError] = useState("");
   const [rowError, setRowError] = useState<{ activityId: number; message: string } | null>(null);
   const [mutationWarning, setMutationWarning] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [lastCompletedAt, setLastCompletedAt] = useState<Date | null>(null);
   const [staleDeleteIds, setStaleDeleteIds] = useState<Set<number>>(() => new Set());
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -128,12 +131,13 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       setTotalElements(0);
     }
     try {
-      const page = await fetchWeeklyActivities(nextQuery);
+      const page = await fetchWeeklyActivities(nextQuery, apiFetchQuiet);
       if (!requestGuardRef.current.isLatest(requestId)) return;
       if (!append) setExpanded(new Set());
       setItems((current) => append ? [...current, ...page.items] : page.items);
       setTotalElements(page.totalElements);
       setQuery(nextQuery);
+      setLastCompletedAt(new Date());
       if (!append) {
         setMutationWarning("");
         setStaleDeleteIds(new Set());
@@ -263,6 +267,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
   const applyAuthoritativePage = (page: Awaited<ReturnType<typeof fetchWeeklyActivityLoadedWindow>>) => {
     setItems(page.items);
     setTotalElements(page.totalElements);
+    setLastCompletedAt(new Date());
   };
 
   const save = async () => {
@@ -328,7 +333,6 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       if (session.mode === "edit" && !savedMatchesQuery) setTotalElements((current) => Math.max(0, current - 1));
       setEditSession(null);
       focusEditOrAdd(savedMatchesQuery ? saved.activityId : null);
-      setSuccessMessage("Weekly Activity saved.");
 
       const requestId = requestGuardRef.current.begin();
       try {
@@ -380,7 +384,6 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       );
 
       if (outcome.status === "deleted") {
-        setSuccessMessage("Weekly Activity deleted.");
         if (outcome.page) applyAuthoritativePage(outcome.page);
         if (outcome.refreshError) {
           setMutationWarning("The activity was deleted, but the latest list could not be refreshed. Do not retry the delete; reload the list to confirm current data.");
@@ -442,7 +445,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
         registerFlush={(flush) => { editorFlushRef.current = flush; }}
         onDraftsChange={(drafts) => setEditSession((current) => current ? { ...current, drafts } : current)}
       />
-      {editError && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{editError}</div>}
+
       <div class="weekly-activity-inline-editor__actions">
         <oj-button chroming="outlined" disabled={saving} onojAction={cancelEdit}>Cancel</oj-button>
         <oj-button chroming="callToAction" disabled={!canWrite || saving} title={!canWrite ? "Write permission is required." : undefined}
@@ -458,20 +461,15 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
   };
 
   return (
-    <section id="weeklyActivitiesPage" class="weekly-activities-page" aria-labelledby="weeklyActivitiesTitle">
-      <header class="weekly-activities-page__header">
-        <div>
-          {breadcrumb}
-          <span class="kpi-eyebrow">Activity planning</span>
-          <h2 id="weeklyActivitiesTitle">Weekly Activities</h2>
-
-        </div>
-        <oj-button ref={(element: EventTarget | null) => { addTriggerRef.current = element as HTMLElement | null; }} id="weeklyActivityAddButton" chroming="callToAction"
+    <PageShell className="activities-standard-page weekly-activities-page" ariaLabelledBy="weeklyActivitiesTitle"
+      rootAttributes={{ id: "weeklyActivitiesPage" }} breadcrumb={breadcrumb} title="Weekly Activities" headingSpacing="compact"
+      busy={controlsBusy} busyLabel="Updating Weekly Activities" activityPosition="custom"
+      actions={<oj-button class="oj-button-sm" ref={(element: EventTarget | null) => { addTriggerRef.current = element as HTMLElement | null; }} id="weeklyActivityAddButton" chroming="callToAction"
           disabled={!canWrite || Boolean(editSession) || controlsBusy} title={!canWrite ? "Write permission is required." : undefined} onojAction={startAdd}>
           <span slot="startIcon" class="oj-ux-ico-plus" aria-hidden="true"></span>
           Add Activity
-        </oj-button>
-      </header>
+        </oj-button>}>
+      <ConsumptionViewportProgress busy={controlsBusy} busyLabel="Updating Weekly Activities" />
 
       <section class="weekly-activity-filters" aria-label="Weekly Activities filters">
         <oj-input-date id="weeklyActivityFromDate" labelHint="From Date" labelEdge="inside" value={filters.fromDate} disabled={Boolean(editSession) || controlsBusy} onvalueChanged={(event: CustomEvent) => setFilters((current) => ({ ...current, fromDate: `${event.detail.value ?? ""}` }))}></oj-input-date>
@@ -484,16 +482,18 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
       </section>
       <AppMessageBanner
         messages={[
+          ...(editError ? [{ id: "weekly-edit-error", severity: "error" as const, summary: editError }] : []),
+          ...(rowError ? [{ id: "weekly-row-error", severity: "error" as const, summary: rowError.message }] : []),
           ...(filterError ? [{ id: "weekly-filter-error", severity: "error" as const, summary: filterError, persistence: "sticky" as const }] : []),
           ...(error ? [{ id: "weekly-load-error", severity: "error" as const, summary: error, persistence: "sticky" as const }] : []),
           ...(mutationWarning ? [{ id: "weekly-mutation-warning", severity: "warning" as const, summary: mutationWarning, persistence: "sticky" as const }] : []),
-          ...(successMessage ? [{ id: "weekly-success", severity: "confirmation" as const, summary: successMessage, persistence: "auto" as const }] : []),
         ]}
         onClose={(id) => {
-          if (id === "weekly-filter-error") setFilterError("");
+          if (id === "weekly-edit-error") setEditError("");
+          else if (id === "weekly-row-error") setRowError(null);
+          else if (id === "weekly-filter-error") setFilterError("");
           else if (id === "weekly-load-error") setError("");
           else if (id === "weekly-mutation-warning") setMutationWarning("");
-          else setSuccessMessage("");
         }}
       />
       {mutationWarning && (
@@ -501,6 +501,12 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
           <oj-button ref={(element: EventTarget | null) => { reloadTriggerRef.current = element as HTMLElement | null; }} chroming="outlined" disabled={controlsBusy || Boolean(editSession)} onojAction={() => void load(query, false, false)}>Reload list</oj-button>
         </div>
       )}
+
+      <DataControlBar className="weekly-activity-reload" ariaLabel="Weekly Activities data controls">
+        <PageActivity busy={controlsBusy} busyLabel="Updating Weekly Activities" lastCompletedAt={lastCompletedAt}
+          refreshDisabled={controlsBusy || Boolean(editSession)} compactTimestampButton
+          onRefresh={() => { if (!controlsBusy && !editSession) return load(query, false, false); }} />
+      </DataControlBar>
 
       {editSession?.mode === "add" && (
         <article class="weekly-activity-card weekly-activity-card--editing">
@@ -549,7 +555,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
                   isEditing && editSession ? (
                     <div class="weekly-activity-card__inline-edit" aria-label={`Edit ${formatWeekDate(record.weekOfDate)}`}>
                       <SharedWeeklyActivityEditor key={editSession.key} drafts={editSession.drafts} disabled={saving} initialTarget={editSession.initialTarget} registerFlush={(flush) => { editorFlushRef.current = flush; }} onDraftsChange={(drafts) => setEditSession((current) => current ? { ...current, drafts } : current)} />
-                      {editError && <div class="weekly-activity-message weekly-activity-message--error" role="alert">{editError}</div>}
+
                     </div>
                   ) : (
                     <div class="weekly-activity-card__sections">
@@ -565,7 +571,7 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
                     </div>
                   )
                 )}
-                {rowError?.activityId === record.activityId && <div class="weekly-activity-message weekly-activity-message--error weekly-activity-message--row" role="alert">{rowError.message}</div>}
+
               </article>
             );
           })}
@@ -587,6 +593,6 @@ export function WeeklyActivitiesPage({ fiscalYear, canWrite, onDirtyStateChange,
           </div>
         </div>
       </oj-dialog>
-    </section>
+    </PageShell>
   );
 }

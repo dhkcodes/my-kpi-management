@@ -1,0 +1,64 @@
+/* My Activities only: reuse Consumption Analysis's PageShell contract. */
+.kap-page-shell.activities-standard-page {
+  display: block;
+  padding: 0;
+  border-radius: var(--oj-core-border-radius-md, .2rem);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+.activities-standard-page .kap-page-shell__inner { gap: .375rem; }
+.activities-standard-page .kap-page-shell__actions oj-button { font-size: .74rem; min-height: 2.25rem; }
+.activities-standard-page .kap-page-shell__actions oj-button [slot="startIcon"] { font-size: .9rem; }
+.activities-standard-page .kap-page-shell__body { display: flex; flex-direction: column; gap: .375rem; }
+.activities-standard-page .kap-page-shell__heading-copy h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.2;
+  margin: .2rem 0;
+  inset-inline-start: .5rem;
+  position: relative;
+}
+.activities-standard-page .consumption-page-progress-controls {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 48;
+}
+.activities-standard-page .consumption-page-progress-controls .kap-page-data-progress {
+  left: var(--consumption-viewport-center-x, 50%);
+  top: var(--consumption-viewport-center-y, 50%);
+}
+.activities-standard-page .consumption-page-progress-controls[data-visible="false"] { display: none; }
+.activities-standard-page .consumption-page-progress-controls[data-visible="true"] { display: block; }
+.activities-calendar-page .kap-page-shell__heading { position: relative; align-items: center; }
+.activities-calendar-page .kap-page-shell__title-controls {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.activities-calendar-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: .5rem; }
+.activities-calendar-page .calendar-toolbar__month { font-size: .74rem; }
+.activities-calendar-page .kap-page-shell__actions { justify-content: flex-end; }
+.activities-calendar-toolbar .calendar-legend { margin: 0; padding: 0; justify-content: flex-start; }
+.activities-calendar-toolbar .kap-page-activity { margin-left: auto; min-height: 2.25rem; }
+.activities-calendar-page .calendar-surface {
+  padding: 0;
+  border-radius: .375rem;
+  box-shadow: none;
+  overflow-x: auto;
+}
+.activities-standard-page .weekly-activity-filters { margin: 0; }
+.activities-standard-page .weekly-activity-reload { display: flex; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .activities-standard-page .kap-page-shell__actions oj-button { min-height: 2.75rem; }
+  .activities-calendar-page .kap-page-shell__title-controls {
+    position: static;
+    transform: none;
+    width: 100%;
+    justify-content: center;
+    order: 2;
+  }
+  .activities-calendar-page .kap-page-shell__title-row { flex-wrap: wrap; }
+  .activities-calendar-page .calendar-toolbar__month { flex-wrap: wrap; justify-content: center; gap: .25rem; }
+  .activities-calendar-toolbar .calendar-legend { flex-wrap: wrap; gap: .35rem .6rem; }
+}

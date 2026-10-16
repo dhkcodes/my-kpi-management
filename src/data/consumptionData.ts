@@ -436,6 +436,16 @@ export const sortConsumptionMonths = (months: readonly string[]) =>
 export const sortConsumptionMonthsNewestFirst = (months: readonly string[]) =>
   [...months].sort((left, right) => fiscalMonthOrder(right) - fiscalMonthOrder(left));
 
+/** Classification is about facts and chronology, never write permissions. */
+export const resolveConsumptionMonthDisplay = (
+  month: string, currentMonth: string, hasActual: boolean, hasForecast: boolean, mtd = false
+): "ACTUAL" | "FORECAST" | "MTD" => {
+  if (mtd) return "MTD";
+  if (hasActual) return "ACTUAL";
+  if (hasForecast || (currentMonth !== "" && fiscalMonthOrder(month) >= fiscalMonthOrder(currentMonth))) return "FORECAST";
+  return "ACTUAL";
+};
+
 export const initialConsumptionRecordsBatchSize = (viewportHeight: number): number =>
   Math.min(100, Math.max(10, Math.ceil((Math.max(0, viewportHeight) - 360) / 44)));
 
@@ -500,10 +510,8 @@ type ConsumptionAccountForecastResolution = Readonly<{
   amountExact: string | null;
 }>;
 
-/**
- * Apply Account Forecast controls only to editable Forecast periods.
- * Closed-period Actuals are authoritative, including explicit zero; a missing
- * Actual remains missing and is never manufactured from a Forecast control.
+/** Apply stored Forecast controls independently from write permissions.
+ * FINAL Actuals are authoritative, including explicit zero.
  */
 export const applyConsumptionAccountForecastResolutions = <T extends ConsumptionDisplaySeries>(
   series: T,
@@ -511,8 +519,8 @@ export const applyConsumptionAccountForecastResolutions = <T extends Consumption
 ): T => {
   const forecasts = { ...series.forecasts };
   const forecastsExact = { ...(series.forecastsExact ?? {}) };
-  resolutions.forEach(({ period, editable, amount, amountExact }) => {
-    if (!editable || amount === null || amountExact === null) {
+  resolutions.forEach(({ period, amount, amountExact }) => {
+    if (Object.prototype.hasOwnProperty.call(series.actuals, period) || amount === null || amountExact === null) {
       delete forecasts[period];
       delete forecastsExact[period];
       return;
@@ -600,6 +608,9 @@ const fiscalQuarterOrder = (quarter: string): number => {
   const match = /^FY(\d{2})-Q([1-4])$/.exec(quarter);
   return match ? Number(match[1]) * 4 + Number(match[2]) - 1 : Number.MAX_SAFE_INTEGER;
 };
+
+export const sortConsumptionQuartersNewestFirst = (quarters: readonly string[]): string[] =>
+  [...quarters].sort((left, right) => fiscalQuarterOrder(right) - fiscalQuarterOrder(left));
 
 export const expandConsumptionQuarterOptions = (quarters: readonly string[]): string[] => {
   const fiscalYears = [...new Set(quarters.flatMap((quarter) => {

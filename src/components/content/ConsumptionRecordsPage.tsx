@@ -28,9 +28,11 @@ import {
   isConsumptionQuarterRangeValid,
   parseConsumptionCsv,
   resolveConsumptionControlTotal,
+  resolveConsumptionMonthDisplay,
   resolveConsumptionRecordsViewState,
   sortConsumptionMonths,
-  sortConsumptionMonthsNewestFirst
+  sortConsumptionMonthsNewestFirst,
+  sortConsumptionQuartersNewestFirst
 } from "../../data/consumptionData";
 import { consumptionSyntheticCsv } from "../../data/consumptionMockData";
 import { ForecastCompositionDraft, forecastAmountExactToKInput, parseForecastCompositionK } from "../../data/forecastComposition";
@@ -662,7 +664,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     setFromQuarter(workspace.fromQuarter);
     setToQuarter(workspace.toQuarter);
     setEditablePeriodIds(new Set(workspace.editablePeriodIds));
-    setDisplayQuarterOrder([...workspace.displayQuarterOrder]);
+    setDisplayQuarterOrder(sortConsumptionQuartersNewestFirst(workspace.displayQuarterOrder));
     setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...workspace.displayQuarterOrder, workspace.fromQuarter, workspace.toQuarter].filter(Boolean)));
     setCurrentFiscalMonth(workspace.currentFiscalMonth);
     setRangeInitialized(true);
@@ -826,7 +828,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         setRangeTouched(false);
       }
       setEditablePeriodIds(new Set(page.editablePeriodIds));
-      setDisplayQuarterOrder([...page.displayQuarterOrder]);
+      setDisplayQuarterOrder(sortConsumptionQuartersNewestFirst(page.displayQuarterOrder));
       setAvailableQuarterOptions((current) => expandConsumptionQuarterOptions([...current, ...page.displayQuarterOrder, page.fromQuarter, page.toQuarter].filter(Boolean)));
       setCurrentFiscalMonth(page.currentFiscalMonth);
       setRecordsTotalAccounts(page.totalAccounts);
@@ -906,7 +908,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
         setFromQuarter(fallbackFrom);
         setToQuarter(fallbackTo);
         setEditablePeriodIds(new Set(fallbackEditablePeriods));
-        setDisplayQuarterOrder(fallbackDisplayQuarterOrder);
+        setDisplayQuarterOrder(sortConsumptionQuartersNewestFirst(fallbackDisplayQuarterOrder));
         setAvailableQuarterOptions(expandConsumptionQuarterOptions([...fallbackDisplayQuarterOrder, ...fallbackActualQuarters, ...fallbackForecastQuarters]));
         setCurrentFiscalMonth(initialSeed.latestActualMonth);
         setRecordsTotalAccounts(aggregateConsumptionAccounts(fallbackPlans).length);
@@ -1740,6 +1742,15 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
 
   const closeImportDialog = () => importDialogRef.current?.close();
 
+  const monthHeaderStatus = (month: string) => resolveConsumptionMonthDisplay(month, currentFiscalMonth,
+    Object.prototype.hasOwnProperty.call(serverActualTotals ?? {}, month)
+      || draftPlans.some((plan) => Object.prototype.hasOwnProperty.call(plan.actuals, month)),
+    accountForecasts.some((forecast) => forecast.periodKey === month)
+      || draftPlans.some((plan) => Object.prototype.hasOwnProperty.call(plan.forecasts, month)),
+    showMtd && month === currentMtdPeriod);
+  const isForecastQuarter = (quarter: string) => getQuarterMonths(quarter)
+    .some((month) => monthHeaderStatus(month) === "FORECAST");
+
   const renderQuarterCells = (series: ConsumptionPlan | ReturnType<typeof aggregateConsumptionAccounts>[number], accountLevel: boolean) => {
     const accountResolutions = accountLevel && "plans" in series ? Object.fromEntries(allMonths.map((month) => {
       const manualExact = controlValueExact(draftControlTotals, series.customer, month);
@@ -1765,25 +1776,20 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
       && Object.prototype.hasOwnProperty.call(currentMtdExact, currentMtdPeriod);
     const displaySeries = applyConsumptionMtdDisplayOverride(
       baseDisplaySeries, currentMtdPeriod, currentMtdExact, showMtd);
-    return buildDisplayQuarterSummaries({
-      ...displaySeries,
-      actuals: Object.fromEntries(Object.entries(displaySeries.actuals).filter(([month]) =>
-        !editablePeriodIds.has(month) || !Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month)))
-    }, displayQuarterOrder).flatMap((summary) => {
+    return buildDisplayQuarterSummaries(displaySeries, displayQuarterOrder).flatMap((summary) => {
       const quarter = summary.quarter;
-      const forecastQuarter = summary.months.some((month) => editablePeriodIds.has(month));
+      const forecastQuarter = summary.months.some((month) => resolveConsumptionMonthDisplay(month, currentFiscalMonth,
+        Object.prototype.hasOwnProperty.call(displaySeries.actuals, month),
+        Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month)) === "FORECAST");
       return [
         ...sortConsumptionMonthsNewestFirst(summary.months).map((month) => {
           const actual = Object.prototype.hasOwnProperty.call(displaySeries.actuals, month);
           const forecast = Object.prototype.hasOwnProperty.call(displaySeries.forecasts, month);
           const mtd = isConsumptionMtdDisplayPeriod(showMtd, currentMtdPeriod, currentMtdExact, month);
-          const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month) && !mtd;
-          const value = editable
-            ? displaySeries.forecasts[month] ?? displaySeries.actuals[month] ?? null
-            : actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
-          const valueExact = editable
-            ? displaySeries.forecastsExact?.[month] ?? displaySeries.actualsExact?.[month] ?? null
-            : actual ? displaySeries.actualsExact?.[month] ?? null : forecast ? displaySeries.forecastsExact?.[month] ?? null : null;
+          const status = resolveConsumptionMonthDisplay(month, currentFiscalMonth, actual, forecast, mtd);
+          const editable = selectedPillar !== "ALL" && editablePeriodIds.has(month) && status === "FORECAST";
+          const value = actual ? displaySeries.actuals[month] : forecast ? displaySeries.forecasts[month] : null;
+          const valueExact = actual ? displaySeries.actualsExact?.[month] ?? null : forecast ? displaySeries.forecastsExact?.[month] ?? null : null;
           const key = `${series.id}-${month}`;
           if (accountLevel && "plans" in series) {
             const resolution = accountResolutions[month];
@@ -1814,7 +1820,7 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             </td>;
             return <td key={key} data-control-cell={`${series.customer}:${month}`}
               data-control-source={resolution?.source}
-              class={`consumption-value-cell${editable ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
+              class={`consumption-value-cell${status === "FORECAST" ? " consumption-forecast-cell" : ""}${dirty ? " is-draft" : ""}`}
               onDblClick={(event) => canEditControl && beginControlEdit(event.currentTarget, series.customer, month, valueExact)}
               onPointerDown={(event) => canEditControl && doubleActivationRef.current.onPointerDown(event, key)}
               onPointerMove={(event) => canEditControl && doubleActivationRef.current.onPointerMove(event)}
@@ -2245,18 +2251,18 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
               <tr>
                 <th class="consumption-account-column" rowSpan={2}>Account / End User</th>
                 {quarters.map((quarter) => {
-                  const forecastQuarter = getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month));
+                  const forecastQuarter = isForecastQuarter(quarter);
                   return <th key={quarter} colSpan={5} class={`consumption-quarter-heading${forecastQuarter ? " is-forecast" : ""}`}><span class="consumption-quarter-label">{quarter}</span></th>;
                 })}
               </tr>
               <tr>
                 {displayQuarterOrder.flatMap((quarter) => [
                   ...sortConsumptionMonthsNewestFirst(getQuarterMonths(quarter)).map((month) => {
-                    const status = showMtd && month === currentMtdPeriod ? "MTD" : editablePeriodIds.has(month) ? "FORECAST" : "ACTUAL";
+                    const status = monthHeaderStatus(month);
                     return <th key={`${quarter}-${month}`} class={`consumption-month-heading is-${status.toLowerCase()}`}><span class="consumption-month-label">{shortMonth(month)}</span><small class={`consumption-month-status consumption-data-kind is-${status.toLowerCase()}`}>{status}</small></th>;
                   }),
-                  <th key={`${quarter}-total`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-quarter-total is-forecast" : "consumption-quarter-total"}>Quarter Total</th>,
-                  <th key={`${quarter}-gap`} class={getQuarterMonths(quarter).some((month) => editablePeriodIds.has(month)) ? "consumption-preq-gap is-forecast" : "consumption-preq-gap"}>PreQ Gap</th>
+                  <th key={`${quarter}-total`} class={isForecastQuarter(quarter) ? "consumption-quarter-total is-forecast" : "consumption-quarter-total"}>Quarter Total</th>,
+                  <th key={`${quarter}-gap`} class={isForecastQuarter(quarter) ? "consumption-preq-gap is-forecast" : "consumption-preq-gap"}>PreQ Gap</th>
                 ])}
               </tr>
             </thead>

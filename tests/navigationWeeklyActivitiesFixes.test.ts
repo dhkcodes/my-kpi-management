@@ -107,12 +107,16 @@ assert.match(appSource, /const closeNavigation = \(\) => \{\s*navigationIntentOp
 assert.match(appSource, /if \(popup\.isOpen\(\)\) \{\s*navigationIntentOpenRef\.current = false;\s*setNavigationOpen\(false\);\s*popup\.close\(\);\s*\} else \{\s*navigationIntentOpenRef\.current = true;\s*setNavigationOpen\(true\);\s*popup\.open\(launcher\);\s*\}/s, "the launcher icon updates optimistically before the popup animation completes");
 assert.match(appSource, /appName = "Know the pulse, Act on it\. Perform\."/, "the authenticated header uses the approved product title");
 assert.match(appSource, /onojOpen=\{\(\) => setNavigationOpen\(navigationIntentOpenRef\.current\)\}/, "a queued close intent cannot be overwritten by a stale popup-open event");
-assert.match(headerSource, /class="kpi-header__brand" aria-label="Know the pulse, Act on it\. Perform\."/, "the header brand exposes the approved product name");
+assert.match(headerSource, /<a class="kpi-header__brand"[^>]*href="\/"[^>]*aria-label="Home — Know the pulse, Act on it\. Perform\."/,
+  "the home link exposes both its destination and the approved product name");
+assert.match(headerSource, /<img class="kap-header-wordmark"[^>]*alt="Know the pulse, Act on it\. Perform\."/,
+  "the selected KAP wordmark retains the approved accessible product name");
 assert.match(indexSource, /<title>Know the pulse, Act on it\. Perform\.<\/title>/, "the HTML document title uses the approved product name");
 assert.match(cssSource, /\.ql-picker-label svg\s*\{[\s\S]*margin-top:\s*0[\s\S]*position:\s*static[\s\S]*top:\s*auto/, "the Quill absolute-position margin is fully reset for flex centering");
 assert.match(appSource, /anchor\.closest\("#kpiNavigationPopup"\)/, "the document capture guard does not compete with popup leaf navigation");
 assert.match(appSource, /const handleNavigate = \(navigationId: string, onAccepted\?: \(\) => void\)/, "popup close can be deferred until navigation is accepted");
-assert.match(appSource, /if \(!destinationChanged\) \{\s*onAccepted\?\.\(\);\s*return;\s*\}/s, "reselecting the active leaf still closes the popup");
+assert.match(appSource, /if \(!destinationChanged\) \{\s*resetFiscalYearForRoute\(\);\s*onAccepted\?\.\(\);\s*return;\s*\}/s,
+  "reselecting the active leaf preserves its route-specific FY reset and still closes the popup");
 assert.match(appSource, /handleNavigate\(navigationId, closeNavigation\)/, "popup navigation closes only after the existing guard accepts navigation");
 assert.doesNotMatch(appSource, /handleNavigate\(navigationId\);\s*closeNavigation\(\)/s, "popup must remain open when the existing navigation guard rejects navigation");
 assert.doesNotMatch(appSource, /<oj-navigation-list|ArrayTreeDataProvider|drillMode="sliding"/, "the retired sliding rail is not mounted alongside the popup");
