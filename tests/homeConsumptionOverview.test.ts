@@ -84,6 +84,39 @@ const mtdAnalysis = {
     forecastPeriods: ["FY27-SEP"]
   }
 } as ConsumptionAnalysis;
+const futureOverview = buildHomeConsumptionOverview({
+  ...mtdAnalysis,
+  periodCoverage: {
+    ...mtdAnalysis.periodCoverage,
+    forecastPeriods: ["FY27-SEP", "FY27-DEC", "FY27-JAN", "FY27-MAR", "FY27-MAY"],
+    includedPeriods: [...mtdAnalysis.periodCoverage.includedPeriods, "FY27-DEC", "FY27-JAN", "FY27-MAR", "FY27-MAY"]
+  },
+  portfolio: { ...mtdAnalysis.portfolio, totalAmountExact: "26750" },
+  quarters: [
+    ...mtdAnalysis.quarters,
+    { ...mtdAnalysis.quarters[0], quarter: "Q3", actualAmountExact: "0", forecastAmountExact: "7000", totalAmountExact: "7000", status: "FORECAST" },
+    { ...mtdAnalysis.quarters[0], quarter: "Q4", actualAmountExact: "0", forecastAmountExact: "8000", totalAmountExact: "8000", status: "FORECAST" }
+  ]
+} as ConsumptionAnalysis, {
+  ...totals,
+  actualByPeriod: { ...totals.actualByPeriod, "FY27-DEC": "999999" },
+  appliedForecastByPeriod: { ...totals.appliedForecastByPeriod, "FY27-DEC": "3000", "FY27-JAN": "4000", "FY27-MAR": "3500", "FY27-MAY": "4500" },
+  mtdByPeriod: { "FY27-SEP": "1250", "FY27-DEC": "888888" },
+  mtdStatusByPeriod: { "FY27-SEP": "PROVISIONAL", "FY27-DEC": "PROVISIONAL" }
+}, "FY27-SEP");
+assert.deepEqual(futureOverview.months.filter((month) => ["FY27-DEC", "FY27-JAN", "FY27-MAR", "FY27-MAY"].includes(month.periodKey))
+  .map(({ periodKey, kind, amountExact }) => ({ periodKey, kind, amountExact })), [
+  { periodKey: "FY27-DEC", kind: "FORECAST", amountExact: "3000" },
+  { periodKey: "FY27-JAN", kind: "FORECAST", amountExact: "4000" },
+  { periodKey: "FY27-MAR", kind: "FORECAST", amountExact: "3500" },
+  { periodKey: "FY27-MAY", kind: "FORECAST", amountExact: "4500" }
+], "registered Q3/Q4 months stay Forecast even with future Actual/MTD values in Records totals");
+assert.equal(futureOverview.months.filter((month) => month.kind === "MTD").length, 1);
+assert.equal(futureOverview.months.filter((month) => month.periodKey === "FY27-SEP").length, 1, "current MTD appears exactly once");
+assert.equal(futureOverview.expectedAmountExact, "26750", "preserve server aggregation/overlap rather than sum raw Records values");
+assert.equal(futureOverview.actualAmountExact, mtdAnalysis.portfolio.actualAmountExact);
+assert.deepEqual(futureOverview.quarters.map((quarter) => quarter.quarter), ["Q1", "Q3", "Q4"]);
+
 const mtdOverview = buildHomeConsumptionOverview(mtdAnalysis, {
   ...totals,
   mtdByPeriod: { "FY27-SEP": "1250" },

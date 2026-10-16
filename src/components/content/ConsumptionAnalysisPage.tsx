@@ -77,7 +77,7 @@ const actualEntryText = (status: "PROVIDED" | "MISSING", amountExact: string) =>
 const ACTUAL_COLOR = "#315f75";
 const FORECAST_COLOR = "#78abc4";
 const MTD_COLOR = "#b56a3b";
-const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead.";
+const OPEN_FORECAST_TOOLTIP = "Open Forecast selection excludes FINAL periods. Forecast for an included MTD period remains shown. Total removes overlapping Forecast once and uses MTD instead. Registered future-quarter Forecast months are included.";
 
 const ACTUAL_TO_DATE_TOOLTIP = "Actual to date follows the closed-period actual total. Include MTD adds the current-period MTD once.";
 const FY_FORECAST_TOOLTIP = "FY Forecast is the stored Forecast for the selected fiscal year, including months that are now closed by FINAL Actual. Include MTD does not change this amount.";

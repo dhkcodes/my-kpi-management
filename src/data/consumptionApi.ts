@@ -1474,11 +1474,33 @@ export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): P
   return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.csv" };
 };
 
-export const exportConsumptionForecastXlsx = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
-  if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
+export type ConsumptionForecastExportQuery = Readonly<{
+  pillar: ConsumptionPillar;
+  fiscalYear?: string;
+  fromQuarter?: string;
+  toQuarter?: string;
+  salesRep?: string;
+  search?: string;
+}>;
+
+// Export the server's complete import-compatible workbook, not the currently loaded Records page.
+export const exportConsumptionForecastXlsx = async (
+  input: ConsumptionForecastExportQuery | ConsumptionPillar
+): Promise<ConsumptionCsvExport> => {
+  const query: ConsumptionForecastExportQuery = typeof input === "string" ? { pillar: input } : input;
+  if (!isConsumptionPillar(query.pillar)
+    || (query.fiscalYear !== undefined && query.fiscalYear !== "" && !/^FY\d{2}$/.test(query.fiscalYear))
+    || [query.fromQuarter, query.toQuarter].some((quarter) => quarter !== undefined && quarter !== "" && !fiscalQuarterPattern.test(quarter))
+    || (query.fromQuarter && query.toQuarter && query.fromQuarter > query.toQuarter)) {
+    throw new Error("Invalid Consumption forecast export query");
+  }
+  const parameters = new URLSearchParams({ pillar: query.pillar });
+  for (const key of ["fiscalYear", "fromQuarter", "toQuarter", "salesRep", "search"] as const) {
+    if (query[key] !== undefined) parameters.set(key, query[key]);
+  }
   let response: Response;
   try {
-    response = await apiFetch(`${apiBase()}/consumption/exports/forecast-xlsx?pillar=${pillar}`, { method: "GET" });
+    response = await apiFetch(`${apiBase()}/consumption/exports/forecast-xlsx?${parameters}`, { method: "GET" });
   } catch (cause) {
     throw new ConsumptionNetworkError(cause);
   }
@@ -1492,9 +1514,12 @@ export const exportConsumptionForecastXlsx = async (pillar: ConsumptionPillar): 
   const blob = await response.blob();
   if (!contentType.toLowerCase().startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") || blob.size === 0)
     throw new Error("Malformed Consumption Forecast XLSX export response");
-  const disposition = response.headers.get("Content-Disposition") ?? "";
-  const match = /filename="([^"]+\.xlsx)"/i.exec(disposition);
-  return { blob, fileName: match?.[1] ?? "OCI Consumption Forecast.xlsx" };
+  const years = [query.fromQuarter?.split("-")[0], query.toQuarter?.split("-")[0]]
+    .filter((year): year is string => Boolean(year));
+  const yearSuffix = years.length > 0
+    ? [...new Set(years)].join("-") : query.fiscalYear || "";
+  const fallbackName = `OCI Consumption Forecast${yearSuffix ? ` ${yearSuffix}` : ""}.xlsx`;
+  return { blob, fileName: xlsxAttachmentFileName(response.headers.get("Content-Disposition") ?? "", fallbackName) };
 };
 export function applyConsumptionImport(input: string, pillar?: ConsumptionPillar): Promise<ConsumptionImportResult>;
 export function applyConsumptionImport(input: readonly File[], pillar?: ConsumptionPillar, validatedPreview?: ConsumptionImportPreview, diagnosticId?: string): Promise<ConsumptionMultiImportResult>;

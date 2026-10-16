@@ -32,7 +32,7 @@ const periodRange = (periods: readonly string[]) => {
   if (periods.length === 1) return periods[0];
   return `${periods[0]} – ${periods[periods.length - 1]}`;
 };
-const OPEN_FORECAST_TOOLTIP = "Open Forecast excludes FINAL periods. When MTD Actual is available for an included period, FY Expected removes overlapping Forecast once and uses MTD Actual instead.";
+const OPEN_FORECAST_TOOLTIP = "Open Forecast excludes FINAL periods. When MTD Actual is available for an included period, FY Expected removes overlapping Forecast once and uses MTD Actual instead. Registered future-quarter Forecast months are included.";
 const MTD_TOOLTIP = "MTD Actual is cumulative month-to-date usage and is not final. It remains visible until finalized Actual is uploaded; finalized Actual then takes priority.";
 type HomeTooltipPosition = Readonly<{ left: number; top: number; width: number }>;
 const InfoTooltip = ({ id, label, text, updatedOn }: Readonly<{ id: string; label: string; text: string; updatedOn?: string | null }>) => {

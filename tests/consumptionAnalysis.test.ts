@@ -391,5 +391,17 @@ void (async () => {
     "exact positive values remain visible even when a coarser display would round them to zero");
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Expansion").map((row) => row.account), ["Expansion"]);
   assert.deepEqual(filterForecastCompositionAccounts(compositionAccounts, "Reduction").map((row) => row.account), ["Reduction"]);
+  const futurePeriods = ["FY27-SEP", "FY27-DEC", "FY27-JAN", "FY27-FEB", "FY27-MAR", "FY27-APR", "FY27-MAY"];
+  runtime.fetch = async () => new Response(JSON.stringify({
+    ...analysis,
+    periodCoverage: { ...analysis.periodCoverage, forecastPeriods: futurePeriods,
+      includedPeriods: [...analysis.periodCoverage.actualPeriods, ...futurePeriods] }
+  }), { headers: { "Content-Type": "application/json" } });
+  const futureAnalysis = await fetchConsumptionAnalysis({ fiscalYear: "FY27", search: "", account: "" });
+  assert.deepEqual(futureAnalysis.periodCoverage.forecastPeriods, futurePeriods,
+    "Analysis must retain registered future months instead of trimming to the current quarter");
+  assert.equal(futureAnalysis.quarters[2].forecastAmountExact, "300");
+  assert.equal(futureAnalysis.quarters[3].forecastAmountExact, "0", "entered zero remains a future Forecast value");
+  assert.equal(futureAnalysis.portfolio.totalAmountExact, "1000", "do not recompute server overlap totals on the client");
   console.log("consumptionAnalysis tests passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
