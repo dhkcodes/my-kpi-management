@@ -1452,6 +1452,22 @@ export const exportConsumptionActualXlsx = async (): Promise<ConsumptionCsvExpor
   };
 };
 
+export const exportConsumptionOpportunityReportXlsx = async (): Promise<ConsumptionCsvExport> => {
+  let response: Response;
+  try {
+    response = await apiFetch(`${apiBase()}/consumption/exports/opportunity-report-xlsx`, { method: "GET" });
+  } catch (cause) { throw new ConsumptionNetworkError(cause); }
+  if (!response.ok) {
+    let error: { code?: string; message?: string } = {};
+    try { error = await response.clone().json(); } catch { /* retain safe fallback */ }
+    throw new ConsumptionApiError(response.status, error.code ?? "HTTP_ERROR", error.message ?? `Report export failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  if (!(response.headers.get("Content-Type") ?? "").toLowerCase().startsWith("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") || !blob.size)
+    throw new Error("Malformed Consumption report response");
+  return { blob, fileName: xlsxAttachmentFileName(response.headers.get("Content-Disposition") ?? "", "Consumption_Opportunities.xlsx") };
+};
+
 export const exportConsumptionForecastCsv = async (pillar: ConsumptionPillar): Promise<ConsumptionCsvExport> => {
   if (!isConsumptionPillar(pillar)) throw new Error("Invalid Consumption pillar");
   let response: Response;

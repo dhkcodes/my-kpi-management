@@ -61,6 +61,7 @@ import {
   applyConsumptionForecastWide,
   canUseConsumptionFallback,
   exportConsumptionActualXlsx,
+  exportConsumptionOpportunityReportXlsx,
   exportConsumptionForecastXlsx,
   exportConsumptionImportCompatibleCsv,
   fetchConsumptionImportMetadata,
@@ -1688,13 +1689,13 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     }
   };
 
-  const exportActualXlsx = async () => {
+  const exportActualXlsx = async (report = false) => {
     if (exportingRef.current || isSaving || importPhase === "previewing" || importPhase === "applying") return;
     exportingRef.current = true;
     setIsExporting(true);
     setImportError("");
     try {
-      const exported = await exportConsumptionActualXlsx();
+      const exported = report ? await exportConsumptionOpportunityReportXlsx() : await exportConsumptionActualXlsx();
       const url = URL.createObjectURL(exported.blob);
       try {
         const anchor = document.createElement("a");
@@ -1720,7 +1721,13 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     setIsExporting(true);
     setImportError("");
     try {
-      const exported = await exportConsumptionForecastXlsx("ALL");
+      const applied = recordsQueryRef.current;
+      const exported = await exportConsumptionForecastXlsx({
+        pillar: applied.pillar,
+        fromQuarter: applied.fromQuarter,
+        toQuarter: applied.toQuarter,
+        search: applied.search,
+      });
       const url = URL.createObjectURL(exported.blob);
       try {
         const anchor = document.createElement("a");
@@ -1915,11 +1922,11 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
             <span slot="startIcon" class="oj-ux-ico-upload"></span>
             Actual Import
           </oj-button>
-          <oj-button class="oj-button-sm" chroming="outlined" title="Export ACTUAL data in Excel format"
+          <oj-button class="oj-button-sm" chroming="outlined" title="Export Consumption and Opportunity Report independently of screen filters"
             disabled={exportActionsDisabled}
-            onojAction={() => void exportActualXlsx()}>
+            onojAction={() => void exportActualXlsx(true)}>
             <span slot="startIcon" class="oj-ux-ico-download"></span>
-            {isExporting ? "Exporting…" : "Actual Export"}
+            {isExporting ? "Exporting…" : "Consumption & Opportunity Report"}
           </oj-button>
         </div>}
       messages={<>
