@@ -8,7 +8,7 @@
 .activities-standard-page .kap-page-shell__inner { gap: .375rem; }
 .activities-standard-page .kap-page-shell__actions oj-button { font-size: .74rem; min-height: 2.25rem; }
 .activities-standard-page .kap-page-shell__actions oj-button [slot="startIcon"] { font-size: .9rem; }
-.activities-standard-page .kap-page-shell__body { gap: .375rem; }
+.activities-standard-page .kap-page-shell__body { display: flex; flex-direction: column; gap: .375rem; }
 .activities-standard-page .kap-page-shell__heading-copy h1 {
   font-size: 1.65rem;
   font-weight: 700;
