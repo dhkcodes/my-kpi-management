@@ -14,11 +14,19 @@ assert.match(page, /<PageShell[\s\S]*className="consumption-insights-page foreca
 assert.match(page, /PageFilterPanel/u);
 assert.match(page, /PageActivity/u);
 assert.match(page, /ConsumptionViewportProgress/u);
-assert.match(mtdControl, /role="switch"/u);
-assert.match(mtdControl, /aria-checked=\{checked\}/u);
-assert.match(mtdControl, /disabled=\{disabled\}/u);
-assert.match(mtdControl, /onClick=\{onToggle\}/u);
-assert.equal((mtdControl.match(/role="switch"/gu) ?? []).length, 1);
+const includeSwitch = readFileSync("src/components/common/IncludeSwitch.tsx", "utf8");
+assert.match(mtdControl, /import \{ IncludeSwitch \} from "\.\.\/common\/IncludeSwitch"/u);
+assert.match(mtdControl, /<IncludeSwitch checked=\{checked\} disabled=\{disabled\} labelId=\{`\$\{tooltipId\}-label`\} onToggle=\{onToggle\} \/>/u,
+  "the MTD wrapper forwards state, disabled state, accessible label and action to the shared switch");
+assert.match(mtdControl, /<span id=\{`\$\{tooltipId\}-label`\}[^>]*>Include MTD<\/span>/u);
+assert.match(includeSwitch, /<button type="button"[^>]*role="switch"/u);
+assert.match(includeSwitch, /aria-checked=\{checked\}/u);
+assert.match(includeSwitch, /aria-labelledby=\{labelId\}/u);
+assert.match(includeSwitch, /disabled=\{disabled\}/u);
+assert.match(includeSwitch, /onClick=\{onToggle\}/u);
+assert.equal((includeSwitch.match(/role="switch"/gu) ?? []).length, 1);
+assert.equal((mtdControl.match(/<IncludeSwitch\b/gu) ?? []).length, 1);
+assert.doesNotMatch(mtdControl, /role="switch"/u, "the wrapper does not duplicate the shared switch");
 assert.match(page, /checked=\{actualMode === "MTD"\}/u);
 assert.match(page, /disabled=\{loading \|\| !currentData\?\.currentMtdAvailable\}/u);
 assert.match(page, /mtdAppliedDate=\{mtdAppliedTimestamp\}/u);

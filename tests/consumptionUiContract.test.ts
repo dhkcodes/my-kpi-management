@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { resolveConsumptionMonthDisplay } from "../src/data/consumptionData";
 
 const recordsPage = readFileSync("src/components/content/ConsumptionRecordsPage.tsx", "utf8");
 const insightsPage = readFileSync("src/components/content/ConsumptionAnalysisPage.tsx", "utf8");
@@ -125,8 +126,13 @@ assert.match(styles, /\.kap-auth-checking__surface\s*\{[^}]*height:\s*100%;[^}]*
   "the route-entry surface fills the real content track instead of imposing an oversized viewport minimum");
 assert.match(app, /const isKapPageShellRoute = \["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-shell\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
   "Analysis, Forecast vs Actual, and Records share the root fixed-shell route geometry");
-assert.match(content, /const isKapPageShellRoute = \["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
-  "all three Consumption PageShell pages share the root content geometry");
+const contentShellRoutes = content.match(/const isKapPageShellRoute = (\[[^\]]*\])\.includes\(activeRoute\.module\)/)?.[1];
+assert.ok(contentShellRoutes, "content derives PageShell geometry from explicit route membership");
+for (const route of ["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords", "calendar", "weeklyActivities", "meetingNotes"]) {
+  assert.ok(JSON.parse(contentShellRoutes).includes(route), `${route} retains the shared content geometry`);
+}
+assert.match(content, /kpi-content\$\{isKapPageShellRoute \? " is-kap-page-shell-route" : ""\}/,
+  "PageShell route membership controls the content class without excluding Activity pages");
 
 assert.match(insightsPage, /<FiscalYearSelector selected=\{fiscalYear\} current=\{currentFiscalYear\}[\s\S]*onSelect=\{\(year\) => \{ if \(year !== fiscalYear\) runQueryControlAction\(\(\) => setFiscalYear\(year\)\); \}\} \/>/u,
   "Analysis renders the shared fiscal-year picker beside the title and synchronously locks the request trigger");
@@ -491,7 +497,12 @@ assert.match(routes, /id: "analysis"[\s\S]*module: "consumptionAnalysis"[\s\S]*i
 assert.match(routes, /"consumption": "analysis"/, "/consumption remains a compatibility alias to Analysis");
 assert.match(content, /activeRoute\.module === "consumptionAnalysis"[\s\S]*<ConsumptionAnalysisPage breadcrumb=\{pageNavigation\} \/>/, "Consumption Analysis owns its selected fiscal year locally");
 assert.match(content, /activeRoute\.module === "consumptionRecords"[\s\S]*<ConsumptionRecordsPage[\s\S]*canWrite=\{canWrite\}/, "Consumption Records renders the preserved editable workspace without global FY coupling");
-assert.match(content, /!\['profile', 'users', 'kpiPage', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'\]\.includes\(activeRoute\.module\)/, "global FY is replaced by local page controls and remains hidden for FY-independent pages");
+const fiscalYearIndependentRoutes = content.match(/const showsFiscalYearPanel = !(\[[^\]]*\])\.includes\(activeRoute\.module\)/)?.[1];
+assert.ok(fiscalYearIndependentRoutes, "global FY visibility is route-based");
+const hiddenFiscalYearRoutes = [...fiscalYearIndependentRoutes.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
+for (const route of ["calendar", "weeklyActivities", "meetingNotes", "profile", "users", "kpiPage", "consumptionRecords", "consumptionAnalysis", "forecastActual", "accountsWorkloads", "accountManagementOverview"]) {
+  assert.ok(hiddenFiscalYearRoutes.includes(route), `${route} does not inherit a global FY panel`);
+}
 
 // Consumption Analysis: one FY/account server context, ACTUAL-only six-month trend and Account→Plan drilldown.
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{ fiscalYear, search:[^,]+, account:[^}]+\}\)/, "Consumption Analysis loads one server-owned FY/account analysis context");
@@ -578,13 +589,23 @@ assert.match(insightsPage, /<ConsumptionMtdControl checked=\{includeMtd\}/u, "An
 assert.equal(recordsPage.includes("const [showMtd, setShowMtd] = useState(false)"), true, "Show MTD is default OFF");
 assert.match(recordsPage, /<ConsumptionMtdControl checked=\{showMtd\}/u, "Records exposes the shared Include MTD toggle");
 assert.equal(mtdControl.includes("Include MTD"), true, "the shared control exposes the approved Include MTD label");
-assert.match(recordsPage, /showMtd && month === currentMtdPeriod \? "MTD"/, "Current-period MTD is labelled explicitly");
+assert.match(recordsPage, /const monthHeaderStatus = \(month: string\) => resolveConsumptionMonthDisplay\([\s\S]*?showMtd && month === currentMtdPeriod\);/,
+  "current-period MTD is passed explicitly to the permission-independent classifier");
+assert.match(recordsPage, /const status = monthHeaderStatus\(month\);[\s\S]*?consumption-month-status[^>]*>\{status\}<\/small>/,
+  "the rendered month header exposes the resolved ACTUAL, MTD or FORECAST label");
+assert.equal(resolveConsumptionMonthDisplay("FY27-OCT", "FY27-OCT", false, true, true), "MTD");
+assert.equal(resolveConsumptionMonthDisplay("FY27-NOV", "FY27-OCT", false, true, false), "FORECAST");
+assert.equal(resolveConsumptionMonthDisplay("FY27-OCT", "FY27-OCT", true, true, false), "ACTUAL",
+  "a recorded Actual, including zero, takes priority over Forecast when MTD is excluded");
 assert.equal(recordsPage.includes('data-readonly="mtd"'), true, "MTD cells are read-only");
 assert.match(recordsPage, /const displayedActualsExact = showMtd && currentMtdPeriod[\s\S]*serverMtdTotals\[currentMtdPeriod\][\s\S]*actualsExact: \{ \.\.\.displayedActualsExact \}[\s\S]*forecastsExact: showMtd && currentMtdPeriod[\s\S]*filter\(\(\[period\]\) => period !== currentMtdPeriod\)/,
   "portfolio MTD is represented separately from Forecast and never falls back to the current-period Forecast");
 assert.match(recordsPage, /const currentMtdExact = accountLevel[\s\S]*serverAccountMtdTotals[\s\S]*series\.mtdsExact[\s\S]*applyConsumptionMtdDisplayOverride\(\s*baseDisplaySeries,\s*currentMtdPeriod,\s*currentMtdExact,\s*showMtd\s*\)/,
   "account and plan MTD use the tested exact-decimal override without being stored or classified as Forecast");
-assert.match(mtdControl, /class="consumption-mtd-switch" role="switch" aria-checked=\{checked\}/, "the shared Show MTD control uses an accessible ON\/OFF switch instead of a checkbox");
+const includeSwitch = readFileSync("src/components/common/IncludeSwitch.tsx", "utf8");
+assert.match(mtdControl, /<IncludeSwitch checked=\{checked\} disabled=\{disabled\}/, "MTD delegates state to the shared switch");
+assert.match(includeSwitch, /class="consumption-mtd-switch" role="switch" aria-checked=\{checked\}/, "the shared control remains an accessible switch");
+assert.match(includeSwitch, /aria-labelledby=\{labelId\} disabled=\{disabled\} onClick=\{onToggle\}/, "the switch retains its accessible label, disabled state and action");
 assert.match(recordsPage, /consumption-records-toolbar__left[\s\S]*?<ConsumptionMtdControl checked=\{showMtd\}[\s\S]*?consumption-records-toolbar-activity[\s\S]*?<PageActivity/,
   "Records places Show MTD at the far left and the stable loading/Refresh slot at the far right");
 const forecastCompositionTooltipSource = recordsPage.slice(
@@ -801,7 +822,7 @@ assert.match(recordsPage, /recordsViewState === "empty"[\s\S]*consumption-empty-
 assert.match(recordsPage, /const adoptWorkspace[\s\S]*filterVisibleConsumptionPlans\(workspace\.plans, workspace\.fromQuarter, workspace\.toQuarter\)[\s\S]*recordGroupMatchesSearch[\s\S]*setRecordAccountNames\(adoptedAccountNames\)[\s\S]*setRecordsTotalAccounts\(adoptedAccountNames\.length\)[\s\S]*setRecordsHasMore\(false\)/, "workspace adoption rebuilds filtered Account names and Footer metadata instead of retaining stale paged rows");
 assert.match(recordsPage, /const controlUpdates = accounts\.flatMap/, "manual Forecast save includes every Account, including one or zero visible Plans");
 assert.match(recordsPage, /saveConsumptionForecasts\(apiEtag, controlUpdates, selectedPillar\)/, "Forecast API integration sends Account-level updates and validates the selected-pillar response");
-assert.match(recordsPage, /const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\) && !mtd;[\s\S]*const canEditControl = canWrite && editable/, "every backend-declared DP or OCI Forecast cell is editable outside MTD for authorized writers regardless of an existing value while ALL remains read-only");
+assert.match(recordsPage, /const status = resolveConsumptionMonthDisplay\(month, currentFiscalMonth, actual, forecast, mtd\);[\s\S]*const editable = selectedPillar !== "ALL" && editablePeriodIds\.has\(month\) && status === "FORECAST";[\s\S]*const canEditControl = canWrite && editable/, "backend-declared DP or OCI Forecast cells use the shared display classifier and writer permission; ACTUAL, MTD, and ALL remain read-only");
 assert.match(recordsPage, /const editable = selectedPillar !== "ALL"/, "ALL is derived from entered pillar values and never directly entered without a standing helper note");
 assert.doesNotMatch(recordsPage, /ALL Forecast is read-only and sums entered Pillar values; missing values count as zero/, "derived ALL guidance is not repeated in the main content");
 assert.doesNotMatch(recordsPage, /incomplete \? "INCOMPLETE"/, "Forecast status words are not rendered as currency values");
@@ -977,8 +998,8 @@ assert.match(content, /activeRoute\.module === "forecastActual"/, "the new menu 
 
 assert.match(app, /\["consumptionAnalysis", "forecastActual", "consumptionRecords"\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
   "the authenticated shell opts into the shared viewport layout before the child surface mounts");
-assert.match(content, /const isKapPageShellRoute = \[[\s\S]*'consumptionRecords'[\s\S]*'consumptionAnalysis'[\s\S]*'forecastActual'[\s\S]*\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
-  "the content layout is route-stable for all shared PageShell routes without relying only on :has timing");
+assert.match(content, /const isKapPageShellRoute = \[[^\]]*\]\.includes\(activeRoute\.module\)[\s\S]*is-kap-page-shell-route/,
+  "the content layout uses the verified route membership above without relying only on :has timing");
 assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataLoadedAt\}[\s\S]{0,120}compactTimestampButton \/>/,
   "Records restores the reusable one-button icon-or-spinner and timestamp control");
 assert.doesNotMatch(recordsPage, /labeledRefreshButton/, "Records does not opt back into the labeled Reload regression");
