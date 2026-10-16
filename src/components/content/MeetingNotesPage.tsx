@@ -1,6 +1,10 @@
 import { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
+import { apiFetchQuiet } from "../../auth/apiFetch";
+import { PageShell } from "../common/PageShell";
+import { AppMessageBanner, type AppMessage } from "./AppMessageBanner";
+import { ConsumptionViewportProgress } from "./ConsumptionViewportProgress";
 import { canAccessLocalRecording, createMeetingNoteEntity, listMeetingNotes, syncMeetingNoteShares, updateMeetingNoteEntity, type MeetingNote, type MeetingNoteInput, type MeetingNoteShare } from "../../data/meetingNotesApi";
 import { getBrowserRecordingCapability, loadLocalRecording, saveLocalRecording } from "../../data/localRecordingStore";
 import type { FiscalYear } from "../../data/kpiMockData";
@@ -26,6 +30,7 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
   const [consent, setConsent] = useState(false);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingMessage, setRecordingMessage] = useState("");
+  const [capabilityWarningDismissed, setCapabilityWarningDismissed] = useState(false);
   const [pendingAudio, setPendingAudio] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [shareSync, setShareSync] = useState<{ note: MeetingNote; shares: readonly MeetingNoteShare[] } | null>(null);
@@ -41,7 +46,7 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
   useEffect(() => {
     let live = true;
     setLoading(true);
-    void listMeetingNotes(fiscalYear).then((items) => {
+    void listMeetingNotes(fiscalYear, apiFetchQuiet).then((items) => {
       if (!live) return;
       setNotes(items); setSelectedKey(items[0]?.id ?? null); setError("");
     }).catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : "Unable to load meeting notes."); })
@@ -51,7 +56,7 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
 
   useEffect(() => {
     let live = true;
-    void listCalendarEvents(fiscalYear).then((items) => { if (live) setCalendarEvents(items); }).catch(() => { if (live) setCalendarEvents([]); });
+    void listCalendarEvents(fiscalYear, apiFetchQuiet).then((items) => { if (live) setCalendarEvents(items); }).catch(() => { if (live) setCalendarEvents([]); });
     return () => { live = false; };
   }, [fiscalYear]);
 
@@ -160,14 +165,28 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
       : { ...draft, calendarEventId: null });
   };
 
-  return <section class="weekly-activities-page meeting-notes-page">
-    <header class="weekly-activities-page__header"><div>{breadcrumb}<span class="kpi-eyebrow">My Activities</span><h2>Meeting Notes</h2><p>Notes are filtered by meeting date in the selected Oracle fiscal year (June 1–May 31).</p></div>
-      <div class="meeting-notes-header-actions"><button type="button" class="codex-auth-status" onClick={() => setAuthOpen(true)} aria-haspopup="dialog">Codex · {codexConnectionPrimaryLabel(codexConnection)}</button><oj-button chroming="callToAction" disabled={!canWrite || Boolean(shareSync) || recordingState === "recording"} onojAction={() => edit()}>Create note</oj-button></div></header>
+  const recordingFailure = Boolean(recordingMessage) && (recordingState.includes("error") || recordingState === "interrupted"
+    || recordingMessage === "This recording could not be loaded from local browser storage.");
+  const messages: AppMessage[] = [];
+  if (error) messages.push({ id: "meeting-notes-error", severity: shareSync ? "warning" : "error", summary: error, persistence: "sticky" });
+  if (recordingFailure && !error.includes(recordingMessage)) messages.push({ id: "meeting-notes-recording", severity: "error", summary: recordingMessage });
+  if (draft && !capability.supported && !capabilityWarningDismissed) messages.push({ id: "meeting-notes-capability", severity: "warning", summary: capability.reason, persistence: "sticky" });
+
+  return <PageShell ariaLabelledBy="meeting-notes-title" title="Meeting Notes" breadcrumb={breadcrumb}
+    headingSpacing="compact" className="activities-standard-page meeting-notes-page"
+    busy={loading || saving} busyLabel={saving ? "Saving meeting notes" : "Loading meeting notes"} activityPosition="custom"
+    actions={<div class="meeting-notes-header-actions"><button type="button" class="codex-auth-status" onClick={() => setAuthOpen(true)} aria-haspopup="dialog">Codex · {codexConnectionPrimaryLabel(codexConnection)}</button><oj-button class="oj-button-sm" chroming="callToAction" disabled={!canWrite || Boolean(shareSync) || recordingState === "recording"} onojAction={() => edit()}>New note</oj-button></div>}
+    messages={<AppMessageBanner messages={messages} placement="floating" ariaLabel="Meeting notes notifications" onClose={(id) => {
+      if (id === "meeting-notes-error") setError("");
+      if (id === "meeting-notes-recording") setRecordingMessage("");
+      if (id === "meeting-notes-capability") setCapabilityWarningDismissed(true);
+    }} />}>
+    <ConsumptionViewportProgress busy={loading || saving} busyLabel={saving ? "Saving meeting notes" : "Loading meeting notes"} />
+    <p class="kap-field__hint">Notes are filtered by meeting date in the selected Oracle fiscal year (June 1–May 31).</p>
     <div class="codex-connection-notice" role="status"><strong>개인별 Codex 연결은 현재 지원되지 않습니다.</strong><span>{codexConnection.detail} 이 배포에는 개인 OAuth/토큰 저장소와 Codex 실행 서비스가 없으며, 인증 변경 없이 수동 입력만 지원합니다.</span><button type="button" onClick={() => setAuthOpen(true)}>지원 상태 보기</button></div>
     {authOpen && <div class="kap-modal-backdrop" role="presentation"><section class="kap-modal codex-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="codex-auth-title"><header><div><span class="kpi-eyebrow">Authentication</span><h3 id="codex-auth-title">Codex 연결 관리</h3></div><button type="button" onClick={() => setAuthOpen(false)} aria-label="닫기">×</button></header><div class="kap-modal__body"><p><strong>{codexConnectionPrimaryLabel(codexConnection)}</strong></p>{codexConnectivityLabel(codexConnection.connectivity) && <p role="status"><strong>{codexConnectivityLabel(codexConnection.connectivity)}</strong> — 기존 인증 정보는 삭제하지 않으며 복구 가능한 오류로 처리합니다.</p>}<p>{codexConnection.detail}</p><p>이 배포에는 Codex 인증 또는 요약 실행 서비스가 구성되어 있지 않습니다. 토큰 입력이나 연결을 가장하지 않습니다.</p><dl><dt>앱 로그아웃</dt><dd>KAP 로그인 세션만 종료합니다. 사용자별로 격리된 Codex 연결을 다른 사용자에게 넘기거나 자동 해제하지 않습니다.</dd><dt>Codex 연결 해제</dt><dd>사용자가 이 팝업에서 명시적으로 선택할 때만 공식 철회 후 저장된 연결을 별도로 삭제해야 합니다.</dd><dt>재인증</dt><dd>지원되는 자동 갱신이 실패해 연결이 복구 불가능해진 경우 또는 사용자가 직접 선택한 경우에만 요구합니다.</dd></dl><p class="kap-field__hint">페이지 이동·새로고침·앱 재접속과 일시적인 연결 오류는 재인증 사유가 아닙니다. 토큰은 화면과 로그에 표시하지 않습니다.</p></div><footer><button type="button" disabled title="공식 개인 Codex 연결이 이 배포에 구성되지 않았습니다">Codex 연결</button><button type="button" onClick={() => setAuthOpen(false)}>닫기</button></footer></section></div>}
     {!canWrite && <div class="weekly-activity-filters"><span class="kap-field__hint">Read-only access. Write permission is required.</span></div>}
-    {shareSync && <div class="kap-message-banner" role="alert"><strong>Note saved.</strong> Share settings were not fully synchronized. <button type="button" disabled={saving} onClick={() => void retryShareSync()}>{saving ? "Retrying…" : "Retry sharing"}</button></div>}
-    {error && <div class="kap-error" role="alert">{error}</div>}
+    {shareSync && <div class="meeting-notes-share-retry"><button type="button" disabled={saving} onClick={() => void retryShareSync()}>{saving ? "Retrying…" : "Retry sharing"}</button></div>}
     {loading ? <div class="kap-empty-state" role="status">Loading meeting notes…</div> : <div class="meeting-notes-layout">
       <aside class="meeting-notes-list" aria-label="Meeting notes">{notes.map((note) => <button type="button" class={note.id === selectedKey ? "is-selected" : ""} onClick={() => selectNote(note)} key={note.id}><strong>{note.title}</strong><time dateTime={note.meetingDate}>{note.meetingDate}</time><span>{note.accountId ? `Account ${note.accountId}` : "No account"}</span></button>)}{notes.length === 0 && <div class="kap-empty-state"><strong>No meeting notes for {fiscalYear}.</strong><p>Create a note or choose another fiscal year.</p></div>}</aside>
       <main class="meeting-notes-detail">{draft ? <div class="meeting-note-editor">
@@ -183,9 +202,8 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
         <section class="calendar-sharing"><div><strong>Minutes sharing</strong><button type="button" onClick={addShare}>Add person</button></div><p class="kap-field__hint">Recipients can access note text only. Raw audio always remains local to this browser.</p>{draft.shares.map((share, index) => <div class="calendar-sharing__row" key={index}><input aria-label={`Shared user ${index + 1}`} placeholder="User key" value={share.userKey} onInput={(e) => changeShare(index, { userKey: e.currentTarget.value })} /><select aria-label={`Permission for shared user ${index + 1}`} value={share.permission} onChange={(e) => changeShare(index, { permission: e.currentTarget.value as "VIEW" | "EDIT" })}><option value="VIEW">VIEW</option><option value="EDIT">EDIT</option></select><button type="button" aria-label={`Remove shared user ${index + 1}`} onClick={() => setDraft({ ...draft, shares: draft.shares.filter((_, shareIndex) => shareIndex !== index) })}>Remove</button></div>)}</section>
         <section class="local-recorder" aria-labelledby="local-recorder-title"><h4 id="local-recorder-title">Quick local recording</h4><div class="local-recorder__warning"><strong>Raw audio stays on this device and browser only.</strong> It is never uploaded with the note because shared audio storage is not approved. Other users, including users who can read this note, cannot play this recording.</div>
           <label class="kap-check"><input type="checkbox" checked={consent} disabled={!capability.supported || recordingState === "recording"} onChange={(e) => setConsent(e.currentTarget.checked)} /> I have everyone’s consent to record.</label>
-          {!capability.supported && <div class="kap-message-banner" role="status">{capability.reason}</div>}
           <div class="local-recorder__actions"><button type="button" disabled={!capability.supported || !consent || recordingState === "recording"} onClick={() => void startRecording()}>Start recording</button><button type="button" disabled={recordingState !== "recording"} onClick={stopRecording}>Stop</button></div>
-          {recordingMessage && <div class={recordingState.includes("error") || recordingState === "interrupted" ? "kap-error" : "kap-success"} role="status">{recordingMessage}</div>}
+          {recordingMessage && !recordingFailure && <div class="kap-field__hint" role="status">{recordingMessage}</div>}
           {audioUrl && <audio controls src={audioUrl}>Audio playback is not supported by this browser.</audio>}
         </section>
         <div class="meeting-note-editor__actions"><oj-button disabled={saving || recordingState === "recording"} onojAction={cancelEdit}>Cancel</oj-button><oj-button chroming="callToAction" disabled={saving || recordingState === "recording" || !canWrite} onojAction={() => void save()}>{saving ? "Saving…" : "Save note"}</oj-button></div>
@@ -194,5 +212,5 @@ export function MeetingNotesPage({ fiscalYear, canWrite, recordingNamespace, bre
         <div class="local-recorder__warning"><strong>Local audio:</strong> Audio is device-local and is not shared with this note.{audioUrl ? <audio controls src={audioUrl}></audio> : " No recording is available in this browser."}</div>
       </article> : <div class="kap-empty-state"><strong>Select or create a meeting note.</strong></div>}</main>
     </div>}
-  </section>;
+  </PageShell>;
 }

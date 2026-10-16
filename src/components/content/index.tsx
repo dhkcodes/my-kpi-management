@@ -448,8 +448,8 @@ export function Content({
     onOpenAccountWorkloads(account);
   };
   const pageNavigation = <PageNavigationToolbar activeRoute={activeRoute} profile={profile} onNavigate={onNavigate} />;
-  const isKapPageShellRoute = ["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords"].includes(activeRoute.module);
-  const showsFiscalYearPanel = !['profile', 'users', 'kpiPage', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
+  const isKapPageShellRoute = ["kpiPage", "consumptionAnalysis", "forecastActual", "consumptionRecords", "calendar", "weeklyActivities", "meetingNotes"].includes(activeRoute.module);
+  const showsFiscalYearPanel = !['calendar', 'weeklyActivities', 'meetingNotes', 'profile', 'users', 'kpiPage', 'consumptionRecords', 'consumptionAnalysis', 'forecastActual', 'accountsWorkloads', 'accountManagementOverview'].includes(activeRoute.module);
 
   return (
     <main id="cockpit" role="main" class={`oj-web-applayout-content kpi-content${isKapPageShellRoute ? " is-kap-page-shell-route" : ""}${isKapPageShellRoute && showsFiscalYearPanel ? " has-fiscal-year-panel" : ""}`}>
