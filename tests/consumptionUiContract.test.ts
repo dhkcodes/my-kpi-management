@@ -628,7 +628,14 @@ assert.match(insightsPage, /selectedAccountContext && !value\.accountCandidates\
 assert.match(recordsPage, /fetchConsumptionRecords\(\{[\s\S]*pillar:/, "Consumption Records sends the selected pillar with every records request");
 assert.match(insightsPage, /fetchConsumptionAnalysis\(\{[^}]*pillar: selectedPillar/, "Consumption Analysis sends the selected pillar with every analysis request");
 assert.match(recordsPage, /exportConsumptionImportCompatibleCsv\(selectedPillar, fromQuarter, toQuarter\)/, "Consumption Records exports Actual for the selected pillar and currently displayed quarter range");
-assert.match(recordsPage, /exportConsumptionForecastXlsx\("ALL"\)/, "Consumption Records exports Forecast for every Account across DP and OCI regardless of the screen filter");
+const forecastExportHandler = recordsPage.slice(recordsPage.indexOf("const exportForecastXlsx ="), recordsPage.indexOf("const closeImportDialog ="));
+assert.match(forecastExportHandler, /const applied = recordsQueryRef\.current/, "Forecast Export uses the successfully applied query, not pending filter controls");
+for (const filter of ["fiscalYear", "fromQuarter", "toQuarter", "salesRep", "pillar", "search"]) {
+  assert.match(forecastExportHandler, new RegExp(`${filter}: applied\\.${filter}\\b`),
+    `Forecast Export preserves the applied ${filter} filter`);
+}
+assert.doesNotMatch(forecastExportHandler, /exportConsumptionForecastXlsx\("ALL"\)|pillar: selectedPillar/,
+  "Forecast Export must not broaden to ALL or use an unapplied pillar");
 assert.match(recordsPage, /formatConsumptionDataCenter\(plan, selectedPillar\)[\s\S]*aria-label=\{`Data center count \$\{display\.primary\}`\}[\s\S]*DC \{display\.primary\}/, "all Plan presentations keep one scoped Data Center total for the current query");
 assert.doesNotMatch(recordsPage, /display\.detail|consumption-data-center__detail/, "Plan rows never split the All Data Center total into DP and OCI copy");
 assert.doesNotMatch(recordsPage, /display\.duplicateWarning|Duplicate possible across pillars|consumption-data-center__warning/, "Plan rows do not imply a confirmed conflict from DP and OCI count coexistence alone");
@@ -666,7 +673,7 @@ assert.match(recordsPage, /Account[\s\S]*Sales Rep \(before → after\)[\s\S]*Ch
 assert.match(recordsPage, /Blank or missing Sales Rep values are ignored[\s\S]*No Sales Rep values to apply/, "Sales Rep preview explains blank no-op and legacy empty-response behavior");
 assert.match(recordsPage, /exportConsumptionForecastXlsx[\s\S]*exportConsumptionImportCompatibleCsv[\s\S]*URL\.createObjectURL[\s\S]*download = exported\.fileName[\s\S]*URL\.revokeObjectURL/, "Consumption Records downloads both server-owned Export files and releases object URLs");
 assert.doesNotMatch(recordsPage, /title="Export ACTUAL data in the Consumption Import CSV format"/, "Actual CSV Export is hidden from the toolbar without deleting its helper");
-assert.match(recordsPage, /title="Export ACTUAL data in Excel format"[\s\S]*\{isExporting \? "Exporting…" : "Actual Export"\}/, "the visible Actual Export is the XLSX control");
+assert.match(recordsPage, /exportConsumptionOpportunityReportXlsx/, "report replaces the visible Actual export");
 assert.match(recordsPage, /exportConsumptionActualXlsx\(\)/, "Actual Export remains wired to the XLSX API helper");
 assert.match(insightsPage, /useState<\{ quarter: string; category: ForecastCompositionCategory \} \| null>/, "Forecast composition supports All and each classified drill category");
 assert.match(insightsPage, /COMPOSITION_CATEGORIES\.map[\s\S]*aria-pressed=\{selectedMovement\.category === category\}/, "detail exposes persistent All, New, Expansion, and Reduction selectors for the selected quarter");
@@ -1005,8 +1012,8 @@ assert.match(recordsPage, /<PageActivity[\s\S]{0,300}lastCompletedAt=\{lastDataL
 assert.doesNotMatch(recordsPage, /labeledRefreshButton/, "Records does not opt back into the labeled Reload regression");
 assert.doesNotMatch(recordsPage, /Export ACTUAL data in the Consumption Import CSV format/,
   "the legacy Actual CSV export action is hidden without deleting its underlying export function");
-assert.match(recordsPage, /title="Export ACTUAL data in Excel format"[\s\S]*Actual Export/,
-  "the visible Actual Export remains the XLSX download");
+assert.match(recordsPage, /Consumption & Opportunity Report/,
+  "the report is the visible XLSX download");
 assert.match(recordsPage, /const exportActionsDisabled = hasDraftChanges \|\| isSaving[\s\S]*disabled=\{exportActionsDisabled\}/,
   "exports preserve draft and mutation conflict protection");
 assert.doesNotMatch(recordsPage, /const exportActionsDisabled =[^;]+(?:dataMode|rangeLoading|recordsLoading|recordsReplacementLoading|isExporting)[^;]+;/,

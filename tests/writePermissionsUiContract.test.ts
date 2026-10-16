@@ -68,6 +68,6 @@ assert.match(records, /applyPendingImport[\s\S]{0,180}if \(!canWrite\)/,
 assert.match(records, /saveForecasts[\s\S]{0,180}if \(!canWrite\)[\s\S]{0,180}forecast changes were kept/,
   "permission removal blocks saving while preserving forecast drafts");
 assert.match(records, /Forecast Export/);
-assert.match(records, /Actual Export/);
+assert.match(records, /Consumption & Opportunity Report/);
 
 console.log("writePermissionsUiContract tests passed");
