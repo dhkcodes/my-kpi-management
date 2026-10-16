@@ -406,7 +406,7 @@ type EditCell = Readonly<{ planKey: string; month: string; control?: boolean }>;
 type ConflictRow = Readonly<{ plan: string; month: string; saved: number | null; draft: number | null; current: number | null }>;
 type ImportPhase = "idle" | "previewing" | "preview" | "applying" | "complete" | "warning" | "error";
 type RecordsLoadingPhase = "idle" | "initial" | "query" | "append";
-type RecordsQuery = Readonly<{ fromQuarter: string; toQuarter: string; search: string; pillar: ConsumptionPillar }>;
+type RecordsQuery = Readonly<{ fromQuarter: string; toQuarter: string; search: string; pillar: ConsumptionPillar; fiscalYear?: string; salesRep?: string }>;
 type PendingImport = Readonly<{
   files: readonly File[];
   preview: ConsumptionImportPreview;
@@ -1723,6 +1723,8 @@ export function ConsumptionRecordsPage({ canWrite, canWriteForecast, onNavigatio
     try {
       const applied = recordsQueryRef.current;
       const exported = await exportConsumptionForecastXlsx({
+        fiscalYear: applied.fiscalYear,
+        salesRep: applied.salesRep,
         pillar: applied.pillar,
         fromQuarter: applied.fromQuarter,
         toQuarter: applied.toQuarter,
